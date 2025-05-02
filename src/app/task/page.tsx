@@ -24,20 +24,30 @@ export default function TaskPage() {
     ],
   };
 
-  const [visibleGroups, setVisibleGroups] = useState({
-    '毎日': true,
-    '毎週': true,
-    '毎月': true,
+  type Period = '毎日' | '毎週' | '毎月';
+
+  type Task = {
+    title: string;
+    point: number;
+    done: boolean;
+    person: string;
+    image: string;
+  };
+
+  const [visibleGroups, setVisibleGroups] = useState<Record<Period, boolean>>({
+    毎日: true,
+    毎週: true,
+    毎月: true,
   });
 
   const [filter, setFilter] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
 
-  const toggleGroup = (group: string) => {
+  const toggleGroup = (group: Period) => {
     setVisibleGroups((prev) => ({ ...prev, [group]: !prev[group] }));
   };
-
-  const toggleFilter = (period: string) => {
+  
+  const toggleFilter = (period: Period) => {
     setFilter((prev) => (prev === period ? null : period));
   };
 
@@ -96,6 +106,8 @@ export default function TaskPage() {
 
         {/* タスクリスト */}
         {Object.entries(taskGroups).map(([period, tasks], idx) => {
+          const typedPeriod = period as Period;
+
           if (filter && filter !== period) return null;
 
           return (
