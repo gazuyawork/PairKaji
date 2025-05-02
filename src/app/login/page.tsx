@@ -8,19 +8,24 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { FirebaseError } from 'firebase/app';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-
+  
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/home');
-    } catch (error: any) {
-      alert('ログインに失敗しました: ' + error.message);
+    } catch (error) {
+      if (error instanceof FirebaseError) {
+        alert('ログインに失敗しました: ' + error.message);
+      } else {
+        alert('予期せぬエラーが発生しました');
+      }
     }
   };
 

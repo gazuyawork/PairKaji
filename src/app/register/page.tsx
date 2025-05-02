@@ -8,6 +8,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { FirebaseError } from 'firebase/app';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -19,8 +20,12 @@ export default function RegisterPage() {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       router.push('/home');
-    } catch (error: any) {
-      alert('登録に失敗しました: ' + error.message);
+    } catch (error) {
+      if (error instanceof FirebaseError) {
+        alert('登録に失敗しました: ' + error.message);
+      } else {
+        alert('予期せぬエラーが発生しました');
+      }
     }
   };
 
