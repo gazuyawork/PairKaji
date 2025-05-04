@@ -29,7 +29,7 @@ interface TaskCardProps {
   generatePointOptions: () => JSX.Element[];
 }
 
-const TaskCard = ({
+const TaskCard: React.FC<TaskCardProps> = ({
   task,
   onChange,
   onRemove,
@@ -37,7 +37,7 @@ const TaskCard = ({
   onToggleDay,
   onToggleDelete,
   generatePointOptions,
-}: TaskCardProps) => {
+}) => {
   const days = ['月', '火', '水', '木', '金', '土', '日'];
 
   const handlers = useSwipeable({
