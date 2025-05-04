@@ -116,7 +116,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
                     : 'border-gray-300 opacity-30'
                 }`}
               >
-                <Image src={user.image} alt={user.name} width={32} height={32} className="object-cover" />
+                <Image src={user.image} alt={user.name} width={32} height={32} className="object-cover w-full h-full" />
               </button>
             )
           )}
