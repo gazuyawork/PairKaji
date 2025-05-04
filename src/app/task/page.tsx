@@ -202,7 +202,7 @@ const TaskItem = memo((props: {
   const { task, isConfirming, onToggle, onSkip, onRequestSkip } = props;
   const handlers = useSwipeable({
     onSwipedLeft: onRequestSkip,
-    preventDefaultTouchmoveEvent: true,
+    // preventDefaultTouchmoveEvent: true,
     trackTouch: true,
   });
 
