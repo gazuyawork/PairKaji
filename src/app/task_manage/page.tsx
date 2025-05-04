@@ -3,10 +3,9 @@
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import { Search, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSwipeable } from 'react-swipeable';
-import { useEffect, useRef } from 'react';
-
+import Image from 'next/image';
 
 interface Task {
   id: number;
@@ -22,7 +21,7 @@ interface Task {
 
 interface TaskCardProps {
   task: Task;
-  onChange: (id: number, key: keyof Task, value: any) => void;
+  onChange: (id: number, key: keyof Task, value: string | number | string[]) => void;
   onRemove: (id: number) => void;
   onToggleUser: (id: number, user: string) => void;
   onToggleDay: (id: number, day: string) => void;
@@ -30,7 +29,7 @@ interface TaskCardProps {
   generatePointOptions: () => JSX.Element[];
 }
 
-function TaskCard({
+const TaskCard = ({
   task,
   onChange,
   onRemove,
@@ -38,7 +37,7 @@ function TaskCard({
   onToggleDay,
   onToggleDelete,
   generatePointOptions,
-}: TaskCardProps) {
+}: TaskCardProps) => {
   const days = ['月', '火', '水', '木', '金', '土', '日'];
 
   const handlers = useSwipeable({
@@ -117,7 +116,7 @@ function TaskCard({
                     : 'border-gray-300 opacity-30'
                 }`}
               >
-                <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                <Image src={user.image} alt={user.name} width={32} height={32} className="object-cover" />
               </button>
             )
           )}
@@ -143,7 +142,9 @@ function TaskCard({
       )}
     </div>
   );
-}
+};
+
+TaskCard.displayName = 'TaskCard';
 
 export default function TaskManagePage() {
   const [tasks, setTasks] = useState<Task[]>([
