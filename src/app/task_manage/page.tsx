@@ -162,7 +162,11 @@ export default function TaskManagePage() {
     setTasks([{ id: newId, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], isNew: true, isEdited: false, showDelete: false }, ...tasks]);
   };
 
-  const updateTask = (id: number, key: keyof Task, value: any) => {
+  const updateTask = (
+    id: number,
+    key: keyof Task,
+    value: string | number | string[] | boolean
+  ) => {  
     setTasks(prev =>
       prev.map(task =>
         task.id === id ? { ...task, [key]: value, isEdited: !task.isNew ? true : task.isEdited } : task
