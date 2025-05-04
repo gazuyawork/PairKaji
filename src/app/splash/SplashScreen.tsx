@@ -43,7 +43,7 @@ export default function SplashScreen() {
       {/* ロゴ + サブタイトル */}
       <div className="text-center">
         <motion.h1
-            className="font-pacifico text-[60px] text-[#5E5E5E] mb-3"
+            className="font-pacifico text-[50px] text-[#5E5E5E] mb-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 3.0 }}
@@ -52,7 +52,7 @@ export default function SplashScreen() {
         </motion.h1>
 
         <motion.p
-          className="text-[#5E5E5E] ml-4 font-sans text-lg"
+          className="text-[#5E5E5E] ml-4 font-sans"
           variants={container}
           initial="hidden"
           animate="visible"

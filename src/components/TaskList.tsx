@@ -9,12 +9,12 @@ export default function TaskList() {
 
   return (
     <>
-      <h2 className="text-xl font-bold text-[#5E5E5E] mb-4 font-sans">パートナーががんばりました</h2>
-      <ul className="space-y-4">
+      <h2 className="text-[18px] font-bold text-[#5E5E5E] mb-2 ml-1 font-sans">パートナーががんばりました</h2>
+      <ul className="space-y-2">
         {tasks.map((task, index) => (
           <li
             key={index}
-            className="flex justify-between items-center px-4 py-3 rounded-2xl shadow-sm bg-white border border-[#e5e5e5] hover:shadow-md cursor-pointer"
+            className="flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border border-[#e5e5e5] hover:shadow-md cursor-pointer"
           >
             <span className="text-sm text-[#5E5E5E] font-medium font-sans">{task}</span>
             <Heart

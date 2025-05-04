@@ -36,24 +36,24 @@ export default function RegisterPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.7 }}
     >
-      <h1 className="text-[50px] text-[#5E5E5E] font-pacifico mb-1 mt-[80px]">PairKaji</h1>
-      <p className="text-[#5E5E5E] text-[20px] mb-[50px] font-sans">新規登録</p>
+      <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
+      <p className="text-[#5E5E5E] mb-[50px] font-sans">新規登録</p>
 
       <div className="w-full max-w-[320px] flex flex-col gap-4">
-        <label className="text-[#5E5E5E] text-[18px] mb-[8px] font-sans">メールアドレス</label>
+        <label className="text-[#5E5E5E] text-[18px] font-sans">メールアドレス</label>
         <input
           type="email"
-          className="text-[18px] mb-[10px] p-[10px] border border-[#AAAAAA] w-full font-sans"
+          className="text-[18px] mt-[-10px] p-[10px] border border-[#AAAAAA] w-full font-sans"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="test@gmail.com"
         />
 
-        <label className="text-[#5E5E5E] text-[18px] mb-[8px] font-sans">パスワード</label>
+        <label className="text-[#5E5E5E] text-[18px] font-sans">パスワード</label>
         <div className="relative">
           <input
             type={showPassword ? 'text' : 'password'}
-            className="text-[18px] mb-[10px] p-[10px] border border-[#AAAAAA] w-full font-sans"
+            className="text-[18px] mt-[-10px] p-[10px] border border-[#AAAAAA] w-full font-sans"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••"
@@ -69,7 +69,7 @@ export default function RegisterPage() {
 
         <button
           onClick={handleRegister}
-          className="w-[340px] mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-[340px] mt-[20px] mb-[5px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
         >
           登録する
         </button>

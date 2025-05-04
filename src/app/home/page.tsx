@@ -15,12 +15,16 @@ export default function HomePage() {
       <Header title="Home" />
 
       {/* メインコンテンツ */}
-      <main className="flex-1 px-4 py-6 space-y-6">
+      <main className="flex-1 px-4 py-5 space-y-6">
         {/* 1週間の合計ポイントなどの表示 */}
         <WeeklyPoints />
 
         {/* ペアポイント（タロウ・ハナコなど） */}
         <PairPoints />
+
+
+        {/* 区切り線 */}
+        <hr className="border-t border-gray-300 opacity-50 my-4" />
 
         {/* パートナーの頑張り一覧 */}
         <TaskList />
