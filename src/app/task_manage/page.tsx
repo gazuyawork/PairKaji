@@ -229,7 +229,9 @@ export default function TaskManagePage() {
     );
   };
 
-  const generatePointOptions = () => {
+  // const generatePointOptions = () => {
+  const generatePointOptions = (): React.ReactElement[] => {
+
     const options = [];
     for (let i = 0; i <= 100; i += 5) {
       options.push(<option key={i} value={i}>{i}</option>);
