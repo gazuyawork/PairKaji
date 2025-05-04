@@ -26,7 +26,7 @@ interface TaskCardProps {
   onToggleUser: (id: number, user: string) => void;
   onToggleDay: (id: number, day: string) => void;
   onToggleDelete: (id: number) => void;
-  generatePointOptions: () => JSX.Element[];
+  generatePointOptions: () => React.ReactElement[];
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({
