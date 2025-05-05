@@ -1,5 +1,6 @@
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
+import Head from 'next/head'
 
 // Google Fonts の設定
 const zenMaruGothic = Zen_Maru_Gothic({ subsets: ['latin'], weight: ['400'], variable: '--font-zen' });
@@ -13,6 +14,11 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" className={`${zenMaruGothic.variable} ${pacifico.variable}`}>
+      <Head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#5E8BC7" />
+        <link rel="icon" href="/icons/icon-192.png" />
+      </Head>
       <body className="font-sans bg-white text-gray-800 min-h-screen antialiased">
         {children}
       </body>
