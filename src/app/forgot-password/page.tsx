@@ -18,6 +18,7 @@ export default function ForgotPasswordPage() {
       await sendPasswordResetEmail(auth, email);
       setSent(true);
     } catch (err: any) {
+      console.error(err); // ← errを使っている
       setError('リセットメールの送信に失敗しました。メールアドレスをご確認ください。');
     }
   };
