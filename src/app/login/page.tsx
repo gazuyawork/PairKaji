@@ -1,5 +1,3 @@
-// src/app/login/page.tsx
-
 'use client';
 
 import { useState } from 'react';
@@ -9,13 +7,14 @@ import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { FirebaseError } from 'firebase/app';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-  
+
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -74,9 +73,11 @@ export default function LoginPage() {
           ログインする
         </button>
 
-        <p className="text-xs text-center text-[#5E5E5E] mt-2 underline font-sans">
-          パスワードを忘れた方はこちら
-        </p>
+        <Link href="/forgot-password">
+          <p className="text-xs text-center text-[#5E5E5E] mt-2 underline font-sans">
+            パスワードを忘れた方はこちら
+          </p>
+        </Link>
 
         <hr className="w-full border-t border-[#AAAAAA] opacity-30 my-5" />
 
