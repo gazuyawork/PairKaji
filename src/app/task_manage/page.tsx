@@ -62,7 +62,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
       {task.showDelete && (
         <button
-          className="absolute right-2 top-2 w-16 h-16 bg-[#ff6347] text-white font-bold rounded-xl shadow-md flex items-center justify-center z-10"
+          className="absolute right-2 top-2 w-20 h-18 bg-[#ff6347] text-white font-bold rounded-xl shadow-md flex items-center justify-center z-10"
           onClick={(e) => {
             e.stopPropagation();
             onRemove(task.id);
@@ -78,11 +78,11 @@ const TaskCard: React.FC<TaskCardProps> = ({
           value={task.name}
           placeholder="ここに家事を入力する"
           onChange={(e) => onChange(task.id, 'name', e.target.value)}
-          className="flex-1 text-sm text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent"
+          className="flex-1 text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent"
         />
       </div>
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between">
         <select
           value={task.frequency}
           onChange={(e) => onChange(task.id, 'frequency', e.target.value as Task['frequency'])}
@@ -268,7 +268,7 @@ export default function TaskManagePage() {
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Edit" />
 
-      <main className="flex-1 px-4 py-4 space-y-4">
+      <main className="flex-1 px-4 py-6 space-y-4">
         <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white">
           <Search className="text-gray-400 mr-2" size={20} />
           <input
@@ -276,7 +276,7 @@ export default function TaskManagePage() {
             placeholder="検索する家事の名前を入力"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="flex-1 outline-none text-sm text-[#5E5E5E] font-sans"
+            className="flex-1 outline-none text-[#5E5E5E] font-sans"
           />
         </div>
 
@@ -285,7 +285,7 @@ export default function TaskManagePage() {
             <button
               key={period}
               onClick={() => toggleFilter(period)}
-              className={`px-4 py-2 rounded-full font-sans text-sm border ${
+              className={`px-4 py-2 rounded-full font-sans border ${
                 filter === period ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
               }`}
             >
@@ -321,7 +321,7 @@ export default function TaskManagePage() {
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
 
-        <div className="space-y-4 pb-34">
+        <div className="space-y-2.5 pb-30">
           {tasks
             .filter(task => !filter || task.frequency === filter)
             .filter(task => !personFilter || task.users.includes(personFilter))
@@ -341,7 +341,7 @@ export default function TaskManagePage() {
         </div>
       </main>
 
-      <div className="fixed bottom-20 left-0 w-full flex justify-center items-center mb-3">
+      <div className="fixed bottom-20 left-0 w-full flex justify-center items-center mb-1">
         <button
           onClick={confirmTasks}
           className="w-[300px] bg-[#FFCB7D] text-white font-bold py-3 rounded-xl shadow-lg"

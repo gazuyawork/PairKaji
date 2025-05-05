@@ -52,47 +52,48 @@ export default function ProfilePage() {
             <div className="flex-1 space-y-4">
               {/* 氏名 */}
               <div className="space-y-1">
-                <label className="text-sm text-[#5E5E5E] font-semibold">氏名</label>
+                <label className="text-[#5E5E5E] font-semibold">氏名</label>
                 {isEditing ? (
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full text-sm text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
+                    className="w-full text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
                   />
                 ) : (
-                  <p className="text-sm text-[#5E5E5E] border-b border-b-gray-200 py-1">{name}</p>
+                  <p className="text-[#5E5E5E] border-b border-b-gray-200 py-1">{name}</p>
                 )}
               </div>
 
               {/* メールアドレス */}
               <div className="space-y-1">
-                <label className="text-sm text-[#5E5E5E] font-semibold">メールアドレス</label>
+                <label className="text-[#5E5E5E] font-semibold">メールアドレス</label>
                 {isEditing ? (
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full text-sm text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
+                    className="w-full text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
                   />
                 ) : (
-                  <p className="text-sm text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
+                  <p className="text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
                 )}
               </div>
             </div>
           </div>
 
           {/* パスワード */}
-          <div className="space-y-1">
-            <label className="text-sm text-[#5E5E5E] font-semibold">パスワード</label>
-            {isEditing ? (
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full text-sm text-[#5E5E5E] border-b border-gray-300 py-1 pr-8 focus:outline-none"
-                />
+          <div className="space-y-1 mb-5">
+            <label className="text-[#5E5E5E] font-semibold">パスワード</label>
+            <div className="relative">
+              <input
+                type={isEditing ? (showPassword ? 'text' : 'password') : 'text'}
+                value={isEditing ? password : '●●●●●●●●'}
+                onChange={(e) => isEditing && setPassword(e.target.value)}
+                className="w-full text-[#5E5E5E] border-b border-gray-300 py-1 pr-8 tracking-widest focus:outline-none"
+                readOnly={!isEditing}
+              />
+              {isEditing && (
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -100,18 +101,14 @@ export default function ProfilePage() {
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-              </div>
-            ) : (
-              <p className="text-sm text-[#5E5E5E] border-b border-b-gray-200 py-1">
-                {'●'.repeat(password.length)}
-              </p>
-            )}
+              )}
+            </div>
           </div>
 
           {/* 招待コード（常時表示） */}
           <div className="space-y-1">
-            <label className="text-sm text-[#5E5E5E] font-semibold">招待コード</label>
-            <p className="text-sm text-[#5E5E5E] border-b border-b-gray-200 py-1">ABC12345</p>
+            <label className="text-[#5E5E5E] font-semibold">招待コード</label>
+            <p className="text-[#5E5E5E] border-b border-b-gray-200 py-1">ABC12345</p>
           </div>
 
           <button
@@ -130,9 +127,9 @@ export default function ProfilePage() {
               alt="パートナー画像"
               className="w-12 h-12 rounded-full object-cover border border-gray-300"
             />
-            <div className="text-sm text-[#5E5E5E]">
+            <div className="text-[#5E5E5E]">
               <p className="font-semibold">花子</p>
-              <p className="text-xs">partner@example.com</p>
+              <p className="">partner@example.com</p>
             </div>
           </div>
           <button className="text-red-500">

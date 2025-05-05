@@ -88,22 +88,22 @@ export default function TaskPage() {
 
       <main className="flex-1 px-4 py-6 space-y-6">
         {/* 検索ボックス（機能未実装） */}
-        <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white">
+        <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white mb-4">
           <Search className="text-gray-400 mr-2" size={20} />
           <input
             type="text"
             placeholder="検索する家事の名前を入力"
-            className="flex-1 outline-none text-sm text-[#5E5E5E] font-sans"
+            className="flex-1 outline-none text-[#5E5E5E] font-sans"
           />
         </div>
 
         {/* フィルター */}
-        <div className="flex justify-center gap-4 flex-wrap">
+        <div className="flex justify-center gap-4 flex-wrap my-0">
           {periods.map(p => (
             <button
               key={p}
               onClick={() => togglePeriod(p)}
-              className={`px-4 py-2 rounded-full text-sm font-sans border ${
+              className={`px-4 py-2 rounded-full font-sans border ${
                 periodFilter === p ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
               }`}
             >
@@ -136,7 +136,7 @@ export default function TaskPage() {
                 setPeriodFilter(null);
                 setPersonFilter(null);
               }}
-              className="text-xs px-3 py-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
+              className="text-ls px-3 py-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
             >
               フィルター解除
             </button>
@@ -223,11 +223,11 @@ const TaskItem = memo((props: {
         ) : (
           <Circle className="text-gray-400" />
         )}
-        <span className="text-sm text-[#5E5E5E] font-medium font-sans">{task.title}</span>
+        <span className="text-[#5E5E5E] font-medium font-sans">{task.title}</span>
         {task.scheduledDate && (
-          <span className="ml-2 text-xs text-gray-400">
+          <span className="text-xs text-gray-400">
             <Calendar size={12} className="inline mr-1" />
-            {task.scheduledDate.replace(/-/g, '/').slice(5)} 予定
+            {task.scheduledDate.replace(/-/g, '/').slice(5)} 
           </span>
         )}
         {task.daysOfWeek && (
@@ -235,7 +235,7 @@ const TaskItem = memo((props: {
             {task.daysOfWeek.map((d, i) => (
               <div
                 key={i}
-                className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-[10px] flex items-center justify-center"
+                className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center"
               >
                 {d}
               </div>
@@ -252,8 +252,8 @@ const TaskItem = memo((props: {
             SKIP
           </button>
         ) : (
-          <p className="text-sm font-bold text-[#5E5E5E] font-sans">
-            {task.skipped ? 'SKIP' : `${task.point} pt`}
+          <p className="font-bold text-[#5E5E5E] font-sans">
+            {task.skipped ? 'SKIP' : `${task.point} `}<span className="text-sm">pt</span>
           </p>
         )}
         <img

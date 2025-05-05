@@ -16,7 +16,7 @@ export default function TaskList() {
             key={index}
             className="flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border border-[#e5e5e5] hover:shadow-md cursor-pointer"
           >
-            <span className="text-sm text-[#5E5E5E] font-medium font-sans">{task}</span>
+            <span className="text-[#5E5E5E] font-medium font-sans">{task}</span>
             <Heart
               size={25}
               fill={index === 0 ? '#ff6b6b' : 'none'}

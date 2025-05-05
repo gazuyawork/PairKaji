@@ -17,7 +17,7 @@ export default function FooterNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 shadow-inner px-6 py-7">
+    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 shadow-inner px-6 pt-4 pb-6">
       <ul className="flex justify-between">
         {navItems.map((item, index) => {
           const isActive = pathname === item.href;
@@ -25,7 +25,7 @@ export default function FooterNav() {
           return (
             <li key={index} onClick={() => router.push(item.href)} className="flex flex-col items-center cursor-pointer">
               <div className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'}>
-                <Icon />
+                <Icon size={32}/>
               </div>
             </li>
           );
