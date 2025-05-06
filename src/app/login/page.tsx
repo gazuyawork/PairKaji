@@ -1,3 +1,4 @@
+// src/app/login/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -13,18 +14,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [checking, setChecking] = useState(true);
   const router = useRouter();
 
-  // 追加：ログイン済みなら /home にリダイレクト
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         router.replace('/home');
+      } else {
+        setChecking(false);
       }
     });
-
     return () => unsubscribe();
   }, []);
+
+  if (checking) return null;
 
   const handleLogin = async () => {
     try {

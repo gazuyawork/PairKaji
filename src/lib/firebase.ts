@@ -1,7 +1,8 @@
-'use client'; // ← これが必須になります
+// src/lib/firebase.ts
+'use client';
 
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,5 +13,13 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+const auth = getAuth(app);
+
+// 🔽 初回のみセッション永続化を設定（この1回で十分）
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.error('永続化エラー:', err);
+});
+
+export { auth };
