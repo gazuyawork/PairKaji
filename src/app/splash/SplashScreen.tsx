@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const sentence = '家事をわけて、やさしさふえる。';
 
@@ -25,28 +27,45 @@ const letter = {
 export default function SplashScreen() {
   const router = useRouter();
 
+  // 自動遷移（ログイン状態によって分岐）
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.push('/login');
-    }, 300000); // 自動遷移
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          router.replace('/home');
+        } else {
+          router.replace('/login');
+        }
+      });
+    }, 30000); // 3秒後に遷移
+
     return () => clearTimeout(timer);
   }, [router]);
 
+  // 手動タップ時もログイン状態を見て遷移
+  const handleTap = () => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace('/home');
+      } else {
+        router.replace('/login');
+      }
+    });
+  };
+
   return (
     <div
-      onClick={() => router.push('/login')}
+      onClick={handleTap}
       className="flex flex-col items-center justify-between h-screen w-full bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-6 py-12 cursor-pointer"
     >
-      {/* 上部スペース */}
       <div />
 
-      {/* ロゴ + サブタイトル */}
       <div className="text-center">
         <motion.h1
-            className="font-pacifico text-[50px] text-[#5E5E5E] mb-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 3.0 }}
+          className="font-pacifico text-[50px] text-[#5E5E5E] mb-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 3.0 }}
         >
           PairKaji
         </motion.h1>
@@ -65,7 +84,6 @@ export default function SplashScreen() {
         </motion.p>
       </div>
 
-      {/* タップでスタート（点滅アニメーション） */}
       <motion.p
         className="text-[#5E5E5E] text-[20px] font-semibold tracking-wide mb-[140px]"
         initial={{ opacity: 0 }}

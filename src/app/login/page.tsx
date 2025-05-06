@@ -1,9 +1,13 @@
-// src/app/login/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -14,24 +18,27 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [checking, setChecking] = useState(true);
+  // const [checking, setChecking] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace('/home');
-      } else {
-        setChecking(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+  // 🔸 すでにログインしていれば /home に遷移
+  // useEffect(() => {
+  //   const unsubscribe = onAuthStateChanged(auth, (user) => {
+  //     if (user) {
+  //       router.replace('/home');
+  //     } else {
+  //       setChecking(false);
+  //     }
+  //   });
+  //   return () => unsubscribe();
+  // }, [router]);
 
-  if (checking) return null;
+  // if (checking) return null;
 
   const handleLogin = async () => {
     try {
+      // 🔸 セッションの永続化（アプリ再起動後もログイン状態保持）
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/home');
     } catch (error) {

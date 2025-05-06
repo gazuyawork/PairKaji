@@ -2,7 +2,7 @@
 'use client';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,12 +14,11 @@ const firebaseConfig = {
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-
 const auth = getAuth(app);
 
-// 🔽 初回のみセッション永続化を設定（この1回で十分）
-setPersistence(auth, browserLocalPersistence).catch((err) => {
-  console.error('永続化エラー:', err);
+// ✅ ここで永続化を設定（初期化時に1度だけ）
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Auth persistence setting failed:', error);
 });
 
 export { auth };
