@@ -8,12 +8,17 @@ const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font
 export const metadata = {
   title: 'PairKaji',
   description: '家事を2人で分担するアプリ',
-  manifest: '/manifest.json',                         // ✅ 追加
-  themeColor: '#5E8BC7',                              // ✅ 追加
+  manifest: '/manifest.json',
+  themeColor: '#5E8BC7',
   icons: {
-    icon: '/icons/icon-192.png',                      // ✅ Favicon 用
+    icon: '/icons/icon-192.png',
     shortcut: '/icons/icon-192.png',
     apple: '/icons/icon-192.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'PairKaji',
+    statusBarStyle: 'default',
   },
 };
 
