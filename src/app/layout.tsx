@@ -1,6 +1,5 @@
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
-import Head from 'next/head'
 
 // Google Fonts の設定
 const zenMaruGothic = Zen_Maru_Gothic({ subsets: ['latin'], weight: ['400'], variable: '--font-zen' });
@@ -9,16 +8,18 @@ const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font
 export const metadata = {
   title: 'PairKaji',
   description: '家事を2人で分担するアプリ',
+  manifest: '/manifest.json',                         // ✅ 追加
+  themeColor: '#5E8BC7',                              // ✅ 追加
+  icons: {
+    icon: '/icons/icon-192.png',                      // ✅ Favicon 用
+    shortcut: '/icons/icon-192.png',
+    apple: '/icons/icon-192.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" className={`${zenMaruGothic.variable} ${pacifico.variable}`}>
-      <Head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#5E8BC7" />
-        <link rel="icon" href="/icons/icon-192.png" />
-      </Head>
       <body className="font-sans bg-white text-gray-800 min-h-screen antialiased">
         {children}
       </body>
