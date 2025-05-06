@@ -1,4 +1,5 @@
-// src/lib/firebase.ts
+'use client'; // ← これが必須になります
+
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
