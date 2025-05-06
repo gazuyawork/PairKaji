@@ -8,6 +8,10 @@ const nextConfig = withPWA({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
 
+  fallback: {
+    document: '/offline', // ← ここ
+  },
+
   runtimeCaching: [
     // APIレスポンスのキャッシュ（NetworkFirst）
     {
