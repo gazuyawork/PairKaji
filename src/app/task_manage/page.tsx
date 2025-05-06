@@ -192,8 +192,24 @@ export default function TaskManagePage() {
 
   const addTask = () => {
     const newId = tasks.length + 1;
-    setTasks([{ id: newId, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], isNew: true, isEdited: false, showDelete: false }, ...tasks]);
+    setTasks([
+      {
+        id: newId,
+        name: '',
+        frequency: '毎日',
+        point: 100,
+        users: ['太郎', '花子'],
+        daysOfWeek: [],
+        dates: [],
+        isTodo: false,
+        isNew: true,
+        isEdited: false,
+        showDelete: false,
+      },
+      ...tasks,
+    ]);
   };
+  
 
   const updateTask = (
     id: number,
