@@ -1,4 +1,5 @@
 // next.config.ts
+// @ts-ignore
 import withPWA from 'next-pwa';
 import type { NextConfig } from 'next';
 
