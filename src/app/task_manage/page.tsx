@@ -14,6 +14,8 @@ interface Task {
   point: number;
   users: string[];
   daysOfWeek: string[];
+  dates: string[];
+  isTodo: boolean;
   isNew: boolean;
   isEdited: boolean;
   showDelete: boolean;
@@ -21,7 +23,7 @@ interface Task {
 
 interface TaskCardProps {
   task: Task;
-  onChange: (id: number, key: keyof Task, value: string | number | string[]) => void;
+  onChange: (id: number, key: keyof Task, value: string | number | string[] | boolean) => void;
   onRemove: (id: number) => void;
   onToggleUser: (id: number, user: string) => void;
   onToggleDay: (id: number, day: string) => void;
@@ -45,6 +47,11 @@ const TaskCard: React.FC<TaskCardProps> = ({
     onSwipedRight: () => onToggleDelete(task.id),
     delta: 50,
   });
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    onChange(task.id, 'dates', [newDate]);
+  };
 
   return (
     <div
@@ -78,28 +85,39 @@ const TaskCard: React.FC<TaskCardProps> = ({
           value={task.name}
           placeholder="ここに家事を入力する"
           onChange={(e) => onChange(task.id, 'name', e.target.value)}
-          className="flex-1 text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent"
+          className="flex-1 text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent border-b border-gray-300"
         />
+        <label className="flex items-center gap-1 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={task.isTodo}
+            onChange={(e) => onChange(task.id, 'isTodo', e.target.checked)}
+            className="appearance-none w-4 h-4 rounded-full border border-gray-300 checked:bg-[#5E5E5E] checked:border-transparent ml-6 mr-1"
+          />
+          <span className="font-bold">TODO</span>
+        </label>
       </div>
 
       <div className="flex items-center justify-between">
         <select
           value={task.frequency}
           onChange={(e) => onChange(task.id, 'frequency', e.target.value as Task['frequency'])}
-          className="bg-transparent outline-none"
+          className="bg-transparent outline-none border-b border-gray-300"
         >
           {['毎日', '週次', '不定期'].map((f) => (
             <option key={f} value={f}>{f}</option>
           ))}
         </select>
 
-        <div className="flex items-center">
+        <div className="flex items-center w-20">
           <select
             value={task.point}
             onChange={(e) => onChange(task.id, 'point', Number(e.target.value))}
-            className="w-20 bg-transparent outline-none"
+            className="w-20 bg-transparent outline-none border-b border-gray-300"
           >
-            {generatePointOptions()}
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => (
+              <option key={val} value={val}>{val}</option>
+            ))}
           </select>
           <span className="ml-1">pt</span>
         </div>
@@ -110,7 +128,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
               <button
                 key={user.name}
                 onClick={() => onToggleUser(task.id, user.name)}
-                className={`w-8 h-8 rounded-full border overflow-hidden ${
+                className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
                   task.users.includes(user.name)
                     ? 'border-[#FFCB7D] opacity-100'
                     : 'border-gray-300 opacity-30'
@@ -140,17 +158,32 @@ const TaskCard: React.FC<TaskCardProps> = ({
           ))}
         </div>
       )}
+
+      {task.frequency === '不定期' && (
+        <div className="pt-1">
+          <label className="text-sm text-gray-600">日付選択：</label>
+          <input
+            type="date"
+            value={task.dates[0] || ''}
+            onChange={handleDateChange}
+            className="ml-2 border-b border-gray-300 px-2 py-1 text-sm bg-transparent focus:outline-none"
+          />
+        </div>
+      )}
     </div>
   );
 };
 
 TaskCard.displayName = 'TaskCard';
 
+
+
 export default function TaskManagePage() {
   const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], isNew: false, isEdited: false, showDelete: false },
-    { id: 2, name: '', frequency: '毎日', point: 100, users: ['太郎'], daysOfWeek: [], isNew: false, isEdited: false, showDelete: false },
-    { id: 3, name: '', frequency: '毎日', point: 100, users: ['花子'], daysOfWeek: [], isNew: false, isEdited: false, showDelete: false },
+    { id: 1, name: '', frequency: '毎日', point: 100, users: ['太郎'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
+    { id: 2, name: '', frequency: '毎日', point: 100, users: ['花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
+    { id: 3, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
+    { id: 4, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
   ]);
 
   const [filter, setFilter] = useState<string | null>(null);
@@ -233,7 +266,7 @@ export default function TaskManagePage() {
   const generatePointOptions = (): React.ReactElement[] => {
 
     const options = [];
-    for (let i = 0; i <= 100; i += 5) {
+    for (let i = 0; i <= 10; i += 1) {
       options.push(<option key={i} value={i}>{i}</option>);
     }
     return options;
