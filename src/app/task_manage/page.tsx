@@ -28,7 +28,6 @@ interface TaskCardProps {
   onToggleUser: (id: number, user: string) => void;
   onToggleDay: (id: number, day: string) => void;
   onToggleDelete: (id: number) => void;
-  // generatePointOptions: () => React.ReactElement[];
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({
@@ -38,7 +37,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
   onToggleUser,
   onToggleDay,
   onToggleDelete,
-  // generatePointOptions,
 }) => {
   const days = ['月', '火', '水', '木', '金', '土', '日'];
 
@@ -384,7 +382,6 @@ export default function TaskManagePage() {
                 onToggleUser={handleUserToggle}
                 onToggleDay={toggleDay}
                 onToggleDelete={toggleShowDelete}
-                generatePointOptions={generatePointOptions}
               />
             ))}
         </div>
