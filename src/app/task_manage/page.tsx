@@ -276,16 +276,6 @@ export default function TaskManagePage() {
     );
   };
 
-  // const generatePointOptions = () => {
-  const generatePointOptions = (): React.ReactElement[] => {
-
-    const options = [];
-    for (let i = 0; i <= 10; i += 1) {
-      options.push(<option key={i} value={i}>{i}</option>);
-    }
-    return options;
-  };
-
   const clearFilters = () => {
     setFilter(null);
     setPersonFilter(null);
