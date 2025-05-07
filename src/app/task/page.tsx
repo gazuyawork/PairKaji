@@ -2,12 +2,11 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { CheckCircle, Circle, Search, Calendar, MoreVertical, ClipboardList, Trash2 } from 'lucide-react';
-import { useState, useEffect, useRef, memo } from 'react';
-import { motion } from 'framer-motion';
-import { useSwipeable } from 'react-swipeable';
+import { Search } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
+import Image from 'next/image'; // 追加
 
 type Period = '毎日' | '週次' | '不定期';
 
@@ -21,7 +20,7 @@ type Task = {
   image: string;
   scheduledDate?: string;
   daysOfWeek?: string[];
-  period: Period;
+  period: Period; // 明示的に追加
 };
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
@@ -29,17 +28,17 @@ const periods: Period[] = ['毎日', '週次', '不定期'];
 export default function TaskPage() {
   const initialTaskGroups: Record<Period, Task[]> = {
     '毎日': [
-      { id: 1, title: '食器洗い', point: 10, done: false, skipped: false, person: '太郎', image: '/images/taro.png' },
-      { id: 2, title: '夕食準備', point: 15, done: false, skipped: false, person: '太郎', image: '/images/taro.png' },
-      { id: 3, title: '風呂掃除', point: 10, done: true, skipped: false, person: '花子', image: '/images/hanako.png' },
+      { id: 1, title: '食器洗い', point: 10, done: false, skipped: false, person: '太郎', image: '/images/taro.png', period: '毎日' },
+      { id: 2, title: '夕食準備', point: 15, done: false, skipped: false, person: '太郎', image: '/images/taro.png', period: '毎日' },
+      { id: 3, title: '風呂掃除', point: 10, done: true, skipped: false, person: '花子', image: '/images/hanako.png', period: '毎日' },
     ],
     '週次': [
-      { id: 4, title: '風呂掃除', point: 10, done: false, skipped: false, person: '未設定', image: '/images/default.png', daysOfWeek: ['火', '木'] },
-      { id: 5, title: '掃除機がけ', point: 10, done: false, skipped: false, person: '未設定', image: '/images/default.png', daysOfWeek: ['土'] },
+      { id: 4, title: '風呂掃除', point: 10, done: false, skipped: false, person: '未設定', image: '/images/default.png', daysOfWeek: ['火', '木'], period: '週次' },
+      { id: 5, title: '掃除機がけ', point: 10, done: false, skipped: false, person: '未設定', image: '/images/default.png', daysOfWeek: ['土'], period: '週次' },
     ],
     '不定期': [
-      { id: 6, title: '粗大ごみ出し', point: 20, done: false, skipped: false, person: '花子', image: '/images/hanako.png', scheduledDate: '2025-05-10' },
-      { id: 7, title: '家電修理立ち合い', point: 30, done: false, skipped: false, person: '太郎', image: '/images/taro.png', scheduledDate: '2025-05-15' },
+      { id: 6, title: '粗大ごみ出し', point: 20, done: false, skipped: false, person: '花子', image: '/images/hanako.png', scheduledDate: '2025-05-10', period: '不定期' },
+      { id: 7, title: '家電修理立ち合い', point: 30, done: false, skipped: false, person: '太郎', image: '/images/taro.png', scheduledDate: '2025-05-15', period: '不定期' },
     ],
   };
 
@@ -48,17 +47,6 @@ export default function TaskPage() {
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpenId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   const togglePeriod = (p: Period) => setPeriodFilter(prev => (prev === p ? null : p));
   const togglePerson = (name: string) => setPersonFilter(prev => (prev === name ? null : name));
@@ -92,7 +80,7 @@ export default function TaskPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none">
       <Header title="Task" />
 
       <main className="flex-1 px-4 py-6 space-y-6">
@@ -126,10 +114,12 @@ export default function TaskPage() {
                 personFilter === name ? 'border-[#FFCB7D]' : 'border-gray-300'
               }`}
             >
-              <img
+              <Image
                 src={`/images/${name === '太郎' ? 'taro' : 'hanako'}.png`}
                 alt={`${name}のフィルター`}
-                className="w-full h-full object-cover"
+                width={40}
+                height={40}
+                className="object-cover"
               />
             </button>
           ))}
@@ -175,7 +165,7 @@ export default function TaskPage() {
                     index={idx}
                     onToggleDone={toggleDone}
                     onDelete={deleteTask}
-                    onEdit={() => setEditTargetTask({ ...task, period })}
+                    onEdit={() => setEditTargetTask(task)}
                     menuOpenId={menuOpenId}
                     setMenuOpenId={setMenuOpenId}
                   />
@@ -193,9 +183,7 @@ export default function TaskPage() {
           isOpen={!!editTargetTask}
           task={editTargetTask}
           onClose={() => setEditTargetTask(null)}
-          // onSave={(updated) => updateTask(updated.period as Period, updated)}
           onSave={(updated) => updateTask(updated.period, updated)}
-
         />
       )}
     </div>
