@@ -11,20 +11,8 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useRef } from 'react';
-import type { Period } from '@/app/task/page';
+import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
-
-type Task = {
-  id: number;
-  title: string;
-  point: number;
-  done: boolean;
-  skipped: boolean;
-  person: string;
-  image: string;
-  scheduledDate?: string;
-  daysOfWeek?: string[];
-};
 
 type Props = {
   task: Task;

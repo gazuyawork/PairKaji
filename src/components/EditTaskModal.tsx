@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Task } from '@/types/Task';
+import type { Task, Period } from '@/types/Task';
 
 type Props = {
   isOpen: boolean;
@@ -20,6 +20,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
       daysOfWeek: task.daysOfWeek ?? [],
       dates: task.dates ?? [],
       isTodo: task.isTodo ?? false,
+      period: task.period, // 明示的に保持
     });
   }, [task]);
 
@@ -37,6 +38,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
         </button>
 
         <div className="space-y-6 mt-6 mx-3">
+          {/* 家事名 */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">家事名：</label>
             <input
@@ -47,20 +49,22 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             />
           </div>
 
+          {/* 頻度（period） */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">&nbsp;&nbsp;&nbsp;&nbsp;頻度：</label>
             <select
-              value={editedTask.frequency}
-              onChange={e => update('frequency', e.target.value as Task['frequency'])}
+              value={editedTask.period}
+              onChange={e => update('period', e.target.value as Period)}
               className="w-24 border-b border-gray-300 outline-none pl-2"
             >
-              {['毎日', '週次', '不定期'].map(f => (
-                <option key={f} value={f}>{f}</option>
+              {['毎日', '週次', '不定期'].map(p => (
+                <option key={p} value={p}>{p}</option>
               ))}
             </select>
           </div>
 
-          {editedTask.frequency === '週次' && (
+          {/* 週次 → 曜日選択 */}
+          {editedTask.period === '週次' && (
             <div className="flex items-center">
               <label className="w-20 text-gray-600">&nbsp;&nbsp;&nbsp;&nbsp;曜日：</label>
               <div className="flex gap-2 flex-wrap">
@@ -87,7 +91,8 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </div>
           )}
 
-          {editedTask.frequency === '不定期' && (
+          {/* 不定期 → 日付入力 */}
+          {editedTask.period === '不定期' && (
             <div className="flex items-center">
               <label className="w-20 text-gray-600">&nbsp;&nbsp;&nbsp;&nbsp;日付：</label>
               <input
@@ -99,6 +104,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </div>
           )}
 
+          {/* ポイント */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">ポイント：</label>
             <select
@@ -112,6 +118,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </select>
           </div>
 
+          {/* TODO */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">&nbsp;&nbsp;TODO：</label>
             <div className="relative">
