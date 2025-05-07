@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { MoreVertical } from 'lucide-react';
-import { User, Mail, LogOut } from 'lucide-react';
+import { User, Mail, LogOut, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getAuth, signOut } from 'firebase/auth';
 
@@ -29,6 +29,14 @@ export default function Header({ title }: HeaderProps) {
     <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
       {/* 中央タイトル */}
       <h1 className="absolute left-1/2 -translate-x-1/2 text-2xl font-pacifico text-[#5E5E5E]">{title}</h1>
+
+      <button
+        onClick={() => router.push('/task_manage')}
+        className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
+      >
+        <Pencil className="w-4 h-4" />
+        一括編集
+      </button>
 
       {/* 右側の3点メニュー */}
       <button

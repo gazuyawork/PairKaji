@@ -84,7 +84,8 @@ export default function TaskCard({
         initial={{ scale: 1 }}
         animate={{ scale: task.done ? 0.99 : 1, opacity: task.done ? 0.5 : 1 }}
         transition={{ duration: 0.2 }}
-        className="w-[470px] relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border border-[#e5e5e5] hover:shadow-md cursor-pointer"
+        className="w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border border-[#e5e5e5] hover:shadow-md cursor-pointer"
+        style={{ width: 'calc(100% - 28px)' }}
       >
         <div className="flex items-center gap-3">
           {task.done ? (
