@@ -6,10 +6,15 @@ import type { Task } from '@/types/Task';
 
 interface Props {
   isOpen: boolean;
-  task: Task;
+  task: Task & {
+    daysOfWeek?: string[];  // ← これで undefined 許容
+    dates?: string[];
+    isTodo?: boolean;
+  };
   onClose: () => void;
   onSave: (updated: Task) => void;
 }
+
 
 export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) {
   const [editedTask, setEditedTask] = useState<Task>({

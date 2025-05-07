@@ -263,7 +263,11 @@ export default function TaskPage() {
                     index={idx}
                     onToggleDone={toggleDone}
                     onDelete={deleteTask}
-                    onEdit={() => setEditTargetTask(task)}
+                    onEdit={() => setEditTargetTask({
+                      ...task,
+                      daysOfWeek: task.daysOfWeek ?? [],
+                      dates: task.dates ?? [],
+                    })}
                     menuOpenId={menuOpenId}
                     setMenuOpenId={setMenuOpenId}
                   />
