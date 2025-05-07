@@ -13,6 +13,7 @@ import {
 import { useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
+import { useEffect } from 'react';
 
 type Props = {
   task: Task;
@@ -42,6 +43,20 @@ export default function TaskCard({
   });
 
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // クリックでメニューを閉じる処理
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuOpenId === task.id && menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [menuOpenId, task.id, setMenuOpenId]);
 
   return (
     <div className="relative">

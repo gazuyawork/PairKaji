@@ -2,16 +2,18 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { Search } from 'lucide-react';
+import { Search, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
 import Image from 'next/image';
 import type { Task, Period } from '@/types/Task';
+import { useRouter } from 'next/navigation';   // ← router.push に必要
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
 export default function TaskPage() {
+  const router = useRouter(); // TaskPage 内 useRouter フック追加
   const initialTaskGroups: Record<Period, Task[]> = {
     '毎日': [
       {
@@ -188,7 +190,7 @@ export default function TaskPage() {
           />
         </div>
 
-        <div className="flex justify-center gap-4 flex-wrap my-0">
+        <div className="flex justify-center items-center gap-2 flex-wrap my-0">
           {periods.map(p => (
             <button
               key={p}
@@ -218,6 +220,16 @@ export default function TaskPage() {
               />
             </button>
           ))}
+
+          <div className="h-6 border-l border-gray-300 mx-2" />
+
+          <button
+            onClick={() => router.push('/task_manage')}
+            className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
+          >
+            <Pencil className="w-4 h-4" />
+            一括編集
+          </button>
         </div>
 
         {(periodFilter || personFilter) && (

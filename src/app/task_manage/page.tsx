@@ -2,10 +2,11 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, ArrowLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 interface Task {
   id: number;
@@ -183,6 +184,7 @@ TaskCard.displayName = 'TaskCard';
 
 
 export default function TaskManagePage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([
     { id: 1, name: '', frequency: '毎日', point: 100, users: ['太郎'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
     { id: 2, name: '', frequency: '毎日', point: 100, users: ['花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
@@ -312,6 +314,7 @@ export default function TaskManagePage() {
       <Header title="Edit" />
 
       <main className="flex-1 px-4 py-6 space-y-4">
+        {/* 検索ボックス */}
         <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white">
           <Search className="text-gray-400 mr-2" size={20} />
           <input
@@ -323,7 +326,8 @@ export default function TaskManagePage() {
           />
         </div>
 
-        <div className="flex justify-center gap-4 flex-wrap">
+        {/* フィルタ＋戻るボタン */}
+        <div className="flex justify-center items-center gap-2 flex-wrap">
           {['毎日', '週次', '不定期'].map(period => (
             <button
               key={period}
@@ -336,26 +340,48 @@ export default function TaskManagePage() {
             </button>
           ))}
 
-          {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(
-            user => (
-              <button
-                key={user.name}
-                onClick={() => togglePerson(user.name)}
-                className={`w-10 h-10 rounded-full overflow-hidden border ${
-                  personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
-                }`}
-              >
-                <Image 
-                  src={user.image} 
-                  alt={`${user.name}のフィルター`} 
-                  width={38} // px単位で明示
-                  height={38}
-                  className="w-full h-full object-cover" 
-                />
-              </button>
-            )
-          )}
+          {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(user => (
+            <button
+              key={user.name}
+              onClick={() => togglePerson(user.name)}
+              className={`w-10 h-10 rounded-full overflow-hidden border ${
+                personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
+              }`}
+            >
+              <Image
+                src={user.image}
+                alt={`${user.name}のフィルター`}
+                width={38}
+                height={38}
+                className="w-full h-full object-cover"
+              />
+            </button>
+          ))}
+
+          {/* 縦棒 */}
+          <div className="h-6 border-l border-gray-300 mx-2" />
+
+          {/* 戻るボタン */}
+          <button
+            onClick={() => router.push('/task')}
+            className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            タスク一覧へ
+          </button>
         </div>
+
+
+
+
+
+
+
+
+
+
+
+
 
         {(filter || personFilter || searchTerm) && (
           <div className="flex justify-center mt-2">
