@@ -2,18 +2,10 @@
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import {
-  CheckCircle,
-  Circle,
-  Calendar,
-  MoreVertical,
-  Trash2,
-  Pencil,
-} from 'lucide-react';
-import { useRef } from 'react';
+import { CheckCircle, Circle, Calendar, Trash2, Pencil } from 'lucide-react';
+import { useRef, useEffect, useState } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
-import { useEffect } from 'react';
 
 type Props = {
   task: Task;
@@ -21,7 +13,6 @@ type Props = {
   index: number;
   onToggleDone: (period: Period, index: number) => void;
   onDelete: (period: Period, taskId: number) => void;
-
   onEdit: () => void;
   menuOpenId: number | null;
   setMenuOpenId: (id: number | null) => void;
@@ -43,65 +34,90 @@ export default function TaskCard({
   });
 
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isLongPress, setIsLongPress] = useState(false);
 
-  // クリックでメニューを閉じる処理
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuOpenId === task.id && menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpenId(null);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpenId, task.id, setMenuOpenId]);
 
-  return (
-    <div className="relative">
-      {/* 3点メニュー */}
-      <div className="absolute -right-6 top-1/2 -translate-y-1/2 z-20 mr-5" ref={menuRef}>
-        <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(task.id); }}>
-          <MoreVertical className="text-gray-500 w-5 h-5 cursor-pointer" />
-        </button>
-        {menuOpenId === task.id && (
-          <div className="absolute right-7 top-0 w-30 bg-white border border-gray-200 rounded-xl shadow-lg z-30 px-3 py-1 pb-3">
-            <button
-              className="w-full text-left px-3 py-3 flex items-center gap-2 hover:bg-gray-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-                setMenuOpenId(null);
-              }}
-            >
-              <Pencil className="w-4 h-4 text-gray-500" />
-              <span>編集</span>
-            </button>
-            <button
-              className="w-full text-left px-3 py-1 flex items-center gap-2 text-red-500 hover:bg-red-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(period, task.id);
-                setMenuOpenId(null);
-              }}
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>削除</span>
-            </button>
-          </div>
-        )}
-      </div>
+  const handleTouchStart = () => {
+    const timer = setTimeout(() => {
+      setMenuOpenId(task.id);
+      setIsLongPress(true);
+    }, 600);
+    setLongPressTimer(timer);
+  };
 
-      <motion.li
-        {...handlers}
-        onClick={() => onToggleDone(period, index)}
-        initial={{ scale: 1 }}
-        animate={{ scale: task.done ? 0.99 : 1, opacity: task.done ? 0.5 : 1 }}
-        transition={{ duration: 0.2 }}
-        className="w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border border-[#e5e5e5] hover:shadow-md cursor-pointer"
-        style={{ width: 'calc(100% - 28px)' }}
-      >
+  const handleTouchEnd = () => {
+    if (longPressTimer) clearTimeout(longPressTimer);
+    setTimeout(() => setIsLongPress(false), 300); // 状態リセット
+  };
+
+  const handleClick = () => {
+    if (!isLongPress) {
+      onToggleDone(period, index);
+    }
+  };
+
+  return (
+    <div className="relative" ref={menuRef}>
+      {menuOpenId === task.id && (
+        <div className="absolute right-0 top-0 w-30 bg-white border border-gray-200 rounded-xl shadow-lg z-30 px-3 py-1 pb-3">
+          <button
+            className="w-full text-left px-3 py-3 flex items-center gap-2 hover:bg-gray-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+              setMenuOpenId(null);
+            }}
+          >
+            <Pencil className="w-4 h-4 text-gray-500" />
+            <span>編集</span>
+          </button>
+          <button
+            className="w-full text-left px-3 py-1 flex items-center gap-2 text-red-500 hover:bg-red-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(period, task.id);
+              setMenuOpenId(null);
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>削除</span>
+          </button>
+        </div>
+      )}
+
+        <motion.li
+          {...handlers}
+          onClick={handleClick}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenuOpenId(task.id);
+          }}
+          animate={
+            isLongPress
+              ? { scale: [1, 1.05, 0.97, 1], backgroundColor: '#ffffff' }
+              : {}
+          }
+          transition={
+            isLongPress
+              ? { duration: 0.4, times: [0, 0.2, 0.6, 1] }
+              : {}
+          }
+          className={`w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border border-[#e5e5e5] hover:shadow-md cursor-pointer 
+            ${task.done ? 'opacity-50 scale-[0.99]' : ''} bg-white`}
+        >
+
         <div className="flex items-center gap-3">
           {task.done ? (
             <CheckCircle className="text-yellow-500" />
@@ -118,10 +134,7 @@ export default function TaskCard({
           {task.daysOfWeek && (
             <div className="flex gap-1 ml-2">
               {task.daysOfWeek.map((d, i) => (
-                <div
-                  key={i}
-                  className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center"
-                >
+                <div key={i} className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center">
                   {d}
                 </div>
               ))}
