@@ -6,34 +6,13 @@ import { Search } from 'lucide-react';
 import { useState } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
-import Image from 'next/image'; // 追加
-
-type Period = '毎日' | '週次' | '不定期';
-
-type Task = {
-  id: number;
-  title: string;
-  point: number;
-  done: boolean;
-  skipped: boolean;
-  person: string;
-  image: string;
-  scheduledDate?: string;
-  daysOfWeek?: string[];
-  period: Period;
-  name: string; // ← 追加
-  frequency: '毎日' | '週次' | '不定期'; // ← 追加
-  users: string[]; // ← 追加
-  dates: string[]; // ← 追加
-  isTodo: boolean; // ← 追加
-};
-
+import Image from 'next/image';
+import type { Task, Period } from '@/types/Task';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
 export default function TaskPage() {
   const initialTaskGroups: Record<Period, Task[]> = {
-
     '毎日': [
       {
         id: 1,
@@ -49,6 +28,8 @@ export default function TaskPage() {
         users: [],
         dates: [],
         isTodo: false,
+        daysOfWeek: [],
+        scheduledDate: '',
       },
       {
         id: 2,
@@ -64,6 +45,8 @@ export default function TaskPage() {
         users: [],
         dates: [],
         isTodo: false,
+        daysOfWeek: [],
+        scheduledDate: '',
       },
       {
         id: 3,
@@ -79,9 +62,10 @@ export default function TaskPage() {
         users: [],
         dates: [],
         isTodo: false,
+        daysOfWeek: [],
+        scheduledDate: '',
       },
     ],
-
     '週次': [
       {
         id: 4,
@@ -98,6 +82,7 @@ export default function TaskPage() {
         isTodo: false,
         users: [],
         period: '週次',
+        scheduledDate: '',
       },
       {
         id: 5,
@@ -114,9 +99,9 @@ export default function TaskPage() {
         isTodo: false,
         users: [],
         period: '週次',
+        scheduledDate: '',
       },
     ],
-
     '不定期': [
       {
         id: 6,
@@ -153,7 +138,6 @@ export default function TaskPage() {
         period: '不定期',
       },
     ],
-
   };
 
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
