@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import { useState } from 'react';
 import { Eye, EyeOff, X } from 'lucide-react';
+import Image from 'next/image';
 
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
@@ -35,10 +36,12 @@ export default function ProfilePage() {
           {/* プロフィール画像＋情報 */}
           <div className="flex items-center gap-4 mb-4">
             <div className="relative">
-              <img
+              <Image
                 src={profileImage}
                 alt="プロフィール画像"
-                className="w-20 h-20 rounded-full object-cover border border-gray-300"
+                width={100}
+                height={100}
+                className="rounded-full object-cover border border-gray-300"
               />
               {isEditing && (
                 <input
@@ -122,10 +125,12 @@ export default function ProfilePage() {
         {/* パートナー設定済みの例 */}
         <div className="bg-white shadow rounded-2xl px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
+            <Image
               src="/images/hanako.png"
               alt="パートナー画像"
-              className="w-12 h-12 rounded-full object-cover border border-gray-300"
+              width={60} // px単位で明示
+              height={60}
+              className="rounded-full object-cover border border-gray-300"
             />
             <div className="text-[#5E5E5E]">
               <p className="font-semibold">花子</p>

@@ -27,6 +27,7 @@ export default function TaskPage() {
         period: '毎日',
         users: [],
         dates: [],
+        daysOfWeek: [],
         isTodo: false,
       },
       {
@@ -42,6 +43,7 @@ export default function TaskPage() {
         period: '毎日',
         users: [],
         dates: [],
+        daysOfWeek: [],
         isTodo: false,
       },
       {
@@ -57,9 +59,11 @@ export default function TaskPage() {
         period: '毎日',
         users: [],
         dates: [],
+        daysOfWeek: [],
         isTodo: false,
       },
     ],
+
     '週次': [
       {
         id: 4,
@@ -94,6 +98,7 @@ export default function TaskPage() {
         period: '週次',
       },
     ],
+
     '不定期': [
       {
         id: 6,
@@ -260,7 +265,7 @@ export default function TaskPage() {
                       daysOfWeek: task.daysOfWeek ?? [],
                       dates: task.dates ?? [],
                       isTodo: task.isTodo ?? false,
-                    })}                    
+                    })}
                     menuOpenId={menuOpenId}
                     setMenuOpenId={setMenuOpenId}
                   />

@@ -2,6 +2,8 @@
 
 'use client';
 
+import Image from 'next/image';
+
 export default function PairPoints() {
   const userA = { name: 'たろう', points: 24, image: '/images/taro.png' };
   const userB = { name: 'はなこ', points: 18, image: '/images/hanako.png' };
@@ -14,10 +16,12 @@ export default function PairPoints() {
           className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-4 py-4"
         >
           <div className="flex items-center gap-4">
-            <img
+            <Image
               src={user.image}
               alt={`${user.name}のアイコン`}
-              className="w-18 h-18 rounded-full border-2 border-[#5E5E5E] object-cover"
+              width={18} // px単位で明示
+              height={18}
+              className="rounded-full border-2 border-[#5E5E5E] object-cover"
             />
             <div className="text-left">
               <p className="text-sm text-gray-500 font-sans font-bold">{user.name}</p>

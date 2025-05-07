@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useRef } from 'react';
 import type { Period } from '@/app/task/page';
+import Image from 'next/image';
 
 type Task = {
   id: number;
@@ -127,10 +128,12 @@ export default function TaskCard({
           <p className="font-bold text-[#5E5E5E] font-sans">
             {task.point} <span className="text-sm">pt</span>
           </p>
-          <img
+          <Image
             src={task.image}
             alt={`${task.person}のアイコン`}
-            className="w-8 h-8 rounded-full border border-gray-300 object-cover"
+            width={38}
+            height={38}
+            className="rounded-full border border-gray-300 object-cover"
           />
         </div>
       </motion.li>

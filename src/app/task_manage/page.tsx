@@ -132,7 +132,13 @@ const TaskCard: React.FC<TaskCardProps> = ({
                     : 'border-gray-300 opacity-30'
                 }`}
               >
-                <Image src={user.image} alt={user.name} width={32} height={32} className="object-cover w-full h-full" />
+                <Image 
+                  src={user.image} 
+                  alt={user.name} 
+                  width={32} 
+                  height={32} 
+                  className="object-cover w-full h-full" 
+                />
               </button>
             )
           )}
@@ -339,7 +345,13 @@ export default function TaskManagePage() {
                   personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
                 }`}
               >
-                <img src={user.image} alt={`${user.name}のフィルター`} className="w-full h-full object-cover" />
+                <Image 
+                  src={user.image} 
+                  alt={`${user.name}のフィルター`} 
+                  width={38} // px単位で明示
+                  height={38}
+                  className="w-full h-full object-cover" 
+                />
               </button>
             )
           )}
