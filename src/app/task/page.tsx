@@ -3,7 +3,7 @@
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import { Search } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
 import Image from 'next/image'; // 追加
