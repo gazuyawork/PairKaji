@@ -7,7 +7,6 @@ import {
   Circle,
   Calendar,
   MoreVertical,
-  ClipboardList,
   Trash2,
   Pencil,
 } from 'lucide-react';
