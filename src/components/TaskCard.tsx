@@ -11,6 +11,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useRef } from 'react';
+import type { Period } from '@/app/task/page';
 
 type Task = {
   id: number;
@@ -26,10 +27,11 @@ type Task = {
 
 type Props = {
   task: Task;
-  period: string;
+  period: Period;
   index: number;
-  onToggleDone: (period: string, index: number) => void;
-  onDelete: (period: string, taskId: number) => void;
+  onToggleDone: (period: Period, index: number) => void;
+  onDelete: (period: Period, taskId: number) => void;
+
   onEdit: () => void;
   menuOpenId: number | null;
   setMenuOpenId: (id: number | null) => void;
