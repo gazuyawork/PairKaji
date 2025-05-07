@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { MoreVertical } from 'lucide-react';
-import { User, Mail, LogOut, Pencil } from 'lucide-react';
+import { User, Mail, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getAuth, signOut } from 'firebase/auth';
 
