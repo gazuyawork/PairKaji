@@ -66,9 +66,9 @@ export default function TaskCard({
           <MoreVertical className="text-gray-500 w-5 h-5 cursor-pointer" />
         </button>
         {menuOpenId === task.id && (
-          <div className="absolute right-6 top-0 w-28 bg-white border border-gray-200 rounded-xl shadow-lg z-30 px-2 py-2">
+          <div className="absolute right-7 top-0 w-30 bg-white border border-gray-200 rounded-xl shadow-lg z-30 px-3 py-1 pb-3">
             <button
-              className="w-full text-left px-3 py-1 text-sm flex items-center gap-2 hover:bg-gray-100"
+              className="w-full text-left px-3 py-3 flex items-center gap-2 hover:bg-gray-100"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
@@ -79,7 +79,7 @@ export default function TaskCard({
               <span>編集</span>
             </button>
             <button
-              className="w-full text-left px-3 py-1 text-sm flex items-center gap-2 text-red-500 hover:bg-red-100"
+              className="w-full text-left px-3 py-1 flex items-center gap-2 text-red-500 hover:bg-red-100"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(period, task.id);
