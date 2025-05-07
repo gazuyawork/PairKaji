@@ -28,8 +28,6 @@ export default function TaskPage() {
         users: [],
         dates: [],
         isTodo: false,
-        daysOfWeek: [],
-        scheduledDate: '',
       },
       {
         id: 2,
@@ -45,8 +43,6 @@ export default function TaskPage() {
         users: [],
         dates: [],
         isTodo: false,
-        daysOfWeek: [],
-        scheduledDate: '',
       },
       {
         id: 3,
@@ -62,8 +58,6 @@ export default function TaskPage() {
         users: [],
         dates: [],
         isTodo: false,
-        daysOfWeek: [],
-        scheduledDate: '',
       },
     ],
     '週次': [
@@ -82,7 +76,6 @@ export default function TaskPage() {
         isTodo: false,
         users: [],
         period: '週次',
-        scheduledDate: '',
       },
       {
         id: 5,
@@ -99,7 +92,6 @@ export default function TaskPage() {
         isTodo: false,
         users: [],
         period: '週次',
-        scheduledDate: '',
       },
     ],
     '不定期': [
@@ -267,7 +259,8 @@ export default function TaskPage() {
                       ...task,
                       daysOfWeek: task.daysOfWeek ?? [],
                       dates: task.dates ?? [],
-                    })}
+                      isTodo: task.isTodo ?? false,
+                    })}                    
                     menuOpenId={menuOpenId}
                     setMenuOpenId={setMenuOpenId}
                   />
