@@ -30,14 +30,6 @@ export default function Header({ title }: HeaderProps) {
       {/* 中央タイトル */}
       <h1 className="absolute left-1/2 -translate-x-1/2 text-2xl font-pacifico text-[#5E5E5E]">{title}</h1>
 
-      <button
-        onClick={() => router.push('/task_manage')}
-        className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
-      >
-        <Pencil className="w-4 h-4" />
-        一括編集
-      </button>
-
       {/* 右側の3点メニュー */}
       <button
         className="ml-auto text-[#5E5E5E]"
