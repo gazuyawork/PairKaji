@@ -20,8 +20,14 @@ type Task = {
   image: string;
   scheduledDate?: string;
   daysOfWeek?: string[];
-  period: Period; // 明示的に追加
+  period: Period;
+  name: string; // ← 追加
+  frequency: '毎日' | '週次' | '不定期'; // ← 追加
+  users: string[]; // ← 追加
+  dates: string[]; // ← 追加
+  isTodo: boolean; // ← 追加
 };
+
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
