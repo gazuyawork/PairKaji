@@ -17,7 +17,7 @@ export default function FooterNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 shadow-inner px-6 pt-4 pb-6">
+    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 shadow-inner px-10 pt-4 pb-8">
       <ul className="flex justify-between">
         {navItems.map((item, index) => {
           const isActive = pathname === item.href;
