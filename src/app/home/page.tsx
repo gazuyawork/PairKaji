@@ -17,7 +17,7 @@ export default function HomePage() {
         <Header title="Home" />
 
         {/* メインコンテンツ */}
-        <main className="flex-1 px-4 py-5 space-y-6">
+        <main className="flex-1 px-4 py-5 space-y-6 overflow-y-auto">
           {/* 1週間の合計ポイントなどの表示 */}
           <WeeklyPoints />
 

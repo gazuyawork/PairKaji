@@ -97,7 +97,7 @@ export default function TodoPage() {
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
       <Header title="Todo" />
 
-      <main className="flex-1 px-4 py-6 space-y-6">
+      <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         <div className="flex gap-2 items-center">
           <div className="relative flex-1">
             <input

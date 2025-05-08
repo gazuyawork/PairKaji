@@ -24,7 +24,7 @@ export default function ContactPage() {
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Contact" />
 
-      <main className="flex-1 px-4 py-6">
+      <main className="flex-1 px-4 py-6 overflow-y-auto">
         {submitted ? (
           <div className="text-center mt-20">
             <p className="text-lg font-bold text-[#5E5E5E]">お問い合わせを送信しました。</p>
