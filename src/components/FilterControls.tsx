@@ -2,13 +2,14 @@
 
 import Image from 'next/image';
 import { ReactNode } from 'react';
+import type { Period } from '@/types/Task';
 
 interface Props {
-  periodFilter: string | null;
-  personFilter: string | null;
-  onTogglePeriod: (period: string) => void;
-  onTogglePerson: (person: string) => void;
-  extraButton?: ReactNode;
+    personFilter: string | null;
+    periodFilter: Period | null;
+    onTogglePeriod: (period: Period) => void;
+    onTogglePerson: (person: string) => void;
+    extraButton?: ReactNode;
 }
 
 export default function FilterControls({
