@@ -233,6 +233,7 @@ export default function TaskPage() {
                     onDelete={deleteTask}
                     onEdit={() => setEditTargetTask({
                       ...task,
+                      period,
                       daysOfWeek: task.daysOfWeek ?? [],
                       dates: task.dates ?? [],
                       isTodo: task.isTodo ?? false,

@@ -146,7 +146,7 @@ export default function TaskCard({
             {task.point} <span className="text-sm">pt</span>
           </p>
           <Image
-            src={task.image}
+            src={task.image ?? '/images/default.png'}
             alt={`${task.person}のアイコン`}
             width={38}
             height={38}

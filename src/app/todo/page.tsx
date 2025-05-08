@@ -5,21 +5,18 @@
 import { useState } from 'react';
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import type { Task } from '@/types/Task';
+import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus, Trash2 } from 'lucide-react';
 
-const initialTasks: Task[] = [
+const initialTasks: TodoOnlyTask[] = [
   { id: 1, name: '食器洗い', frequency: '毎日', todos: [] },
   { id: 2, name: '風呂掃除', frequency: '週次', todos: [] },
   { id: 3, name: '粗大ごみ出し', frequency: '不定期', todos: [] },
 ];
 
 export default function TodoPage() {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [tasks, setTasks] = useState<TodoOnlyTask[]>(initialTasks);
   const [taskInput, setTaskInput] = useState('');
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-
-  const filteredTasks = tasks.filter(task => task.name.includes(taskInput));
 
   const handleAddTodo = (taskId: number) => {
     setTasks(prev =>
@@ -84,10 +81,8 @@ export default function TodoPage() {
   const handleSelectOrAddTask = () => {
     if (!taskInput.trim()) return;
     const existing = tasks.find(task => task.name === taskInput.trim());
-    if (existing) {
-      setSelectedTaskId(existing.id);
-    } else {
-      const newTask: Task = {
+    if (!existing) {
+      const newTask: TodoOnlyTask = {
         id: Date.now(),
         name: taskInput.trim(),
         frequency: '毎日',
