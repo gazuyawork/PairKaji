@@ -5,11 +5,11 @@ import { ReactNode } from 'react';
 import type { Period } from '@/types/Task';
 
 interface Props {
-    personFilter: string | null;
-    periodFilter: Period | null;
-    onTogglePeriod: (period: Period) => void;
-    onTogglePerson: (person: string) => void;
-    extraButton?: ReactNode;
+  personFilter: string | null;
+  periodFilter: Period | null;
+  onTogglePeriod: (period: Period | null) => void;
+  onTogglePerson: (person: string | null) => void;
+  extraButton?: ReactNode;
 }
 
 export default function FilterControls({
@@ -25,40 +25,58 @@ export default function FilterControls({
     { name: '花子', image: '/images/hanako.png' },
   ];
 
+  const showClear = !!(periodFilter || personFilter);
+
   return (
-    <div className="flex justify-center items-center gap-2 flex-wrap">
-      {periods.map(period => (
-        <button
-          key={period}
-          onClick={() => onTogglePeriod(period)}
-          className={`px-4 py-2 rounded-full font-sans border ${
-            periodFilter === period ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
-          }`}
-        >
-          {period}
-        </button>
-      ))}
+    <div className="w-full flex flex-col items-center gap-2">
+      <div className="flex justify-center items-center gap-2 flex-wrap">
+        {periods.map(period => (
+          <button
+            key={period}
+            onClick={() => onTogglePeriod(period)}
+            className={`px-4 py-2 rounded-full font-sans border ${
+              periodFilter === period ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
+            }`}
+          >
+            {period}
+          </button>
+        ))}
 
-      {users.map(user => (
-        <button
-          key={user.name}
-          onClick={() => onTogglePerson(user.name)}
-          className={`w-10 h-10 rounded-full overflow-hidden border ${
-            personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
-          }`}
-        >
-          <Image
-            src={user.image}
-            alt={`${user.name}のフィルター`}
-            width={40}
-            height={40}
-            className="object-cover"
-          />
-        </button>
-      ))}
+        {users.map(user => (
+          <button
+            key={user.name}
+            onClick={() => onTogglePerson(user.name)}
+            className={`w-10 h-10 rounded-full overflow-hidden border ${
+              personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
+            }`}
+          >
+            <Image
+              src={user.image}
+              alt={`${user.name}のフィルター`}
+              width={40}
+              height={40}
+              className="object-cover"
+            />
+          </button>
+        ))}
 
-      <div className="h-6 border-l border-gray-300 mx-2" />
-      {extraButton}
+        <div className="h-6 border-l border-gray-300 mx-2" />
+        {extraButton}
+      </div>
+
+      {showClear && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => {
+              onTogglePeriod(null);
+              onTogglePerson(null);
+            }}
+            className="text-xs px-3 py-1 mt-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
+          >
+            フィルター解除
+          </button>
+        </div>
+      )}
     </div>
   );
 }

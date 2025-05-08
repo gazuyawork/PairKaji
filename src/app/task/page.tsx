@@ -148,8 +148,9 @@ export default function TaskPage() {
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
 
-  const togglePeriod = (p: Period) => setPeriodFilter(prev => (prev === p ? null : p));
-  const togglePerson = (name: string) => setPersonFilter(prev => (prev === name ? null : name));
+  const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
+  const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
+
 
   const toggleDone = (period: Period, index: number) => {
     setTasksState(prev => {
@@ -203,9 +204,6 @@ export default function TaskPage() {
           </button>
         }
       />
-
-
-        
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
 

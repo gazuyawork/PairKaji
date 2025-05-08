@@ -236,14 +236,14 @@ export default function TaskManagePage() {
     setTasks(prev => prev.filter(task => task.id !== id));
   };
 
-  const toggleFilter = (period: Period) => {
+  const toggleFilter = (period: Period | null) => {
     setFilter(prev => (prev === period ? null : period));
   };
-
-  const togglePerson = (person: string) => {
+  
+  const togglePerson = (person: string | null) => {
     setPersonFilter(prev => (prev === person ? null : person));
   };
-
+  
   const handleUserToggle = (id: number, user: string) => {
     setTasks(prev =>
       prev.map(task => {
@@ -310,17 +310,11 @@ export default function TaskManagePage() {
     };
   }, []);
   
-
-
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Edit" />
 
       <main className="flex-1 px-4 py-6 space-y-4">
-
-
-
-
 
       <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
@@ -339,10 +333,6 @@ export default function TaskManagePage() {
           </button>
         }
       />
-
-
-
-
 
         {(filter || personFilter || searchTerm) && (
           <div className="flex justify-center mt-2">
