@@ -2,11 +2,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Circle } from 'lucide-react';
 
 const initialTasks: TodoOnlyTask[] = [
   { id: 1, name: '食器洗い', frequency: '毎日', todos: [] },
@@ -17,14 +17,25 @@ const initialTasks: TodoOnlyTask[] = [
 export default function TodoPage() {
   const [tasks, setTasks] = useState<TodoOnlyTask[]>(initialTasks);
   const [taskInput, setTaskInput] = useState('');
+  const [lastAddedTodoId, setLastAddedTodoId] = useState<number | null>(null);
+  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    if (lastAddedTodoId && inputRefs.current[lastAddedTodoId]) {
+      inputRefs.current[lastAddedTodoId]?.focus();
+      setLastAddedTodoId(null);
+    }
+  }, [tasks, lastAddedTodoId]);
 
   const handleAddTodo = (taskId: number) => {
+    const newTodoId = Date.now();
+    setLastAddedTodoId(newTodoId);
     setTasks(prev =>
       prev.map(task =>
         task.id === taskId
           ? {
               ...task,
-              todos: [...(task.todos || []), { id: Date.now(), text: '', done: false }],
+              todos: [...(task.todos || []), { id: newTodoId, text: '', done: false }],
             }
           : task
       )
@@ -126,19 +137,31 @@ export default function TodoPage() {
           <div key={task.id} className="bg-white rounded-xl shadow p-4 space-y-2">
             <div className="flex justify-between items-center">
               <h2 className="font-bold text-[#5E5E5E] text-lg">{task.name}</h2>
-              <button onClick={() => handleDeleteTask(task.id)}>
+              <button 
+                onClick={() => handleDeleteTask(task.id)}
+                className="pb-2"
+              >
                 <span className="text-xl text-gray-400 hover:text-red-500 font-bold">×</span>
               </button>
             </div>
 
             {(task.todos || []).map(todo => (
-              <div key={todo.id} className="flex items-center gap-2">
+              <div key={todo.id} className="flex items-center gap-2 mb-4">
+                <div
+                  className="cursor-pointer"
+                  onClick={() => handleToggleDone(task.id, todo.id)}
+                >
+                  {todo.done ? (
+                    <CheckCircle className="text-yellow-500" />
+                  ) : (
+                    <Circle className="text-gray-400" />
+                  )}
+                </div>
+
                 <input
-                  type="checkbox"
-                  checked={todo.done}
-                  onChange={() => handleToggleDone(task.id, todo.id)}
-                />
-                <input
+                  ref={(el) => {
+                    inputRefs.current[todo.id] = el;
+                  }}
                   type="text"
                   value={todo.text}
                   onChange={e => handleChangeTodo(task.id, todo.id, e.target.value)}
@@ -146,16 +169,16 @@ export default function TodoPage() {
                   placeholder="TODOを入力"
                 />
                 <button onClick={() => handleDeleteTodo(task.id, todo.id)}>
-                  <Trash2 size={16} className="text-gray-400 hover:text-red-500" />
+                  <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
                 </button>
               </div>
             ))}
 
             <button
               onClick={() => handleAddTodo(task.id)}
-              className="flex items-center gap-1 text-sm text-gray-600 hover:text-[#FFCB7D]"
+              className="flex items-center gap-2 text-gray-600 hover:text-[#FFCB7D]"
             >
-              <Plus size={16} /> TODOを追加
+              <Plus size={24} /> TODOを追加
             </button>
           </div>
         ))}
