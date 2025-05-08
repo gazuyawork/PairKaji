@@ -9,10 +9,14 @@ import EditTaskModal from '@/components/EditTaskModal';
 import Image from 'next/image';
 import type { Task, Period } from '@/types/Task';
 import { useRouter } from 'next/navigation';   // ← router.push に必要
+import SearchBox from '@/components/SearchBox';
+import FilterControls from '@/components/FilterControls';
+
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
 export default function TaskPage() {
+  const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter(); // TaskPage 内 useRouter フック追加
   const initialTaskGroups: Record<Period, Task[]> = {
     '毎日': [
@@ -181,48 +185,16 @@ export default function TaskPage() {
       <Header title="Task" />
 
       <main className="flex-1 px-4 py-6 space-y-6">
-        <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white mb-4">
-          <Search className="text-gray-400 mr-2" size={20} />
-          <input
-            type="text"
-            placeholder="検索する家事の名前を入力"
-            className="flex-1 outline-none text-[#5E5E5E] font-sans"
-          />
-        </div>
 
-        <div className="flex justify-center items-center gap-2 flex-wrap my-0">
-          {periods.map(p => (
-            <button
-              key={p}
-              onClick={() => togglePeriod(p)}
-              className={`px-4 py-2 rounded-full font-sans border ${
-                periodFilter === p ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
-              }`}
-            >
-              {p}
-            </button>
-          ))}
 
-          {['太郎', '花子'].map(name => (
-            <button
-              key={name}
-              onClick={() => togglePerson(name)}
-              className={`w-10 h-10 rounded-full overflow-hidden border ${
-                personFilter === name ? 'border-[#FFCB7D]' : 'border-gray-300'
-              }`}
-            >
-              <Image
-                src={`/images/${name === '太郎' ? 'taro' : 'hanako'}.png`}
-                alt={`${name}のフィルター`}
-                width={40}
-                height={40}
-                className="object-cover"
-              />
-            </button>
-          ))}
+      <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
-          <div className="h-6 border-l border-gray-300 mx-2" />
-
+      <FilterControls
+        periodFilter={periodFilter}
+        personFilter={personFilter}
+        onTogglePeriod={togglePeriod}
+        onTogglePerson={togglePerson}
+        extraButton={
           <button
             onClick={() => router.push('/task_manage')}
             className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
@@ -230,21 +202,11 @@ export default function TaskPage() {
             <Pencil className="w-4 h-4" />
             一括編集
           </button>
-        </div>
+        }
+      />
 
-        {(periodFilter || personFilter) && (
-          <div className="flex justify-center mt-2">
-            <button
-              onClick={() => {
-                setPeriodFilter(null);
-                setPersonFilter(null);
-              }}
-              className="text-ls px-3 py-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
-            >
-              フィルター解除
-            </button>
-          </div>
-        )}
+
+        
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
 

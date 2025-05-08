@@ -2,11 +2,13 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { Search, Plus, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import SearchBox from '@/components/SearchBox';
+import FilterControls from '@/components/FilterControls';
 
 interface Task {
   id: number;
@@ -314,54 +316,19 @@ export default function TaskManagePage() {
       <Header title="Edit" />
 
       <main className="flex-1 px-4 py-6 space-y-4">
-        {/* 検索ボックス */}
-        <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white">
-          <Search className="text-gray-400 mr-2" size={20} />
-          <input
-            type="text"
-            placeholder="検索する家事の名前を入力"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="flex-1 outline-none text-[#5E5E5E] font-sans"
-          />
-        </div>
 
-        {/* フィルタ＋戻るボタン */}
-        <div className="flex justify-center items-center gap-2 flex-wrap">
-          {['毎日', '週次', '不定期'].map(period => (
-            <button
-              key={period}
-              onClick={() => toggleFilter(period)}
-              className={`px-4 py-2 rounded-full font-sans border ${
-                filter === period ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
-              }`}
-            >
-              {period}
-            </button>
-          ))}
 
-          {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(user => (
-            <button
-              key={user.name}
-              onClick={() => togglePerson(user.name)}
-              className={`w-10 h-10 rounded-full overflow-hidden border ${
-                personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
-              }`}
-            >
-              <Image
-                src={user.image}
-                alt={`${user.name}のフィルター`}
-                width={38}
-                height={38}
-                className="w-full h-full object-cover"
-              />
-            </button>
-          ))}
 
-          {/* 縦棒 */}
-          <div className="h-6 border-l border-gray-300 mx-2" />
 
-          {/* 戻るボタン */}
+
+      <SearchBox value={searchTerm} onChange={setSearchTerm} />
+
+      <FilterControls
+        periodFilter={filter}
+        personFilter={personFilter}
+        onTogglePeriod={toggleFilter}
+        onTogglePerson={togglePerson}
+        extraButton={
           <button
             onClick={() => router.push('/task')}
             className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
@@ -369,15 +336,8 @@ export default function TaskManagePage() {
             <ArrowLeft className="w-4 h-4" />
             タスク一覧へ
           </button>
-        </div>
-
-
-
-
-
-
-
-
+        }
+      />
 
 
 
