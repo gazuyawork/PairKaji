@@ -2,11 +2,10 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { Search, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useState } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
-import Image from 'next/image';
 import type { Task, Period } from '@/types/Task';
 import { useRouter } from 'next/navigation';   // ← router.push に必要
 import SearchBox from '@/components/SearchBox';

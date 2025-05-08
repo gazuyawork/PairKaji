@@ -11,7 +11,7 @@ import { getAuth, signOut } from 'firebase/auth';
 // 例：ログアウト処理のあるコンポーネント
 import { auth } from '@/lib/firebase';
 
-await signOut(auth);
+// await signOut(auth);
 
 
 
