@@ -19,7 +19,7 @@ export default function FilterControls({
   onTogglePerson,
   extraButton,
 }: Props) {
-  const periods = ['毎日', '週次', '不定期'];
+  const periods = ['毎日', '週次', '不定期'] as const;
   const users = [
     { name: '太郎', image: '/images/taro.png' },
     { name: '花子', image: '/images/hanako.png' },
