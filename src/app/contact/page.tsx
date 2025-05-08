@@ -1,4 +1,8 @@
+// src/app/contact/page.tsx
+
 'use client';
+
+export const dynamic = 'force-dynamic'; // ← ★ 追加（重要）
 
 import { useState } from 'react';
 import Header from '@/components/Header';
@@ -12,7 +16,7 @@ export default function ContactPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // ここに送信処理を実装（例: Firebase Functions や SendGrid）
+    // 本来ならここに送信処理を追加（Firebase Functions など）
     setSubmitted(true);
   };
 
