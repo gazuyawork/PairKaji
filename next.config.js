@@ -1,15 +1,10 @@
-// next.config.ts または next.config.js
-// @ts-ignore
-import withPWA from 'next-pwa';
-
-const nextConfig = withPWA({
+// next.config.js
+const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
-
   runtimeCaching: [
-    // APIレスポンスのキャッシュ（NetworkFirst）
     {
       urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
       handler: 'NetworkFirst',
@@ -17,11 +12,10 @@ const nextConfig = withPWA({
         cacheName: 'firebase-api',
         expiration: {
           maxEntries: 50,
-          maxAgeSeconds: 60 * 60, // 1時間
+          maxAgeSeconds: 60 * 60,
         },
       },
     },
-    // 画像などの静的アセット（CacheFirst）
     {
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/,
       handler: 'CacheFirst',
@@ -29,11 +23,10 @@ const nextConfig = withPWA({
         cacheName: 'images',
         expiration: {
           maxEntries: 100,
-          maxAgeSeconds: 7 * 24 * 60 * 60, // 1週間
+          maxAgeSeconds: 7 * 24 * 60 * 60,
         },
       },
     },
-    // CSS・JSファイル
     {
       urlPattern: /\.(?:js|css)$/,
       handler: 'StaleWhileRevalidate',
@@ -45,7 +38,6 @@ const nextConfig = withPWA({
         },
       },
     },
-    // ルーティングされたページ
     {
       urlPattern: /^\/$/,
       handler: 'NetworkFirst',
@@ -60,4 +52,8 @@ const nextConfig = withPWA({
   ],
 });
 
-export default nextConfig;
+const nextConfig = {
+  reactStrictMode: true,
+};
+
+module.exports = withPWA(nextConfig);
