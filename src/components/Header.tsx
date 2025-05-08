@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { getAuth, signOut } from 'firebase/auth';
 
 // 例：ログアウト処理のあるコンポーネント
-import { auth } from '@/lib/firebase';
+// import { auth } from '@/lib/firebase';
 
 // await signOut(auth);
 
