@@ -10,7 +10,7 @@ export default function FooterNav() {
   const navItems = [
     { name: 'ホーム', icon: Home, href: '/home' },
     { name: '掃除', icon: ListTodo, href: '/task' }, // 中央に配置
-    { name: 'プロフィール', icon: LayoutList, href: '/profile' },
+    { name: 'プロフィール', icon: LayoutList, href: '/todo' },
   ];
 
   return (
