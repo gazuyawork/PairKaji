@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
+import type { Period } from '@/types/Task';
 
 interface Task {
   id: number;
@@ -194,7 +195,7 @@ export default function TaskManagePage() {
     { id: 4, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
   ]);
 
-  const [filter, setFilter] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -235,7 +236,7 @@ export default function TaskManagePage() {
     setTasks(prev => prev.filter(task => task.id !== id));
   };
 
-  const toggleFilter = (period: string) => {
+  const toggleFilter = (period: Period) => {
     setFilter(prev => (prev === period ? null : period));
   };
 
