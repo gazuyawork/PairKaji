@@ -17,25 +17,41 @@ const initialTasks: TodoOnlyTask[] = [
 export default function TodoPage() {
   const [tasks, setTasks] = useState<TodoOnlyTask[]>(initialTasks);
   const [taskInput, setTaskInput] = useState('');
-  const [lastAddedTodoId, setLastAddedTodoId] = useState<number | null>(null);
-  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
-
-  useEffect(() => {
-    if (lastAddedTodoId && inputRefs.current[lastAddedTodoId]) {
-      inputRefs.current[lastAddedTodoId]?.focus();
-      setLastAddedTodoId(null);
-    }
-  }, [tasks, lastAddedTodoId]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const todoInputRef = useRef<HTMLInputElement | null>(null);
+  const [focusedTodoId, setFocusedTodoId] = useState<number | null>(null);
 
   const handleAddTodo = (taskId: number) => {
     const newTodoId = Date.now();
-    setLastAddedTodoId(newTodoId);
+    setFocusedTodoId(newTodoId);
     setTasks(prev =>
       prev.map(task =>
         task.id === taskId
           ? {
               ...task,
               todos: [...(task.todos || []), { id: newTodoId, text: '', done: false }],
+            }
+          : task
+      )
+    );
+  };
+
+  useEffect(() => {
+    if (focusedTodoId !== null) {
+      setTimeout(() => {
+        todoInputRef.current?.focus();
+      }, 0);
+    }
+  }, [tasks]);
+
+  const handleBlurTodo = (taskId: number, todoId: number, text: string) => {
+    if (text.trim() !== '') return;
+    setTasks(prev =>
+      prev.map(task =>
+        task.id === taskId
+          ? {
+              ...task,
+              todos: task.todos.filter(todo => todo.id !== todoId),
             }
           : task
       )
@@ -102,6 +118,7 @@ export default function TodoPage() {
       setTasks(prev => [...prev, newTask]);
     }
     setTaskInput('');
+    inputRef.current?.focus();
   };
 
   return (
@@ -112,6 +129,7 @@ export default function TodoPage() {
         <div className="flex gap-2 items-center">
           <div className="relative flex-1">
             <input
+              ref={inputRef}
               type="text"
               value={taskInput}
               onChange={(e) => setTaskInput(e.target.value)}
@@ -157,14 +175,12 @@ export default function TodoPage() {
                     <Circle className="text-gray-400" />
                   )}
                 </div>
-
                 <input
-                  ref={(el) => {
-                    inputRefs.current[todo.id] = el;
-                  }}
+                  ref={todo.id === focusedTodoId ? todoInputRef : null}
                   type="text"
                   value={todo.text}
                   onChange={e => handleChangeTodo(task.id, todo.id, e.target.value)}
+                  onBlur={() => handleBlurTodo(task.id, todo.id, todo.text)}
                   className="flex-1 border-b border-gray-300 bg-transparent outline-none"
                   placeholder="TODOを入力"
                 />
