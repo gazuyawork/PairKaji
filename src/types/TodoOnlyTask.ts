@@ -1,6 +1,4 @@
 // src/types/TodoOnlyTask.ts
-import type { Period } from './Task';
-
 export type TodoItem = {
   id: string;
   text: string;
