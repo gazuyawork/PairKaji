@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
