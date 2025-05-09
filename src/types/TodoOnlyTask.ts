@@ -1,15 +1,15 @@
 // src/types/TodoOnlyTask.ts
 import type { Period } from './Task';
 
-export type Todo = {
-  id: number;
+export type TodoItem = {
+  id: string;
   text: string;
   done: boolean;
 };
 
 export type TodoOnlyTask = {
-  id: number;
+  id: string;
   name: string;
-  frequency: Period;
-  todos: Todo[];
+  frequency: '毎日' | '週次' | '不定期';
+  todos: TodoItem[];
 };
