@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect, KeyboardEvent, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import TodoTaskCard from '@/components/TodoTaskCard';
-import type { TodoOnlyTask, TodoItem } from '@/types/TodoOnlyTask';
+import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus } from 'lucide-react';
 
 const initialTasks: TodoOnlyTask[] = [
