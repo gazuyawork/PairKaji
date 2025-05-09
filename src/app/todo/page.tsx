@@ -17,13 +17,10 @@ const initialTasks: TodoOnlyTask[] = [
 export default function TodoPage() {
   const [tasks, setTasks] = useState<TodoOnlyTask[]>(initialTasks);
   const [taskInput, setTaskInput] = useState('');
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const todoInputRef = useRef<HTMLInputElement | null>(null);
   const [focusedTodoId, setFocusedTodoId] = useState<number | null>(null);
 
   const handleAddTodo = (taskId: number) => {
     const newTodoId = Date.now();
-    setFocusedTodoId(newTodoId);
     setTasks(prev =>
       prev.map(task =>
         task.id === taskId
@@ -34,15 +31,8 @@ export default function TodoPage() {
           : task
       )
     );
+    setFocusedTodoId(newTodoId);
   };
-
-  useEffect(() => {
-    if (focusedTodoId !== null) {
-      setTimeout(() => {
-        todoInputRef.current?.focus();
-      }, 0);
-    }
-  }, [tasks]);
 
   const handleBlurTodo = (taskId: number, todoId: number, text: string) => {
     if (text.trim() !== '') return;
@@ -118,7 +108,6 @@ export default function TodoPage() {
       setTasks(prev => [...prev, newTask]);
     }
     setTaskInput('');
-    inputRef.current?.focus();
   };
 
   return (
@@ -129,7 +118,6 @@ export default function TodoPage() {
         <div className="flex gap-2 items-center">
           <div className="relative flex-1">
             <input
-              ref={inputRef}
               type="text"
               value={taskInput}
               onChange={(e) => setTaskInput(e.target.value)}
@@ -176,11 +164,17 @@ export default function TodoPage() {
                   )}
                 </div>
                 <input
-                  ref={todo.id === focusedTodoId ? todoInputRef : null}
+                  id={`todo-input-${todo.id}`}
                   type="text"
                   value={todo.text}
-                  onChange={e => handleChangeTodo(task.id, todo.id, e.target.value)}
                   onBlur={() => handleBlurTodo(task.id, todo.id, todo.text)}
+                  onChange={e => handleChangeTodo(task.id, todo.id, e.target.value)}
+                  ref={el => {
+                    if (el && todo.id === focusedTodoId) {
+                      el.focus();
+                      setFocusedTodoId(null);
+                    }
+                  }}
                   className="flex-1 border-b border-gray-300 bg-transparent outline-none"
                   placeholder="TODOを入力"
                 />
