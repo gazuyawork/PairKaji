@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+// import { X } from 'lucide-react';
 import type { Task, Period } from '@/types/Task';
+import Image from 'next/image';
 
 type Props = {
   isOpen: boolean;
@@ -19,8 +20,8 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
       ...task,
       daysOfWeek: task.daysOfWeek ?? [],
       dates: task.dates ?? [],
-      isTodo: task.isTodo ?? false,
-      period: task.period, // 明示的に保持
+      users: task.users ?? [],
+      period: task.period,
     });
   }, [task]);
 
@@ -30,12 +31,19 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
     setEditedTask(prev => ({ ...prev, [key]: value }));
   };
 
+  const toggleUser = (user: string) => {
+    const newUsers = editedTask.users.includes(user)
+      ? editedTask.users.filter(u => u !== user)
+      : [...editedTask.users, user];
+    update('users', newUsers);
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
       <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative">
-        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+        {/* <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
           <X size={20} />
-        </button>
+        </button> */}
 
         <div className="space-y-6 mt-6 mx-3">
           {/* 家事名 */}
@@ -49,9 +57,9 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             />
           </div>
 
-          {/* 頻度（period） */}
+          {/* 頻度 */}
           <div className="flex items-center">
-            <label className="w-20 text-gray-600">&nbsp;&nbsp;&nbsp;&nbsp;頻度：</label>
+            <label className="w-20 text-gray-600">頻度：</label>
             <select
               value={editedTask.period}
               onChange={e => update('period', e.target.value as Period)}
@@ -63,10 +71,10 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </select>
           </div>
 
-          {/* 週次 → 曜日選択 */}
+          {/* 曜日（週次） */}
           {editedTask.period === '週次' && (
             <div className="flex items-center">
-              <label className="w-20 text-gray-600">&nbsp;&nbsp;&nbsp;&nbsp;曜日：</label>
+              <label className="w-20 text-gray-600">曜日：</label>
               <div className="flex gap-2 flex-wrap">
                 {['月', '火', '水', '木', '金', '土', '日'].map(day => (
                   <button
@@ -91,10 +99,10 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </div>
           )}
 
-          {/* 不定期 → 日付入力 */}
+          {/* 日付（不定期） */}
           {editedTask.period === '不定期' && (
             <div className="flex items-center">
-              <label className="w-20 text-gray-600">&nbsp;&nbsp;&nbsp;&nbsp;日付：</label>
+              <label className="w-20 text-gray-600">日付：</label>
               <input
                 type="date"
                 value={editedTask.dates[0] || ''}
@@ -118,34 +126,44 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </select>
           </div>
 
-          {/* TODO */}
+          {/* 担当者 */}
           <div className="flex items-center">
-            <label className="w-20 text-gray-600">&nbsp;&nbsp;TODO：</label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => update('isTodo', !editedTask.isTodo)}
-                className={`w-10 h-6 rounded-full relative transition-colors duration-300 ml-3 ${
-                  editedTask.isTodo ? 'bg-[#FFCB7D]' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${
-                    editedTask.isTodo ? 'translate-x-4' : ''
+            <label className="w-20 text-gray-600">担当者：</label>
+            <div className="flex gap-2">
+              {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(user => (
+                <button
+                  key={user.name}
+                  type="button"
+                  onClick={() => toggleUser(user.name)}
+                  className={`w-12 h-12 rounded-full border overflow-hidden ${
+                    editedTask.users.includes(user.name)
+                      ? 'border-[#FFCB7D] opacity-100'
+                      : 'border-gray-300 opacity-30'
                   }`}
-                ></span>
-              </button>
+                >
+                  <Image src={user.image} alt={user.name} width={48} height={48} />
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-full hover:shadow-md cursor-pointer">キャンセル</button>
+        <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
           <button
-            onClick={() => onSave(editedTask)}
-            className="px-4 py-2 bg-[#FFCB7D] text-white rounded-full font-bold hover:shadow-md cursor-pointer"
+            onClick={() => {
+              onSave(editedTask);
+              onClose();
+            }}
+            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
           >
             保存
+          </button>
+
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+          >
+            キャンセル
           </button>
         </div>
       </div>

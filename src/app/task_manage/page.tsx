@@ -1,3 +1,5 @@
+// src/app/todo/page.tsx
+
 'use client';
 
 import Header from '@/components/Header';
@@ -19,7 +21,6 @@ interface Task {
   users: string[];
   daysOfWeek: string[];
   dates: string[];
-  isTodo: boolean;
   isNew: boolean;
   isEdited: boolean;
   showDelete: boolean;
@@ -89,15 +90,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
           onChange={(e) => onChange(task.id, 'name', e.target.value)}
           className="flex-1 text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent border-b border-gray-300"
         />
-        <label className="flex items-center gap-1 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={task.isTodo}
-            onChange={(e) => onChange(task.id, 'isTodo', e.target.checked)}
-            className="appearance-none w-4 h-4 rounded-full border border-gray-300 checked:bg-[#5E5E5E] checked:border-transparent ml-6 mr-1"
-          />
-          <span className="font-bold">TODO</span>
-        </label>
       </div>
 
       <div className="flex items-center justify-between">
@@ -184,15 +176,13 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
 TaskCard.displayName = 'TaskCard';
 
-
-
 export default function TaskManagePage() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, name: '', frequency: '毎日', point: 100, users: ['太郎'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
-    { id: 2, name: '', frequency: '毎日', point: 100, users: ['花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
-    { id: 3, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
-    { id: 4, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isTodo: false, isNew: false, isEdited: false, showDelete: false },
+    { id: 1, name: '', frequency: '毎日', point: 100, users: ['太郎'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
+    { id: 2, name: '', frequency: '毎日', point: 100, users: ['花子'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
+    { id: 3, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
+    { id: 4, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
   ]);
 
   const [filter, setFilter] = useState<Period | null>(null);
@@ -210,7 +200,6 @@ export default function TaskManagePage() {
         users: ['太郎', '花子'],
         daysOfWeek: [],
         dates: [],
-        isTodo: false,
         isNew: true,
         isEdited: false,
         showDelete: false,

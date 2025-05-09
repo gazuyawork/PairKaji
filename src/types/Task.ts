@@ -17,4 +17,5 @@ export type Task = {
   image: string;
   scheduledDate?: string;
   period: Period;
+  showDelete?: boolean;
 };
