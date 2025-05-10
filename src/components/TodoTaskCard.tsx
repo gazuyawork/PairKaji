@@ -74,54 +74,58 @@ export default function TodoTaskCard({
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2">
         <h2 className="font-bold text-[#5E5E5E] text-lg py-2">{task.name}</h2>
 
-        {filteredTodos.length === 0 && tab === 'done' && (
-          <div className="text-sm text-gray-400 italic">完了したタスクはありません</div>
-        )}
+        {/* ▼ カード内スクロール対応エリア ▼ */}
+        <div className="max-h-[30vh] overflow-y-auto space-y-4 pr-2">
+          {filteredTodos.length === 0 && tab === 'done' && (
+            <div className="text-sm text-gray-400 italic">完了したタスクはありません</div>
+          )}
 
-        {filteredTodos.map(todo => (
-          <div
-            key={todo.id}
-            className="flex items-center gap-2 mb-4"
-          >
+          {filteredTodos.map(todo => (
             <div
-              className="cursor-pointer"
-              onClick={() => onToggleDone(todo.id)}
+              key={todo.id}
+              className="flex items-center gap-2"
             >
-              {todo.done ? (
-                <CheckCircle className="text-yellow-500" />
-              ) : (
-                <Circle className="text-gray-400" />
-              )}
+              <div
+                className="cursor-pointer"
+                onClick={() => onToggleDone(todo.id)}
+              >
+                {todo.done ? (
+                  <CheckCircle className="text-yellow-500" />
+                ) : (
+                  <Circle className="text-gray-400" />
+                )}
+              </div>
+              <input
+                type="text"
+                value={todo.text}
+                onChange={(e) => onChangeTodo(todo.id, e.target.value)}
+                onBlur={() => onBlurTodo(todo.id, todo.text)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && todo.text.trim() !== '') {
+                    e.preventDefault();
+                    onAddTodo(crypto.randomUUID());
+                  }
+                }}
+                ref={(el) => {
+                  if (el) todoRefs.current[todo.id] = el;
+                  if (focusedTodoId === todo.id) {
+                    el?.focus();
+                  }
+                }}
+                className={clsx(
+                  'flex-1 border-b bg-transparent outline-none border-gray-200',
+                  todo.done ? 'text-gray-400 line-through' : 'text-black'
+                )}
+                placeholder="TODOを入力"
+              />
+              <button onClick={() => onDeleteTodo(todo.id)} type="button">
+                <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
+              </button>
             </div>
-            <input
-              type="text"
-              value={todo.text}
-              onChange={(e) => onChangeTodo(todo.id, e.target.value)}
-              onBlur={() => onBlurTodo(todo.id, todo.text)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && todo.text.trim() !== '') {
-                  e.preventDefault();
-                  onAddTodo(crypto.randomUUID());
-                }
-              }}
-              ref={(el) => {
-                if (el) todoRefs.current[todo.id] = el;
-                if (focusedTodoId === todo.id) {
-                  el?.focus();
-                }
-              }}
-              className={clsx(
-                'flex-1 border-b bg-transparent outline-none border-gray-200',
-                todo.done ? 'text-gray-400 line-through' : 'text-black'
-              )}
-              placeholder="TODOを入力"
-            />
-            <button onClick={() => onDeleteTodo(todo.id)} type="button">
-              <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
-            </button>
-          </div>
-        ))}
+          ))}
+        </div>
 
+        {/* ▼ 追加ボタンは下に固定表示 */}
         {tab === 'undone' && (
           <button
             onClick={() => onAddTodo(crypto.randomUUID())}

@@ -40,7 +40,7 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
   }, []);
 
   return (
-    <div className="relative py-2">
+    <div className="relative py-0">
       {/* スクロール可能なグループボタンエリア */}
       <div
         ref={scrollRef}
