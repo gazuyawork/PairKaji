@@ -60,11 +60,11 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
               max={1000}
               value={point}
               onChange={e => setPoint(Number(e.target.value))}
-              className="w-26 text-4xl border-b border-gray-300 outline-none px-2 py-1 text-[#5E5E5E]"
+              className="w-26 text-4xl border-b border-gray-300 outline-none px-2 py-1 text-[#5E5E5E] text-center"
             />
             <button
               onClick={() => setPoint(onAutoCalculate())}
-              className="flex w-20 items-center gap-1 px-2 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100"
+              className="flex w-20 items-center gap-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100"
             >
               <Sparkles size={16} className="text-yellow-500" />
               自動
@@ -98,6 +98,7 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
           <button
             onClick={onClose}
             className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+            // className="w-fullpx-6 py-3 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100"
           >
             キャンセル
           </button>
