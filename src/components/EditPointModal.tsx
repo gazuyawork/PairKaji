@@ -71,15 +71,23 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
             </button>
           </div>
 
-          {/* 合計ポイント下に担当者内訳 */}
-          <div className="mt-4 space-y-2">
-            <p className="text-sm text-gray-600 font-semibold">担当者別の内訳：</p>
-            {userPoints.map(user => (
-              <div key={user.name} className="flex items-center gap-4">
-                <Image src={user.image} alt={user.name} width={36} height={36} className="rounded-full border border-gray-300" />
-                <p className="text-gray-600 font-bold">{user.name}：{user.point} pt</p>
-              </div>
-            ))}
+          {/* 合計ポイント下に担当者内訳（横並び表示） */}
+          <div className="flex mt-4">
+            <p className="text-gray-600 font-bold pt-2 pl-2 pr-6">内訳</p>
+            <div className="flex justify-center gap-6">
+              {userPoints.map(user => (
+                <div key={user.name} className="flex items-center gap-2">
+                  <Image
+                    src={user.image}
+                    alt={user.name}
+                    width={40}
+                    height={42}
+                    className="rounded-full border border-gray-300"
+                  />
+                  <p className="text-gray-600"><span className="text-2xl">{user.point}</span> pt</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
