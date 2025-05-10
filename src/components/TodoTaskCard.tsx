@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Circle, Trash2, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
@@ -30,30 +29,38 @@ export default function TodoTaskCard({
   todoRefs,
   focusedTodoId,
 }: Props) {
-  const filteredTodos = task.todos.filter(todo =>
-    tab === 'done' ? todo.done : !todo.done
-  );
+  const undoneCount = task.todos.filter(todo => !todo.done).length;
+  const doneCount = task.todos.filter(todo => todo.done).length;
+  const filteredTodos = tab === 'done'
+    ? task.todos.filter(todo => todo.done)
+    : task.todos.filter(todo => !todo.done);
 
   return (
     <div className="relative">
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <div className="flex space-x-0">
-          {['undone', 'done'].map((type) => (
-            <button
-              key={type}
-              onClick={() => setTab(type as 'undone' | 'done')}
-              className={clsx(
-                'px-4 py-1 text-sm font-bold border border-gray-300',
-                'rounded-t-md w-24',
-                type === tab
-                  ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
-                  : 'bg-gray-100 text-gray-400 z-0'
-              )}
-              type="button"
-            >
-              {type === 'undone' ? '未処理' : '完了'}
-            </button>
-          ))}
+          {['undone', 'done'].map((type) => {
+            const count = type === 'undone' ? undoneCount : doneCount;
+            return (
+              <button
+                key={type}
+                onClick={() => setTab(type as 'undone' | 'done')}
+                className={clsx(
+                  'relative px-4 py-1 text-sm font-bold border border-gray-300',
+                  'rounded-t-md w-30 flex items-center justify-center',
+                  type === tab
+                    ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
+                    : 'bg-gray-100 text-gray-400 z-0'
+                )}
+                type="button"
+              >
+                <span className="absolute left-2 inline-block min-w-[20px] h-[20px] text-xs leading-[20px] text-white bg-[#5E5E5E] rounded-full text-center">
+                  {count}
+                </span>
+                {type === 'undone' ? '未処理' : '完了'}
+              </button>
+            );
+          })}
         </div>
         <button
           onClick={onDeleteTask}
@@ -71,56 +78,49 @@ export default function TodoTaskCard({
           <div className="text-sm text-gray-400 italic">完了したタスクはありません</div>
         )}
 
-        <AnimatePresence>
-          {filteredTodos.map(todo => (
-            <motion.div
-              key={todo.id}
-              className="flex items-center gap-2 mb-4"
-              initial={{ opacity: -20, y: 0 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.2 }}
+        {filteredTodos.map(todo => (
+          <div
+            key={todo.id}
+            className="flex items-center gap-2 mb-4"
+          >
+            <div
+              className="cursor-pointer"
+              onClick={() => onToggleDone(todo.id)}
             >
-              <div
-                className="cursor-pointer"
-                onClick={() => onToggleDone(todo.id)}
-              >
-                {todo.done ? (
-                  <CheckCircle className="text-yellow-500" />
-                ) : (
-                  <Circle className="text-gray-400" />
-                )}
-              </div>
-                <input
-                type="text"
-                value={todo.text}
-                onChange={(e) => onChangeTodo(todo.id, e.target.value)}
-                onBlur={() => onBlurTodo(todo.id, todo.text)}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' && todo.text.trim() !== '') {
-                    e.preventDefault(); // スマホでも改行を防止
-                    onAddTodo(crypto.randomUUID());
-                    }
-                }}
-                ref={(el) => {
-                    if (el) todoRefs.current[todo.id] = el;
-                    if (focusedTodoId === todo.id) {
-                    el?.focus();
-                    }
-                }}
-                className={clsx(
-                    'flex-1 border-b bg-transparent outline-none border-gray-200',
-                    todo.done ? 'text-gray-400 line-through' : 'text-black'
-                )}
-                placeholder="TODOを入力"
-                />
-
-              <button onClick={() => onDeleteTodo(todo.id)} type="button">
-                <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              {todo.done ? (
+                <CheckCircle className="text-yellow-500" />
+              ) : (
+                <Circle className="text-gray-400" />
+              )}
+            </div>
+            <input
+              type="text"
+              value={todo.text}
+              onChange={(e) => onChangeTodo(todo.id, e.target.value)}
+              onBlur={() => onBlurTodo(todo.id, todo.text)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && todo.text.trim() !== '') {
+                  e.preventDefault();
+                  onAddTodo(crypto.randomUUID());
+                }
+              }}
+              ref={(el) => {
+                if (el) todoRefs.current[todo.id] = el;
+                if (focusedTodoId === todo.id) {
+                  el?.focus();
+                }
+              }}
+              className={clsx(
+                'flex-1 border-b bg-transparent outline-none border-gray-200',
+                todo.done ? 'text-gray-400 line-through' : 'text-black'
+              )}
+              placeholder="TODOを入力"
+            />
+            <button onClick={() => onDeleteTodo(todo.id)} type="button">
+              <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
+            </button>
+          </div>
+        ))}
 
         {tab === 'undone' && (
           <button

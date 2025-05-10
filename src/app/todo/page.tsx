@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import TodoTaskCard from '@/components/TodoTaskCard';
+import GroupSelector from '@/components/GroupSelector';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus } from 'lucide-react';
 
@@ -18,6 +19,7 @@ export default function TodoPage() {
   const [taskInput, setTaskInput] = useState('');
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const taskInputRef = useRef<HTMLInputElement | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -79,6 +81,12 @@ export default function TodoPage() {
             <Plus size={20} />
           </button>
         </div>
+
+        {/* グループ選択コンポーネント */}
+        <GroupSelector
+          selectedGroupId={selectedGroupId}
+          onSelectGroup={setSelectedGroupId}
+        />
 
         {tasks.map(task => (
           <TodoTaskCard
