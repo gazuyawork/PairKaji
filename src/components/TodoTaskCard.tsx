@@ -93,7 +93,7 @@ export default function TodoTaskCard({
         <div
           ref={scrollRef}
           className={clsx(
-            'max-h-[60vh] space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100',
+            'max-h-[30vh] space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100',
             isScrollable ? 'overflow-y-scroll' : 'overflow-y-auto'
           )}
         >
