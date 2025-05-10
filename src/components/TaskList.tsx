@@ -2,11 +2,10 @@
 
 'use client';
 
-import type { Task } from '@/types/Task';
 import { useState } from 'react';
 import { Heart } from 'lucide-react';
 
-export default function TaskCalendar({ tasks = [] }: { tasks?: Task[] }) {
+export default function TaskCalendar() {
   const sampleTasks = ['食器洗い', 'ゴミ出し', '掃除機がけ'];
   const [liked, setLiked] = useState<boolean[]>(Array(sampleTasks.length).fill(false));
 
