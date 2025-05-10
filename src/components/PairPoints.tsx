@@ -6,14 +6,13 @@ import type { Task } from '@/types/Task';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
-export default function TaskCalendar({ tasks = [] }: { tasks?: Task[] }) {
+export default function TaskCalendar() {
   const router = useRouter();
 
   const userA = { name: 'たろう', points: 24, image: '/images/taro.png' };
   const userB = { name: 'はなこ', points: 24, image: '/images/hanako.png' };
 
   return (
-
     <>
       {/* ペアポイントカード（1枚） */}
       {userA && userB ? (
