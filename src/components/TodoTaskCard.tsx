@@ -53,7 +53,17 @@ export default function TodoTaskCard({
 
   return (
     <div className="relative">
+      {/* ヘッダー：グループ名 + タブ + 削除ボタン */}
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
+      {/* 左端：グループ名 */}
+      <h2 className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%]">
+        {task.name}
+      </h2>
+
+
+      {/* 右側：タブ + ×ボタンを横並び */}
+      <div className="flex items-center gap-2">
+        {/* タブボタン（未処理・完了） */}
         <div className="flex space-x-0">
           {['undone', 'done'].map((type) => {
             const count = type === 'undone' ? undoneCount : doneCount;
@@ -62,8 +72,8 @@ export default function TodoTaskCard({
                 key={type}
                 onClick={() => setTab(type as 'undone' | 'done')}
                 className={clsx(
-                  'relative px-4 py-1 text-sm font-bold border border-gray-300',
-                  'rounded-t-md w-30 flex items-center justify-center',
+                  'relative pl-5 py-1 text-sm font-bold border border-gray-300',
+                  'rounded-t-md w-22 flex items-center justify-center',
                   type === tab
                     ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
                     : 'bg-gray-100 text-gray-400 z-0'
@@ -78,6 +88,8 @@ export default function TodoTaskCard({
             );
           })}
         </div>
+
+        {/* ×ボタン */}
         <button
           onClick={onDeleteTask}
           className="text-gray-400 hover:text-red-500 text-xl font-bold"
@@ -86,10 +98,12 @@ export default function TodoTaskCard({
           ×
         </button>
       </div>
+    </div>
 
+
+      {/* 本体部分：TODO一覧と追加ボタン */}
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2">
-        <h2 className="font-bold text-[#5E5E5E] text-lg py-2">{task.name}</h2>
-
+        {/* TODOリスト表示 */}
         <div
           ref={scrollRef}
           className={clsx(
@@ -140,6 +154,7 @@ export default function TodoTaskCard({
           ))}
         </div>
 
+        {/* TODO追加ボタン（未処理タブのみ） */}
         <div className="relative flex items-center justify-between">
           {tab === 'undone' && (
             <button

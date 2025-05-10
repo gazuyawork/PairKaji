@@ -11,7 +11,7 @@ import { Plus } from 'lucide-react';
 const initialTasks: TodoOnlyTask[] = [
   { id: crypto.randomUUID(), name: '食器洗い', frequency: '毎日', todos: [] },
   { id: crypto.randomUUID(), name: '風呂掃除', frequency: '週次', todos: [] },
-  { id: crypto.randomUUID(), name: '粗大ごみ出し', frequency: '不定期', todos: [] },
+  { id: crypto.randomUUID(), name: '粗大ごみ出ししてください', frequency: '不定期', todos: [] },
 ];
 
 export default function TodoPage() {
