@@ -66,7 +66,7 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
       {/* 左矢印 */}
       {showLeftArrow && (
         <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
-          <div className="w-8 h-8 bg-[#ffe3b3] rounded-full flex items-center justify-center shadow-md animate-blink">
+          <div className="w-8 h-8 bg-[#5E5E5E] rounded-full flex items-center justify-center shadow-md animate-blink">
             <ChevronLeft className="text-white w-4 h-4" />
           </div>
         </div>
@@ -75,7 +75,7 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
       {/* 右矢印 */}
       {showRightArrow && (
         <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
-          <div className="w-8 h-8 bg-[#ffe3b3] rounded-full flex items-center justify-center shadow-md animate-blink">
+          <div className="w-8 h-8 bg-[#5E5E5E] rounded-full flex items-center justify-center shadow-md animate-blink">
             <ChevronRight className="text-white w-4 h-4" />
           </div>
         </div>
@@ -85,10 +85,10 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
       <style jsx>{`
         @keyframes blink {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.2; }
+          50% { opacity: 0.6; }
         }
         .animate-blink {
-          animation: blink 2.4s infinite;
+          animation: blink 3.4s infinite;
         }
       `}</style>
     </div>

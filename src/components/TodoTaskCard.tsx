@@ -1,5 +1,6 @@
 import { CheckCircle, Circle, Trash2, Plus } from 'lucide-react';
 import clsx from 'clsx';
+import { useRef, useState, useEffect } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
 type Props = {
@@ -34,6 +35,21 @@ export default function TodoTaskCard({
   const filteredTodos = tab === 'done'
     ? task.todos.filter(todo => todo.done)
     : task.todos.filter(todo => !todo.done);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isScrollable, setIsScrollable] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      const checkScroll = () => {
+        setIsScrollable(el.scrollHeight > el.clientHeight);
+      };
+      checkScroll();
+      window.addEventListener('resize', checkScroll);
+      return () => window.removeEventListener('resize', checkScroll);
+    }
+  }, [filteredTodos.length]);
 
   return (
     <div className="relative">
@@ -74,21 +90,20 @@ export default function TodoTaskCard({
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2">
         <h2 className="font-bold text-[#5E5E5E] text-lg py-2">{task.name}</h2>
 
-        {/* ▼ カード内スクロール対応エリア ▼ */}
-        <div className="max-h-[30vh] overflow-y-auto space-y-4 pr-2">
+        <div
+          ref={scrollRef}
+          className={clsx(
+            'max-h-[60vh] space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100',
+            isScrollable ? 'overflow-y-scroll' : 'overflow-y-auto'
+          )}
+        >
           {filteredTodos.length === 0 && tab === 'done' && (
             <div className="text-sm text-gray-400 italic">完了したタスクはありません</div>
           )}
 
           {filteredTodos.map(todo => (
-            <div
-              key={todo.id}
-              className="flex items-center gap-2"
-            >
-              <div
-                className="cursor-pointer"
-                onClick={() => onToggleDone(todo.id)}
-              >
+            <div key={todo.id} className="flex items-center gap-2">
+              <div className="cursor-pointer" onClick={() => onToggleDone(todo.id)}>
                 {todo.done ? (
                   <CheckCircle className="text-yellow-500" />
                 ) : (
@@ -125,16 +140,17 @@ export default function TodoTaskCard({
           ))}
         </div>
 
-        {/* ▼ 追加ボタンは下に固定表示 */}
-        {tab === 'undone' && (
-          <button
-            onClick={() => onAddTodo(crypto.randomUUID())}
-            className="flex items-center gap-2 text-gray-600 hover:text-[#FFCB7D]"
-            type="button"
-          >
-            <Plus size={24} /> TODOを追加
-          </button>
-        )}
+        <div className="relative flex items-center justify-between">
+          {tab === 'undone' && (
+            <button
+              onClick={() => onAddTodo(crypto.randomUUID())}
+              className="flex items-center gap-2 text-gray-600 hover:text-[#FFCB7D]"
+              type="button"
+            >
+              <Plus size={24} /> TODOを追加
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
