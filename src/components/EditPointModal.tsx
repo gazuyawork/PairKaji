@@ -53,7 +53,7 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
 
           {/* 数値入力 + 自動設定ボタン横並び */}
           <div className="flex items-center pt-4 gap-4">
-            <label className="w-14 text-gray-600 font-bold">合計pt</label>
+            <label className="w-14 text-gray-600 font-bold">目標 pt</label>
             <input
               type="number"
               min={0}
