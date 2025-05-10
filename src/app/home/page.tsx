@@ -38,7 +38,7 @@ export default function HomePage() {
       point: 2,
       users: ['はなこ'],
       daysOfWeek: [],
-      dates: ['2025-05-15'],
+      dates: ['2025-05-13'],
       isTodo: false,
       done: false,
       skipped: false,
@@ -46,7 +46,24 @@ export default function HomePage() {
       image: '/images/hanako.png',
       period: '不定期',
     },
+    {
+      id: 3,
+      name: '洗濯物たたみ',
+      title: '洗濯物たたみ',
+      frequency: '不定期',
+      point: 2,
+      users: ['たろう'],
+      daysOfWeek: [],
+      dates: ['2025-05-13'],
+      isTodo: false,
+      done: false,
+      skipped: false,
+      person: 'たろう',
+      image: '/images/taro.png',
+      period: '不定期',
+    },
   ];
+  
 
   return (
     <AuthGuard>

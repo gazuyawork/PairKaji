@@ -82,10 +82,10 @@ export default function WeeklyPoints() {
   return (
     <>
       <div
-        className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 text-center mb-4 cursor-pointer hover:shadow-lg transition"
+        className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 text-center mb-3 cursor-pointer hover:shadow-lg transition"
         onClick={() => setIsModalOpen(true)}
       >
-        <p className="text-gray-500 font-sans font-bold">今週の合計ポイント</p>
+        <p className="text-lg font-bold text-[#5E5E5E] mb-4">今週の合計ポイント</p>
         <div className="mt-4 h-6 w-full bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-[#FFCB7D]"
