@@ -2,7 +2,6 @@
 
 'use client';
 
-import type { Task } from '@/types/Task';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
