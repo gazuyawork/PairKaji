@@ -1,4 +1,4 @@
-// src/components/TaskCalendar.tsx
+// src/components/PairPoints.tsx
 
 'use client';
 

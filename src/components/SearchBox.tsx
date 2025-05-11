@@ -1,3 +1,5 @@
+// src/components/SearchBox.tsx
+
 'use client';
 
 import { Search } from 'lucide-react';

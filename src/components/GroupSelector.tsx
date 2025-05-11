@@ -1,3 +1,5 @@
+// src/components/GroupSelector.tsx
+
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
