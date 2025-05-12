@@ -13,7 +13,7 @@ export default function WeeklyPoints() {
 
   const tasks: Task[] = [
     {
-      id: 1,
+      id: "1",
       name: '皿洗い',
       title: '皿洗い',
       frequency: '毎日',
@@ -29,7 +29,7 @@ export default function WeeklyPoints() {
       image: '/images/taro.png'
     },
     {
-      id: 2,
+      id: "2",
       name: 'ゴミ出し',
       title: 'ゴミ出し',
       frequency: '週次',
@@ -45,7 +45,7 @@ export default function WeeklyPoints() {
       image: '/images/hanako.png'
     },
     {
-      id: 3,
+      id: "3",
       name: '洗濯',
       title: '洗濯',
       frequency: '週次',

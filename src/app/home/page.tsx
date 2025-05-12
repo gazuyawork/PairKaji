@@ -15,7 +15,7 @@ export default function HomePage() {
   // 仮データ（今後Firestoreから取得予定）
   const tasks: Task[] = [
     {
-      id: 1,
+      id: "1",
       name: 'ゴミ出し',
       title: 'ゴミ出し',
       frequency: '不定期',
@@ -31,7 +31,7 @@ export default function HomePage() {
       period: '不定期',
     },
     {
-      id: 2,
+      id: "2",
       name: '掃除機がけ',
       title: '掃除機がけ',
       frequency: '不定期',
@@ -47,7 +47,7 @@ export default function HomePage() {
       period: '不定期',
     },
     {
-      id: 3,
+      id: "3",
       name: '洗濯物たたみ',
       title: '洗濯物たたみ',
       frequency: '不定期',

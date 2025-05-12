@@ -11,11 +11,11 @@ type Props = {
 };
 
 const groupList = [
-  { id: '1', name: 'リビング' },
-  { id: '2', name: 'キッチン' },
-  { id: '3', name: 'トイレ' },
-  { id: '4', name: '洗面所' },
-  { id: '5', name: '玄関' },
+  { id: "1", name: 'リビング' },
+  { id: "2", name: 'キッチン' },
+  { id: "3", name: 'トイレ' },
+  { id: "4", name: '洗面所' },
+  { id: "5", name: '玄関' },
 ];
 
 export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props) {
