@@ -4,7 +4,8 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'; // 🔹 Firestoreを追加
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage'; // ✅ 追加
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,6 +23,7 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error('Auth persistence setting failed:', error);
 });
 
-const db = getFirestore(app); // 🔹 Firestoreインスタンス作成
+const db = getFirestore(app);
+const storage = getStorage(app); // ✅ 追加
 
-export { auth, db }; // 🔹 Firestoreも export
+export { auth, db, storage }; // ✅ 追加した storage を export
