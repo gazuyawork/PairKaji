@@ -1,15 +1,20 @@
+// src/app/task/page.tsx
+
 'use client';
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import { Pencil } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
 import type { Task, Period } from '@/types/Task';
-import { useRouter } from 'next/navigation';   // ← router.push に必要
+import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+
 
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
@@ -18,134 +23,16 @@ export default function TaskPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter(); // TaskPage 内 useRouter フック追加
   const initialTaskGroups: Record<Period, Task[]> = {
-    '毎日': [
-      {
-        id: 1,
-        title: '食器洗い',
-        name: '食器洗い',
-        frequency: '毎日',
-        point: 10,
-        done: false,
-        skipped: false,
-        person: '太郎',
-        image: '/images/taro.png',
-        period: '毎日',
-        users: [],
-        dates: [],
-        daysOfWeek: [],
-        isTodo: false,
-      },
-      {
-        id: 2,
-        title: '食器洗い',
-        name: '食器洗い',
-        frequency: '毎日',
-        point: 10,
-        done: false,
-        skipped: false,
-        person: '太郎',
-        image: '/images/hanako.png',
-        period: '毎日',
-        users: [],
-        dates: [],
-        daysOfWeek: [],
-        isTodo: false,
-      },
-      {
-        id: 3,
-        title: '食器洗い',
-        name: '食器洗い',
-        frequency: '毎日',
-        point: 10,
-        done: false,
-        skipped: false,
-        person: '太郎',
-        image: '/images/taro.png',
-        period: '毎日',
-        users: [],
-        dates: [],
-        daysOfWeek: [],
-        isTodo: false,
-      },
-    ],
-
-    '週次': [
-      {
-        id: 4,
-        title: '風呂掃除',
-        name: '風呂掃除',
-        frequency: '週次',
-        point: 10,
-        done: false,
-        skipped: false,
-        person: '未設定',
-        image: '/images/default.png',
-        daysOfWeek: ['火', '木'],
-        dates: [],
-        isTodo: false,
-        users: [],
-        period: '週次',
-      },
-      {
-        id: 5,
-        title: '掃除機がけ',
-        name: '掃除機がけ',
-        frequency: '週次',
-        point: 10,
-        done: false,
-        skipped: false,
-        person: '未設定',
-        image: '/images/default.png',
-        daysOfWeek: ['土'],
-        dates: [],
-        isTodo: false,
-        users: [],
-        period: '週次',
-      },
-    ],
-
-    '不定期': [
-      {
-        id: 6,
-        title: '粗大ごみ出し',
-        name: '粗大ごみ出し',
-        frequency: '不定期',
-        point: 20,
-        done: false,
-        skipped: false,
-        person: '花子',
-        image: '/images/hanako.png',
-        scheduledDate: '2025-05-10',
-        daysOfWeek: [],
-        dates: ['2025-05-10'],
-        isTodo: false,
-        users: [],
-        period: '不定期',
-      },
-      {
-        id: 7,
-        title: '家電修理立ち合い',
-        name: '家電修理立ち合い',
-        frequency: '不定期',
-        point: 30,
-        done: false,
-        skipped: false,
-        person: '太郎',
-        image: '/images/taro.png',
-        scheduledDate: '2025-05-15',
-        daysOfWeek: [],
-        dates: ['2025-05-15'],
-        isTodo: false,
-        users: [],
-        period: '不定期',
-      },
-    ],
+    毎日: [],
+    週次: [],
+    不定期: [],
   };
+
 
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
   const [periodFilter, setPeriodFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
-  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
 
   const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
@@ -165,7 +52,7 @@ export default function TaskPage() {
     });
   };
 
-  const deleteTask = (period: Period, id: number) => {
+  const deleteTask = (period: Period, id: string) => {
     setTasksState(prev => {
       const updated = prev[period].filter(task => task.id !== id);
       return { ...prev, [period]: updated };
@@ -179,6 +66,67 @@ export default function TaskPage() {
     });
     setEditTargetTask(null);
   };
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+      const snapshot = await getDocs(q);
+
+      
+      const rawTasks = snapshot.docs.map((doc): Task => {
+        const data = doc.data();
+
+        const user = data.users?.[0] ?? '未設定';
+        const period = data.frequency as Period;
+
+
+        return {
+          id: doc.id,
+          title: data.title ?? data.name ?? '',
+          name: data.name ?? '',
+          frequency: period,
+          point: data.point ?? 0,
+          done: false,
+          skipped: false,
+          person: user,
+          image:
+            user === '太郎'
+              ? '/images/taro.png'
+              : user === '花子'
+              ? '/images/hanako.png'
+              : '/images/default.png',
+          daysOfWeek: data.daysOfWeek ?? [],
+          dates: data.dates ?? [],
+          isTodo: data.isTodo ?? false,
+          users: data.users ?? [],
+          period,
+          scheduledDate: data.dates?.[0] ?? '',
+        };
+      });
+
+      const grouped: Record<Period, Task[]> = {
+        毎日: [],
+        週次: [],
+        不定期: [],
+      };
+
+      for (const task of rawTasks) {
+        if (task.period === '毎日' || task.period === '週次' || task.period === '不定期') {
+          grouped[task.period].push(task);
+        } else {
+          console.warn('無効な period 値:', task.period, task);
+        }
+      }
+
+
+      setTasksState(grouped);
+    };
+
+    fetchTasks();
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none">

@@ -14,10 +14,10 @@ type Props = {
   period: Period;
   index: number;
   onToggleDone: (period: Period, index: number) => void;
-  onDelete: (period: Period, taskId: number) => void;
+  onDelete: (period: Period, id: string) => void;
   onEdit: () => void;
-  menuOpenId: number | null;
-  setMenuOpenId: (id: number | null) => void;
+  menuOpenId: string | null;
+  setMenuOpenId: (id: string | null) => void;
 };
 
 export default function TaskCard({
@@ -31,9 +31,10 @@ export default function TaskCard({
   setMenuOpenId,
 }: Props) {
   const handlers = useSwipeable({
-    onSwipedLeft: () => console.log('swiped:', task.title),
+    onSwipedLeft: () => setMenuOpenId(task.id), // ← 削除メニュー表示
     trackTouch: true,
   });
+
 
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -103,8 +104,8 @@ export default function TaskCard({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onContextMenu={(e) => {
-            e.preventDefault();
-            setMenuOpenId(task.id);
+            e.preventDefault();       // 右クリックのデフォルト抑制
+            setMenuOpenId(task.id);   // メニューを表示
           }}
           animate={
             isLongPress

@@ -1,8 +1,10 @@
 // src/lib/firebase.ts
+
 'use client';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore'; // 🔹 Firestoreを追加
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,11 +16,12 @@ const firebaseConfig = {
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
 
-// ✅ ここで永続化を設定（初期化時に1度だけ）
+const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error('Auth persistence setting failed:', error);
 });
 
-export { auth };
+const db = getFirestore(app); // 🔹 Firestoreインスタンス作成
+
+export { auth, db }; // 🔹 Firestoreも export

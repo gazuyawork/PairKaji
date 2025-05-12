@@ -1,10 +1,11 @@
 // /src/types/Task.ts
+
 export type Period = '毎日' | '週次' | '不定期';
 
 export type Task = {
-  id: number;
+  id: string;
   name: string;
-  title: string;
+  title?: string;
   frequency: Period;
   point: number;
   users: string[];

@@ -6,15 +6,21 @@ import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useSwipeable } from 'react-swipeable';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import type { Period } from '@/types/Task';
+import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { getDocs, query, where } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { useSwipeable } from 'react-swipeable';
+
+
+
 
 interface Task {
-  id: number;
+  id: string;
   name: string;
   frequency: '毎日' | '週次' | '不定期';
   point: number;
@@ -24,16 +30,18 @@ interface Task {
   isNew: boolean;
   isEdited: boolean;
   showDelete: boolean;
+  isTodo?: boolean; // ← 追加（optional にしておく）
 }
 
 interface TaskCardProps {
   task: Task;
-  onChange: (id: number, key: keyof Task, value: string | number | string[] | boolean) => void;
-  onRemove: (id: number) => void;
-  onToggleUser: (id: number, user: string) => void;
-  onToggleDay: (id: number, day: string) => void;
-  onToggleDelete: (id: number) => void;
+  onChange: (id: string, key: keyof Task, value: string | number | string[] | boolean) => void;
+  onRemove: (id: string) => void;
+  onToggleUser: (id: string, user: string) => void;
+  onToggleDay: (id: string, day: string) => void;
+  onToggleDelete: (id: string) => void;
 }
+
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task,
@@ -45,11 +53,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
 }) => {
   const days = ['月', '火', '水', '木', '金', '土', '日'];
 
+
   const handlers = useSwipeable({
     onSwipedLeft: () => onToggleDelete(task.id),
-    onSwipedRight: () => onToggleDelete(task.id),
     delta: 50,
   });
+
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = e.target.value;
@@ -60,6 +69,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
     <div
       {...handlers}
       onClick={() => task.showDelete && onToggleDelete(task.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onToggleDelete(task.id); // ✅ 右クリックで削除トグル
+      }}
       className="relative bg-white shadow rounded-2xl px-4 py-3 space-y-2 flex flex-col"
     >
       {(task.isNew || task.isEdited) && (
@@ -117,27 +130,41 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </div>
 
         <div className="flex gap-2">
-          {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(
-            (user) => (
-              <button
-                key={user.name}
-                onClick={() => onToggleUser(task.id, user.name)}
-                className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
-                  task.users.includes(user.name)
-                    ? 'border-[#FFCB7D] opacity-100'
-                    : 'border-gray-300 opacity-30'
-                }`}
-              >
-                <Image 
-                  src={user.image} 
-                  alt={user.name} 
-                  width={32} 
-                  height={32} 
-                  className="object-cover w-full h-full" 
-                />
-              </button>
-            )
-          )}
+          {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map((user, _, array) => (
+            <button
+              key={user.name}
+              onClick={() => {
+                const isSelected = task.users.includes(user.name);
+                const other = array.find(u => u.name !== user.name);
+                const isOtherSelected = other ? task.users.includes(other.name) : false;
+
+                if (isSelected && !isOtherSelected) {
+                  // 自分だけ ON → 自分を OFF、相手を ON
+                  onToggleUser(task.id, user.name);     // OFF
+                  if (other) onToggleUser(task.id, other.name); // ON
+                } else if (isSelected && isOtherSelected) {
+                  // 両方 ON → 自分だけ OFF
+                  onToggleUser(task.id, user.name);     // OFF
+                } else if (!isSelected) {
+                  // 自分が OFF → 自分を ON
+                  onToggleUser(task.id, user.name);     // ON
+                }
+              }}
+              className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
+                task.users.includes(user.name)
+                  ? 'border-[#FFCB7D] opacity-100'
+                  : 'border-gray-300 opacity-30'
+              }`}
+            >
+              <Image
+                src={user.image}
+                alt={`${user.name}のフィルター`}
+                width={32}
+                height={32}
+                className="object-cover w-full h-full"
+              />
+            </button>
+          ))}
         </div>
       </div>
 
@@ -178,25 +205,20 @@ TaskCard.displayName = 'TaskCard';
 
 export default function TaskManagePage() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, name: '', frequency: '毎日', point: 100, users: ['太郎'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
-    { id: 2, name: '', frequency: '毎日', point: 100, users: ['花子'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
-    { id: 3, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
-    { id: 4, name: '', frequency: '毎日', point: 100, users: ['太郎', '花子'], daysOfWeek: [], dates: [], isNew: false, isEdited: false, showDelete: false },
-  ]);
-
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const addTask = () => {
-    const newId = tasks.length + 1;
+    const newId = crypto.randomUUID(); // 例: "9a4b-xxx-..."
+
     setTasks([
       {
         id: newId,
         name: '',
         frequency: '毎日',
-        point: 100,
+        point: 10,
         users: ['太郎', '花子'],
         daysOfWeek: [],
         dates: [],
@@ -210,9 +232,10 @@ export default function TaskManagePage() {
   
 
   const updateTask = (
-    id: number,
+    id: string,
     key: keyof Task,
     value: string | number | string[] | boolean
+
   ) => {  
     setTasks(prev =>
       prev.map(task =>
@@ -221,7 +244,7 @@ export default function TaskManagePage() {
     );
   };
 
-  const removeTask = (id: number) => {
+  const removeTask = (id: string) => {
     setTasks(prev => prev.filter(task => task.id !== id));
   };
 
@@ -233,21 +256,33 @@ export default function TaskManagePage() {
     setPersonFilter(prev => (prev === person ? null : person));
   };
   
-  const handleUserToggle = (id: number, user: string) => {
-    setTasks(prev =>
-      prev.map(task => {
-        if (task.id === id) {
-          const newUsers = task.users.includes(user)
-            ? task.users.filter(u => u !== user)
-            : [...task.users, user];
-          return { ...task, users: newUsers, isEdited: !task.isNew ? true : task.isEdited };
-        }
-        return task;
-      })
-    );
-  };
+const handleUserToggle = (id: string, user: string) => {
+  setTasks(prev =>
+    prev.map(task => {
+      if (task.id !== id) return task;
 
-  const toggleDay = (id: number, day: string) => {
+      const isSelected = task.users.includes(user);
+      if (isSelected) {
+        // OFFにする
+        return {
+          ...task,
+          users: task.users.filter(u => u !== user),
+          isEdited: !task.isNew ? true : task.isEdited,
+        };
+      } else {
+        // ONにする
+        return {
+          ...task,
+          users: [...task.users, user],
+          isEdited: !task.isNew ? true : task.isEdited,
+        };
+      }
+    })
+  );
+};
+
+
+  const toggleDay = (id: string, day: string) => {
     setTasks(prev =>
       prev.map(task => {
         if (task.id === id) {
@@ -261,7 +296,7 @@ export default function TaskManagePage() {
     );
   };
 
-  const toggleShowDelete = (id: number) => {
+  const toggleShowDelete = (id: string) => {
     setTasks(prev =>
       prev.map(task => ({
         ...task,
@@ -270,11 +305,42 @@ export default function TaskManagePage() {
     );
   };
 
-  const confirmTasks = () => {
+  const confirmTasks = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      alert('ログインしてください');
+      return;
+    }
+
+    for (const task of tasks) {
+      const taskData = {
+        userId: uid,
+        name: task.name,
+        frequency: task.frequency,
+        point: task.point,
+        users: task.users,
+        daysOfWeek: task.daysOfWeek,
+        dates: task.dates,
+        isTodo: task.isTodo ?? false,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (task.isNew) {
+        await addDoc(collection(db, 'tasks'), {
+          ...taskData,
+          createdAt: serverTimestamp(),
+        });
+      } else if (task.isEdited) {
+        await updateDoc(doc(db, 'tasks', task.id), taskData);
+      }
+
+    }
+
     setTasks(prev =>
       prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
     );
   };
+
 
   const clearFilters = () => {
     setFilter(null);
@@ -284,20 +350,25 @@ export default function TaskManagePage() {
 
 
   useEffect(() => {
-    const handleClickOutside = () => {
-      setTasks(prev =>
-        prev.map(task =>
-          task.showDelete ? { ...task, showDelete: false } : task
-        )
-      );
+    const fetchTasks = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+      const snapshot = await getDocs(q);
+      const loadedTasks: Task[] = snapshot.docs.map((doc) => ({
+        ...(doc.data() as Omit<Task, 'id' | 'isNew' | 'isEdited' | 'showDelete'>),
+        id: doc.id,
+        isNew: false,
+        isEdited: false,
+        showDelete: false,
+      }));
+      setTasks(loadedTasks);
     };
-  
-    window.addEventListener('click', handleClickOutside);
-  
-    return () => {
-      window.removeEventListener('click', handleClickOutside);
-    };
+
+    fetchTasks();
   }, []);
+
   
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
@@ -340,7 +411,7 @@ export default function TaskManagePage() {
           {tasks
             .filter(task => !filter || task.frequency === filter)
             .filter(task => !personFilter || task.users.includes(personFilter))
-            .filter(task => task.name.toLowerCase().includes(searchTerm.toLowerCase()))
+            .filter(task => (task.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
             .map(task => (
               <TaskCard
                 key={task.id}
