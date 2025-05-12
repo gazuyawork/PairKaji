@@ -2,7 +2,7 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { Eye, EyeOff, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
@@ -14,8 +14,8 @@ import PasswordEditModal from '@/components/PasswordEditModal';
 export default function ProfilePage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  // const [password, setPassword] = useState('');
+  // const [showPassword, setShowPassword] = useState(false);
   const [profileImage, setProfileImage] = useState('/images/default.png');
   const [partnerImage, setPartnerImage] = useState('/images/hanako_default.png');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -180,7 +180,7 @@ export default function ProfilePage() {
       <EmailEditModal
         open={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
-        currentEmail={email}
+        // currentEmail={email}
         onUpdated={(newEmail) => setEmail(newEmail)}
       />
 

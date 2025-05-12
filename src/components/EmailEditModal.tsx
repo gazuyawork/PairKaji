@@ -12,14 +12,14 @@ import { toast } from 'sonner';
 interface EmailEditModalProps {
   open: boolean;
   onClose: () => void;
-  currentEmail: string;
+//   currentEmail: string;
   onUpdated: (newEmail: string) => void;
 }
 
 export default function EmailEditModal({
   open,
   onClose,
-  currentEmail,
+//   currentEmail,
   onUpdated,
 }: EmailEditModalProps) {
   const [newEmail, setNewEmail] = useState('');
