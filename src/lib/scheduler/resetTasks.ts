@@ -4,7 +4,7 @@ import { isSameDay, parseISO, startOfToday } from 'date-fns';
 
 export const resetCompletedTasks = async () => {
   const snapshot = await getDocs(collection(db, 'tasks'));
-  const now = new Date();
+//   const now = new Date();
   const today = startOfToday();
 
   for (const docSnap of snapshot.docs) {

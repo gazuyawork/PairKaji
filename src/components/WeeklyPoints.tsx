@@ -10,7 +10,8 @@ import EditPointModal from './EditPointModal';
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [targetPoint, setTargetPoint] = useState(0);
-  const [maxPoints, setMaxPoints] = useState(100);
+  // const [maxPoints, setMaxPoints] = useState(100);
+  const maxPoints = 100;
   const [tasks, setTasks] = useState<Task[]>([]);
 
   const today = new Date();
