@@ -15,9 +15,8 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/fi
 import { getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useSwipeable } from 'react-swipeable';
-
-
-
+import { toast } from 'sonner'; 
+import { deleteDoc } from 'firebase/firestore';
 
 interface Task {
   id: string;
@@ -31,6 +30,7 @@ interface Task {
   isEdited: boolean;
   showDelete: boolean;
   isTodo?: boolean; // ← 追加（optional にしておく）
+  nameError?: boolean;
 }
 
 interface TaskCardProps {
@@ -40,8 +40,9 @@ interface TaskCardProps {
   onToggleUser: (id: string, user: string) => void;
   onToggleDay: (id: string, day: string) => void;
   onToggleDelete: (id: string) => void;
+  profileImage: string;
+  partnerImage: string;
 }
-
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task,
@@ -50,6 +51,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
   onToggleUser,
   onToggleDay,
   onToggleDelete,
+  profileImage,
+  partnerImage,
 }) => {
   const days = ['月', '火', '水', '木', '金', '土', '日'];
 
@@ -95,15 +98,19 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </button>
       )}
 
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col flex-1">
         <input
           type="text"
           value={task.name}
           placeholder="ここに家事を入力する"
           onChange={(e) => onChange(task.id, 'name', e.target.value)}
-          className="flex-1 text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent border-b border-gray-300"
+          className="text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent border-b border-gray-300"
         />
+        {task.nameError && (
+          <p className="text-red-500 text-xs mt-1">タスク名を入力してください</p>
+        )}
       </div>
+
 
       <div className="flex items-center justify-between">
         <select
@@ -130,7 +137,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </div>
 
         <div className="flex gap-2">
-          {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map((user, _, array) => (
+          {[{ name: '太郎', image: profileImage }, { name: '花子', image: partnerImage }].map((user, _, array) => (
             <button
               key={user.name}
               onClick={() => {
@@ -209,10 +216,10 @@ export default function TaskManagePage() {
   const [filter, setFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
-
+  const [profileImage, setProfileImage] = useState<string>('/images/taro.png');
+  const [partnerImage, setPartnerImage] = useState<string>('/images/hanako.png');
   const addTask = () => {
-    const newId = crypto.randomUUID(); // 例: "9a4b-xxx-..."
-
+  const newId = crypto.randomUUID(); // 例: "9a4b-xxx-..."
     setTasks([
       {
         id: newId,
@@ -235,18 +242,40 @@ export default function TaskManagePage() {
     id: string,
     key: keyof Task,
     value: string | number | string[] | boolean
-
-  ) => {  
+  ) => {
     setTasks(prev =>
       prev.map(task =>
-        task.id === id ? { ...task, [key]: value, isEdited: !task.isNew ? true : task.isEdited } : task
+        task.id === id
+          ? {
+              ...task,
+              [key]: value,
+              isEdited: !task.isNew ? true : task.isEdited,
+              ...(key === 'name' ? { nameError: false } : {}), // 入力時にエラー解除
+            }
+          : task
       )
     );
   };
 
-  const removeTask = (id: string) => {
+
+  const removeTask = async (id: string) => {
+    const taskToRemove = tasks.find(task => task.id === id);
+    if (!taskToRemove) return;
+
+    if (!taskToRemove.isNew) {
+      try {
+        await deleteDoc(doc(db, 'tasks', id));
+        toast.success('タスクを削除しました');
+      } catch (error) {
+        console.error('Firestoreからの削除に失敗:', error);
+        toast.error('タスクの削除に失敗しました');
+        return;
+      }
+    }
+
     setTasks(prev => prev.filter(task => task.id !== id));
   };
+
 
   const toggleFilter = (period: Period | null) => {
     setFilter(prev => (prev === period ? null : period));
@@ -308,9 +337,24 @@ const handleUserToggle = (id: string, user: string) => {
   const confirmTasks = async () => {
     const uid = auth.currentUser?.uid;
     if (!uid) {
-      alert('ログインしてください');
+      toast.error('ログインしてください');
       return;
     }
+
+    let hasEmptyName = false;
+
+    setTasks(prev =>
+      prev.map(task => {
+        const isEmpty = !task.name.trim();
+        if (isEmpty) hasEmptyName = true;
+        return {
+          ...task,
+          nameError: isEmpty,
+        };
+      })
+    );
+
+    if (hasEmptyName) return;
 
     for (const task of tasks) {
       const taskData = {
@@ -333,13 +377,14 @@ const handleUserToggle = (id: string, user: string) => {
       } else if (task.isEdited) {
         await updateDoc(doc(db, 'tasks', task.id), taskData);
       }
-
     }
 
     setTasks(prev =>
       prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
     );
+    toast.success('タスクを保存しました');
   };
+
 
 
   const clearFilters = () => {
@@ -347,6 +392,19 @@ const handleUserToggle = (id: string, user: string) => {
     setPersonFilter(null);
     setSearchTerm('');
   };
+
+  useEffect(() => {
+    const storedProfileImage = localStorage.getItem('profileImage');
+    const storedPartnerImage = localStorage.getItem('partnerImage');
+
+    if (storedProfileImage) {
+      setProfileImage(storedProfileImage);
+    }
+    if (storedPartnerImage) {
+      setPartnerImage(storedPartnerImage);
+    }
+  }, []);
+
 
 
   useEffect(() => {
@@ -368,6 +426,8 @@ const handleUserToggle = (id: string, user: string) => {
 
     fetchTasks();
   }, []);
+
+  const isConfirmDisabled = !tasks.some(task => task.isNew || task.isEdited);
 
   
   return (
@@ -421,18 +481,26 @@ const handleUserToggle = (id: string, user: string) => {
                 onToggleUser={handleUserToggle}
                 onToggleDay={toggleDay}
                 onToggleDelete={toggleShowDelete}
+                profileImage={profileImage}
+                partnerImage={partnerImage}
               />
             ))}
         </div>
       </main>
 
-      <div className="fixed bottom-20 left-0 w-full flex justify-center items-center mb-1">
+      <div className="fixed bottom-20 left-0 w-full flex justify-center items-center mb-6">
         <button
           onClick={confirmTasks}
-          className="w-[300px] bg-[#FFCB7D] text-white font-bold py-3 rounded-xl shadow-lg"
+          disabled={isConfirmDisabled}
+          className={`w-[300px] font-bold py-3 rounded-xl shadow-lg ${
+            isConfirmDisabled
+              ? 'bg-gray-300 text-white cursor-not-allowed'
+              : 'bg-[#FFCB7D] text-white'
+          }`}
         >
           OK
         </button>
+
         <button
           onClick={addTask}
           className="ml-4 w-12 h-12 bg-[#FFCB7D] text-white rounded-full flex items-center justify-center shadow-lg"

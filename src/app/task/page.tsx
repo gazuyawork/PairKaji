@@ -14,8 +14,7 @@ import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-
-
+import { updateDoc, deleteDoc, serverTimestamp, doc } from 'firebase/firestore';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -52,20 +51,79 @@ export default function TaskPage() {
     });
   };
 
-  const deleteTask = (period: Period, id: string) => {
-    setTasksState(prev => {
-      const updated = prev[period].filter(task => task.id !== id);
-      return { ...prev, [period]: updated };
-    });
+  const deleteTask = async (period: Period, id: string) => {
+    try {
+      await deleteDoc(doc(db, 'tasks', id)); // 🔥 Firestoreから削除
+      setTasksState(prev => {
+        const updated = prev[period].filter(task => task.id !== id);
+        return { ...prev, [period]: updated };
+      });
+    } catch (error) {
+      console.error('タスクの削除に失敗しました:', error);
+    }
   };
 
-  const updateTask = (period: Period, updated: Task) => {
-    setTasksState(prev => {
-      const updatedList = prev[period].map(task => task.id === updated.id ? updated : task);
-      return { ...prev, [period]: updatedList };
+
+const updateTask = async (oldPeriod: Period, updated: Task) => {
+  try {
+    const newPeriod = updated.period as Period; // ✅ periodを優先する
+
+    // ✅ 頻度変更によって不要なデータを初期化
+    const cleanedDaysOfWeek =
+      newPeriod === '不定期' || newPeriod === '毎日' ? [] : updated.daysOfWeek ?? [];
+    const cleanedDates =
+      newPeriod === '週次' || newPeriod === '毎日' ? [] : updated.dates ?? [];
+
+    await updateDoc(doc(db, 'tasks', updated.id), {
+      name: updated.name,
+      frequency: newPeriod,
+      point: updated.point,
+      users: updated.users,
+      daysOfWeek: cleanedDaysOfWeek,
+      dates: cleanedDates,
+      isTodo: updated.isTodo ?? false,
+      updatedAt: serverTimestamp(),
     });
+
+    const user = updated.users?.[0] ?? '未設定';
+
+    const displayTask: Task = {
+      ...updated,
+      title: updated.name,
+      person: user,
+      scheduledDate: cleanedDates?.[0] ?? '',
+      image:
+        user === '太郎'
+          ? '/images/taro.png'
+          : user === '花子'
+          ? '/images/hanako.png'
+          : '/images/default.png',
+      done: false,
+      skipped: false,
+      daysOfWeek: cleanedDaysOfWeek,
+      dates: cleanedDates,
+      period: newPeriod,
+    };
+
+  setTasksState(prev => {
+    const newState = { ...prev };
+
+    // 一旦両方に対して重複排除しておく
+    newState[oldPeriod] = prev[oldPeriod].filter(task => task.id !== updated.id);
+    newState[newPeriod] = newState[newPeriod].filter(task => task.id !== updated.id);
+
+    // 最後に新しいタスクを追加
+    newState[newPeriod].push(displayTask);
+
+    return newState;
+  });
+
+
     setEditTargetTask(null);
-  };
+  } catch (error) {
+    console.error('タスク更新に失敗しました:', error);
+  }
+};
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -181,7 +239,7 @@ export default function TaskPage() {
                     onDelete={deleteTask}
                     onEdit={() => setEditTargetTask({
                       ...task,
-                      period,
+                      period: task.period,
                       daysOfWeek: task.daysOfWeek ?? [],
                       dates: task.dates ?? [],
                       isTodo: task.isTodo ?? false,
@@ -200,12 +258,14 @@ export default function TaskPage() {
 
       {editTargetTask && (
         <EditTaskModal
+          key={editTargetTask.id} // ← ✅ これを追加
           isOpen={!!editTargetTask}
           task={editTargetTask}
           onClose={() => setEditTargetTask(null)}
-          onSave={(updated) => updateTask(updated.period, updated)}
+          onSave={(updated) => updateTask(editTargetTask.period, updated)}
         />
       )}
+
     </div>
   );
 }

@@ -15,23 +15,32 @@ type Props = {
 };
 
 export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) {
-  const [editedTask, setEditedTask] = useState<Task>(task);
+  
+  const [editedTask, setEditedTask] = useState<Task | null>(null);
 
   useEffect(() => {
-    setEditedTask({
-      ...task,
-      daysOfWeek: task.daysOfWeek ?? [],
-      dates: task.dates ?? [],
-      users: task.users ?? [],
-      period: task.period,
-    });
+    if (task) {
+      setEditedTask({
+        ...task,
+        daysOfWeek: task.daysOfWeek ?? [],
+        dates: task.dates ?? [],
+        users: task.users ?? [],
+        period: task.period ?? task.frequency,
+      });
+    }
   }, [task]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !editedTask) return null;
+
 
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
-    setEditedTask(prev => ({ ...prev, [key]: value }));
+    setEditedTask(prev => {
+      if (!prev) return prev; // null のままなら何もしない
+      return { ...prev, [key]: value };
+    });
   };
+
+
 
   const toggleUser = (user: string) => {
     const newUsers = editedTask.users.includes(user)
@@ -64,13 +73,30 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             <label className="w-20 text-gray-600">頻度：</label>
             <select
               value={editedTask.period}
-              onChange={e => update('period', e.target.value as Period)}
+              onChange={(e) => {
+                const newPeriod = e.target.value as Period;
+                setEditedTask(prev => {
+                  if (!prev) return prev;
+                  let updated = { ...prev, period: newPeriod };
+                  if (newPeriod === '毎日') {
+                    updated.daysOfWeek = [];
+                    updated.dates = [];
+                  } else if (newPeriod === '週次') {
+                    updated.dates = [];
+                  } else if (newPeriod === '不定期') {
+                    updated.daysOfWeek = [];
+                  }
+                  return updated;
+                });
+              }}
+
               className="w-24 border-b border-gray-300 outline-none pl-2"
             >
               {['毎日', '週次', '不定期'].map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
+
           </div>
 
           {/* 曜日（週次） */}

@@ -19,4 +19,5 @@ export type Task = {
   scheduledDate?: string;
   period: Period;
   showDelete?: boolean;
+  nameError?: boolean;
 };
