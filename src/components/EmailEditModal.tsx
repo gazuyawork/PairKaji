@@ -12,13 +12,13 @@ import { toast } from 'sonner';
 interface EmailEditModalProps {
   open: boolean;
   onClose: () => void;
-  onUpdated: (newEmail: string) => void; // 今回は呼びませんが残します
+  // onUpdated: (newEmail: string) => void; // 今回は呼びませんが残します
 }
 
 export default function EmailEditModal({
   open,
   onClose,
-  onUpdated,
+  // onUpdated,
 }: EmailEditModalProps) {
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
