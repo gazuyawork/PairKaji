@@ -9,61 +9,55 @@ import TaskList from '@/components/TaskList';
 import FooterNav from '@/components/FooterNav';
 import AuthGuard from '@/components/AuthGuard';
 import TaskCalendar from '@/components/TaskCalendar';
-import type { Task } from '@/types/Task';
+import type { Task, Period } from '@/types/Task';
+import { useEffect, useState } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
 export default function HomePage() {
-  // 仮データ（今後Firestoreから取得予定）
-  const tasks: Task[] = [
-    {
-      id: "1",
-      name: 'ゴミ出し',
-      title: 'ゴミ出し',
-      frequency: '不定期',
-      point: 3,
-      users: ['たろう'],
-      daysOfWeek: [],
-      dates: ['2025-05-13'],
-      isTodo: false,
-      done: false,
-      skipped: false,
-      person: 'たろう',
-      image: '/images/taro.png',
-      period: '不定期',
-    },
-    {
-      id: "2",
-      name: '掃除機がけ',
-      title: '掃除機がけ',
-      frequency: '不定期',
-      point: 2,
-      users: ['はなこ'],
-      daysOfWeek: [],
-      dates: ['2025-05-13'],
-      isTodo: false,
-      done: false,
-      skipped: false,
-      person: 'はなこ',
-      image: '/images/hanako.png',
-      period: '不定期',
-    },
-    {
-      id: "3",
-      name: '洗濯物たたみ',
-      title: '洗濯物たたみ',
-      frequency: '不定期',
-      point: 2,
-      users: ['たろう'],
-      daysOfWeek: [],
-      dates: ['2025-05-13'],
-      isTodo: false,
-      done: false,
-      skipped: false,
-      person: 'たろう',
-      image: '/images/taro.png',
-      period: '不定期',
-    },
-  ];
-  
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+      const snapshot = await getDocs(q);
+
+      const taskList: Task[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const user = data.users?.[0] ?? '未設定';
+
+        return {
+          id: doc.id,
+          name: data.name ?? '',
+          title: data.name ?? '',
+          frequency: data.frequency,
+          point: data.point ?? 0,
+          users: data.users ?? [],
+          daysOfWeek: data.daysOfWeek ?? [],
+          dates: data.dates ?? [],
+          isTodo: data.isTodo ?? false,
+          done: false,
+          skipped: false,
+          person: user,
+          image:
+            user === '太郎'
+              ? localStorage.getItem('taroImage') ?? '/images/taro.png'
+              : user === '花子'
+              ? localStorage.getItem('hanakoImage') ?? '/images/hanako.png'
+              : '/images/default.png',
+          period: data.frequency,
+          scheduledDate: data.dates?.[0] ?? '',
+        };
+      });
+
+      setTasks(taskList);
+    };
+
+    fetchTasks();
+  }, []);
 
   return (
     <AuthGuard>
@@ -78,9 +72,6 @@ export default function HomePage() {
 
           {/* ペアポイント（タロウ・ハナコなど） */}
           <PairPoints />
-
-          {/* 区切り線 */}
-          {/* <hr className="border-t border-gray-300 opacity-50 my-4" /> */}
 
           {/* カレンダー表示（今週分） */}
           <TaskCalendar tasks={tasks} />

@@ -14,10 +14,12 @@ export type Task = {
   isTodo: boolean;
   done: boolean;
   skipped: boolean;
+  completedAt?: string;
   person: string;
   image: string;
   scheduledDate?: string;
   period: Period;
   showDelete?: boolean;
   nameError?: boolean;
+  completedBy?: string; // 完了者（userIdなど）
 };

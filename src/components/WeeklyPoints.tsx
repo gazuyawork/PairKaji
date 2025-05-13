@@ -1,66 +1,66 @@
-// src/components/WeeklyPoints.tsx
-
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Task } from '@/types/Task';
+import { auth, db } from '@/lib/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format } from 'date-fns';
 import EditPointModal from './EditPointModal';
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [targetPoint, setTargetPoint] = useState(42);
-  const maxPoints = 100;
+  const [targetPoint, setTargetPoint] = useState(0);
+  const [maxPoints, setMaxPoints] = useState(100);
+  const [tasks, setTasks] = useState<Task[]>([]);
 
-  const tasks: Task[] = [
-    {
-      id: "1",
-      name: '皿洗い',
-      title: '皿洗い',
-      frequency: '毎日',
-      period: '毎日',
-      point: 2,
-      users: ['たろう'],
-      daysOfWeek: [],
-      dates: [],
-      isTodo: false,
-      done: false,
-      skipped: false,
-      person: 'たろう',
-      image: '/images/taro.png'
-    },
-    {
-      id: "2",
-      name: 'ゴミ出し',
-      title: 'ゴミ出し',
-      frequency: '週次',
-      period: '週次',
-      point: 4,
-      users: ['はなこ'],
-      daysOfWeek: ['月', '金'],
-      dates: [],
-      isTodo: false,
-      done: false,
-      skipped: false,
-      person: 'はなこ',
-      image: '/images/hanako.png'
-    },
-    {
-      id: "3",
-      name: '洗濯',
-      title: '洗濯',
-      frequency: '週次',
-      period: '週次',
-      point: 3,
-      users: ['たろう'],
-      daysOfWeek: ['土'],
-      dates: [],
-      isTodo: false,
-      done: false,
-      skipped: false,
-      person: 'たろう',
-      image: '/images/taro.png'
-    }
-  ];
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // 月曜日
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });     // 日曜日
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+      const snapshot = await getDocs(q);
+
+      const fetched: Task[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name ?? '',
+          title: data.name ?? '',
+          frequency: data.frequency ?? '毎日',
+          period: data.frequency ?? '毎日',
+          point: data.point ?? 0,
+          users: data.users ?? [],
+          daysOfWeek: data.daysOfWeek ?? [],
+          dates: data.dates ?? [],
+          isTodo: data.isTodo ?? false,
+          done: data.done ?? false,
+          skipped: data.skipped ?? false,
+          completedAt: data.completedAt ?? '',
+          person: data.users?.[0] ?? '未設定',
+          image: '/images/default.png',
+        };
+      });
+
+      setTasks(fetched);
+
+      // ✅ 進捗ポイント集計（completedAtの中で今週分）
+      const thisWeekPoints = fetched.reduce((sum, task) => {
+        if (task.completedAt && isWithinInterval(parseISO(task.completedAt), { start: weekStart, end: weekEnd })) {
+          return sum + (task.point ?? 0);
+        }
+        return sum;
+      }, 0);
+
+      setTargetPoint(thisWeekPoints);
+    };
+
+    fetchTasks();
+  }, []);
 
   const autoCalculate = () => {
     let daily = 0;
@@ -78,6 +78,7 @@ export default function WeeklyPoints() {
   };
 
   const percent = (targetPoint / maxPoints) * 100;
+  const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
 
   return (
     <>
@@ -85,7 +86,9 @@ export default function WeeklyPoints() {
         className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 text-center mb-3 cursor-pointer hover:shadow-lg transition"
         onClick={() => setIsModalOpen(true)}
       >
-        <p className="text-lg font-bold text-[#5E5E5E] mb-4">今週の合計ポイント</p>
+        <p className="text-lg font-bold text-[#5E5E5E] mb-4">
+          今週の合計ポイント {weekLabel}
+        </p>
         <div className="mt-4 h-6 w-full bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-[#FFCB7D]"

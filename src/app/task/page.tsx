@@ -12,7 +12,7 @@ import type { Task, Period } from '@/types/Task';
 import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { updateDoc, deleteDoc, serverTimestamp, doc } from 'firebase/firestore';
 
@@ -36,20 +36,79 @@ export default function TaskPage() {
 
   const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
   const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
-
-
-  const toggleDone = (period: Period, index: number) => {
+  
+  const toggleDone = async (period: Period, index: number) => {
     setTasksState(prev => {
       const updated = [...prev[period]];
-      const wasSkipped = updated[index].skipped;
+      const task = updated[index];
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  
+      const newDone = !task.done;
+  
+      // Firestore更新は async に外で行う
+      (async () => {
+        const ref = doc(db, 'tasks', task.id);
+        await updateDoc(ref, {
+          done: newDone,
+          skipped: false,
+          completedAt: newDone ? now.toISOString() : '',
+        });
+  
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+  
+        const completionsRef = collection(db, 'taskCompletions');
+        const q = query(
+          completionsRef,
+          where('taskId', '==', task.id),
+          where('userId', '==', uid),
+          where('date', '==', todayStr)
+        );
+        const snapshot = await getDocs(q);
+  
+        if (newDone) {
+          // ✅ 完了処理（初回のみ記録）
+          if (snapshot.empty) {
+            await addDoc(completionsRef, {
+              taskId: task.id,
+              userId: uid,
+              date: todayStr,
+              point: task.point,
+            });
+  
+            // ✅ 完了ログ（履歴）も task_logs に追加
+            await addDoc(collection(db, 'task_logs'), {
+              taskId: task.id,
+              userId: uid,
+              taskName: task.name,
+              point: task.point,
+              period: task.period,
+              completedAt: now.toISOString(),
+            });
+          }
+        } else {
+          // ✅ 未完了に戻した場合 → 該当履歴を削除
+          for (const docSnap of snapshot.docs) {
+            await deleteDoc(doc(db, 'taskCompletions', docSnap.id));
+          }
+          // ❗ task_logs は履歴として残すので削除しない
+        }
+      })().catch(console.error);
+  
       updated[index] = {
-        ...updated[index],
-        done: !updated[index].done,
-        skipped: wasSkipped ? false : updated[index].skipped,
+        ...task,
+        done: newDone,
+        skipped: false,
+        completedAt: newDone ? now.toISOString() : '',
       };
+  
       return { ...prev, [period]: updated };
     });
   };
+  
+  
+  
 
   const deleteTask = async (period: Period, id: string) => {
     try {
@@ -98,8 +157,9 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
           : user === '花子'
           ? '/images/hanako.png'
           : '/images/default.png',
-      done: false,
-      skipped: false,
+      done: updated.done ?? false,
+      skipped: updated.skipped ?? false,
+      completedAt: updated.completedAt ?? '', 
       daysOfWeek: cleanedDaysOfWeek,
       dates: cleanedDates,
       period: newPeriod,
@@ -156,8 +216,10 @@ useEffect(() => {
         name: data.name ?? '',
         frequency: period,
         point: data.point ?? 0,
-        done: false,
-        skipped: false,
+        done: data.done ?? false,
+        skipped: data.skipped ?? false,
+        completedAt: data.completedAt ?? '',
+        completedBy: data.completedBy ?? '',
         person: user,
         image, // ← 差し替え
         daysOfWeek: data.daysOfWeek ?? [],

@@ -3,24 +3,82 @@
 'use client';
 
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { auth, db } from '@/lib/firebase';
+import {
+  collection,
+  getDocs,
+} from 'firebase/firestore';
+import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 
-export default function TaskCalendar() {
+interface UserPoints {
+  [userId: string]: {
+    name: string;
+    points: number;
+    image: string;
+  };
+}
+
+export default function PairPoints() {
   const router = useRouter();
+  const [userPoints, setUserPoints] = useState<UserPoints | null>(null);
 
-  const userA = { name: 'たろう', points: 24, image: '/images/taro.png' };
-  const userB = { name: 'はなこ', points: 24, image: '/images/hanako.png' };
+  useEffect(() => {
+    const fetchPoints = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const completionsRef = collection(db, 'taskCompletions');
+      const snapshot = await getDocs(completionsRef);
+
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+
+      const pointsMap: UserPoints = {};
+
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const date = parseISO(data.date);
+        if (!isWithinInterval(date, { start: weekStart, end: weekEnd })) return;
+
+        const userId = data.userId;
+        const point = data.point ?? 0;
+        const name = data.userName ?? '未設定';
+
+        const profileImage =
+          userId === uid
+            ? localStorage.getItem('profileImage') || '/images/taro.png'
+            : localStorage.getItem('partnerImage') || '/images/hanako.png';
+
+        if (!pointsMap[userId]) {
+          pointsMap[userId] = {
+            name,
+            points: 0,
+            image: profileImage,
+          };
+        }
+
+        pointsMap[userId].points += point;
+      });
+
+      setUserPoints(pointsMap);
+    };
+
+    fetchPoints();
+  }, []);
+
+  const users = userPoints ? Object.values(userPoints) : [];
 
   return (
     <>
-      {/* ペアポイントカード（1枚） */}
-      {userA && userB ? (
+      {users.length === 2 ? (
         <div
           onClick={() => router.push('/profile')}
           className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-10 py-4 cursor-pointer hover:shadow-lg transition mb-3"
         >
           <div className="flex justify-between items-center">
-            {[userA, userB].map((user, idx) => (
+            {users.map((user, idx) => (
               <div key={idx} className="flex items-center gap-4">
                 <Image
                   src={user.image}
