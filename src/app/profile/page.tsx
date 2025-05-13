@@ -2,7 +2,7 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { Eye, EyeOff, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
