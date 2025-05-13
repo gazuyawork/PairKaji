@@ -77,7 +77,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
                 const newPeriod = e.target.value as Period;
                 setEditedTask(prev => {
                   if (!prev) return prev;
-                  let updated = { ...prev, period: newPeriod };
+                    const updated = { ...prev, period: newPeriod };
                   if (newPeriod === '毎日') {
                     updated.daysOfWeek = [];
                     updated.dates = [];
