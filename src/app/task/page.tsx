@@ -125,66 +125,70 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
   }
 };
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+useEffect(() => {
+  const fetchTasks = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
-      const snapshot = await getDocs(q);
+    const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+    const snapshot = await getDocs(q);
 
-      
-      const rawTasks = snapshot.docs.map((doc): Task => {
-        const data = doc.data();
+    // 🔽 ここで localStorage から画像を取得
+    const storedProfileImage = localStorage.getItem('profileImage');
+    const storedPartnerImage = localStorage.getItem('partnerImage');
 
-        const user = data.users?.[0] ?? '未設定';
-        const period = data.frequency as Period;
+    const rawTasks = snapshot.docs.map((doc): Task => {
+      const data = doc.data();
+      const user = data.users?.[0] ?? '未設定';
+      const period = data.frequency as Period;
 
+      // 🔽 localStorageの画像を使用するように変更
+      const image =
+        user === '太郎'
+          ? storedProfileImage || '/images/taro.png'
+          : user === '花子'
+          ? storedPartnerImage || '/images/hanako.png'
+          : '/images/default.png';
 
-        return {
-          id: doc.id,
-          title: data.title ?? data.name ?? '',
-          name: data.name ?? '',
-          frequency: period,
-          point: data.point ?? 0,
-          done: false,
-          skipped: false,
-          person: user,
-          image:
-            user === '太郎'
-              ? '/images/taro.png'
-              : user === '花子'
-              ? '/images/hanako.png'
-              : '/images/default.png',
-          daysOfWeek: data.daysOfWeek ?? [],
-          dates: data.dates ?? [],
-          isTodo: data.isTodo ?? false,
-          users: data.users ?? [],
-          period,
-          scheduledDate: data.dates?.[0] ?? '',
-        };
-      });
-
-      const grouped: Record<Period, Task[]> = {
-        毎日: [],
-        週次: [],
-        不定期: [],
+      return {
+        id: doc.id,
+        title: data.title ?? data.name ?? '',
+        name: data.name ?? '',
+        frequency: period,
+        point: data.point ?? 0,
+        done: false,
+        skipped: false,
+        person: user,
+        image, // ← 差し替え
+        daysOfWeek: data.daysOfWeek ?? [],
+        dates: data.dates ?? [],
+        isTodo: data.isTodo ?? false,
+        users: data.users ?? [],
+        period,
+        scheduledDate: data.dates?.[0] ?? '',
       };
+    });
 
-      for (const task of rawTasks) {
-        if (task.period === '毎日' || task.period === '週次' || task.period === '不定期') {
-          grouped[task.period].push(task);
-        } else {
-          console.warn('無効な period 値:', task.period, task);
-        }
-      }
-
-
-      setTasksState(grouped);
+    const grouped: Record<Period, Task[]> = {
+      毎日: [],
+      週次: [],
+      不定期: [],
     };
 
-    fetchTasks();
-  }, []);
+    for (const task of rawTasks) {
+      if (task.period === '毎日' || task.period === '週次' || task.period === '不定期') {
+        grouped[task.period].push(task);
+      } else {
+        console.warn('無効な period 値:', task.period, task);
+      }
+    }
+
+    setTasksState(grouped);
+  };
+
+  fetchTasks();
+}, []);
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none">
