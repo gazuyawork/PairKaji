@@ -153,7 +153,7 @@ export default function TaskCard({
             alt={`${task.person}のアイコン`}
             width={38}
             height={38}
-            className="rounded-full border border-gray-300 object-cover"
+            className="rounded-full border border-gray-300 object-cover aspect-square"
           />
         </div>
       </motion.li>
