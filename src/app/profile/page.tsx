@@ -92,7 +92,7 @@ export default function ProfilePage() {
                 alt="プロフィール画像"
                 width={100}
                 height={100}
-                className="aspect-square rounded-full object-cover border border-gray-300 w-24"
+                className="h-24 aspect-square rounded-full object-cover border border-gray-300"
               />
               <input
                 type="file"
