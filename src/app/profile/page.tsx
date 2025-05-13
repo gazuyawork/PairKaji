@@ -185,7 +185,7 @@ export default function ProfilePage() {
         open={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
         // currentEmail={email}
-        onUpdated={(newEmail) => setEmail(newEmail)}
+        // onUpdated={(newEmail) => setEmail(newEmail)}
       />
 
       <PasswordEditModal
