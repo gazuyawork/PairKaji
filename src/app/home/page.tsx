@@ -9,7 +9,7 @@ import TaskList from '@/components/TaskList';
 import FooterNav from '@/components/FooterNav';
 import AuthGuard from '@/components/AuthGuard';
 import TaskCalendar from '@/components/TaskCalendar';
-import type { Task, Period } from '@/types/Task';
+import type { Task } from '@/types/Task';
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
