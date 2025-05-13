@@ -17,7 +17,7 @@ export default function ProfilePage() {
   // const [password, setPassword] = useState('');
   // const [showPassword, setShowPassword] = useState(false);
   const [profileImage, setProfileImage] = useState('/images/default.png');
-  const [partnerImage, setPartnerImage] = useState('/images/hanako_default.png');
+  const [partnerImage, setPartnerImage] = useState('/images/hanako.png');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
