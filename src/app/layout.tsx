@@ -1,6 +1,7 @@
 // layout.tsx
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
+import { Toaster } from 'sonner';
 
 const zenMaruGothic = Zen_Maru_Gothic({ subsets: ['latin'], weight: ['400'], variable: '--font-zen' });
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font-pacifico' });
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex flex-col h-full overscroll-none">
           {/* 子要素側でスクロールを許可する場合に overflow-y-auto を使う */}
           {children}
+          <Toaster />
         </div>
       </body>
     </html>

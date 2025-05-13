@@ -5,21 +5,19 @@ import { auth } from '@/lib/firebase';
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
-  updateEmail,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import { toast } from 'sonner';
 
 interface EmailEditModalProps {
   open: boolean;
   onClose: () => void;
-//   currentEmail: string;
-  onUpdated: (newEmail: string) => void;
+  onUpdated: (newEmail: string) => void; // 今回は呼びませんが残します
 }
 
 export default function EmailEditModal({
   open,
   onClose,
-//   currentEmail,
   onUpdated,
 }: EmailEditModalProps) {
   const [newEmail, setNewEmail] = useState('');
@@ -27,9 +25,6 @@ export default function EmailEditModal({
   const [loading, setLoading] = useState(false);
 
   const handleUpdate = async () => {
-    const user = auth.currentUser;
-    if (!user || !user.email) return;
-
     if (!newEmail.trim() || !password.trim()) {
       toast.error('すべての項目を入力してください');
       return;
@@ -37,19 +32,28 @@ export default function EmailEditModal({
 
     try {
       setLoading(true);
+
+      const user = auth.currentUser;
+      if (!user || !user.email) return;
+
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
-      await updateEmail(user, newEmail);
-      toast.success('メールアドレスを更新しました');
-      onUpdated(newEmail);
+
+      console.log('再認証完了');
+      await verifyBeforeUpdateEmail(user, newEmail);
+      console.log('verifyBeforeUpdateEmail 完了');
+
+      toast.success('確認メールを送信しました。メールをご確認ください。');
       onClose();
     } catch (err: any) {
-      console.error(err);
+      console.error('エラー内容：', err);
       toast.error(`更新に失敗しました: ${err.message || '不明なエラー'}`);
     } finally {
       setLoading(false);
     }
   };
+
+
 
   if (!open) return null;
 
@@ -59,12 +63,16 @@ export default function EmailEditModal({
         <div className="space-y-6 mt-4 mx-3">
           <div className="text-center">
             <p className="text-lg font-bold text-[#5E5E5E] font-sans">メールアドレスを変更</p>
-            <p className="text-sm text-gray-500 font-sans mt-1">本人確認のためパスワードを入力してください</p>
+            <p className="text-sm text-gray-500 font-sans mt-1">
+              本人確認のためパスワードを入力してください
+            </p>
           </div>
 
           <div className="space-y-4 pt-4">
             <div>
-              <label className="block text-gray-600 font-semibold text-sm mb-1">新しいメールアドレス</label>
+              <label className="block text-gray-600 font-semibold text-sm mb-1">
+                新しいメールアドレス
+              </label>
               <input
                 type="email"
                 placeholder="new@example.com"
@@ -75,7 +83,9 @@ export default function EmailEditModal({
             </div>
 
             <div>
-              <label className="block text-gray-600 font-semibold text-sm mb-1">現在のパスワード</label>
+              <label className="block text-gray-600 font-semibold text-sm mb-1">
+                現在のパスワード
+              </label>
               <input
                 type="password"
                 placeholder="パスワード"

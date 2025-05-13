@@ -79,59 +79,61 @@ export default function ProfilePage() {
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Profile" />
 
-      <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
-        <div className="bg-white shadow rounded-2xl px-4 py-4">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative">
-              <Image
-                src={profileImage}
-                alt="プロフィール画像"
-                width={100}
-                height={100}
-                className="w-24 h-24 rounded-full object-cover border border-gray-300"
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
-              />
-            </div>
-            <div className="flex-1 space-y-4">
-              <div className="space-y-1">
-                <label className="text-[#5E5E5E] font-semibold">氏名</label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="flex-1 text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
-                  />
-                  <button
-                    onClick={handleSaveName}
-                    className="text-sm bg-[#FFCB7D] text-white px-3 py-1 rounded shadow"
-                  >
-                    変更
-                  </button>
-                </div>
-              </div>
+    <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
+      <div className="bg-white shadow rounded-2xl px-4 py-4 space-y-6">
+        {/* プロフ画像と氏名のみ横並び */}
+        <div className="flex items-center gap-6">
+          <div className="relative">
+            <Image
+              src={profileImage}
+              alt="プロフィール画像"
+              width={100}
+              height={100}
+              className="w-24 h-24 aspect-square rounded-full object-cover border border-gray-300"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </div>
 
-              <div className="space-y-1">
-                <label className="text-[#5E5E5E] font-semibold">メールアドレス</label>
-                <div className="flex gap-2 items-center">
-                  <p className="flex-1 text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
-                  <button
-                    onClick={() => setIsEmailModalOpen(true)}
-                    className="text-sm bg-gray-300 text-white px-3 py-1 rounded"
-                  >
-                    変更
-                  </button>
-                </div>
-              </div>
+          <div className="flex-1 space-y-1">
+            <label className="text-[#5E5E5E] font-semibold">氏名</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="flex-1 text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
+              />
+              <button
+                onClick={handleSaveName}
+                className="w-12 h-8 rounded-sm  text-sm bg-[#FFCB7D] text-white shadow"
+              >
+                変更
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ここから下は縦並びに表示 */}
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[#5E5E5E] font-semibold">メールアドレス</label>
+            <div className="flex gap-2 items-center">
+              <p className="flex-1 text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
+              <button
+                onClick={() => setIsEmailModalOpen(true)}
+                className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
+              >
+                変更
+              </button>
             </div>
           </div>
 
-          <div className="space-y-1 mb-5">
+          <div className="space-y-1">
             <label className="text-[#5E5E5E] font-semibold">パスワード</label>
             <div className="flex gap-2 items-center">
               <input
@@ -142,7 +144,7 @@ export default function ProfilePage() {
               />
               <button
                 onClick={() => setIsPasswordModalOpen(true)}
-                className="text-sm bg-gray-300 text-white px-3 py-1 rounded"
+                className="w-12 h-8 rounded-sm  text-sm bg-gray-500 text-white"
               >
                 変更
               </button>
@@ -154,26 +156,28 @@ export default function ProfilePage() {
             <p className="text-[#5E5E5E] border-b border-b-gray-200 py-1">ABC12345</p>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white shadow rounded-2xl px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image
-              src={partnerImage}
-              alt="パートナー画像"
-              width={60}
-              height={60}
-              className="w-16 h-16 rounded-full object-cover border border-gray-300"
-            />
-            <div className="text-[#5E5E5E]">
-              <p className="font-semibold">花子</p>
-              <p>partner@example.com</p>
-            </div>
+      <div className="bg-white shadow rounded-2xl px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src={partnerImage}
+            alt="パートナー画像"
+            width={60}
+            height={60}
+            className="w-16 h-16 rounded-full object-cover border border-gray-300"
+          />
+          <div className="text-[#5E5E5E]">
+            <p className="font-semibold">花子</p>
+            <p>partner@example.com</p>
           </div>
-          <button className="text-red-500">
-            <X size={24} />
-          </button>
         </div>
-      </main>
+        <button className="text-red-500">
+          <X size={24} />
+        </button>
+      </div>
+    </main>
+
 
       <FooterNav />
 
