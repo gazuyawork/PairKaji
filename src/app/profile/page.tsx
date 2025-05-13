@@ -2,7 +2,7 @@
 
 import Header from '@/components/Header';
 import FooterNav from '@/components/FooterNav';
-import { X } from 'lucide-react';
+import { Eye, EyeOff, X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
@@ -14,7 +14,9 @@ import PasswordEditModal from '@/components/PasswordEditModal';
 export default function ProfilePage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [profileImage, setProfileImage] = useState('/images/default.png');
+  const [profileImage, setProfileImage] = useState<string | null>(
+    typeof window !== 'undefined' ? localStorage.getItem('profileImage') : null
+  );
   const [partnerImage, setPartnerImage] = useState('/images/hanako_default.png');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -41,7 +43,11 @@ export default function ProfilePage() {
       setEmail(user.email || '');
 
       const storedImage = localStorage.getItem('profileImage');
-      if (storedImage) setProfileImage(storedImage);
+      if (storedImage) {
+        setProfileImage(storedImage);
+      } else {
+        setProfileImage('/images/default.png');
+      }
 
       const storedPartnerImage = localStorage.getItem('partnerImage');
       if (storedPartnerImage) setPartnerImage(storedPartnerImage);
@@ -84,11 +90,11 @@ export default function ProfilePage() {
 
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         <div className="bg-white shadow rounded-2xl px-4 py-4 space-y-6">
-          {/* プロフ画像と氏名のみ横並び */}
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="relative">
+          {/* プロフ画像と氏名のみ横並び（幅が狭くても横並びを維持） */}
+          <div className="flex flex-row flex-nowrap items-center gap-6 overflow-x-auto">
+            <div className="relative shrink-0">
               <Image
-                src={profileImage}
+                src={profileImage || '/images/default.png'}
                 alt="プロフィール画像"
                 width={100}
                 height={100}
@@ -102,7 +108,7 @@ export default function ProfilePage() {
               />
             </div>
 
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-1 min-w-0">
               <label className="text-[#5E5E5E] font-semibold">氏名</label>
               <div className="flex gap-2 items-center">
                 <input
