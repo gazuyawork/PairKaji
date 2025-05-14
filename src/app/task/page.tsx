@@ -15,6 +15,7 @@ import FilterControls from '@/components/FilterControls';
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { updateDoc, deleteDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -68,7 +69,7 @@ export default function TaskPage() {
         const snapshot = await getDocs(q);
   
         if (newDone) {
-          // ✅ 完了処理（初回のみ記録）
+          // 完了処理（初回のみ記録）
           if (snapshot.empty) {
             await addDoc(completionsRef, {
               taskId: task.id,
@@ -77,7 +78,7 @@ export default function TaskPage() {
               point: task.point,
             });
   
-            // ✅ 完了ログ（履歴）も task_logs に追加
+            // 完了ログ（履歴）も task_logs に追加
             await addDoc(collection(db, 'task_logs'), {
               taskId: task.id,
               userId: uid,
@@ -85,10 +86,11 @@ export default function TaskPage() {
               point: task.point,
               period: task.period,
               completedAt: now.toISOString(),
+              date: todayStr,
             });
           }
         } else {
-          // ✅ 未完了に戻した場合 → 該当履歴を削除
+          // 未完了に戻した場合 → 該当履歴を削除
           for (const docSnap of snapshot.docs) {
             await deleteDoc(doc(db, 'taskCompletions', docSnap.id));
           }
@@ -125,9 +127,9 @@ export default function TaskPage() {
 
 const updateTask = async (oldPeriod: Period, updated: Task) => {
   try {
-    const newPeriod = updated.period as Period; // ✅ periodを優先する
+    const newPeriod = updated.period as Period; // periodを優先する
 
-    // ✅ 頻度変更によって不要なデータを初期化
+    // 頻度変更によって不要なデータを初期化
     const cleanedDaysOfWeek =
       newPeriod === '不定期' || newPeriod === '毎日' ? [] : updated.daysOfWeek ?? [];
     const cleanedDates =
@@ -185,6 +187,12 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
   }
 };
 
+// 初回読み込み時に実行
+useEffect(() => {
+  resetCompletedTasks().catch(console.error);
+}, []);
+
+
 useEffect(() => {
   const fetchTasks = async () => {
     const uid = auth.currentUser?.uid;
@@ -193,7 +201,7 @@ useEffect(() => {
     const q = query(collection(db, 'tasks'), where('userId', '==', uid));
     const snapshot = await getDocs(q);
 
-    // 🔽 ここで localStorage から画像を取得
+    // localStorage から画像を取得
     const storedProfileImage = localStorage.getItem('profileImage');
     const storedPartnerImage = localStorage.getItem('partnerImage');
 
@@ -202,7 +210,7 @@ useEffect(() => {
       const user = data.users?.[0] ?? '未設定';
       const period = data.frequency as Period;
 
-      // 🔽 localStorageの画像を使用するように変更
+      // localStorageの画像を使用するように変更
       const image =
         user === '太郎'
           ? storedProfileImage || '/images/taro.png'
@@ -324,7 +332,7 @@ useEffect(() => {
 
       {editTargetTask && (
         <EditTaskModal
-          key={editTargetTask.id} // ← ✅ これを追加
+          key={editTargetTask.id}
           isOpen={!!editTargetTask}
           task={editTargetTask}
           onClose={() => setEditTargetTask(null)}
