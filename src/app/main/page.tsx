@@ -45,10 +45,11 @@ export default function MainView() {
       <div className="flex-1 overflow-hidden relative">
         <motion.div
           className="flex w-[300vw] h-full transition-transform duration-300"
-          initial={{ x: '-0vw' }}  // ← 初期値は固定にしておくのが安全
+          initial={{ x: `-${initialIndex * 100}vw` }}  // ← 初期表示位置も index に合わせて調整
           animate={{ x: `-${index * 100}vw` }}
           transition={{ type: "tween", duration: 0.2 }}
         >
+
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto bg-[#fffaf1]">
             <HomeView />
           </div>
