@@ -12,7 +12,7 @@ export default function WeeklyPoints() {
   const [targetPoint, setTargetPoint] = useState(0);
   // const [maxPoints, setMaxPoints] = useState(100);
   const maxPoints = 100;
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks] = useState<Task[]>([]);
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // 月曜日

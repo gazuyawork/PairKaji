@@ -1,7 +1,7 @@
 import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { parseISO, isToday, startOfWeek, endOfWeek } from 'date-fns';
-import type { Task, Period } from '@/types/Task';
+import { parseISO, isToday } from 'date-fns';
+import type { Task } from '@/types/Task';
 
 export const resetCompletedTasks = async () => {
   const uid = auth.currentUser?.uid;
