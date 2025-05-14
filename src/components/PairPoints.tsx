@@ -75,7 +75,7 @@ export default function PairPoints() {
       {users.length === 2 ? (
         <div
           onClick={() => router.push('/profile')}
-          className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-10 py-4 cursor-pointer hover:shadow-lg transition mb-3"
+          className="h-full bg-white rounded-xl shadow-md border border-[#e5e5e5] px-10 py-4 cursor-pointer hover:shadow-lg transition"
         >
           <div className="flex justify-between items-center">
             {users.map((user, idx) => (
@@ -99,7 +99,7 @@ export default function PairPoints() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-4 py-6 text-center text-gray-500 font-sans text-sm">
+        <div className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-4 py-16 text-center text-gray-500 font-sans text-sm h-full">
           パートナー設定を行うと表示されます
         </div>
       )}

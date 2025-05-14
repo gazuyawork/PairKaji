@@ -67,21 +67,29 @@ export default function HomePage() {
         <Header title="Home" />
 
         {/* メインコンテンツ */}
-        <main className="flex-1 px-4 py-5 space-y-6 overflow-y-auto pb-50">
+        <main className="flex-1 px-4 py-5 space-y-4 overflow-hidden pb-20">
           {/* 1週間の合計ポイントなどの表示 */}
-          <WeeklyPoints />
+          <div className="h-[150px]">
+            <WeeklyPoints />
+          </div>
 
           {/* ペアポイント（タロウ・ハナコなど） */}
-          <PairPoints />
+          <div className="h-[150px]">
+            <PairPoints />
+          </div>
 
           {/* カレンダー表示（今週分） */}
-          <TaskCalendar tasks={tasks} />
+          <div className="h-[170px]">
+            <TaskCalendar tasks={tasks} />
+          </div>
 
           {/* パートナーの頑張り一覧 */}
           {/* <TaskList /> */}
 
           {/* パートナーの頑張り一覧 */}
-          <TaskHistory />
+          <div className="flex-1 overflow-y-auto">
+            <TaskHistory />
+          </div>
 
         </main>
 
