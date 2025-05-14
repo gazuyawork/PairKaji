@@ -16,6 +16,7 @@ import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { updateDoc, deleteDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
+import { isToday, parseISO } from 'date-fns';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -229,7 +230,7 @@ useEffect(() => {
         completedAt: data.completedAt ?? '',
         completedBy: data.completedBy ?? '',
         person: user,
-        image, // ← 差し替え
+        image,
         daysOfWeek: data.daysOfWeek ?? [],
         dates: data.dates ?? [],
         isTodo: data.isTodo ?? false,
@@ -239,6 +240,37 @@ useEffect(() => {
       };
     });
 
+    // 🔁 取得直後に、前日以前の完了タスクを未完了にリセット
+    const today = new Date();
+    const updates: Promise<void>[] = [];
+
+    for (const task of rawTasks) {
+      if (task.completedAt) {
+        const completedDate = parseISO(task.completedAt);
+        const isTodayTask = isToday(completedDate);
+        if (!isTodayTask) {
+          const taskRef = doc(db, 'users', uid, 'tasks', task.id);
+          updates.push(
+            updateDoc(taskRef, {
+              done: false,
+              skipped: false,
+              completedAt: null,
+              completedBy: '',
+            })
+          );
+
+          // ローカルデータも更新（表示用）
+          task.done = false;
+          task.skipped = false;
+          task.completedAt = '';
+          task.completedBy = '';
+        }
+      }
+    }
+
+    await Promise.all(updates);
+
+    // Periodでグループ分け
     const grouped: Record<Period, Task[]> = {
       毎日: [],
       週次: [],
@@ -258,6 +290,7 @@ useEffect(() => {
 
   fetchTasks();
 }, []);
+
 
 
   return (

@@ -9,6 +9,8 @@ import { auth, db } from '@/lib/firebase';
 import {
   collection,
   getDocs,
+  query,
+  where
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 
@@ -29,7 +31,7 @@ export default function PairPoints() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const completionsRef = collection(db, 'taskCompletions');
+      const completionsRef = collection(db, 'task_logs');
       const snapshot = await getDocs(completionsRef);
 
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -39,12 +41,12 @@ export default function PairPoints() {
 
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
-        const date = parseISO(data.date);
+        const date = parseISO(data.completedAt);
         if (!isWithinInterval(date, { start: weekStart, end: weekEnd })) return;
 
         const userId = data.userId;
         const point = data.point ?? 0;
-        const name = data.userName ?? '未設定';
+        const name = data.taskName ?? '未設定';
 
         const profileImage =
           userId === uid

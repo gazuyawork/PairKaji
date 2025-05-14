@@ -8,6 +8,7 @@ import { CheckCircle, Circle, Calendar, Trash2, Pencil } from 'lucide-react';
 import { useRef, useEffect, useState } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
+import { format, isToday, parseISO, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
 type Props = {
   task: Task;
@@ -18,6 +19,49 @@ type Props = {
   onEdit: () => void;
   menuOpenId: string | null;
   setMenuOpenId: (id: string | null) => void;
+};
+
+
+const isTaskActiveToday = (task: Task): boolean => {
+  const today = new Date();
+  const todayDay = today.getDay(); // 0=日〜6=土
+  const todayStr = format(today, 'yyyy-MM-dd');
+
+  if (task.frequency === '毎日') {
+    return true;
+  }
+
+  if (task.frequency === '週次') {
+    if (task.daysOfWeek && task.daysOfWeek.length > 0) {
+      return task.daysOfWeek.includes(String(todayDay));
+    } else {
+      // 曜日指定なし → 週次特別ルール
+      const completedAtDate = task.completedAt ? parseISO(task.completedAt) : null;
+
+      if (completedAtDate) {
+        const isDoneToday = isToday(completedAtDate);
+        if (isDoneToday) return true; // 当日なら切り替え可
+
+        const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+
+        const doneThisWeek = isWithinInterval(completedAtDate, {
+          start: weekStart,
+          end: weekEnd,
+        });
+
+        if (doneThisWeek) return false; // 今週すでに完了 → 翌週まで不可
+      }
+
+      return true; // 今週未完了 → タップ可
+    }
+  }
+
+  if (task.frequency === '不定期') {
+    return task.scheduledDate === todayStr;
+  }
+
+  return false;
 };
 
 export default function TaskCard({
@@ -34,7 +78,6 @@ export default function TaskCard({
     onSwipedLeft: () => setMenuOpenId(task.id), // ← 削除メニュー表示
     trackTouch: true,
   });
-
 
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -64,7 +107,7 @@ export default function TaskCard({
   };
 
   const handleClick = () => {
-    if (!isLongPress) {
+    if (!isLongPress && isTaskActiveToday(task)) {
       onToggleDone(period, index);
     }
   };
@@ -117,8 +160,13 @@ export default function TaskCard({
               ? { duration: 0.4, times: [0, 0.2, 0.6, 1] }
               : {}
           }
-          className={`w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border border-[#e5e5e5] hover:shadow-md cursor-pointer 
-            ${task.done ? 'opacity-50 scale-[0.99]' : ''} bg-white`}
+          className={`
+            w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border border-[#e5e5e5]
+            ${task.done ? 'opacity-50 scale-[0.99]' : ''}
+            ${!isTaskActiveToday(task) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md cursor-pointer'}
+            bg-white
+          `}
+
         >
 
         <div className="flex items-center gap-3">
