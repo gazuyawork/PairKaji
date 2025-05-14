@@ -9,8 +9,6 @@ import { auth, db } from '@/lib/firebase';
 import {
   collection,
   getDocs,
-  query,
-  where
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 

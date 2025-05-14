@@ -61,7 +61,7 @@ export default function WeeklyPoints() {
     };
 
     fetchTasks();
-  }, []);
+  }, [weekStart, weekEnd]);
 
   const autoCalculate = () => {
     let daily = 0;

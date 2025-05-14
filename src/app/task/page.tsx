@@ -241,7 +241,7 @@ useEffect(() => {
     });
 
     // 🔁 取得直後に、前日以前の完了タスクを未完了にリセット
-    const today = new Date();
+    // const today = new Date();
     const updates: Promise<void>[] = [];
 
     for (const task of rawTasks) {
