@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useSwipeable } from "react-swipeable";
@@ -11,7 +11,7 @@ import HomeView from '@/components/views/HomeView';
 import TaskView from '@/components/views/TaskView';
 import TodoView from '@/components/views/TodoView';
 
-export default function MainView() {
+function MainContent() {
   const searchParams = useSearchParams();
   const initialView = searchParams.get("view");
   const initialIndex = initialView === "task" ? 1 : 0;
@@ -46,11 +46,10 @@ export default function MainView() {
       <div className="flex-1 overflow-hidden relative">
         <motion.div
           className="flex w-[300vw] h-full transition-transform duration-300"
-          initial={{ x: `-${initialIndex * 100}vw` }}  // ← 初期表示位置も index に合わせて調整
+          initial={{ x: `-${initialIndex * 100}vw` }}
           animate={{ x: `-${index * 100}vw` }}
           transition={{ type: "tween", duration: 0.2 }}
         >
-
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto bg-[#fffaf1]">
             <HomeView />
           </div>
@@ -67,5 +66,13 @@ export default function MainView() {
         <FooterNav currentIndex={index} setIndex={setIndex} />
       </div>
     </div>
+  );
+}
+
+export default function MainView() {
+  return (
+    <Suspense fallback={null}>
+      <MainContent />
+    </Suspense>
   );
 }
