@@ -9,15 +9,15 @@ import TodoView from '@/components/views/TodoView'
 
 
 const views = ["home", "task", "todo"] as const;
-type View = (typeof views)[number];
+// type View = (typeof views)[number];
 
 export default function MainView() {
   const [index, setIndex] = useState(0);
 
-  const handleSwipe = (direction: "left" | "right") => {
-    if (direction === "left" && index < views.length - 1) setIndex(index + 1);
-    else if (direction === "right" && index > 0) setIndex(index - 1);
-  };
+//   const handleSwipe = (direction: "left" | "right") => {
+//     if (direction === "left" && index < views.length - 1) setIndex(index + 1);
+//     else if (direction === "right" && index > 0) setIndex(index - 1);
+//   };
 
   return (
     // <div className="h-screen flex flex-col overflow-hidden">
