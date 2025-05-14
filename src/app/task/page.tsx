@@ -249,7 +249,7 @@ useEffect(() => {
         const completedDate = parseISO(task.completedAt);
         const isTodayTask = isToday(completedDate);
         if (!isTodayTask) {
-          const taskRef = doc(db, 'users', uid, 'tasks', task.id);
+          const taskRef = doc(db, 'tasks', task.id);
           updates.push(
             updateDoc(taskRef, {
               done: false,

@@ -18,50 +18,32 @@ export default function WeeklyPoints() {
   const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // 月曜日
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });     // 日曜日
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+useEffect(() => {
+  const fetchPoints = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
-      const snapshot = await getDocs(q);
+    const completionsRef = collection(db, 'taskCompletions');
+    const q = query(completionsRef, where('userId', '==', uid));
+    const snapshot = await getDocs(q);
 
-      const fetched: Task[] = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name ?? '',
-          title: data.name ?? '',
-          frequency: data.frequency ?? '毎日',
-          period: data.frequency ?? '毎日',
-          point: data.point ?? 0,
-          users: data.users ?? [],
-          daysOfWeek: data.daysOfWeek ?? [],
-          dates: data.dates ?? [],
-          isTodo: data.isTodo ?? false,
-          done: data.done ?? false,
-          skipped: data.skipped ?? false,
-          completedAt: data.completedAt ?? '',
-          person: data.users?.[0] ?? '未設定',
-          image: '/images/default.png',
-        };
-      });
+    const pointsThisWeek = snapshot.docs.reduce((sum, doc) => {
+      const data = doc.data();
+      const date = parseISO(data.date); // 'YYYY-MM-DD'
+      const point = data.point ?? 0;
 
-      setTasks(fetched);
+      if (isWithinInterval(date, { start: weekStart, end: weekEnd })) {
+        return sum + point;
+      }
+      return sum;
+    }, 0);
 
-      // ✅ 進捗ポイント集計（completedAtの中で今週分）
-      const thisWeekPoints = fetched.reduce((sum, task) => {
-        if (task.completedAt && isWithinInterval(parseISO(task.completedAt), { start: weekStart, end: weekEnd })) {
-          return sum + (task.point ?? 0);
-        }
-        return sum;
-      }, 0);
+    setTargetPoint(pointsThisWeek);
+  };
 
-      setTargetPoint(thisWeekPoints);
-    };
+  fetchPoints();
+}, [weekStart, weekEnd]);
 
-    fetchTasks();
-  }, [weekStart, weekEnd]);
 
   const autoCalculate = () => {
     let daily = 0;

@@ -5,7 +5,8 @@
 import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
 import PairPoints from '@/components/PairPoints';
-import TaskList from '@/components/TaskList';
+// import TaskList from '@/components/TaskList';
+import TaskHistory from '@/components/TaskHistory';
 import FooterNav from '@/components/FooterNav';
 import AuthGuard from '@/components/AuthGuard';
 import TaskCalendar from '@/components/TaskCalendar';
@@ -77,7 +78,10 @@ export default function HomePage() {
           <TaskCalendar tasks={tasks} />
 
           {/* パートナーの頑張り一覧 */}
-          <TaskList />
+          {/* <TaskList /> */}
+
+          {/* パートナーの頑張り一覧 */}
+          <TaskHistory />
 
         </main>
 

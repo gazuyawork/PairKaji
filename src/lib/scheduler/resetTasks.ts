@@ -1,41 +1,69 @@
-import { db } from '@/lib/firebase';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { isSameDay, parseISO, startOfToday } from 'date-fns';
+import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { parseISO, isToday, startOfWeek, endOfWeek } from 'date-fns';
+import type { Task, Period } from '@/types/Task';
 
 export const resetCompletedTasks = async () => {
-  const snapshot = await getDocs(collection(db, 'tasks'));
-//   const now = new Date();
-  const today = startOfToday();
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+
+  const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+  const snapshot = await getDocs(q);
+  const today = new Date();
+  const todayDay = today.getDay(); // 0=日〜6=土
+
+  const updates: Promise<void>[] = [];
 
   for (const docSnap of snapshot.docs) {
-    const data = docSnap.data();
-    const completedAt = data.completedAt;
-    const period = data.frequency;
 
-    if (!data.done || !completedAt) continue;
+    const task = {
+      ...(docSnap.data() as Task),
+      id: docSnap.id,
+    };
 
-    const completedDate = parseISO(completedAt);
+    // ✅ docSnap.id を使ってドキュメント参照を取得
+    const taskRef = doc(db, 'tasks', docSnap.id);
 
-    // ✅ 共通：完了日が今日でない場合のみリセット検討
-    if (isSameDay(today, completedDate)) continue;
+
+    const completedAt = task.completedAt ? parseISO(task.completedAt) : null;
+    const isDoneToday = completedAt && isToday(completedAt);
 
     let shouldReset = false;
 
-    if (period === '毎日') {
-      shouldReset = true;
-    } else if (period === '週次') {
-      const dayOfWeek = today.getDay(); // 0(日)〜6(土)
-      const days = data.daysOfWeek ?? [];
-      const weekdayMap = ['日', '月', '火', '水', '木', '金', '土'];
-      const todayName = weekdayMap[dayOfWeek];
-      shouldReset = !days.includes(todayName);
+    if (task.frequency === '毎日') {
+      if (completedAt && !isDoneToday) shouldReset = true;
+
+    } else if (task.frequency === '週次') {
+      const days = task.daysOfWeek ?? [];
+
+      if (days.length > 0) {
+        // 曜日指定あり：今日が対象曜日かつ未完了
+        const isTodayActive = days.includes(String(todayDay));
+        if (isTodayActive && completedAt && !isDoneToday) {
+          shouldReset = true;
+        }
+      } else {
+        // 曜日指定なし：月曜のみリセット
+        if (todayDay === 1 && completedAt && !isDoneToday) {
+          shouldReset = true;
+        }
+      }
+
+    } else if (task.frequency === '不定期') {
+      // リセットしない
     }
 
     if (shouldReset) {
-      await updateDoc(doc(db, 'tasks', docSnap.id), {
-        done: false,
-        completedAt: '',
-      });
+      updates.push(
+        updateDoc(taskRef, {
+          done: false,
+          skipped: false,
+          completedAt: null,
+          completedBy: '',
+        })
+      );
     }
   }
+
+  await Promise.all(updates);
 };
