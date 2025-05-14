@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSwipeable } from "react-swipeable";
+import { auth } from '@/lib/firebase';
 import FooterNav from "@/components/FooterNav";
 import HomeView from '@/components/views/HomeView';
 import TaskView from '@/components/views/TaskView';
@@ -10,6 +11,14 @@ import TodoView from '@/components/views/TodoView';
 
 export default function MainView() {
   const [index, setIndex] = useState(0);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(() => {
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleSwipe = (direction: "left" | "right") => {
     if (direction === "left" && index < 2) setIndex(index + 1);
@@ -19,10 +28,13 @@ export default function MainView() {
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => handleSwipe("left"),
     onSwipedRight: () => handleSwipe("right"),
-    delta: 50, // スワイプ感度
+    delta: 50,
     trackTouch: true,
     trackMouse: false,
   });
+
+  // 🔒 認証状態が確定するまで描画しない
+  if (!authReady) return null;
 
   return (
     <div className="flex flex-col min-h-screen" {...swipeHandlers}>

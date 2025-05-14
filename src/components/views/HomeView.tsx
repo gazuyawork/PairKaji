@@ -60,20 +60,20 @@ export default function HomeView() {
       <Header title="Home" />
 
       <main className="flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20">
-        <div className="h-[150px]">
-          <WeeklyPoints />
-        </div>
-
-        <div className="h-[150px]">
-          <PairPoints />
+        <div className="h-[300px]">
+          <TaskHistory />
         </div>
 
         <div className="h-[170px]">
           <TaskCalendar tasks={tasks} />
         </div>
 
-        <div className="h-[300px]">
-          <TaskHistory />
+        <div className="h-[150px]">
+          <WeeklyPoints />
+        </div>
+
+        <div className="h-[150px]">
+          <PairPoints />
         </div>
       </main>
     </div>
