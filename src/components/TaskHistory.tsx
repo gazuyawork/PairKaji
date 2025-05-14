@@ -94,15 +94,6 @@ export default function TaskHistory() {
 
         <h2 className="text-lg font-bold text-[#5E5E5E] flex items-center gap-2">
           完了履歴
-          <select
-            value={weekOffset}
-            onChange={(e) => setWeekOffset(Number(e.target.value))}
-            className="ml-1 text-sm border-b border-gray-400 bg-transparent outline-none appearance-none"
-          >
-            {generateWeekOptions().map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
         </h2>
 
         <div className="w-[60px] text-right">
@@ -117,14 +108,28 @@ export default function TaskHistory() {
         </div>
       </div>
 
-      {weekOffset < 0 && (
+      <div className="mb-6">
+        <select
+            value={weekOffset}
+            onChange={(e) => setWeekOffset(Number(e.target.value))}
+            className="ml-1 text-sm border-b border-gray-400 bg-transparent outline-none appearance-none"
+            >
+            {generateWeekOptions().map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+        </select>
+    </div>
+
+
+        {weekOffset < 0 && (
         <div
-          className="text-sm text-gray-500 hover:bg-gray-200 px-2 py-1 rounded cursor-pointer inline-block mb-2"
-          onClick={() => setWeekOffset(0)}
+            className="text-sm bg-gray-500 text-white hover:bg-gray-600 px-4 py-2 rounded-full cursor-pointer inline-block mb-10 shadow"
+            onClick={() => setWeekOffset(0)}
         >
-          今週に戻る
+            今週に戻る
         </div>
-      )}
+        )}
+
 
       {logs.length === 0 ? (
         <p className="text-gray-400 mb-10">この週の履歴はありません</p>
@@ -132,29 +137,30 @@ export default function TaskHistory() {
         <div className="text-left space-y-4">
           {sortedDates.map(date => (
             <div key={date}>
-              <h3 className="text-sm font-semibold text-gray-600 mb-2">
+              <h3 className="font-semibold text-gray-600 mb-2">
                 {format(parseISO(date), 'M/d (E)')}
               </h3>
-              <ul className="space-y-1">
+              <ul className="space-y-2">
                 {groupedByDate[date].map((log, idx) => (
                   <li
                     key={idx}
-                    className="flex items-center gap-4 border-b pb-1 text-sm text-[#5E5E5E]"
+                    className="flex items-center gap-4 border-b pb-1 text-[#5E5E5E]"
                   >
                     <div className="w-[100px] truncate text-ellipsis overflow-hidden whitespace-nowrap">
                       {log.taskName ?? '（タスク名なし）'}
                     </div>
                     <div className="ml-auto flex items-center gap-2">
-                      <div className="w-[60px] text-xs text-right text-gray-600">{log.point}pt</div>
-                      <div className="w-[36px] h-[36px]">
+                      <div className="w-[60px] text-right text-gray-600 pr-4-4">{log.point}pt</div>
+                        <div className="w-[36px] h-[36px] flex-shrink-0">
                         <Image
-                          src={getProfileImage(log.person)}
-                          alt="icon"
-                          width={36}
-                          height={36}
-                          className="rounded-full border border-gray-300 object-cover"
+                            src={getProfileImage(log.person)}
+                            alt="icon"
+                            width={38}
+                            height={38}
+                            className="rounded-full border border-gray-300 object-cover w-full h-full"
+                            style={{ aspectRatio: '1 / 1' }}
                         />
-                      </div>
+                        </div>
                     </div>
                   </li>
                 ))}
