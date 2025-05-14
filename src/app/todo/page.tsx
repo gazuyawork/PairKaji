@@ -4,7 +4,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
 import Header from '@/components/Header';
-import FooterNav from '@/components/FooterNav';
+// import FooterNav from '@/components/FooterNav';
 import TodoTaskCard from '@/components/TodoTaskCard';
 import GroupSelector from '@/components/GroupSelector';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
@@ -161,7 +161,7 @@ export default function TodoPage() {
           />
         ))}
       </main>
-      <FooterNav />
+      {/* <FooterNav /> */}
     </div>
   );
 }

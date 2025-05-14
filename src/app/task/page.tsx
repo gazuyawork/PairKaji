@@ -3,7 +3,7 @@
 'use client';
 
 import Header from '@/components/Header';
-import FooterNav from '@/components/FooterNav';
+// import FooterNav from '@/components/FooterNav';
 import { Pencil } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import TaskCard from '@/components/TaskCard';
