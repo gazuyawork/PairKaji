@@ -83,7 +83,8 @@ export default function TaskHistory() {
   };
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-md text-center mb-5 h-[calc(100vh-200px)] overflow-y-auto">
+    // <div className="bg-white p-4 rounded-xl shadow-md text-center mb-5 h-[calc(100vh-200px)] overflow-y-auto">
+    <div className="h-full flex flex-col bg-white p-4 rounded-xl shadow-md text-center  overflow-y-auto">
       <div className="flex justify-between items-center mb-4">
         <button
           className="text-sm text-gray-500 hover:bg-gray-200 px-2 py-1 rounded w-[60px] text-left"

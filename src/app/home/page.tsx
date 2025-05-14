@@ -67,7 +67,7 @@ export default function HomePage() {
         <Header title="Home" />
 
         {/* メインコンテンツ */}
-        <main className="flex-1 px-4 py-5 space-y-4 overflow-hidden pb-20">
+        <main className="flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20">
           {/* 1週間の合計ポイントなどの表示 */}
           <div className="h-[150px]">
             <WeeklyPoints />
@@ -87,7 +87,8 @@ export default function HomePage() {
           {/* <TaskList /> */}
 
           {/* パートナーの頑張り一覧 */}
-          <div className="flex-1 overflow-y-auto">
+          {/* <div className="flex-1 overflow-y-auto"> */}
+          <div className="h-[300px]">
             <TaskHistory />
           </div>
 
