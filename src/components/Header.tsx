@@ -27,17 +27,22 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
   return (
     <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
       {/* 左端：戻るボタン（/profile, /contact のみ） */}
-      <div className="flex items-center gap-2">
-        {(pathname === '/profile' || pathname === '/contact') && (
-          <button
-            onClick={() => router.push('/main')}
-            className="text-[#5E5E5E]"
-            aria-label="メインに戻る"
-          >
-            <ArrowLeft size={24} />
-          </button>
-        )}
-      </div>
+        <div className="flex items-center gap-2">
+          {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage') && (
+            <button
+              onClick={() =>
+                pathname === '/task_manage'
+                  ? router.push('/main?view=task') // ← タスク画面に戻す
+                  : router.push('/main')
+              }
+              className="text-[#5E5E5E]"
+              aria-label="メインに戻る"
+            >
+              <ArrowLeft size={24} />
+            </button>
+          )}
+        </div>
+
 
       {/* 中央タイトル */}
       <h1 className="absolute left-1/2 -translate-x-1/2 text-2xl font-pacifico text-[#5E5E5E]">

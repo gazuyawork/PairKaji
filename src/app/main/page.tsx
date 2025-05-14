@@ -1,6 +1,7 @@
-'use client';
+'use client'; // ← これがないと useSearchParams などが使えません
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation"; // クライアント用の searchParams
 import { motion } from "framer-motion";
 import { useSwipeable } from "react-swipeable";
 import { auth } from '@/lib/firebase';
@@ -10,7 +11,11 @@ import TaskView from '@/components/views/TaskView';
 import TodoView from '@/components/views/TodoView';
 
 export default function MainView() {
-  const [index, setIndex] = useState(0);
+  const searchParams = useSearchParams();
+  const initialView = searchParams.get("view");
+  const initialIndex = initialView === "task" ? 1 : 0;
+
+  const [index, setIndex] = useState(initialIndex);
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
@@ -33,7 +38,6 @@ export default function MainView() {
     trackMouse: false,
   });
 
-  // 🔒 認証状態が確定するまで描画しない
   if (!authReady) return null;
 
   return (
@@ -41,6 +45,7 @@ export default function MainView() {
       <div className="flex-1 overflow-hidden relative">
         <motion.div
           className="flex w-[300vw] h-full transition-transform duration-300"
+        　 initial={{ x: `-${index * 100}vw` }}  // ←これを追加
           animate={{ x: `-${index * 100}vw` }}
           transition={{ type: "tween", duration: 0.2 }}
         >

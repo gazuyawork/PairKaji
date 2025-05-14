@@ -429,30 +429,19 @@ const handleUserToggle = (id: string, user: string) => {
 
   const isConfirmDisabled = !tasks.some(task => task.isNew || task.isEdited);
 
-  
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Edit" />
 
       <main className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
+        <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
-      <SearchBox value={searchTerm} onChange={setSearchTerm} />
-
-      <FilterControls
-        periodFilter={filter}
-        personFilter={personFilter}
-        onTogglePeriod={toggleFilter}
-        onTogglePerson={togglePerson}
-        extraButton={
-          <button
-            onClick={() => router.push('/task')}
-            className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            タスク一覧へ
-          </button>
-        }
-      />
+        <FilterControls
+          periodFilter={filter}
+          personFilter={personFilter}
+          onTogglePeriod={toggleFilter}
+          onTogglePerson={togglePerson}
+        />
 
         {(filter || personFilter || searchTerm) && (
           <div className="flex justify-center mt-2">
@@ -467,7 +456,7 @@ const handleUserToggle = (id: string, user: string) => {
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
 
-        <div className="space-y-2.5 pb-30">
+        <div className="space-y-2.5 pb-40">
           {tasks
             .filter(task => !filter || task.frequency === filter)
             .filter(task => !personFilter || task.users.includes(personFilter))
@@ -488,7 +477,7 @@ const handleUserToggle = (id: string, user: string) => {
         </div>
       </main>
 
-      <div className="fixed bottom-20 left-0 w-full flex justify-center items-center mb-6">
+      <div className="mt-auto py-10 px-4 flex justify-center items-center gap-4">
         <button
           onClick={confirmTasks}
           disabled={isConfirmDisabled}
@@ -503,13 +492,11 @@ const handleUserToggle = (id: string, user: string) => {
 
         <button
           onClick={addTask}
-          className="ml-4 w-12 h-12 bg-[#FFCB7D] text-white rounded-full flex items-center justify-center shadow-lg"
+          className="w-12 h-12 bg-[#FFCB7D] text-white rounded-full flex items-center justify-center shadow-lg"
         >
           <Plus size={24} />
         </button>
       </div>
-
-      {/* <FooterNav /> */}
     </div>
   );
 }
