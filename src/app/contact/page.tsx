@@ -70,8 +70,6 @@ export default function ContactPage() {
           </form>
         )}
       </main>
-
-      <FooterNav />
     </div>
   );
 }

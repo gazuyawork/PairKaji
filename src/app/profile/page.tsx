@@ -187,8 +187,6 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      <FooterNav />
-
       <EmailEditModal
         open={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
