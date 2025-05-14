@@ -8,7 +8,7 @@ import TaskView from '@/components/views/TaskView'
 import TodoView from '@/components/views/TodoView'
 
 
-const views = ["home", "task", "todo"] as const;
+// const views = ["home", "task", "todo"] as const;
 // type View = (typeof views)[number];
 
 export default function MainView() {
