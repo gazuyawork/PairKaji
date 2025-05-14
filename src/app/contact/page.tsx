@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic'; // ← ★ 追加（重要）
 
 import { useState } from 'react';
 import Header from '@/components/Header';
-import FooterNav from '@/components/FooterNav';
 import { Mail, MessageCircle } from 'lucide-react';
 
 export default function ContactPage() {

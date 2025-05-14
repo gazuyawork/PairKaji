@@ -1,7 +1,6 @@
 'use client';
 
 import Header from '@/components/Header';
-import FooterNav from '@/components/FooterNav';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
