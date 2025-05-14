@@ -3,7 +3,7 @@
 'use client';
 
 import Header from '@/components/Header';
-import FooterNav from '@/components/FooterNav';
+// import FooterNav from '@/components/FooterNav';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -509,7 +509,7 @@ const handleUserToggle = (id: string, user: string) => {
         </button>
       </div>
 
-      <FooterNav />
+      {/* <FooterNav /> */}
     </div>
   );
 }
