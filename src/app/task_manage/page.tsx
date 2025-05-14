@@ -7,7 +7,7 @@ import Header from '@/components/Header';
 import { Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import type { Period } from '@/types/Task';
