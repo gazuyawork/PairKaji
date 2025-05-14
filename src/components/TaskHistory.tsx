@@ -83,7 +83,7 @@ export default function TaskHistory() {
   };
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-md text-center mb-5 h-[calc(100vh-700px)] overflow-y-auto">
+    <div className="bg-white p-4 rounded-xl shadow-md text-center mb-5 h-[calc(100vh-200px)] overflow-y-auto">
       <div className="flex justify-between items-center mb-4">
         <button
           className="text-sm text-gray-500 hover:bg-gray-200 px-2 py-1 rounded w-[60px] text-left"
@@ -93,7 +93,7 @@ export default function TaskHistory() {
         </button>
 
         <h2 className="text-lg font-bold text-[#5E5E5E] flex items-center gap-2">
-          完了履歴（
+          完了履歴
           <select
             value={weekOffset}
             onChange={(e) => setWeekOffset(Number(e.target.value))}
@@ -103,7 +103,6 @@ export default function TaskHistory() {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          ）
         </h2>
 
         <div className="w-[60px] text-right">

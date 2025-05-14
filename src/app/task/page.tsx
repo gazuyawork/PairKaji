@@ -12,9 +12,9 @@ import type { Task, Period } from '@/types/Task';
 import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { updateDoc, deleteDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { updateDoc, deleteDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
 
@@ -39,79 +39,70 @@ export default function TaskPage() {
   const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
   const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
   
-  const toggleDone = async (period: Period, index: number) => {
-    setTasksState(prev => {
-      const updated = [...prev[period]];
-      const task = updated[index];
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0]; // 'YYYY-MM-DD'
-  
-      const newDone = !task.done;
-  
-      // Firestore更新は async に外で行う
-      (async () => {
-        const ref = doc(db, 'tasks', task.id);
-        await updateDoc(ref, {
-          done: newDone,
-          skipped: false,
-          completedAt: newDone ? now.toISOString() : '',
-        });
-  
-        const uid = auth.currentUser?.uid;
-        if (!uid) return;
-  
-        const completionsRef = collection(db, 'taskCompletions');
-        const q = query(
-          completionsRef,
-          where('taskId', '==', task.id),
-          where('userId', '==', uid),
-          where('date', '==', todayStr)
-        );
-        const snapshot = await getDocs(q);
-  
-        if (newDone) {
-          // 完了処理（初回のみ記録）
-          if (snapshot.empty) {
-            await addDoc(completionsRef, {
-              taskId: task.id,
-              userId: uid,
-              date: todayStr,
-              point: task.point,
-            });
-  
-            // 完了ログ（履歴）も task_logs に追加
-            await addDoc(collection(db, 'task_logs'), {
-              taskId: task.id,
-              userId: uid,
-              taskName: task.name,
-              point: task.point,
-              period: task.period,
-              completedAt: now.toISOString(),
-              date: todayStr,
-            });
-          }
-        } else {
-          // 未完了に戻した場合 → 該当履歴を削除
-          for (const docSnap of snapshot.docs) {
-            await deleteDoc(doc(db, 'taskCompletions', docSnap.id));
-          }
-          // ❗ task_logs は履歴として残すので削除しない
-        }
-      })().catch(console.error);
-  
-      updated[index] = {
-        ...task,
+const toggleDone = async (period: Period, index: number) => {
+  setTasksState(prev => {
+    const updated = [...prev[period]];
+    const task = updated[index];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+
+    const newDone = !task.done;
+
+    (async () => {
+      const ref = doc(db, 'tasks', task.id);
+      await updateDoc(ref, {
         done: newDone,
         skipped: false,
         completedAt: newDone ? now.toISOString() : '',
-      };
-  
-      return { ...prev, [period]: updated };
-    });
-  };
-  
-  
-  
+      });
+
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const docId = `${task.id}_${uid}_${todayStr}`;
+      const targetDocRef = doc(db, 'taskCompletions', docId);
+      const logDocId = `${task.id}_${uid}_${todayStr}`;
+      const logDocRef = doc(db, 'task_logs', logDocId);
+
+      if (newDone) {
+        await setDoc(targetDocRef, {
+          taskId: task.id,
+          userId: uid,
+          date: todayStr,
+          point: task.point,
+          taskName: task.name,
+          person: task.person,
+        });
+
+        // task_logs も重複させずに上書き保存
+        await setDoc(logDocRef, {
+          taskId: task.id,
+          userId: uid,
+          taskName: task.name,
+          point: task.point,
+          period: task.period,
+          completedAt: now.toISOString(),
+          date: todayStr,
+        });
+      } else {
+        // 完了取消時は明示的に削除
+        await deleteDoc(targetDocRef);
+        await deleteDoc(logDocRef);
+      }
+    })().catch(console.error);
+
+    updated[index] = {
+      ...task,
+      done: newDone,
+      skipped: false,
+      completedAt: newDone ? now.toISOString() : '',
+    };
+
+    return { ...prev, [period]: updated };
+  });
+};
+
+
 
   const deleteTask = async (period: Period, id: string) => {
     try {
