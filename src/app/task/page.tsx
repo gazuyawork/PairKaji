@@ -352,7 +352,7 @@ useEffect(() => {
         })}
       </main>
 
-      <FooterNav />
+      {/* <FooterNav /> */}
 
       {editTargetTask && (
         <EditTaskModal

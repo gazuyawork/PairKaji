@@ -95,7 +95,7 @@ export default function HomePage() {
         </main>
 
         {/* フッターナビゲーション */}
-        <FooterNav />
+        {/* <FooterNav /> */}
       </div>
     </AuthGuard>
   );
