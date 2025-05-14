@@ -4,7 +4,7 @@
 
 import Header from '@/components/Header';
 // import FooterNav from '@/components/FooterNav';
-import { Plus, ArrowLeft } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -211,7 +211,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
 TaskCard.displayName = 'TaskCard';
 
 export default function TaskManagePage() {
-  const router = useRouter();
+  // const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
