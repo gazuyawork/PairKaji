@@ -39,7 +39,7 @@ export default function LoginPage() {
       // 🔸 セッションの永続化（アプリ再起動後もログイン状態保持）
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
-      router.push('/home');
+      router.push('/main');
     } catch (error) {
       if (error instanceof FirebaseError) {
         alert('ログインに失敗しました: ' + error.message);

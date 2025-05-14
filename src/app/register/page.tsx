@@ -19,7 +19,7 @@ export default function RegisterPage() {
   const handleRegister = async () => {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      router.push('/home');
+      router.push('/main');
     } catch (error) {
       if (error instanceof FirebaseError) {
         alert('登録に失敗しました: ' + error.message);
