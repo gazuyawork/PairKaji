@@ -23,7 +23,6 @@ import TodoTaskCard from '@/components/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-toast.success('新しくタスクが登録されました。');
 
 export default function TodoView() {
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
@@ -32,7 +31,6 @@ export default function TodoView() {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
-  const [visibleTaskIds, setVisibleTaskIds] = useState<string[]>([]); // ✅ 表示フラグ管理
   const taskInputRef = useRef<HTMLInputElement | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -53,10 +51,7 @@ export default function TodoView() {
         };
       });
 
-      setTasks(prev => {
-        const filteredPrev = prev.filter(p => !newTasks.find(t => t.id === p.id));
-        return [...filteredPrev, ...newTasks];
-      });
+      setTasks(newTasks);
     });
 
     return () => unsubscribe();
@@ -105,12 +100,11 @@ export default function TodoView() {
       users: [],
       daysOfWeek: [],
       dates: [],
+      visible: true, // ✅ 永続表示フラグ追加
     };
 
     await setDoc(newTaskRef, newTaskData);
-
-    setVisibleTaskIds(prev => [...prev, newTaskId]); // ✅ 表示継続
-    toast.success('新しくタスクが登録されました。'); // ✅ トースター
+    toast.success('新しくタスクが登録されました。');
 
     setTaskInput('');
     setInputError(false);
@@ -198,7 +192,7 @@ export default function TodoView() {
         </div>
 
         {tasks
-          .filter(task => visibleTaskIds.includes(task.id))
+          .filter(task => task.visible) // ✅ Firestore上のvisibleがtrueのものだけ表示
           .map(task => (
             <TodoTaskCard
               key={task.id}
@@ -211,6 +205,7 @@ export default function TodoView() {
                 const newTodos = [...task.todos, { id: todoId, text: '', done: false }];
                 await updateDoc(doc(db, 'tasks', task.id), {
                   todos: newTodos,
+                  updatedAt: serverTimestamp(),
                 });
                 setFocusedTodoId(todoId);
               }}
@@ -220,6 +215,7 @@ export default function TodoView() {
                 );
                 await updateDoc(doc(db, 'tasks', task.id), {
                   todos: updatedTodos,
+                  updatedAt: serverTimestamp(),
                 });
               }}
               onToggleDone={async (todoId) => {
@@ -228,6 +224,7 @@ export default function TodoView() {
                 );
                 await updateDoc(doc(db, 'tasks', task.id), {
                   todos: updatedTodos,
+                  updatedAt: serverTimestamp(),
                 });
               }}
               onBlurTodo={async (todoId, text) => {
@@ -235,16 +232,21 @@ export default function TodoView() {
                 const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
                 await updateDoc(doc(db, 'tasks', task.id), {
                   todos: updatedTodos,
+                  updatedAt: serverTimestamp(),
                 });
               }}
               onDeleteTodo={async (todoId) => {
                 const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
                 await updateDoc(doc(db, 'tasks', task.id), {
                   todos: updatedTodos,
+                  updatedAt: serverTimestamp(),
                 });
               }}
-              onDeleteTask={() => {
-                setVisibleTaskIds(prev => prev.filter(id => id !== task.id));
+              onDeleteTask={async () => {
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  visible: false, // ✅ Firestore上で非表示化
+                  updatedAt: serverTimestamp(),
+                });
               }}
               todoRefs={todoRefs}
               focusedTodoId={focusedTodoId}
