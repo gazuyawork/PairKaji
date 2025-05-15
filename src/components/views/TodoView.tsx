@@ -23,6 +23,8 @@ import TodoTaskCard from '@/components/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import GroupSelector from '@/components/GroupSelector';
+
 
 export default function TodoView() {
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
@@ -31,6 +33,7 @@ export default function TodoView() {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const taskInputRef = useRef<HTMLInputElement | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -94,7 +97,7 @@ export default function TodoView() {
       todos: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      isTodo: false,
+      isTodo: true,
       point: 10,
       userId,
       users: [],
@@ -191,8 +194,17 @@ export default function TodoView() {
           </button>
         </div>
 
+        {/* グループ選択コンポーネント */}
+        <GroupSelector
+          selectedGroupId={selectedGroupId}
+          onSelectGroup={setSelectedGroupId}
+        />
+
         {tasks
-          .filter(task => task.visible) // ✅ Firestore上のvisibleがtrueのものだけ表示
+          .filter(task =>
+            task.visible &&
+            (!selectedGroupId || task.id === selectedGroupId)
+          )
           .map(task => (
             <TodoTaskCard
               key={task.id}

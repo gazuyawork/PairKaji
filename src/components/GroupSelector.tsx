@@ -1,27 +1,39 @@
-// src/components/GroupSelector.tsx
-
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
 type Props = {
   selectedGroupId: string | null;
   onSelectGroup: (id: string) => void;
 };
 
-const groupList = [
-  { id: "1", name: 'リビング' },
-  { id: "2", name: 'キッチン' },
-  { id: "3", name: 'トイレ' },
-  { id: "4", name: '洗面所' },
-  { id: "5", name: '玄関' },
-];
-
 export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
+  const [groupList, setGroupList] = useState<TodoOnlyTask[]>([]);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'tasks'),
+      where('isTodo', '==', true),
+      where('visible', '==', true)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const results: TodoOnlyTask[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as Omit<TodoOnlyTask, 'id'>),
+      }));
+      setGroupList(results);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const updateArrows = () => {
     const container = scrollRef.current;
@@ -43,7 +55,6 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
 
   return (
     <div className="relative py-0">
-      {/* スクロール可能なグループボタンエリア */}
       <div
         ref={scrollRef}
         className="overflow-x-auto whitespace-nowrap scroll-smooth px-4"
@@ -65,7 +76,6 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
         </div>
       </div>
 
-      {/* 左矢印 */}
       {showLeftArrow && (
         <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
           <div className="w-8 h-8 bg-[#5E5E5E] rounded-full flex items-center justify-center shadow-md animate-blink">
@@ -74,7 +84,6 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
         </div>
       )}
 
-      {/* 右矢印 */}
       {showRightArrow && (
         <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
           <div className="w-8 h-8 bg-[#5E5E5E] rounded-full flex items-center justify-center shadow-md animate-blink">
@@ -83,7 +92,6 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
         </div>
       )}
 
-      {/* 点滅アニメーション */}
       <style jsx>{`
         @keyframes blink {
           0%, 100% { opacity: 1; }
