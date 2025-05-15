@@ -1,5 +1,3 @@
-// src/app/todo/page.tsx
-
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
@@ -10,14 +8,8 @@ import GroupSelector from '@/components/GroupSelector';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus } from 'lucide-react';
 
-const initialTasks: TodoOnlyTask[] = [
-  { id: crypto.randomUUID(), name: '食器洗い', frequency: '毎日', todos: [] },
-  { id: crypto.randomUUID(), name: '風呂掃除', frequency: '週次', todos: [] },
-  { id: crypto.randomUUID(), name: '粗大ごみ出ししてください', frequency: '不定期', todos: [] },
-];
-
 export default function TodoPage() {
-  const [tasks, setTasks] = useState<TodoOnlyTask[]>(initialTasks);
+  const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [taskInput, setTaskInput] = useState('');
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
@@ -35,6 +27,7 @@ export default function TodoPage() {
   const handleAddTask = useCallback(() => {
     const name = taskInput.trim();
     if (!name) return;
+
     if (!tasks.find(t => t.name.trim() === name)) {
       setTasks(prev => [
         ...prev,
@@ -43,6 +36,7 @@ export default function TodoPage() {
           name,
           frequency: '毎日',
           todos: [],
+          visible: true, // ✅ 明示的に表示
         },
       ]);
     }
@@ -90,76 +84,82 @@ export default function TodoPage() {
           onSelectGroup={setSelectedGroupId}
         />
 
-        {tasks.map(task => (
-          <TodoTaskCard
-            key={task.id}
-            task={task}
-            tab={activeTabs[task.id] ?? 'undone'}
-            setTab={(tab) => setActiveTabs(prev => ({ ...prev, [task.id]: tab }))}
-            onAddTodo={(todoId) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? { ...t, todos: [...t.todos, { id: todoId, text: '', done: false }] }
-                    : t
-                )
-              );
-              setFocusedTodoId(todoId);
-            }}
-            onChangeTodo={(todoId, value) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? {
-                        ...t,
-                        todos: t.todos.map(todo =>
-                          todo.id === todoId ? { ...todo, text: value } : todo
-                        ),
-                      }
-                    : t
-                )
-              );
-            }}
-            onToggleDone={(todoId) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? {
-                        ...t,
-                        todos: t.todos.map(todo =>
-                          todo.id === todoId ? { ...todo, done: !todo.done } : todo
-                        ),
-                      }
-                    : t
-                )
-              );
-            }}
-            onBlurTodo={(todoId, text) => {
-              if (text.trim() !== '') return;
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? { ...t, todos: t.todos.filter(todo => todo.id !== todoId) }
-                    : t
-                )
-              );
-            }}
-            onDeleteTodo={(todoId) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? { ...t, todos: t.todos.filter(todo => todo.id !== todoId) }
-                    : t
-                )
-              );
-            }}
-            onDeleteTask={() => {
-              setTasks(prev => prev.filter(t => t.id !== task.id));
-            }}
-            todoRefs={todoRefs}
-            focusedTodoId={focusedTodoId}
-          />
-        ))}
+        {tasks
+          .filter(task => task.visible) // ✅ 表示制御
+          .map(task => (
+            <TodoTaskCard
+              key={task.id}
+              task={task}
+              tab={activeTabs[task.id] ?? 'undone'}
+              setTab={(tab) => setActiveTabs(prev => ({ ...prev, [task.id]: tab }))}
+              onAddTodo={(todoId) => {
+                setTasks(prev =>
+                  prev.map(t =>
+                    t.id === task.id
+                      ? { ...t, todos: [...t.todos, { id: todoId, text: '', done: false }] }
+                      : t
+                  )
+                );
+                setFocusedTodoId(todoId);
+              }}
+              onChangeTodo={(todoId, value) => {
+                setTasks(prev =>
+                  prev.map(t =>
+                    t.id === task.id
+                      ? {
+                          ...t,
+                          todos: t.todos.map(todo =>
+                            todo.id === todoId ? { ...todo, text: value } : todo
+                          ),
+                        }
+                      : t
+                  )
+                );
+              }}
+              onToggleDone={(todoId) => {
+                setTasks(prev =>
+                  prev.map(t =>
+                    t.id === task.id
+                      ? {
+                          ...t,
+                          todos: t.todos.map(todo =>
+                            todo.id === todoId ? { ...todo, done: !todo.done } : todo
+                          ),
+                        }
+                      : t
+                  )
+                );
+              }}
+              onBlurTodo={(todoId, text) => {
+                if (text.trim() !== '') return;
+                setTasks(prev =>
+                  prev.map(t =>
+                    t.id === task.id
+                      ? { ...t, todos: t.todos.filter(todo => todo.id !== todoId) }
+                      : t
+                  )
+                );
+              }}
+              onDeleteTodo={(todoId) => {
+                setTasks(prev =>
+                  prev.map(t =>
+                    t.id === task.id
+                      ? { ...t, todos: t.todos.filter(todo => todo.id !== todoId) }
+                      : t
+                  )
+                );
+              }}
+              onDeleteTask={() => {
+                setTasks(prev =>
+                  prev.map(t =>
+                    t.id === task.id ? { ...t, visible: false } : t
+                  )
+                );
+              }}
+              todoRefs={todoRefs}
+              focusedTodoId={focusedTodoId}
+            />
+          ))}
       </main>
       {/* <FooterNav /> */}
     </div>

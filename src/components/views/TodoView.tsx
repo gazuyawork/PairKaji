@@ -86,7 +86,7 @@ export default function TodoView() {
 
     const tasksRef = collection(db, 'tasks');
     const newTaskRef = doc(tasksRef);
-    const newTaskId = newTaskRef.id;
+    // const newTaskId = newTaskRef.id;
 
     const newTaskData = {
       name,
