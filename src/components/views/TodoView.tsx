@@ -1,26 +1,66 @@
 "use client";
 
-import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  KeyboardEvent,
+  useCallback,
+  useMemo,
+} from 'react';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+
 import Header from '@/components/Header';
 import TodoTaskCard from '@/components/TodoTaskCard';
-import GroupSelector from '@/components/GroupSelector';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
-import { Plus } from 'lucide-react';
-
-const initialTasks: TodoOnlyTask[] = [
-  { id: crypto.randomUUID(), name: '食器洗い', frequency: '毎日', todos: [] },
-  { id: crypto.randomUUID(), name: '風呂掃除', frequency: '週次', todos: [] },
-  { id: crypto.randomUUID(), name: '粗大ごみ出ししてください', frequency: '不定期', todos: [] },
-];
+import { Plus, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
+toast.success('新しくタスクが登録されました。');
 
 export default function TodoView() {
-  const [tasks, setTasks] = useState<TodoOnlyTask[]>(initialTasks);
+  const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [taskInput, setTaskInput] = useState('');
+  const [inputError, setInputError] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [visibleTaskIds, setVisibleTaskIds] = useState<string[]>([]); // ✅ 表示フラグ管理
   const taskInputRef = useRef<HTMLInputElement | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const taskNameOptions = useMemo(() => {
+    const names = tasks.map(task => task.name).filter(Boolean);
+    return Array.from(new Set(names));
+  }, [tasks]);
+
+  useEffect(() => {
+    const tasksRef = collection(db, 'tasks');
+    const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
+      const newTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
+        const data = doc.data() as Omit<TodoOnlyTask, 'id'>;
+        return {
+          id: doc.id,
+          ...data,
+          todos: Array.isArray(data.todos) ? data.todos : [],
+        };
+      });
+
+      setTasks(prev => {
+        const filteredPrev = prev.filter(p => !newTasks.find(t => t.id === p.id));
+        return [...filteredPrev, ...newTasks];
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (focusedTodoId && todoRefs.current[focusedTodoId]) {
@@ -29,134 +69,187 @@ export default function TodoView() {
     }
   }, [focusedTodoId]);
 
-  const handleAddTask = useCallback(() => {
+  const handleAddTask = useCallback(async () => {
     const name = taskInput.trim();
-    if (!name) return;
-    if (!tasks.find(t => t.name.trim() === name)) {
-      setTasks(prev => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          name,
-          frequency: '毎日',
-          todos: [],
-        },
-      ]);
+    if (!name) {
+      setInputError(true);
+      return;
     }
+
+    const existing = tasks.find((t) => t.name.trim() === name);
+    if (existing) {
+      setTaskInput('');
+      setInputError(false);
+      return;
+    }
+
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      alert("ユーザー情報が取得できません");
+      return;
+    }
+
+    const tasksRef = collection(db, 'tasks');
+    const newTaskRef = doc(tasksRef);
+    const newTaskId = newTaskRef.id;
+
+    const newTaskData = {
+      name,
+      frequency: '毎日',
+      todos: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      isTodo: false,
+      point: 10,
+      userId,
+      users: [],
+      daysOfWeek: [],
+      dates: [],
+    };
+
+    await setDoc(newTaskRef, newTaskData);
+
+    setVisibleTaskIds(prev => [...prev, newTaskId]); // ✅ 表示継続
+    toast.success('新しくタスクが登録されました。'); // ✅ トースター
+
     setTaskInput('');
+    setInputError(false);
   }, [taskInput, tasks]);
 
   const handleTaskInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleAddTask();
+    if (e.key === 'Enter') {
+      handleAddTask();
+      setIsOpen(false);
+    }
   };
 
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
       <Header title="Todo" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-start">
           <div className="relative flex-1">
-            <input
-              ref={taskInputRef}
-              type="text"
-              value={taskInput}
-              onChange={(e) => setTaskInput(e.target.value)}
-              onKeyDown={handleTaskInputKeyDown}
-              placeholder="タスク名を入力または選択"
-              className="w-full border border-gray-300 bg-white rounded-lg outline-none px-3 py-2 shadow"
-              list="task-options"
-            />
-            <datalist id="task-options">
-              {tasks.map(task => (
-                <option key={task.id} value={task.name} />
-              ))}
-            </datalist>
+            <div className="relative">
+              <input
+                ref={taskInputRef}
+                type="text"
+                value={taskInput}
+                onChange={(e) => {
+                  setTaskInput(e.target.value);
+                  setInputError(false);
+                  setIsOpen(true);
+                }}
+                onKeyDown={handleTaskInputKeyDown}
+                onBlur={(e) => {
+                  const next = e.relatedTarget as HTMLElement | null;
+                  if (!next?.dataset.keepOpen) {
+                    setIsOpen(false);
+                  }
+                }}
+                placeholder="タスク名を入力または選択"
+                className={`w-full border ${inputError ? 'border-red-500' : 'border-gray-300'} bg-white rounded-lg outline-none px-3 py-2 shadow pr-10`}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                data-keep-open
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsOpen((prev) => !prev);
+                }}
+                className="absolute right-2 top-2.5 text-gray-400"
+              >
+                <ChevronDown size={16} />
+              </button>
+
+              {isOpen && taskNameOptions.length > 0 && (
+                <ul
+                  className="absolute z-10 w-full bg-white border border-gray-300 rounded shadow mt-1 max-h-40 overflow-y-auto text-sm"
+                  data-keep-open
+                >
+                  {taskNameOptions.map((name) => (
+                    <li
+                      key={name}
+                      onMouseDown={() => {
+                        setTaskInput(name);
+                        setIsOpen(false);
+                        setInputError(false);
+                      }}
+                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {inputError && (
+              <p className="text-sm text-red-500 mt-1 px-1">タスク名を入力してください</p>
+            )}
           </div>
+
           <button
             onClick={handleAddTask}
-            className="w-10 h-10 bg-[#FFCB7D] text-white rounded-full flex items-center justify-center shadow-md hover:opacity-90"
+            className="w-10 h-10 bg-[#FFCB7D] text-white rounded-full flex items-center justify-center shadow-md hover:opacity-90 mt-1"
             type="button"
           >
             <Plus size={20} />
           </button>
         </div>
 
-        {/* グループ選択コンポーネント */}
-        <GroupSelector
-          selectedGroupId={selectedGroupId}
-          onSelectGroup={setSelectedGroupId}
-        />
-
-        {tasks.map(task => (
-          <TodoTaskCard
-            key={task.id}
-            task={task}
-            tab={activeTabs[task.id] ?? 'undone'}
-            setTab={(tab) => setActiveTabs(prev => ({ ...prev, [task.id]: tab }))}
-            onAddTodo={(todoId) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? { ...t, todos: [...t.todos, { id: todoId, text: '', done: false }] }
-                    : t
-                )
-              );
-              setFocusedTodoId(todoId);
-            }}
-            onChangeTodo={(todoId, value) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? {
-                        ...t,
-                        todos: t.todos.map(todo =>
-                          todo.id === todoId ? { ...todo, text: value } : todo
-                        ),
-                      }
-                    : t
-                )
-              );
-            }}
-            onToggleDone={(todoId) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? {
-                        ...t,
-                        todos: t.todos.map(todo =>
-                          todo.id === todoId ? { ...todo, done: !todo.done } : todo
-                        ),
-                      }
-                    : t
-                )
-              );
-            }}
-            onBlurTodo={(todoId, text) => {
-              if (text.trim() !== '') return;
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? { ...t, todos: t.todos.filter(todo => todo.id !== todoId) }
-                    : t
-                )
-              );
-            }}
-            onDeleteTodo={(todoId) => {
-              setTasks(prev =>
-                prev.map(t =>
-                  t.id === task.id
-                    ? { ...t, todos: t.todos.filter(todo => todo.id !== todoId) }
-                    : t
-                )
-              );
-            }}
-            onDeleteTask={() => {
-              setTasks(prev => prev.filter(t => t.id !== task.id));
-            }}
-            todoRefs={todoRefs}
-            focusedTodoId={focusedTodoId}
-          />
-        ))}
+        {tasks
+          .filter(task => visibleTaskIds.includes(task.id))
+          .map(task => (
+            <TodoTaskCard
+              key={task.id}
+              task={task}
+              tab={activeTabs[task.id] ?? 'undone'}
+              setTab={(tab) =>
+                setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
+              }
+              onAddTodo={async (todoId) => {
+                const newTodos = [...task.todos, { id: todoId, text: '', done: false }];
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  todos: newTodos,
+                });
+                setFocusedTodoId(todoId);
+              }}
+              onChangeTodo={async (todoId, value) => {
+                const updatedTodos = task.todos.map(todo =>
+                  todo.id === todoId ? { ...todo, text: value } : todo
+                );
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  todos: updatedTodos,
+                });
+              }}
+              onToggleDone={async (todoId) => {
+                const updatedTodos = task.todos.map(todo =>
+                  todo.id === todoId ? { ...todo, done: !todo.done } : todo
+                );
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  todos: updatedTodos,
+                });
+              }}
+              onBlurTodo={async (todoId, text) => {
+                if (text.trim() !== '') return;
+                const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  todos: updatedTodos,
+                });
+              }}
+              onDeleteTodo={async (todoId) => {
+                const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  todos: updatedTodos,
+                });
+              }}
+              onDeleteTask={() => {
+                setVisibleTaskIds(prev => prev.filter(id => id !== task.id));
+              }}
+              todoRefs={todoRefs}
+              focusedTodoId={focusedTodoId}
+            />
+          ))}
       </main>
     </div>
   );
