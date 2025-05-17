@@ -43,13 +43,13 @@ export default function TodoTaskCard({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isScrollable, setIsScrollable] = useState(false);
 
-  useEffect(() => {
-    const initialTexts = todos.reduce((acc, todo) => {
-      acc[todo.id] = todo.text;
-      return acc;
-    }, {} as Record<string, string>);
-    setLocalTexts(initialTexts);
-  }, [todos]);
+  // useEffect(() => {
+  //   const initialTexts = todos.reduce((acc, todo) => {
+  //     acc[todo.id] = todo.text;
+  //     return acc;
+  //   }, {} as Record<string, string>);
+  //   setLocalTexts(initialTexts);
+  // }, [todos]);
 
   useEffect(() => {
     const el = scrollRef.current;

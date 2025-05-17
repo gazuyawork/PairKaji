@@ -25,7 +25,6 @@ import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import GroupSelector from '@/components/GroupSelector';
 
-
 export default function TodoView() {
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [taskInput, setTaskInput] = useState('');
@@ -103,7 +102,7 @@ export default function TodoView() {
       users: [],
       daysOfWeek: [],
       dates: [],
-      visible: true, // ✅ 永続表示フラグ追加
+      visible: true,
     };
 
     await setDoc(newTaskRef, newTaskData);
@@ -111,6 +110,7 @@ export default function TodoView() {
 
     setTaskInput('');
     setInputError(false);
+    setFocusedTodoId(null);
   }, [taskInput, tasks]);
 
   const handleTaskInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -256,7 +256,7 @@ export default function TodoView() {
               }}
               onDeleteTask={async () => {
                 await updateDoc(doc(db, 'tasks', task.id), {
-                  visible: false, // ✅ Firestore上で非表示化
+                  visible: false,
                   updatedAt: serverTimestamp(),
                 });
               }}
