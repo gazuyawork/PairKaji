@@ -1,9 +1,9 @@
 import { CheckCircle, Circle, Trash2, Plus } from 'lucide-react';
 import clsx from 'clsx';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
-type Props = {
+interface Props {
   task: TodoOnlyTask;
   tab: 'undone' | 'done';
   setTab: (tab: 'undone' | 'done') => void;
@@ -15,14 +15,14 @@ type Props = {
   onDeleteTask: () => void;
   todoRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
   focusedTodoId: string | null;
-};
+}
 
 export default function TodoTaskCard({
   task,
   tab,
   setTab,
   onAddTodo,
-  // onChangeTodo,
+  onChangeTodo,
   onToggleDone,
   onBlurTodo,
   onDeleteTodo,
@@ -32,24 +32,16 @@ export default function TodoTaskCard({
 }: Props) {
   const todos = task.todos ?? [];
   const [isComposing, setIsComposing] = useState(false);
-  const [localTexts, setLocalTexts] = useState<Record<string, string>>({});
 
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
-  const filteredTodos = tab === 'done'
-    ? todos.filter(todo => todo.done)
-    : todos.filter(todo => !todo.done);
+  const filteredTodos = useMemo(() =>
+    tab === 'done' ? todos.filter(todo => todo.done) : todos.filter(todo => !todo.done),
+    [todos, tab]
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isScrollable, setIsScrollable] = useState(false);
-
-  // useEffect(() => {
-  //   const initialTexts = todos.reduce((acc, todo) => {
-  //     acc[todo.id] = todo.text;
-  //     return acc;
-  //   }, {} as Record<string, string>);
-  //   setLocalTexts(initialTexts);
-  // }, [todos]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -65,7 +57,6 @@ export default function TodoTaskCard({
 
   return (
     <div className="relative">
-      {/* ヘッダー */}
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <h2 className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%]">
           {task.name}
@@ -105,7 +96,6 @@ export default function TodoTaskCard({
         </div>
       </div>
 
-      {/* 本体 */}
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2">
         <div
           ref={scrollRef}
@@ -129,23 +119,18 @@ export default function TodoTaskCard({
               </div>
               <input
                 type="text"
-                value={localTexts[todo.id] ?? ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setLocalTexts((prev) => ({ ...prev, [todo.id]: val }));
+                defaultValue={todo.text}
+                onChange={(e) => onChangeTodo(todo.id, e.target.value)}
+                onBlur={(e) => {
+                  if (!isComposing) onBlurTodo(todo.id, e.target.value);
                 }}
                 onCompositionStart={() => setIsComposing(true)}
-                onCompositionEnd={() => {
+                onCompositionEnd={(e) => {
                   setIsComposing(false);
-                  onBlurTodo(todo.id, localTexts[todo.id] ?? '');
-                }}
-                onBlur={() => {
-                  if (!isComposing) {
-                    onBlurTodo(todo.id, localTexts[todo.id] ?? '');
-                  }
+                  onBlurTodo(todo.id, e.currentTarget.value);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && localTexts[todo.id]?.trim()) {
+                  if (e.key === 'Enter' && !isComposing && e.currentTarget.value.trim()) {
                     e.preventDefault();
                     onAddTodo(crypto.randomUUID());
                   }
@@ -167,7 +152,6 @@ export default function TodoTaskCard({
           ))}
         </div>
 
-        {/* 追加ボタン */}
         {tab === 'undone' && (
           <div className="relative flex items-center justify-between">
             <button

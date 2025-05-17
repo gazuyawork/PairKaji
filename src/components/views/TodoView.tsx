@@ -61,7 +61,9 @@ export default function TodoView() {
 
   useEffect(() => {
     if (focusedTodoId && todoRefs.current[focusedTodoId]) {
-      todoRefs.current[focusedTodoId]?.focus();
+      requestAnimationFrame(() => {
+        todoRefs.current[focusedTodoId]?.focus();
+      });
       setFocusedTodoId(null);
     }
   }, [focusedTodoId]);
@@ -75,6 +77,14 @@ export default function TodoView() {
 
     const existing = tasks.find((t) => t.name.trim() === name);
     if (existing) {
+      // 既存タスクが非表示なら表示状態に戻す
+      if (!existing.visible) {
+        await updateDoc(doc(db, 'tasks', existing.id), {
+          visible: true,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success('非表示のタスクを再表示しました。');
+      }
       setTaskInput('');
       setInputError(false);
       return;
@@ -88,7 +98,6 @@ export default function TodoView() {
 
     const tasksRef = collection(db, 'tasks');
     const newTaskRef = doc(tasksRef);
-    // const newTaskId = newTaskRef.id;
 
     const newTaskData = {
       name,
