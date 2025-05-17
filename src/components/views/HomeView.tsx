@@ -1,17 +1,18 @@
-"use client";
+'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
 import PairPoints from '@/components/PairPoints';
 import TaskHistory from '@/components/TaskHistory';
 import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
-import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -59,12 +60,21 @@ export default function HomeView() {
     <div className="fh-full lex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans">
       <Header title="Home" />
 
-      <main className="flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20">
+      <main
+        className="flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20"
+        ref={scrollRef}
+        onTouchStart={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('.horizontal-scroll')) {
+            e.stopPropagation();
+          }
+        }}
+      >
         <div className="h-[300px]">
           <TaskHistory />
         </div>
 
-        <div className="h-[170px]">
+        <div className="h-[170px] horizontal-scroll">
           <TaskCalendar tasks={tasks} />
         </div>
 

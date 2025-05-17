@@ -1,4 +1,5 @@
 'use client';
+
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, Suspense } from "react";
@@ -32,17 +33,24 @@ function MainContent() {
   };
 
   const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => handleSwipe("left"),
-    onSwipedRight: () => handleSwipe("right"),
+    onSwiped: (e) => {
+      if (e.event && e.event.target instanceof HTMLElement) {
+        const targetElement = e.event.target as HTMLElement;
+        if (!targetElement.closest(".swipe-area")) return;
+      }
+      if (e.dir === 'Left') handleSwipe("left");
+      else if (e.dir === 'Right') handleSwipe("right");
+    },
     delta: 50,
     trackTouch: true,
-    trackMouse: false,
+    trackMouse: true,
   });
 
   if (!authReady) return null;
 
   return (
-    <div className="flex flex-col min-h-screen" {...swipeHandlers}>
+    <div className="flex flex-col min-h-screen">
+      {/* メインビュー */}
       <div className="flex-1 overflow-hidden relative">
         <motion.div
           className="flex w-[300vw] h-full transition-transform duration-300"
@@ -62,7 +70,8 @@ function MainContent() {
         </motion.div>
       </div>
 
-      <div className="border-t border-gray-200">
+      {/* ✅ スワイプ操作はフッター部分のみに制限 */}
+      <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
         <FooterNav currentIndex={index} setIndex={setIndex} />
       </div>
     </div>

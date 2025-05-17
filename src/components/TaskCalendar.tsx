@@ -4,16 +4,6 @@ import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import type { Task } from '@/types/Task';
 import { useRef } from 'react';
 
-// const dayNameToNumber: Record<string, string> = {
-//   '日': '0',
-//   '月': '1',
-//   '火': '2',
-//   '水': '3',
-//   '木': '4',
-//   '金': '5',
-//   '土': '6',
-// };
-
 type Props = {
   tasks: Task[];
 };
@@ -22,21 +12,21 @@ export default function TaskCalendar({ tasks }: Props) {
   const today = new Date();
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
   const containerRef = useRef<HTMLDivElement | null>(null);
-  let isTouchScrolling = false;
+  const isTouchScrollingRef = useRef(false);
 
   const handleTouchStart = () => {
-    isTouchScrolling = true;
+    isTouchScrollingRef.current = true;
   };
 
   const handleTouchEnd = () => {
     setTimeout(() => {
-      isTouchScrolling = false;
+      isTouchScrollingRef.current = false;
     }, 300);
   };
 
   const preventScrollPropagation = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (isTouchScrolling) {
-      e.stopPropagation();
+    if (isTouchScrollingRef.current) {
+      e.stopPropagation(); // ✅ スワイプを防止
     }
   };
 
@@ -44,7 +34,7 @@ export default function TaskCalendar({ tasks }: Props) {
     <div className="bg-white p-4 rounded-xl shadow-md text-center mb-3">
       <h2 className="text-lg font-bold text-[#5E5E5E] mb-4">今後7日間のタスク</h2>
       <div
-        className="overflow-x-auto"
+        className="overflow-x-auto horizontal-scroll"
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
