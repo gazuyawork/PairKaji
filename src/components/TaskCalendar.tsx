@@ -4,15 +4,15 @@ import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import type { Task } from '@/types/Task';
 import { useRef } from 'react';
 
-const dayNameToNumber: Record<string, string> = {
-  '日': '0',
-  '月': '1',
-  '火': '2',
-  '水': '3',
-  '木': '4',
-  '金': '5',
-  '土': '6',
-};
+// const dayNameToNumber: Record<string, string> = {
+//   '日': '0',
+//   '月': '1',
+//   '火': '2',
+//   '水': '3',
+//   '木': '4',
+//   '金': '5',
+//   '土': '6',
+// };
 
 type Props = {
   tasks: Task[];
@@ -24,11 +24,11 @@ export default function TaskCalendar({ tasks }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   let isTouchScrolling = false;
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleTouchStart = () => {
     isTouchScrolling = true;
   };
 
-  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleTouchEnd = () => {
     setTimeout(() => {
       isTouchScrolling = false;
     }, 300);
