@@ -14,10 +14,23 @@ import TodoView from '@/components/views/TodoView';
 
 function MainContent() {
   const searchParams = useSearchParams();
-  const initialView = searchParams.get("view");
-  const initialIndex = initialView === "task" ? 1 : 0;
+  const [index, setIndex] = useState(() => {
+    // sessionStorage が true のとき TaskView を初期表示
+    if (typeof window !== 'undefined') {
+      const fromTaskManage = sessionStorage.getItem('fromTaskManage');
+      if (fromTaskManage === 'true') {
+        sessionStorage.removeItem('fromTaskManage');
+        return 1;
+      }
+    }
 
-  const [index, setIndex] = useState(initialIndex);
+    // 通常の URL クエリによる表示制御（/main?view=task）
+    const view = searchParams.get("view");
+    return view === "task" ? 1 : 0;
+  });
+
+
+
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
@@ -25,6 +38,15 @@ function MainContent() {
       setAuthReady(true);
     });
     return () => unsubscribe();
+  }, []);
+
+  // ✅ ファイル編集画面から戻った時に task に自動で戻る
+  useEffect(() => {
+    const fromTaskManage = sessionStorage.getItem('fromTaskManage');
+    if (fromTaskManage === 'true') {
+      setIndex(1);
+      sessionStorage.removeItem('fromTaskManage');
+    }
   }, []);
 
   const handleSwipe = (direction: "left" | "right") => {
@@ -54,10 +76,12 @@ function MainContent() {
       <div className="flex-1 overflow-hidden relative">
         <motion.div
           className="flex w-[300vw] h-full transition-transform duration-300"
-          initial={{ x: `-${initialIndex * 100}vw` }}
+          // ⛔ initialIndex を参照していたらここも修正
+          initial={{ x: `-${index * 100}vw` }}
           animate={{ x: `-${index * 100}vw` }}
           transition={{ type: "tween", duration: 0.2 }}
         >
+
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto bg-[#fffaf1]">
             <HomeView />
           </div>

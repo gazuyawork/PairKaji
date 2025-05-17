@@ -3,11 +3,9 @@
 'use client';
 
 import Header from '@/components/Header';
-// import FooterNav from '@/components/FooterNav';
 import { Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-// import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import type { Period } from '@/types/Task';
@@ -222,7 +220,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
 TaskCard.displayName = 'TaskCard';
 
 export default function TaskManagePage() {
-  // const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
@@ -461,6 +458,11 @@ const handleUserToggle = (id: string, user: string) => {
   }, []);
 
   const isConfirmDisabled = !tasks.some(task => task.isNew || task.isEdited);
+
+  useEffect(() => {
+    sessionStorage.setItem('fromTaskManage', 'true');
+  }, []);
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">

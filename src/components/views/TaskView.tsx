@@ -1,10 +1,8 @@
 import Header from '@/components/Header';
-import { Pencil } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
 import type { Task, Period } from '@/types/Task';
-import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import { collection, onSnapshot, query, where, updateDoc, deleteDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
@@ -16,7 +14,6 @@ const periods: Period[] = ['毎日', '週次', '不定期'];
 
 export default function TaskView() {
   const [searchTerm, setSearchTerm] = useState('');
-  const router = useRouter();
   const initialTaskGroups: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
 
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
@@ -195,7 +192,8 @@ export default function TaskView() {
 
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none">
-      <Header title="Task" />
+      <Header title="Task" currentIndex={1} />
+
 
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         <SearchBox value={searchTerm} onChange={setSearchTerm} />
@@ -205,15 +203,6 @@ export default function TaskView() {
           personFilter={personFilter}
           onTogglePeriod={togglePeriod}
           onTogglePerson={togglePerson}
-          extraButton={
-            <button
-              onClick={() => router.push('/task_manage')}
-              className="text-sm text-gray-600 hover:text-[#FFCB7D] flex items-center gap-1"
-            >
-              <Pencil className="w-4 h-4" />
-              一括編集
-            </button>
-          }
         />
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
