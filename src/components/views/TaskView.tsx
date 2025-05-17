@@ -7,7 +7,7 @@ import type { Task, Period } from '@/types/Task';
 import { useRouter } from 'next/navigation';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
-import { collection, getDocs, query, where, updateDoc, deleteDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, updateDoc, deleteDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
@@ -29,71 +29,52 @@ export default function TaskView() {
   const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
 
   const toggleDone = async (period: Period, index: number) => {
-    setTasksState(prev => {
-      const updated = [...prev[period]];
-      const task = updated[index];
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      const newDone = !task.done;
+    const task = tasksState[period][index];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const newDone = !task.done;
 
-      (async () => {
-        const ref = doc(db, 'tasks', task.id);
-        await updateDoc(ref, {
-          done: newDone,
-          skipped: false,
-          completedAt: newDone ? now.toISOString() : '',
-        });
-
-        const uid = auth.currentUser?.uid;
-        if (!uid) return;
-
-        const docId = `${task.id}_${uid}_${todayStr}`;
-        const targetDocRef = doc(db, 'taskCompletions', docId);
-        const logDocRef = doc(db, 'task_logs', docId);
-
-        if (newDone) {
-          await setDoc(targetDocRef, {
-            taskId: task.id,
-            userId: uid,
-            date: todayStr,
-            point: task.point,
-            taskName: task.name,
-            person: task.person,
-          });
-
-          await setDoc(logDocRef, {
-            taskId: task.id,
-            userId: uid,
-            taskName: task.name,
-            point: task.point,
-            period: task.period,
-            completedAt: now.toISOString(),
-            date: todayStr,
-          });
-        } else {
-          await deleteDoc(targetDocRef);
-          await deleteDoc(logDocRef);
-        }
-      })().catch(console.error);
-
-      updated[index] = {
-        ...task,
-        done: newDone,
-        skipped: false,
-        completedAt: newDone ? now.toISOString() : '',
-      };
-
-      return { ...prev, [period]: updated };
+    await updateDoc(doc(db, 'tasks', task.id), {
+      done: newDone,
+      skipped: false,
+      completedAt: newDone ? now.toISOString() : '',
     });
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const docId = `${task.id}_${uid}_${todayStr}`;
+    const targetDocRef = doc(db, 'taskCompletions', docId);
+    const logDocRef = doc(db, 'task_logs', docId);
+
+    if (newDone) {
+      await setDoc(targetDocRef, {
+        taskId: task.id,
+        userId: uid,
+        date: todayStr,
+        point: task.point,
+        taskName: task.name,
+        person: task.person,
+      });
+
+      await setDoc(logDocRef, {
+        taskId: task.id,
+        userId: uid,
+        taskName: task.name,
+        point: task.point,
+        period: task.period,
+        completedAt: now.toISOString(),
+        date: todayStr,
+      });
+    } else {
+      await deleteDoc(targetDocRef);
+      await deleteDoc(logDocRef);
+    }
   };
 
   const deleteTask = async (period: Period, id: string) => {
     try {
       await deleteDoc(doc(db, 'tasks', id));
-      setTasksState(prev => {
-        const updated = prev[period].filter(task => task.id !== id);
-        return { ...prev, [period]: updated };
-      });
     } catch (error) {
       console.error('タスクの削除に失敗しました:', error);
     }
@@ -116,34 +97,6 @@ export default function TaskView() {
         updatedAt: serverTimestamp(),
       });
 
-      const user = updated.users?.[0] ?? '未設定';
-      const displayTask: Task = {
-        ...updated,
-        title: updated.name,
-        person: user,
-        scheduledDate: cleanedDates?.[0] ?? '',
-        image:
-          user === '太郎'
-            ? '/images/taro.png'
-            : user === '花子'
-            ? '/images/hanako.png'
-            : '/images/default.png',
-        done: updated.done ?? false,
-        skipped: updated.skipped ?? false,
-        completedAt: updated.completedAt ?? '',
-        daysOfWeek: cleanedDaysOfWeek,
-        dates: cleanedDates,
-        period: newPeriod,
-      };
-
-      setTasksState(prev => {
-        const newState = { ...prev };
-        newState[oldPeriod] = prev[oldPeriod].filter(task => task.id !== updated.id);
-        newState[newPeriod] = newState[newPeriod].filter(task => task.id !== updated.id);
-        newState[newPeriod].push(displayTask);
-        return newState;
-      });
-
       setEditTargetTask(null);
     } catch (error) {
       console.error('タスク更新に失敗しました:', error);
@@ -155,12 +108,11 @@ export default function TaskView() {
   }, []);
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
-      const snapshot = await getDocs(q);
+    const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const storedProfileImage = localStorage.getItem('profileImage');
       const storedPartnerImage = localStorage.getItem('partnerImage');
 
@@ -236,9 +188,9 @@ export default function TaskView() {
       }
 
       setTasksState(grouped);
-    };
+    });
 
-    fetchTasks();
+    return () => unsubscribe();
   }, []);
 
   return (
