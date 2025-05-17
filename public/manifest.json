@@ -1,7 +1,7 @@
 {
     "name": "PairKaji",
     "short_name": "PairKaji",
-    "start_url": "/splash",
+    "start_url": "/",
     "display": "standalone",
     "background_color": "#fffaf1",
     "theme_color": "#5E5E5E",
