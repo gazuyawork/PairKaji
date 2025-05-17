@@ -3,6 +3,8 @@ const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
+  sw: 'sw.js', // 明示的にルートに配置
+  scope: '/',  // iOSは必ず '/' に必要
   disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
     {
