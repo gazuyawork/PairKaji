@@ -18,6 +18,17 @@ import { useSwipeable } from 'react-swipeable';
 import { toast } from 'sonner'; 
 import { deleteDoc } from 'firebase/firestore';
 
+const dayNumberToName: Record<string, string> = {
+  '0': '日',
+  '1': '月',
+  '2': '火',
+  '3': '水',
+  '4': '木',
+  '5': '金',
+  '6': '土',
+};
+
+
 interface Task {
   id: string;
   name: string;
@@ -357,17 +368,34 @@ const handleUserToggle = (id: string, user: string) => {
     if (hasEmptyName) return;
 
     for (const task of tasks) {
+
+      const dayNameToNumber: Record<string, string> = {
+        '日': '0',
+        '月': '1',
+        '火': '2',
+        '水': '3',
+        '木': '4',
+        '金': '5',
+        '土': '6',
+      };
+
+      const daysOfWeek =
+        task.frequency === '週次'
+          ? task.daysOfWeek.map((d) => dayNameToNumber[d])
+          : task.daysOfWeek;
+
       const taskData = {
         userId: uid,
         name: task.name,
         frequency: task.frequency,
         point: task.point,
         users: task.users,
-        daysOfWeek: task.daysOfWeek,
+        daysOfWeek,
         dates: task.dates,
         isTodo: task.isTodo ?? false,
         updatedAt: serverTimestamp(),
       };
+
 
       if (task.isNew) {
         await addDoc(collection(db, 'tasks'), {
@@ -414,13 +442,18 @@ const handleUserToggle = (id: string, user: string) => {
 
       const q = query(collection(db, 'tasks'), where('userId', '==', uid));
       const snapshot = await getDocs(q);
-      const loadedTasks: Task[] = snapshot.docs.map((doc) => ({
-        ...(doc.data() as Omit<Task, 'id' | 'isNew' | 'isEdited' | 'showDelete'>),
-        id: doc.id,
-        isNew: false,
-        isEdited: false,
-        showDelete: false,
-      }));
+      const loadedTasks: Task[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          ...(data as Omit<Task, 'id' | 'isNew' | 'isEdited' | 'showDelete'>),
+          id: doc.id,
+          daysOfWeek: (data.daysOfWeek ?? []).map((d: string) => dayNumberToName[d] ?? d),
+          isNew: false,
+          isEdited: false,
+          showDelete: false,
+        };
+      });
+
       setTasks(loadedTasks);
     };
 

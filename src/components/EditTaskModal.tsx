@@ -1,11 +1,29 @@
-// src/components/EditTaskModal.tsx
-
 'use client';
 
 import { useState, useEffect } from 'react';
 // import { X } from 'lucide-react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
+
+const dayNameToNumber: Record<string, string> = {
+  '日': '0',
+  '月': '1',
+  '火': '2',
+  '水': '3',
+  '木': '4',
+  '金': '5',
+  '土': '6',
+};
+
+const dayNumberToName: Record<string, string> = {
+  '0': '日',
+  '1': '月',
+  '2': '火',
+  '3': '水',
+  '4': '木',
+  '5': '金',
+  '6': '土',
+};
 
 type Props = {
   isOpen: boolean;
@@ -15,14 +33,13 @@ type Props = {
 };
 
 export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) {
-  
   const [editedTask, setEditedTask] = useState<Task | null>(null);
 
   useEffect(() => {
     if (task) {
       setEditedTask({
         ...task,
-        daysOfWeek: task.daysOfWeek ?? [],
+        daysOfWeek: task.daysOfWeek?.map(num => dayNumberToName[num]) ?? [],
         dates: task.dates ?? [],
         users: task.users ?? [],
         period: task.period ?? task.frequency,
@@ -32,15 +49,12 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
 
   if (!isOpen || !editedTask) return null;
 
-
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
     setEditedTask(prev => {
-      if (!prev) return prev; // null のままなら何もしない
+      if (!prev) return prev;
       return { ...prev, [key]: value };
     });
   };
-
-
 
   const toggleUser = (user: string) => {
     const newUsers = editedTask.users.includes(user)
@@ -52,12 +66,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
       <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative">
-        {/* <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
-          <X size={20} />
-        </button> */}
-
         <div className="space-y-6 mt-6 mx-3">
-          {/* 家事名 */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">家事名：</label>
             <input
@@ -68,7 +77,6 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             />
           </div>
 
-          {/* 頻度 */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">頻度：</label>
             <select
@@ -77,7 +85,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
                 const newPeriod = e.target.value as Period;
                 setEditedTask(prev => {
                   if (!prev) return prev;
-                    const updated = { ...prev, period: newPeriod };
+                  const updated = { ...prev, period: newPeriod };
                   if (newPeriod === '毎日') {
                     updated.daysOfWeek = [];
                     updated.dates = [];
@@ -89,17 +97,14 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
                   return updated;
                 });
               }}
-
               className="w-24 border-b border-gray-300 outline-none pl-2"
             >
               {['毎日', '週次', '不定期'].map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
-
           </div>
 
-          {/* 曜日（週次） */}
           {editedTask.period === '週次' && (
             <div className="flex items-center">
               <label className="w-20 text-gray-600">曜日：</label>
@@ -127,7 +132,6 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </div>
           )}
 
-          {/* 日付（不定期） */}
           {editedTask.period === '不定期' && (
             <div className="flex items-center">
               <label className="w-20 text-gray-600">日付：</label>
@@ -140,7 +144,6 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </div>
           )}
 
-          {/* ポイント */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">ポイント：</label>
             <select
@@ -154,7 +157,6 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             </select>
           </div>
 
-          {/* 担当者 */}
           <div className="flex items-center">
             <label className="w-20 text-gray-600">担当者：</label>
             <div className="flex gap-2">
@@ -179,7 +181,11 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
         <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
           <button
             onClick={() => {
-              onSave(editedTask);
+              const transformed = {
+                ...editedTask,
+                daysOfWeek: editedTask.daysOfWeek.map(d => dayNameToNumber[d]),
+              };
+              onSave(transformed);
               onClose();
             }}
             className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"

@@ -10,6 +10,17 @@ import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import { format, isToday, parseISO, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
+const dayNumberToName: Record<string, string> = {
+  '1': '月',
+  '2': '火',
+  '3': '水',
+  '4': '木',
+  '5': '金',
+  '6': '土',
+  '0': '日',
+};
+
+
 type Props = {
   task: Task;
   period: Period;
@@ -184,13 +195,22 @@ export default function TaskCard({
           )}
           {task.daysOfWeek && (
             <div className="flex gap-1 ml-2">
-              {task.daysOfWeek.map((d, i) => (
-                <div key={i} className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center">
-                  {d}
-                </div>
-              ))}
+              {[...task.daysOfWeek]
+                .sort((a, b) => {
+                  const order = ['1', '2', '3', '4', '5', '6', '0']; // 月〜日 順
+                  return order.indexOf(a) - order.indexOf(b);
+                })
+                .map((d, i) => (
+                  <div
+                    key={i}
+                    className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center"
+                  >
+                    {dayNumberToName[d] ?? d}
+                  </div>
+                ))}
             </div>
           )}
+
         </div>
         <div className="flex items-center gap-3">
           <p className="font-bold text-[#5E5E5E] font-sans">
