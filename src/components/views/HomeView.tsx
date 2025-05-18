@@ -70,11 +70,11 @@ export default function HomeView() {
           }
         }}
       >
-        <div className="h-[300px]">
+        <div className="h-[290px]">
           <TaskHistory />
         </div>
 
-        <div className="h-[170px] horizontal-scroll">
+        <div className="h-[162px] horizontal-scroll">
           <TaskCalendar tasks={tasks} />
         </div>
 

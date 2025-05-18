@@ -71,14 +71,14 @@ export default function TodoTaskCard({
                   onClick={() => setTab(type as 'undone' | 'done')}
                   className={clsx(
                     'relative pl-5 py-1 text-sm font-bold border border-gray-300',
-                    'rounded-t-md w-22 flex items-center justify-center',
+                    'rounded-t-md w-24 flex items-center justify-center',
                     type === tab
                       ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
                       : 'bg-gray-100 text-gray-400 z-0'
                   )}
                   type="button"
                 >
-                  <span className="absolute left-2 inline-block min-w-[20px] h-[20px] text-xs leading-[20px] text-white bg-[#5E5E5E] rounded-full text-center">
+                  <span className="absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white bg-[#5E5E5E] rounded-full text-center">
                     {count}
                   </span>
                   {type === 'undone' ? '未処理' : '完了'}
@@ -88,7 +88,7 @@ export default function TodoTaskCard({
           </div>
           <button
             onClick={onDeleteTask}
-            className="text-gray-400 hover:text-red-500 text-xl font-bold"
+            className="text-gray-400 hover:text-red-500 text-2xl font-bold pr-1"
             type="button"
           >
             ×
@@ -153,7 +153,7 @@ export default function TodoTaskCard({
         </div>
 
         {tab === 'undone' && (
-          <div className="relative flex items-center justify-between">
+          <div className="relative flex items-center justify-between mt-4">
             <button
               onClick={() => onAddTodo(crypto.randomUUID())}
               className="flex items-center gap-2 text-gray-600 hover:text-[#FFCB7D]"
