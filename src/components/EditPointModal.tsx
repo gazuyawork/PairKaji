@@ -1,44 +1,112 @@
-// src/components/EditPointModal.tsx
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
-import type { Task } from '@/types/Task';
+// import type { Task } from '@/types/Task';
+import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
 
-type Props = {
+interface Props {
   isOpen: boolean;
   initialPoint: number;
-  tasks: Task[];
+  // tasks: Task[];
   onClose: () => void;
   onSave: (value: number) => void;
-  onAutoCalculate: () => number;
-};
+  // onAutoCalculate: () => number;
+}
 
-export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, onSave, onAutoCalculate }: Props) {
-  const [point, setPoint] = useState<number>(initialPoint);
+export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }: Props) {
+  const [point, setPoint] = useState<number>(0);
+  const [selfPoint, setSelfPoint] = useState<number>(0);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    setPoint(initialPoint);
+    if (initialPoint && initialPoint > 0) {
+      setPoint(initialPoint);
+      setSelfPoint(Math.ceil(initialPoint / 2));
+    } else {
+      fetchTasksAndCalculate();
+    }
   }, [initialPoint]);
 
-  const userPoints = useMemo(() => {
-    if (!Array.isArray(tasks)) return [];
-    const userMap: Record<string, number> = {};
-    tasks.forEach(task => {
-      const base = task.point;
-      const multiplier = task.period === '毎日' ? 7 : (task.daysOfWeek?.length || 0);
-      task.users.forEach(user => {
-        if (!userMap[user]) userMap[user] = 0;
-        userMap[user] += base * multiplier;
+  const fetchTasksAndCalculate = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+      const snapshot = await getDocs(q);
+      let total = 0;
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        const point = data.point ?? 0;
+        const freq = data.frequency;
+        const days = data.daysOfWeek ?? [];
+        console.log('task:', { name: data.name, point, freq, days });
+
+        if (freq === '毎日') {
+          total += point * 7;
+        } else if (freq === '週次') {
+          total += point * days.length;
+        }
       });
-    });
+      console.log('自動算出ポイント:', total);
+      const half = Math.floor(total / 2);
+      const extra = total % 2;
+      setPoint(total);
+      setSelfPoint(half + extra);
+    } catch (err) {
+      console.error('ポイント自動算出失敗:', err);
+    }
+  };
+
+  const userPoints = useMemo(() => {
     return [
-      { name: 'たろう', image: '/images/taro.png', point: userMap['たろう'] || 0 },
-      { name: 'はなこ', image: '/images/hanako.png', point: userMap['はなこ'] || 0 },
+      { name: 'たろう', image: '/images/taro.png' },
+      { name: 'はなこ', image: '/images/hanako.png' },
     ];
-  }, [tasks]);
+  }, []);
+
+  const partnerPoint = Math.max(0, point - selfPoint);
+
+  const handleSave = async () => {
+    if (!point || point < 1) {
+      setError('1以上の数値を入力してください');
+      return;
+    }
+    if (selfPoint > point) {
+      setError('目標値以下で入力してください');
+      return;
+    }
+    setError('');
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    try {
+      await setDoc(doc(db, 'points', uid), {
+        weeklyTargetPoint: point,
+        selfPoint,
+        partnerPoint,
+      }, { merge: true });
+    } catch (error) {
+      console.error('Firebaseへの保存に失敗:', error);
+    }
+
+    onSave(point);
+    onClose();
+  };
+
+  const handleAuto = () => {
+    fetchTasksAndCalculate();
+  };
+
+  const handlePointChange = (value: number) => {
+    setPoint(value);
+    const half = Math.floor(value / 2);
+    const extra = value % 2;
+    setSelfPoint(half + extra);
+  };
 
   if (!isOpen) return null;
 
@@ -51,19 +119,18 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
             <p className="text-sm text-gray-500 font-sans mt-1">無理のない程度で目標を設定しましょう</p>
           </div>
 
-          {/* 数値入力 + 自動設定ボタン横並び */}
           <div className="flex items-center pt-4 gap-4">
             <label className="w-14 text-gray-600 font-bold">目標 pt</label>
             <input
               type="number"
-              min={0}
+              min={1}
               max={1000}
               value={point}
-              onChange={e => setPoint(Number(e.target.value))}
+              onChange={e => handlePointChange(Number(e.target.value))}
               className="w-26 text-4xl border-b border-gray-300 outline-none px-2 py-1 text-[#5E5E5E] text-center"
             />
             <button
-              onClick={() => setPoint(onAutoCalculate())}
+              onClick={handleAuto}
               className="flex w-20 items-center gap-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100"
             >
               <Sparkles size={16} className="text-yellow-500" />
@@ -71,7 +138,6 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
             </button>
           </div>
 
-          {/* 合計ポイント下に担当者内訳（横並び表示） */}
           <div className="flex mt-4">
             <p className="text-gray-600 font-bold pt-2 pl-2 pr-6">内訳</p>
             <div className="flex justify-center gap-6">
@@ -84,20 +150,27 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
                     height={42}
                     className="rounded-full border border-gray-300"
                   />
-                  <p className="text-gray-600"><span className="text-2xl">{user.point}</span> pt</p>
+                  <input
+                    type="number"
+                    min={0}
+                    max={point}
+                    value={user.name === 'たろう' ? selfPoint : partnerPoint}
+                    onChange={e => user.name === 'たろう' && setSelfPoint(Number(e.target.value))}
+                    disabled={user.name === 'はなこ'}
+                    className={`w-16 text-xl border-b border-gray-300 outline-none text-center text-gray-700 ${user.name === 'はなこ' ? 'bg-gray-100' : ''}`}
+                  />
+                  <span className="text-gray-600">pt</span>
                 </div>
               ))}
             </div>
           </div>
+
+          {error && <p className="text-red-500 text-center text-sm pt-2">{error}</p>}
         </div>
 
-        {/* 保存・キャンセル */}
         <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
           <button
-            onClick={() => {
-              onSave(point);
-              onClose();
-            }}
+            onClick={handleSave}
             className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
           >
             保存
@@ -106,7 +179,6 @@ export default function EditPointModal({ isOpen, initialPoint, tasks, onClose, o
           <button
             onClick={onClose}
             className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
-            // className="w-fullpx-6 py-3 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100"
           >
             キャンセル
           </button>
