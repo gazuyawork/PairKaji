@@ -8,7 +8,7 @@ import { CheckCircle, Circle, Calendar, Trash2, Pencil } from 'lucide-react';
 import { useRef, useEffect, useState } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
-import { format, isToday, parseISO, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+// import { format } from 'date-fns';
 
 const dayNumberToName: Record<string, string> = {
   '1': '月',
@@ -34,46 +34,28 @@ type Props = {
 
 
 const isTaskActiveToday = (task: Task): boolean => {
-  const today = new Date();
-  const todayDay = today.getDay(); // 0=日〜6=土
-  const todayStr = format(today, 'yyyy-MM-dd');
+  // const today = new Date();
+  // const todayDay = today.getDay(); // 0=日〜6=土
+  // const todayStr = format(today, 'yyyy-MM-dd');
 
   if (task.frequency === '毎日') {
+    // 今後、毎日の条件を追加予定
     return true;
   }
 
   if (task.frequency === '週次') {
-    if (task.daysOfWeek && task.daysOfWeek.length > 0) {
-      return task.daysOfWeek.includes(String(todayDay));
-    } else {
-      // 曜日指定なし → 週次特別ルール
-      const completedAtDate = task.completedAt ? parseISO(task.completedAt) : null;
-
-      if (completedAtDate) {
-        const isDoneToday = isToday(completedAtDate);
-        if (isDoneToday) return true; // 当日なら切り替え可
-
-        const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-        const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-
-        const doneThisWeek = isWithinInterval(completedAtDate, {
-          start: weekStart,
-          end: weekEnd,
-        });
-
-        if (doneThisWeek) return false; // 今週すでに完了 → 翌週まで不可
-      }
-
-      return true; // 今週未完了 → タップ可
-    }
+    // 今後、週次の条件を追加予定
+    return true;
   }
 
   if (task.frequency === '不定期') {
-    return task.scheduledDate === todayStr;
+    // 今後、不定期の条件を追加予定
+    return true;
   }
 
-  return false;
+  return true;
 };
+
 
 export default function TaskCard({
   task,
@@ -86,7 +68,7 @@ export default function TaskCard({
   setMenuOpenId,
 }: Props) {
   const handlers = useSwipeable({
-    onSwipedLeft: () => setMenuOpenId(task.id), // ← 削除メニュー表示
+    onSwipedLeft: () => setMenuOpenId(task.id),
     trackTouch: true,
   });
 
