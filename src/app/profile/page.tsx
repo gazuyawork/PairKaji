@@ -13,6 +13,7 @@ import PasswordEditModal from '@/components/PasswordEditModal';
 export default function ProfilePage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [isGoogleUser, setIsGoogleUser] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(
     typeof window !== 'undefined' ? localStorage.getItem('profileImage') : null
   );
@@ -24,6 +25,8 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       const user = auth.currentUser;
       if (!user) return;
+
+      setIsGoogleUser(user.providerData.some(p => p.providerId === 'google.com'));
 
       const ref = doc(db, 'users', user.uid);
       const snap = await getDoc(ref);
@@ -89,7 +92,6 @@ export default function ProfilePage() {
 
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         <div className="bg-white shadow rounded-2xl px-4 py-4 space-y-6">
-          {/* プロフ画像と氏名のみ横並び（幅が狭くても横並びを維持） */}
           <div className="flex flex-row flex-nowrap items-center gap-6 overflow-x-auto">
             <div className="relative shrink-0">
               <Image
@@ -118,7 +120,7 @@ export default function ProfilePage() {
                 />
                 <button
                   onClick={handleSaveName}
-                  className="w-12 h-8 rounded-sm  text-sm bg-[#FFCB7D] text-white shadow"
+                  className="w-12 h-8 rounded-sm text-sm bg-[#FFCB7D] text-white shadow"
                 >
                   変更
                 </button>
@@ -126,23 +128,30 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* ここから下は縦並びに表示 */}
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[#5E5E5E] font-semibold">メールアドレス</label>
+              <label className="text-[#5E5E5E] font-semibold flex items-center gap-2">
+                メールアドレス
+                {isGoogleUser && (
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                    Googleログインでは変更不可
+                  </span>
+                )}
+              </label>
               <div className="flex gap-2 items-center">
                 <p className="flex-1 text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
-                <button
-                  onClick={() => setIsEmailModalOpen(true)}
-                  className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
-                >
-                  変更
-                </button>
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-[#5E5E5E] font-semibold">パスワード</label>
+              <label className="text-[#5E5E5E] font-semibold flex items-center gap-2">
+                パスワード
+                {isGoogleUser && (
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                    Googleログインでは変更不可
+                  </span>
+                )}
+              </label>
               <div className="flex gap-2 items-center">
                 <input
                   type="password"
@@ -150,12 +159,6 @@ export default function ProfilePage() {
                   readOnly
                   className="flex-1 text-[#5E5E5E] border-b border-gray-300 py-1 tracking-widest focus:outline-none"
                 />
-                <button
-                  onClick={() => setIsPasswordModalOpen(true)}
-                  className="w-12 h-8 rounded-sm  text-sm bg-gray-500 text-white"
-                >
-                  変更
-                </button>
               </div>
             </div>
 
