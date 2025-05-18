@@ -1,30 +1,55 @@
-// src/app/register/page.tsx
-
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { FirebaseError } from 'firebase/app';
+import { auth } from '@/lib/firebase';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleRegister = async () => {
+    setEmailError('');
+    setPasswordError('');
+
+    let hasError = false;
+
+    if (!email) {
+      setEmailError('メールアドレスを入力してください');
+      hasError = true;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      setEmailError('正しいメールアドレスを入力してください');
+      hasError = true;
+    }
+
+    if (!password) {
+      setPasswordError('パスワードを入力してください');
+      hasError = true;
+    } else if (password.length < 6) {
+      setPasswordError('パスワードは6文字以上で入力してください');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      router.push('/main');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await sendEmailVerification(user);
+      router.push('/verify');
     } catch (error) {
       if (error instanceof FirebaseError) {
-        alert('登録に失敗しました: ' + error.message);
+        setEmailError('登録に失敗しました: ' + error.message);
       } else {
-        alert('予期せぬエラーが発生しました');
+        setEmailError('予期せぬエラーが発生しました');
       }
     }
   };
@@ -48,6 +73,7 @@ export default function RegisterPage() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="test@gmail.com"
         />
+        {emailError && <p className="text-red-500 text-sm mt-1">{emailError}</p>}
 
         <label className="text-[#5E5E5E] text-[18px] font-sans">パスワード</label>
         <div className="relative">
@@ -66,17 +92,18 @@ export default function RegisterPage() {
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
         </div>
+        {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>}
 
         <button
           onClick={handleRegister}
-          className="w-[340px] mt-[20px] mb-[5px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-full mt-[20px] mb-[5px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
         >
           登録する
         </button>
 
         <button
           onClick={() => router.push('/login')}
-          className="w-[340px] mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-full mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px]"
         >
           ログイン画面へ戻る
         </button>

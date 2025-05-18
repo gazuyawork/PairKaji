@@ -9,6 +9,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
+import Link from 'next/link';
 
 export default function ProfilePage() {
   const [name, setName] = useState('');
@@ -26,7 +27,12 @@ export default function ProfilePage() {
       const user = auth.currentUser;
       if (!user) return;
 
-      setIsGoogleUser(user.providerData.some(p => p.providerId === 'google.com'));
+      await user.reload();
+      const refreshedUser = auth.currentUser;
+
+      setIsGoogleUser(
+        refreshedUser?.providerData.some((p) => p.providerId === 'google.com') ?? false
+      );
 
       const ref = doc(db, 'users', user.uid);
       const snap = await getDoc(ref);
@@ -140,6 +146,14 @@ export default function ProfilePage() {
               </label>
               <div className="flex gap-2 items-center">
                 <p className="flex-1 text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
+                {!isGoogleUser && (
+                  <button
+                    onClick={() => setIsEmailModalOpen(true)}
+                    className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
+                  >
+                    変更
+                  </button>
+                )}
               </div>
             </div>
 
@@ -159,6 +173,14 @@ export default function ProfilePage() {
                   readOnly
                   className="flex-1 text-[#5E5E5E] border-b border-gray-300 py-1 tracking-widest focus:outline-none"
                 />
+                {!isGoogleUser && (
+                  <button
+                    onClick={() => setIsPasswordModalOpen(true)}
+                    className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
+                  >
+                    変更
+                  </button>
+                )}
               </div>
             </div>
 
@@ -188,6 +210,12 @@ export default function ProfilePage() {
           </button>
         </div>
       </main>
+
+      <div className="text-center mt-auto mb-10">
+        <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
+          アカウントを削除する
+        </Link>
+      </div>
 
       <EmailEditModal
         open={isEmailModalOpen}
