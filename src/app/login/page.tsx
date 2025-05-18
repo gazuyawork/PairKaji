@@ -1,11 +1,15 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   signInWithEmailAndPassword,
   setPersistence,
   browserLocalPersistence,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
@@ -17,32 +21,31 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // const [checking, setChecking] = useState(true);
   const router = useRouter();
-
-  // 🔸 すでにログインしていれば /home に遷移
-  // useEffect(() => {
-  //   const unsubscribe = onAuthStateChanged(auth, (user) => {
-  //     if (user) {
-  //       router.replace('/home');
-  //     } else {
-  //       setChecking(false);
-  //     }
-  //   });
-  //   return () => unsubscribe();
-  // }, [router]);
-
-  // if (checking) return null;
 
   const handleLogin = async () => {
     try {
-      // 🔸 セッションの永続化（アプリ再起動後もログイン状態保持）
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/main');
     } catch (error) {
       if (error instanceof FirebaseError) {
         alert('ログインに失敗しました: ' + error.message);
+      } else {
+        alert('予期せぬエラーが発生しました');
+      }
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      router.push('/main');
+    } catch (error) {
+      if (error instanceof FirebaseError) {
+        alert('Googleログインに失敗しました: ' + error.message);
       } else {
         alert('予期せぬエラーが発生しました');
       }
@@ -103,6 +106,7 @@ export default function LoginPage() {
         <hr className="w-full border-t border-[#AAAAAA] opacity-30 my-5" />
 
         <button
+          onClick={handleGoogleLogin}
           className="w-[340px] mb-[5px] p-[10px] text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]"
         >
           Googleでログイン
