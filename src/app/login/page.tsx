@@ -62,7 +62,7 @@ export default function LoginPage() {
       <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
       <p className="text-[#5E5E5E] mb-[50px] font-sans">ログイン</p>
 
-      <div className="w-full max-w-[320px] flex flex-col gap-4">
+      <div className="w-full max-w-[340px] flex flex-col gap-4">
         <label className="text-[#5E5E5E] text-[18px] font-sans">メールアドレス</label>
         <input
           type="email"
@@ -92,7 +92,7 @@ export default function LoginPage() {
 
         <button
           onClick={handleLogin}
-          className="w-[340px] mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-full mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
         >
           ログインする
         </button>
@@ -107,14 +107,14 @@ export default function LoginPage() {
 
         <button
           onClick={handleGoogleLogin}
-          className="w-[340px] mb-[5px] p-[10px] text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-full mb-[5px] p-[10px] text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]"
         >
           Googleでログイン
         </button>
 
         <button
           onClick={() => router.push('/register')}
-          className="w-[340px] mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-full mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px]"
         >
           初めての方はこちら
         </button>
