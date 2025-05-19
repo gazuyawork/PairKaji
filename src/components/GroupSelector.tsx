@@ -66,8 +66,8 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
               onClick={() => onSelectGroup(group.id)}
               className={`px-4 py-2 rounded-full text-sm border transition-all duration-150 whitespace-nowrap ${
                 selectedGroupId === group.id
-                  ? 'bg-[#5E5E5E] text-white border-[#5E5E5E]'
-                  : 'bg-white text-[#5E5E5E] border-gray-300 hover:bg-[#f59e0b] hover:text-white'
+                  ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
+                  : 'bg-white text-[#5E5E5E] border-gray-300 hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
               }`}
             >
               {group.name}

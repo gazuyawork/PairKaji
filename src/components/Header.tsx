@@ -16,7 +16,7 @@ import { useState } from 'react';
 type HeaderProps = {
   title: string;
   saveStatus?: 'idle' | 'saving' | 'saved';
-  currentIndex?: number; // ✅ 追加
+  currentIndex?: number;
 };
 
 export default function Header({ title, saveStatus = 'idle', currentIndex }: HeaderProps) {
@@ -28,7 +28,7 @@ export default function Header({ title, saveStatus = 'idle', currentIndex }: Hea
     <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
       <div className="flex items-center gap-2">
         {/* 戻るボタン */}
-        {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage') && (
+        {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
           <button
             onClick={() =>
               pathname === '/task_manage' ? router.push('/main') : router.push('/main')

@@ -410,13 +410,11 @@ const handleUserToggle = (id: string, user: string) => {
     toast.success('タスクを保存しました');
   };
 
-
-
-  const clearFilters = () => {
-    setFilter(null);
-    setPersonFilter(null);
-    setSearchTerm('');
-  };
+  // const clearFilters = () => {
+  //   setFilter(null);
+  //   setPersonFilter(null);
+  //   setSearchTerm('');
+  // };
 
   useEffect(() => {
     const storedProfileImage = localStorage.getItem('profileImage');
@@ -478,16 +476,7 @@ const handleUserToggle = (id: string, user: string) => {
           onTogglePerson={togglePerson}
         />
 
-        {(filter || personFilter || searchTerm) && (
-          <div className="flex justify-center mt-2">
-            <button
-              onClick={clearFilters}
-              className="text-xs px-3 py-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
-            >
-              フィルター解除
-            </button>
-          </div>
-        )}
+
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
 

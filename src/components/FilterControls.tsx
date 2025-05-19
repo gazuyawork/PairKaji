@@ -62,7 +62,6 @@ export default function FilterControls({
           </button>
         ))}
 
-        <div className="h-6 border-l border-gray-300 mx-2" />
         {extraButton}
       </div>
 

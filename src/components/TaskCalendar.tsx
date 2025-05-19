@@ -1,11 +1,21 @@
+// ✅ TaskCalendar.tsx 全体（props対応）
+
 'use client';
 
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import type { Task } from '@/types/Task';
 import { useRef } from 'react';
 
+// ✅ TaskCalendar専用型（軽量）
+type CalendarTask = {
+  id: string;
+  name: string;
+  frequency: '毎日' | '週次' | '不定期';
+  dates?: string[];
+  daysOfWeek?: string[];
+};
+
 type Props = {
-  tasks: Task[];
+  tasks: CalendarTask[];
 };
 
 export default function TaskCalendar({ tasks }: Props) {
@@ -26,7 +36,7 @@ export default function TaskCalendar({ tasks }: Props) {
 
   const preventScrollPropagation = (e: React.TouchEvent<HTMLDivElement>) => {
     if (isTouchScrollingRef.current) {
-      e.stopPropagation(); // ✅ スワイプを防止
+      e.stopPropagation();
     }
   };
 
@@ -43,8 +53,12 @@ export default function TaskCalendar({ tasks }: Props) {
         <div className="flex w-max text-xs text-center gap-2">
           {days.map((day, idx) => {
             const dailyTasks = tasks.filter(task => {
-              const dateMatches = task.dates?.some(dateStr => isSameDay(parseISO(dateStr), day));
-              const weeklyMatches = task.frequency === '週次' && task.daysOfWeek?.includes(String(day.getDay()));
+              const dateMatches = task.dates?.some(dateStr =>
+                isSameDay(parseISO(dateStr), day)
+              );
+              const weeklyMatches =
+                task.frequency === '週次' &&
+                task.daysOfWeek?.includes(String(day.getDay()));
               return dateMatches || weeklyMatches;
             });
 
@@ -56,8 +70,12 @@ export default function TaskCalendar({ tasks }: Props) {
                 key={idx}
                 className={`w-[100px] flex-shrink-0 border rounded-lg p-2 min-h-[60px] ${bgColor}`}
               >
-                <div className="font-semibold text-gray-600">{format(day, 'E')}</div>
-                <div className="text-gray-400 text-[10px]">{format(day, 'M/d')}</div>
+                <div className="font-semibold text-gray-600">
+                  {format(day, 'E')}
+                </div>
+                <div className="text-gray-400 text-[10px]">
+                  {format(day, 'M/d')}
+                </div>
                 <hr className="my-1 border-gray-300 opacity-40" />
                 {hasTask ? (
                   dailyTasks.map((task, i) => (

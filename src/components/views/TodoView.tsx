@@ -209,6 +209,19 @@ export default function TodoView() {
           onSelectGroup={setSelectedGroupId}
         />
 
+        {selectedGroupId && (
+          <div className="flex justify-center">
+            <button
+              onClick={() => setSelectedGroupId(null)}
+              className="text-xs px-3 py-1 mt-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
+            >
+              フィルター解除
+            </button>
+          </div>
+        )}
+
+
+
         {tasks
           .filter(task =>
             task.visible &&

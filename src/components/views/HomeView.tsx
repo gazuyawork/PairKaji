@@ -57,7 +57,7 @@ export default function HomeView() {
   }, []);
 
   return (
-    <div className="fh-full lex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans">
+    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans">
       <Header title="Home" />
 
       <main
@@ -75,7 +75,16 @@ export default function HomeView() {
         </div>
 
         <div className="h-[162px] horizontal-scroll">
-          <TaskCalendar tasks={tasks} />
+          {/* ✅ CalendarTask[] に整形して渡す */}
+          <TaskCalendar
+            tasks={tasks.map(({ id, name, frequency, dates, daysOfWeek }) => ({
+              id,
+              name,
+              frequency,
+              dates,
+              daysOfWeek,
+            }))}
+          />
         </div>
 
         <div className="h-[150px]">
