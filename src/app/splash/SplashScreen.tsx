@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { auth } from '@/lib/firebase';
@@ -26,31 +26,33 @@ const letter = {
 
 export default function SplashScreen() {
   const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  // 自動遷移（ログイン状態によって分岐）
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(!!user);
+      setAuthChecked(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 認証確認後に3秒の待機を入れてから遷移
+  useEffect(() => {
+    if (!authChecked || isAuthenticated === null) return;
+
     const timer = setTimeout(() => {
-      onAuthStateChanged(auth, (user) => {
-        if (user) {
-          router.replace('/home');
-        } else {
-          router.replace('/login');
-        }
-      });
-    }, 30000); // 3秒後に遷移
+      router.replace(isAuthenticated ? '/main' : '/login');
+    }, 3000);
 
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [authChecked, isAuthenticated, router]);
 
-  // 手動タップ時もログイン状態を見て遷移
+  // タップ時に即時遷移
   const handleTap = () => {
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace('/home');
-      } else {
-        router.replace('/login');
-      }
-    });
+    if (!authChecked || isAuthenticated === null) return;
+    router.replace(isAuthenticated ? '/main' : '/login');
   };
 
   return (
