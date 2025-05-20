@@ -7,7 +7,7 @@ import PairPoints from '@/components/PairPoints';
 import TaskHistory from '@/components/TaskHistory';
 import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 export default function HomeView() {
@@ -15,14 +15,13 @@ export default function HomeView() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
-      const snapshot = await getDocs(q);
+    const q = query(collection(db, 'tasks'), where('userId', '==', uid));
 
-      const taskList: Task[] = snapshot.docs.map(doc => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const taskList: Task[] = snapshot.docs.map((doc) => {
         const data = doc.data();
         const user = data.users?.[0] ?? '未設定';
 
@@ -51,9 +50,9 @@ export default function HomeView() {
       });
 
       setTasks(taskList);
-    };
+    });
 
-    fetchTasks();
+    return () => unsubscribe(); // クリーンアップ
   }, []);
 
   return (

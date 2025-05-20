@@ -1,28 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// import { X } from 'lucide-react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 
 const dayNameToNumber: Record<string, string> = {
-  '日': '0',
-  '月': '1',
-  '火': '2',
-  '水': '3',
-  '木': '4',
-  '金': '5',
-  '土': '6',
+  '日': '0', '月': '1', '火': '2', '水': '3', '木': '4', '金': '5', '土': '6',
 };
 
 const dayNumberToName: Record<string, string> = {
-  '0': '日',
-  '1': '月',
-  '2': '火',
-  '3': '水',
-  '4': '木',
-  '5': '金',
-  '6': '土',
+  '0': '日', '1': '月', '2': '火', '3': '水', '4': '木', '5': '金', '6': '土',
 };
 
 type Props = {
@@ -50,10 +37,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
   if (!isOpen || !editedTask) return null;
 
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
-    setEditedTask(prev => {
-      if (!prev) return prev;
-      return { ...prev, [key]: value };
-    });
+    setEditedTask(prev => prev ? { ...prev, [key]: value } : prev);
   };
 
   const toggleUser = (user: string) => {
@@ -64,21 +48,21 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-      <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative">
-        <div className="space-y-6 mt-6 mx-3">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center px-2">
+      <div className="bg-white w-full max-w-sm p-4 rounded-xl shadow-lg relative">
+        <div className="space-y-6">
           <div className="flex items-center">
-            <label className="w-20 text-gray-600">家事名：</label>
+            <label className="w-20 text-gray-600 shrink-0">家事名：</label>
             <input
               type="text"
               value={editedTask.name}
               onChange={e => update('name', e.target.value)}
-              className="flex-1 border-b border-gray-300 outline-none text-[#5E5E5E]"
+              className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
             />
           </div>
 
           <div className="flex items-center">
-            <label className="w-20 text-gray-600">頻度：</label>
+            <label className="w-20 text-gray-600 shrink-0">頻度：</label>
             <select
               value={editedTask.period}
               onChange={(e) => {
@@ -97,7 +81,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
                   return updated;
                 });
               }}
-              className="w-24 border-b border-gray-300 outline-none pl-2"
+              className="w-full border-b border-gray-300 outline-none pl-2"
             >
               {['毎日', '週次', '不定期'].map(p => (
                 <option key={p} value={p}>{p}</option>
@@ -106,8 +90,8 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
           </div>
 
           {editedTask.period === '週次' && (
-            <div className="flex items-center">
-              <label className="w-20 text-gray-600">曜日：</label>
+            <div className="flex items-center flex-wrap gap-y-2">
+              <label className="w-20 text-gray-600 shrink-0">曜日：</label>
               <div className="flex gap-2 flex-wrap">
                 {['月', '火', '水', '木', '金', '土', '日'].map(day => (
                   <button
@@ -134,22 +118,22 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
 
           {editedTask.period === '不定期' && (
             <div className="flex items-center">
-              <label className="w-20 text-gray-600">日付：</label>
+              <label className="w-20 text-gray-600 shrink-0">日付：</label>
               <input
                 type="date"
                 value={editedTask.dates[0] || ''}
                 onChange={(e) => update('dates', [e.target.value])}
-                className="flex-1 border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
+                className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
               />
             </div>
           )}
 
           <div className="flex items-center">
-            <label className="w-20 text-gray-600">ポイント：</label>
+            <label className="w-20 text-gray-600 shrink-0">ポイント：</label>
             <select
               value={editedTask.point}
               onChange={e => update('point', Number(e.target.value))}
-              className="w-24 border-b border-gray-300 outline-none pl-2"
+              className="w-full border-b border-gray-300 outline-none pl-2"
             >
               {Array.from({ length: 10 }, (_, i) => i + 1).map(val => (
                 <option key={val} value={val}>{val} pt</option>
@@ -158,7 +142,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
           </div>
 
           <div className="flex items-center">
-            <label className="w-20 text-gray-600">担当者：</label>
+            <label className="w-20 text-gray-600 shrink-0">担当者：</label>
             <div className="flex gap-2">
               {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(user => (
                 <button
@@ -178,7 +162,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button
             onClick={() => {
               const transformed = {
@@ -188,14 +172,14 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
               onSave(transformed);
               onClose();
             }}
-            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
+            className="w-full sm:w-auto px-6 py-3 text-sm bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
           >
             保存
           </button>
 
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+            className="w-full sm:w-auto px-6 py-3 text-sm bg-gray-200 rounded-lg hover:shadow-md"
           >
             キャンセル
           </button>
