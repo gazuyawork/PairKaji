@@ -15,9 +15,10 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
+  query,
+  where,  
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-
 import Header from '@/components/Header';
 import TodoTaskCard from '@/components/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
@@ -42,8 +43,13 @@ export default function TodoView() {
   }, [tasks]);
 
   useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
     const tasksRef = collection(db, 'tasks');
-    const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
+    const q = query(tasksRef, where('userId', '==', uid)); // ← 🔥 uidフィルター追加
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const newTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
         const data = doc.data() as Omit<TodoOnlyTask, 'id'>;
         return {
@@ -58,6 +64,7 @@ export default function TodoView() {
 
     return () => unsubscribe();
   }, []);
+
 
   useEffect(() => {
     if (focusedTodoId && todoRefs.current[focusedTodoId]) {
