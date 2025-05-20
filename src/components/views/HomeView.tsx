@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
 import PairPoints from '@/components/PairPoints';
-import TaskHistory from '@/components/TaskHistory';
+// import TaskHistory from '@/components/TaskHistory';
+import FinishDayTask from '@/components/FinishDayTask';
 import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -70,10 +71,11 @@ export default function HomeView() {
         }}
       >
         <div className="h-[290px]">
-          <TaskHistory />
+          {/* <TaskHistory /> */}
+          < FinishDayTask />
         </div>
 
-        <div className="h-[162px] horizontal-scroll">
+        <div className="h-[174px] horizontal-scroll">
           {/* ✅ CalendarTask[] に整形して渡す */}
           <TaskCalendar
             tasks={tasks.map(({ id, name, frequency, dates, daysOfWeek }) => ({

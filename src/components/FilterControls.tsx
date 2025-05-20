@@ -11,6 +11,8 @@ interface Props {
   periodFilter: Period | null;
   onTogglePeriod: (period: Period | null) => void;
   onTogglePerson: (person: string | null) => void;
+  searchTerm?: string;  
+  onClearSearch?: () => void;
   extraButton?: ReactNode;
 }
 
@@ -19,6 +21,8 @@ export default function FilterControls({
   personFilter,
   onTogglePeriod,
   onTogglePerson,
+  searchTerm,
+  onClearSearch,
   extraButton,
 }: Props) {
   const periods = ['毎日', '週次', '不定期'] as const;
@@ -27,7 +31,8 @@ export default function FilterControls({
     { name: '花子', image: '/images/hanako.png' },
   ];
 
-  const showClear = !!(periodFilter || personFilter);
+  const showClear = !!(periodFilter || personFilter || searchTerm);
+
 
   return (
     <div className="w-full flex flex-col items-center gap-2">
@@ -71,6 +76,7 @@ export default function FilterControls({
             onClick={() => {
               onTogglePeriod(null);
               onTogglePerson(null);
+              onClearSearch?.();
             }}
             className="text-xs px-3 py-1 mt-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
           >

@@ -12,8 +12,12 @@ import { isToday, parseISO } from 'date-fns';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
-export default function TaskView() {
-  const [searchTerm, setSearchTerm] = useState('');
+type Props = {
+  initialSearch?: string;
+};
+
+export default function TaskView({ initialSearch = '' }: Props) {
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const initialTaskGroups: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
 
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
@@ -190,6 +194,10 @@ export default function TaskView() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    setSearchTerm(initialSearch);
+  }, [initialSearch]);
+
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none">
       <Header title="Task" currentIndex={1} />
@@ -203,6 +211,8 @@ export default function TaskView() {
           personFilter={personFilter}
           onTogglePeriod={togglePeriod}
           onTogglePerson={togglePerson}
+          searchTerm={searchTerm}
+          onClearSearch={() => setSearchTerm('')} 
         />
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
@@ -211,7 +221,8 @@ export default function TaskView() {
           const rawTasks = tasksState[period] ?? [];
           const list = rawTasks.filter(task =>
             (!periodFilter || periodFilter === period) &&
-            (!personFilter || task.person === personFilter)
+            (!personFilter || task.person === personFilter) &&
+            (!searchTerm || task.name.includes(searchTerm)) // ← 追加行
           );
           if (list.length === 0) return null;
 

@@ -2,6 +2,8 @@ import { CheckCircle, Circle, Trash2, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
+import { useRouter } from 'next/navigation';
+
 
 interface Props {
   task: TodoOnlyTask;
@@ -30,6 +32,7 @@ export default function TodoTaskCard({
   todoRefs,
   focusedTodoId,
 }: Props) {
+  const router = useRouter();
   const todos = task.todos ?? [];
   const [isComposing, setIsComposing] = useState(false);
 
@@ -58,7 +61,12 @@ export default function TodoTaskCard({
   return (
     <div className="relative">
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
-        <h2 className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%]">
+        <h2
+          className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline"
+          onClick={() =>
+            router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)
+          }
+        >
           {task.name}
         </h2>
         <div className="flex items-center gap-2">
