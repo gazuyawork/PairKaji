@@ -71,35 +71,52 @@ export default function Header({ title, saveStatus = 'idle', currentIndex }: Hea
       </div>
 
       {showMenu && (
-        <div className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-40 z-10">
-          <ul className="divide-y divide-gray-200">
-            <li
-              className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-              onClick={() => router.push('/profile')}
-            >
-              <User size={16} />
-              プロフィール
-            </li>
-            <li
-              className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-              onClick={() => router.push('/contact')}
-            >
-              <Mail size={16} />
-              お問い合わせ
-            </li>
-            <li
-              className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-              onClick={async () => {
-                await signOut(auth);
-                router.push('/');
-              }}
-            >
-              <LogOut size={16} />
-              ログアウト
-            </li>
-          </ul>
-        </div>
+        <>
+          {/* 背景オーバーレイ（クリックでメニューを閉じる） */}
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setShowMenu(false)}
+          />
+
+          {/* ポップアップメニュー本体 */}
+          <div className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-40 z-20">
+            <ul className="divide-y divide-gray-200">
+              <li
+                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                onClick={() => {
+                  setShowMenu(false);
+                  router.push('/profile');
+                }}
+              >
+                <User size={16} />
+                プロフィール
+              </li>
+              <li
+                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                onClick={() => {
+                  setShowMenu(false);
+                  router.push('/contact');
+                }}
+              >
+                <Mail size={16} />
+                お問い合わせ
+              </li>
+              <li
+                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                onClick={async () => {
+                  setShowMenu(false);
+                  await signOut(auth);
+                  router.push('/');
+                }}
+              >
+                <LogOut size={16} />
+                ログアウト
+              </li>
+            </ul>
+          </div>
+        </>
       )}
+
     </header>
   );
 }
