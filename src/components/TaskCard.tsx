@@ -9,6 +9,8 @@ import { useRef, useEffect, useState } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 // import { format } from 'date-fns';
+import clsx from 'clsx';
+
 
 const dayNumberToName: Record<string, string> = {
   '1': '月',
@@ -30,6 +32,7 @@ type Props = {
   onEdit: () => void;
   menuOpenId: string | null;
   setMenuOpenId: (id: string | null) => void;
+  highlighted?: boolean;
 };
 
 
@@ -66,6 +69,7 @@ export default function TaskCard({
   onEdit,
   menuOpenId,
   setMenuOpenId,
+  highlighted = false,
 }: Props) {
   const handlers = useSwipeable({
     onSwipedLeft: () => setMenuOpenId(task.id),
@@ -153,12 +157,16 @@ export default function TaskCard({
               ? { duration: 0.4, times: [0, 0.2, 0.6, 1] }
               : {}
           }
-          className={`
-            w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border border-[#e5e5e5]
-            ${task.done ? 'opacity-50 scale-[0.99]' : ''}
-            ${!isTaskActiveToday(task) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md cursor-pointer'}
-            bg-white
-          `}
+          className={clsx(
+            'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border', // ✅ ← border を追加
+            task.done && 'opacity-50 scale-[0.99]',
+            !isTaskActiveToday(task)
+              ? 'opacity-50 cursor-not-allowed'
+              : 'hover:shadow-md cursor-pointer',
+            highlighted ? 'border-blue-400' : 'border-[#e5e5e5]'
+          )}
+
+
 
         >
 

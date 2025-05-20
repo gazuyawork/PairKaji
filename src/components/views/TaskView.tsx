@@ -146,6 +146,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
           users: data.users ?? [],
           period,
           scheduledDate: data.dates?.[0] ?? '',
+          visible: data.visible ?? false, // ✅ 追加
         };
       });
 
@@ -234,25 +235,38 @@ export default function TaskView({ initialSearch = '' }: Props) {
                 {period}（残り {remaining} 件）
               </h2>
               <ul className="space-y-2">
-                {list.map((task, idx) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    period={period}
-                    index={idx}
-                    onToggleDone={toggleDone}
-                    onDelete={deleteTask}
-                    onEdit={() => setEditTargetTask({
-                      ...task,
-                      period: task.period,
-                      daysOfWeek: task.daysOfWeek ?? [],
-                      dates: task.dates ?? [],
-                      isTodo: task.isTodo ?? false,
-                    })}
-                    menuOpenId={menuOpenId}
-                    setMenuOpenId={setMenuOpenId}
-                  />
-                ))}
+{list.map((task, idx) => {
+  // ✅ visible が true のときに青枠を表示する
+  const isHighlighted = task.visible === true;
+
+  console.log(
+    `[DEBUG] name=${task.name}, visible=${task.visible}, isHighlighted=${isHighlighted}`
+  );
+
+  return (
+    <TaskCard
+      key={task.id}
+      task={task}
+      period={period}
+      index={idx}
+      onToggleDone={toggleDone}
+      onDelete={deleteTask}
+      onEdit={() => setEditTargetTask({
+        ...task,
+        period: task.period,
+        daysOfWeek: task.daysOfWeek ?? [],
+        dates: task.dates ?? [],
+        isTodo: task.isTodo ?? false,
+      })}
+      menuOpenId={menuOpenId}
+      setMenuOpenId={setMenuOpenId}
+      highlighted={isHighlighted}
+    />
+  );
+})}
+
+
+
               </ul>
             </div>
           );

@@ -22,4 +22,10 @@ export type Task = {
   showDelete?: boolean;
   nameError?: boolean;
   completedBy?: string; // 完了者（userIdなど）
+  todos?: {
+    id: string;
+    text: string;
+    done: boolean;
+  }[];
+  visible?: boolean;
 };
