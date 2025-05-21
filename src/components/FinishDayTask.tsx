@@ -6,6 +6,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { parseISO, isSameDay } from 'date-fns';
 import Image from 'next/image';
 import type { Task } from '@/types/Task';
+import { onSnapshot } from 'firebase/firestore';
 
 interface CompletionLog {
   taskId: string;
@@ -23,6 +24,25 @@ type Props = {
 
 export default function FinishDayTask({ tasks }: Props) {
   const [logs, setLogs] = useState<CompletionLog[]>([]);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const q = query(collection(db, 'taskCompletions'), where('userId', '==', uid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const today = new Date();
+      const todayLogs = snapshot.docs
+        .map(doc => doc.data() as CompletionLog)
+        .filter(log => isSameDay(parseISO(log.date), today))
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      setLogs(todayLogs);
+    });
+
+    return () => unsubscribe(); // クリーンアップ
+  }, []);
 
   useEffect(() => {
     const fetchLogs = async () => {
