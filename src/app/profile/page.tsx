@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
@@ -31,7 +31,6 @@ export default function ProfilePage() {
     inviteCode: string;
   } | null>(null);
   const [pairDocId, setPairDocId] = useState<string | null>(null);
-
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -73,22 +72,19 @@ export default function ProfilePage() {
 
       const pairsRef = collection(db, 'pairs');
 
-      // 自分が招待した場合の確認
       const q = query(pairsRef, where('userAId', '==', user.uid));
       const pairSnap = await getDocs(q);
       if (!pairSnap.empty) {
-        const pairDoc = pairSnap.docs[0]; // ← ここで定義している
+        const pairDoc = pairSnap.docs[0];
         const pair = pairDoc.data();
         setInviteCode(pair.inviteCode);
         setPartnerEmail(pair.emailB);
-        setPairDocId(pairDoc.id); // ← ✅ この位置に移動
+        setPairDocId(pairDoc.id);
         if (pair.userBId) {
           setIsPairConfirmed(true);
         }
       }
 
-
-      // 自分が招待された場合の確認
       const q2 = query(pairsRef, where('emailB', '==', user.email));
       const pendingSnap = await getDocs(q2);
       if (!pendingSnap.empty) {
@@ -164,9 +160,13 @@ export default function ProfilePage() {
       });
 
       toast.success('招待コードを発行しました');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('招待コードの発行に失敗しました');
+      if (err.code === 'permission-denied') {
+        toast.error('操作が許可されていません');
+      } else {
+        toast.error('予期せぬエラーが発生しました');
+      }
     }
   };
 
@@ -182,10 +182,15 @@ export default function ProfilePage() {
       toast.success('ペア設定を承認しました');
       setIsPairConfirmed(true);
       setPendingApproval(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('承認に失敗しました');
+      if (err.code === 'permission-denied') {
+        toast.error('操作が許可されていません');
+      } else {
+        toast.error('予期せぬエラーが発生しました');
+      }
     }
+
   };
 
   const handleRemovePair = async () => {
@@ -205,17 +210,61 @@ export default function ProfilePage() {
       setPartnerEmail('');
       setInviteCode('');
       setPairDocId(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('解除に失敗しました');
+      if (err.code === 'permission-denied') {
+        toast.error('操作が許可されていません');
+      } else {
+        toast.error('予期せぬエラーが発生しました');
+      }
+    }
+
+  };
+
+  const handleCancelInvite = async () => {
+    if (!pairDocId) return;
+    const confirmed = confirm('この招待を取り消しますか？');
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, 'pairs', pairDocId));
+      toast.success('招待を取り消しました');
+      setInviteCode('');
+      setPartnerEmail('');
+      setPairDocId(null);
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'permission-denied') {
+        toast.error('操作が許可されていません');
+      } else {
+        toast.error('予期せぬエラーが発生しました');
+      }
     }
   };
 
+  const handleRejectPair = async () => {
+    if (!pendingApproval) return;
+    const confirmed = confirm('この招待を拒否しますか？');
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, 'pairs', pendingApproval.pairId));
+      toast.success('招待を拒否しました');
+      setPendingApproval(null);
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'permission-denied') {
+        toast.error('操作が許可されていません');
+      } else {
+        toast.error('予期せぬエラーが発生しました');
+      }
+    }
+
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Profile" />
-
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         <div className="bg-white shadow rounded-2xl px-4 py-4 space-y-6">
           <div className="flex flex-row flex-nowrap items-center gap-6 overflow-x-auto">
@@ -234,7 +283,6 @@ export default function ProfilePage() {
                 className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
               />
             </div>
-
             <div className="flex-1 space-y-1 min-w-0">
               <label className="text-[#5E5E5E] font-semibold">氏名</label>
               <div className="flex gap-2 items-center">
@@ -253,7 +301,6 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-
           <div className="space-y-4">
             <div className="space-y-1">
               <label className="text-[#5E5E5E] font-semibold flex items-center gap-2">
@@ -276,7 +323,6 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
-
             <div className="space-y-1">
               <label className="text-[#5E5E5E] font-semibold flex items-center gap-2">
                 パスワード
@@ -305,11 +351,8 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-
-        {/* パートナー設定カード */}
         <div className="bg-white shadow rounded-2xl px-4 py-4 space-y-3">
           <label className="text-[#5E5E5E] font-semibold">パートナー設定</label>
-
           {pendingApproval && !isPairConfirmed && (
             <>
               <p className="text-gray-600 text-sm">{pendingApproval.emailB} さんとして招待されています</p>
@@ -320,9 +363,14 @@ export default function ProfilePage() {
               >
                 承認する
               </button>
+              <button
+                onClick={handleRejectPair}
+                className="w-full bg-gray-300 text-white py-2 rounded shadow text-sm"
+              >
+                拒否する
+              </button>
             </>
           )}
-
           {!isPairConfirmed && !pendingApproval && (
             <>
               <div>
@@ -344,9 +392,14 @@ export default function ProfilePage() {
               >
                 招待コードを発行
               </button>
+              <button
+                onClick={handleCancelInvite}
+                className="w-full text-sm text-red-500 hover:underline"
+              >
+                招待を取り消す
+              </button>
             </>
           )}
-
           {isPairConfirmed && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -367,21 +420,17 @@ export default function ProfilePage() {
               </button>
             </div>
           )}
-
         </div>
       </main>
-
       <div className="text-center mt-auto mb-10">
         <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
           アカウントを削除する
         </Link>
       </div>
-
       <EmailEditModal
         open={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
       />
-
       <PasswordEditModal
         open={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
