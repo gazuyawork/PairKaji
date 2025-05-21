@@ -70,13 +70,15 @@ export default function HomeView() {
           }
         }}
       >
-        <div className="h-[290px]">
-          {/* <TaskHistory /> */}
-          < FinishDayTask />
+        <div className="h-[150px]">
+          <WeeklyPoints />
+        </div>
+
+        <div className="min-h-[150px] max-h-[300px] overflow-y-auto">
+          <FinishDayTask tasks={tasks} />
         </div>
 
         <div className="h-[174px] horizontal-scroll">
-          {/* ✅ CalendarTask[] に整形して渡す */}
           <TaskCalendar
             tasks={tasks.map(({ id, name, frequency, dates, daysOfWeek }) => ({
               id,
@@ -88,11 +90,7 @@ export default function HomeView() {
           />
         </div>
 
-        <div className="h-[150px]">
-          <WeeklyPoints />
-        </div>
-
-        <div className="h-[150px]">
+        <div className="h-[110px]">
           <PairPoints />
         </div>
       </main>

@@ -5,6 +5,7 @@ import { auth, db } from '@/lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { parseISO, isSameDay } from 'date-fns';
 import Image from 'next/image';
+import type { Task } from '@/types/Task';
 
 interface CompletionLog {
   taskId: string;
@@ -16,7 +17,11 @@ interface CompletionLog {
   person?: string;
 }
 
-export default function TaskHistory() {
+type Props = {
+  tasks: Task[];
+};
+
+export default function FinishDayTask({ tasks }: Props) {
   const [logs, setLogs] = useState<CompletionLog[]>([]);
 
   useEffect(() => {
@@ -37,7 +42,7 @@ export default function TaskHistory() {
     };
 
     fetchLogs();
-  }, []);
+  }, [tasks]); // ← tasksが変わるたびに再取得
 
   const getProfileImage = (person?: string) => {
     if (person === '太郎') return localStorage.getItem('profileImage') || '/images/taro.png';
@@ -46,15 +51,14 @@ export default function TaskHistory() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-xl shadow-md overflow-hidden">
-
+    <div className="flex flex-col bg-white rounded-xl shadow-md overflow-hidden max-h-[300px]">
       {/* 固定ヘッダー */}
       <div className="bg-white p-4 shadow sticky top-0 z-10 text-center border-b">
         <h2 className="text-lg font-bold text-[#5E5E5E]">本日の完了タスク</h2>
       </div>
 
       {/* スクロール可能エリア */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="overflow-y-auto p-4">
         {logs.length === 0 ? (
           <p className="text-gray-400 mb-10">本日の履歴はありません</p>
         ) : (
@@ -87,4 +91,5 @@ export default function TaskHistory() {
       </div>
     </div>
   );
+
 }
