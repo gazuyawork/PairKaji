@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
@@ -21,6 +21,17 @@ export default function ProfilePage() {
   const [partnerImage, setPartnerImage] = useState('/images/hanako_default.png');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [partnerEmail, setPartnerEmail] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [isPairConfirmed, setIsPairConfirmed] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<{
+    pairId: string;
+    inviterUid: string;
+    emailB: string;
+    inviteCode: string;
+  } | null>(null);
+  const [pairDocId, setPairDocId] = useState<string | null>(null);
+
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -59,6 +70,39 @@ export default function ProfilePage() {
 
       const storedPartnerImage = localStorage.getItem('partnerImage');
       if (storedPartnerImage) setPartnerImage(storedPartnerImage);
+
+      const pairsRef = collection(db, 'pairs');
+
+      // 自分が招待した場合の確認
+      const q = query(pairsRef, where('userAId', '==', user.uid));
+      const pairSnap = await getDocs(q);
+      if (!pairSnap.empty) {
+        const pairDoc = pairSnap.docs[0]; // ← ここで定義している
+        const pair = pairDoc.data();
+        setInviteCode(pair.inviteCode);
+        setPartnerEmail(pair.emailB);
+        setPairDocId(pairDoc.id); // ← ✅ この位置に移動
+        if (pair.userBId) {
+          setIsPairConfirmed(true);
+        }
+      }
+
+
+      // 自分が招待された場合の確認
+      const q2 = query(pairsRef, where('emailB', '==', user.email));
+      const pendingSnap = await getDocs(q2);
+      if (!pendingSnap.empty) {
+        const docRef = pendingSnap.docs[0];
+        const pair = docRef.data();
+        if (!pair.userBId) {
+          setPendingApproval({
+            pairId: docRef.id,
+            inviterUid: pair.userAId,
+            emailB: pair.emailB,
+            inviteCode: pair.inviteCode,
+          });
+        }
+      }
     };
     fetchProfile();
   }, []);
@@ -91,6 +135,82 @@ export default function ProfilePage() {
       toast.error('氏名の保存に失敗しました');
     }
   };
+
+  const generateInviteCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  const handleSendInvite = async () => {
+    const user = auth.currentUser;
+    if (!user || !partnerEmail.trim()) {
+      toast.error('メールアドレスを入力してください');
+      return;
+    }
+
+    const generatedCode = generateInviteCode();
+    setInviteCode(generatedCode);
+
+    try {
+      await addDoc(collection(db, 'pairs'), {
+        userAId: user.uid,
+        emailB: partnerEmail.trim(),
+        inviteCode: generatedCode,
+        createdAt: new Date(),
+      });
+
+      toast.success('招待コードを発行しました');
+    } catch (err) {
+      console.error(err);
+      toast.error('招待コードの発行に失敗しました');
+    }
+  };
+
+  const handleApprovePair = async () => {
+    const user = auth.currentUser;
+    if (!user || !pendingApproval) return;
+
+    try {
+      await updateDoc(doc(db, 'pairs', pendingApproval.pairId), {
+        userBId: user.uid,
+        updatedAt: new Date(),
+      });
+      toast.success('ペア設定を承認しました');
+      setIsPairConfirmed(true);
+      setPendingApproval(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('承認に失敗しました');
+    }
+  };
+
+  const handleRemovePair = async () => {
+    if (!pairDocId) return;
+    const confirmed = confirm('ペアを解除しますか？この操作は取り消せません。');
+    if (!confirmed) return;
+
+    try {
+      await updateDoc(doc(db, 'pairs', pairDocId), {
+        userBId: null,
+        emailB: null,
+        inviteCode: null,
+        updatedAt: new Date(),
+      });
+      toast.success('ペアを解除しました');
+      setIsPairConfirmed(false);
+      setPartnerEmail('');
+      setInviteCode('');
+      setPairDocId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('解除に失敗しました');
+    }
+  };
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
@@ -183,31 +303,71 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-[#5E5E5E] font-semibold">招待コード</label>
-              <p className="text-[#5E5E5E] border-b border-b-gray-200 py-1">ABC12345</p>
-            </div>
           </div>
         </div>
 
-        <div className="bg-white shadow rounded-2xl px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image
-              src={partnerImage}
-              alt="パートナー画像"
-              width={60}
-              height={60}
-              className="w-16 h-16 rounded-full object-cover border border-gray-300"
-            />
-            <div className="text-[#5E5E5E]">
-              <p className="font-semibold">花子</p>
-              <p>partner@example.com</p>
+        {/* パートナー設定カード */}
+        <div className="bg-white shadow rounded-2xl px-4 py-4 space-y-3">
+          <label className="text-[#5E5E5E] font-semibold">パートナー設定</label>
+
+          {pendingApproval && !isPairConfirmed && (
+            <>
+              <p className="text-gray-600 text-sm">{pendingApproval.emailB} さんとして招待されています</p>
+              <p className="text-gray-600 text-sm">招待コード: {pendingApproval.inviteCode}</p>
+              <button
+                onClick={handleApprovePair}
+                className="w-full bg-[#FFCB7D] text-white py-2 rounded shadow text-sm"
+              >
+                承認する
+              </button>
+            </>
+          )}
+
+          {!isPairConfirmed && !pendingApproval && (
+            <>
+              <div>
+                <input
+                  type="email"
+                  value={partnerEmail}
+                  onChange={(e) => setPartnerEmail(e.target.value)}
+                  placeholder="partner@example.com"
+                  className="w-full border-b border-gray-300 py-1 px-2"
+                />
+              </div>
+              <div>
+                <label className="text-[#5E5E5E] font-semibold">招待コード（自動生成）</label>
+                <p className="text-[#5E5E5E] border-b border-b-gray-200 py-1 tracking-widest">{inviteCode}</p>
+              </div>
+              <button
+                className="w-full bg-[#FFCB7D] text-white py-2 rounded shadow text-sm"
+                onClick={handleSendInvite}
+              >
+                招待コードを発行
+              </button>
+            </>
+          )}
+
+          {isPairConfirmed && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Image
+                  src={partnerImage}
+                  alt="パートナー画像"
+                  width={60}
+                  height={60}
+                  className="w-16 h-16 rounded-full object-cover border border-gray-300"
+                />
+                <div className="text-[#5E5E5E]">
+                  <p className="font-semibold">パートナー承認済み</p>
+                  <p>{partnerEmail}</p>
+                </div>
+              </div>
+              <button onClick={handleRemovePair} className="text-red-500">
+                <X size={24} />
+              </button>
             </div>
-          </div>
-          <button className="text-red-500">
-            <X size={24} />
-          </button>
+          )}
+
         </div>
       </main>
 
