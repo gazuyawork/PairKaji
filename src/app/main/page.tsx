@@ -29,6 +29,7 @@ function MainContent() {
   });
 
   const [authReady, setAuthReady] = useState(false);
+  const [fromSplash, setFromSplash] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
@@ -38,10 +39,10 @@ function MainContent() {
   }, []);
 
   useEffect(() => {
-    const fromTaskManage = sessionStorage.getItem('fromTaskManage');
-    if (fromTaskManage === 'true') {
-      setIndex(1);
-      sessionStorage.removeItem('fromTaskManage');
+    const splashFlag = sessionStorage.getItem('fromSplash');
+    if (splashFlag === '1') {
+      setFromSplash(true);
+      sessionStorage.removeItem('fromSplash');
     }
   }, []);
 
@@ -77,9 +78,8 @@ function MainContent() {
 
   if (!authReady) return null;
 
-  return (
+  const MainUI = (
     <div className="flex flex-col min-h-screen">
-      {/* メインビュー */}
       <div className="flex-1 overflow-hidden relative">
         <motion.div
           className="flex w-[300vw] h-full transition-transform duration-300"
@@ -99,11 +99,22 @@ function MainContent() {
         </motion.div>
       </div>
 
-      {/* スワイプ操作はフッター部分のみに制限 */}
       <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
         <FooterNav currentIndex={index} setIndex={setIndex} />
       </div>
     </div>
+  );
+
+  return fromSplash ? (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 2.5 }}
+    >
+      {MainUI}
+    </motion.div>
+  ) : (
+    MainUI
   );
 }
 

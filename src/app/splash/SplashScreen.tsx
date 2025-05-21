@@ -86,7 +86,7 @@ export default function SplashScreen() {
           className="font-pacifico text-[50px] text-[#5E5E5E] mb-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 3.0 }}
+          transition={{ duration: 0.5 }}
         >
           PairKaji
         </motion.h1>
