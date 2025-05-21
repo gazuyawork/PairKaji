@@ -3,10 +3,19 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useSwipeable } from "react-swipeable";
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import {
+  collection,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import FooterNav from "@/components/FooterNav";
 import HomeView from '@/components/views/HomeView';
 import TaskView from '@/components/views/TaskView';
@@ -16,6 +25,7 @@ function MainContent() {
   const searchParams = useSearchParams();
   const viewParam = searchParams.get("view");
   const searchKeyword = searchParams.get("search") ?? "";
+  const router = useRouter();
 
   const [index, setIndex] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -30,6 +40,8 @@ function MainContent() {
 
   const [authReady, setAuthReady] = useState(false);
   const [fromSplash, setFromSplash] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState<string | null>(null);
+  const [onConfirm, setOnConfirm] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
@@ -56,6 +68,73 @@ function MainContent() {
       setIndex(2);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const status = data.status;
+        const userAId = data.userAId;
+        const userBId = data.userBId;
+
+        const previousStatus = localStorage.getItem(`pairStatus:${docSnap.id}`);
+        if (previousStatus === null) {
+          localStorage.setItem(`pairStatus:${docSnap.id}`, status);
+          return; // 🔁 初回読み込みでは差分検知せず無視
+        }
+        if (status === previousStatus) return;
+        localStorage.setItem(`pairStatus:${docSnap.id}`, status);
+
+
+        if (status === 'confirmed') {
+          setDialogMessage('パートナーとタスクを共有するため、アプリを再起動します。');
+          setOnConfirm(() => async () => {
+            const tasksSnap = await getDocs(collection(db, 'tasks'));
+            const updates: Promise<void>[] = [];
+
+            tasksSnap.forEach(task => {
+              const t = task.data();
+              if (t.userId === userAId || t.userId === userBId) {
+                updates.push(updateDoc(doc(db, 'tasks', task.id), {
+                  userIds: [userAId, userBId],
+                }));
+              }
+            });
+
+            await Promise.all(updates);
+            router.push('/splash');
+          });
+        }
+
+        if (status === 'removed') {
+          setDialogMessage('パートナーとの共有が解除されました。共有情報を初期化します。');
+          setOnConfirm(() => async () => {
+            const tasksSnap = await getDocs(collection(db, 'tasks'));
+            const updates: Promise<void>[] = [];
+
+            tasksSnap.forEach(task => {
+              const t = task.data();
+              const cleanedUsers = (t.users ?? []).filter((u: string) => u !== '太郎' && u !== '花子');
+              updates.push(updateDoc(doc(db, 'tasks', task.id), {
+                users: cleanedUsers,
+                userIds: [uid],
+              }));
+            });
+
+            await Promise.all(updates);
+            router.push('/splash');
+          });
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   const handleSwipe = (direction: "left" | "right") => {
     if (direction === "left" && index < 2) setIndex(index + 1);
@@ -102,6 +181,20 @@ function MainContent() {
       <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
         <FooterNav currentIndex={index} setIndex={setIndex} />
       </div>
+
+      {dialogMessage && onConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-md text-center max-w-sm w-full">
+            <p className="mb-4 text-gray-800 font-semibold">{dialogMessage}</p>
+            <button
+              onClick={onConfirm}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 

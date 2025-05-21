@@ -81,10 +81,12 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
     setError('');
 
     const uid = auth.currentUser?.uid;
+    console.log('保存対象UID:', uid);
     if (!uid) return;
 
     try {
       await setDoc(doc(db, 'points', uid), {
+        userId: uid, // ✅ Firestoreルールを満たすために追加
         weeklyTargetPoint: point,
         selfPoint,
         partnerPoint,

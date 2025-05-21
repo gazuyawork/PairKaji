@@ -30,30 +30,39 @@ export default function PairPoints() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      // --- 🔍 Firestoreからペア情報を検索 ---
+      // --- 🔍 ペア情報を取得 ---
       const pairsRef = collection(db, 'pairs');
-      const snapshotA = await getDocs(query(pairsRef, where('userAId', '==', uid)));
-      const snapshotB = await getDocs(query(pairsRef, where('userBId', '==', uid)));
+      const q = query(pairsRef, where('userIds', 'array-contains', uid));
+      const snapshot = await getDocs(q);
 
-      const pairs = [...snapshotA.docs, ...snapshotB.docs];
-      if (pairs.length > 0) {
-        const pairDoc = pairs[0];
-        const data = pairDoc.data();
-        setPairStatus(data.userBId ? 'active' : 'pending');
+      let partnerUids: string[] = [uid];
+
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        if (data.status === 'confirmed') {
+          setPairStatus('active');
+        } else {
+          setPairStatus('pending');
+        }
+
+        if (Array.isArray(data.userIds)) {
+          partnerUids = data.userIds;
+        }
       } else {
         setPairStatus('none');
       }
 
-      // --- 🔄 ポイント集計 ---
-      const completionsRef = collection(db, 'task_logs');
-      const snapshot = await getDocs(completionsRef);
+      // --- ✅ パートナーを含むユーザーの完了ログのみ取得 ---
+      const logsRef = collection(db, 'task_logs');
+      const logsQuery = query(logsRef, where('userId', 'in', partnerUids));
+      const logsSnap = await getDocs(logsQuery);
 
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
       const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
 
       const pointsMap: UserPoints = {};
 
-      snapshot.docs.forEach((doc) => {
+      logsSnap.docs.forEach((doc) => {
         const data = doc.data();
         const date = parseISO(data.completedAt);
         if (!isWithinInterval(date, { start: weekStart, end: weekEnd })) return;
@@ -86,7 +95,6 @@ export default function PairPoints() {
 
   const users = userPoints ? Object.values(userPoints) : [];
 
-  // --- 💡 表示条件で分岐 ---
   if (pairStatus === 'active' && users.length === 2) {
     return (
       <div
@@ -138,5 +146,4 @@ export default function PairPoints() {
       プロフィール画面から設定できます
     </div>
   );
-
 }
