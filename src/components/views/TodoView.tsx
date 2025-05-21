@@ -232,8 +232,9 @@ export default function TodoView() {
         {tasks
           .filter(task =>
             task.visible &&
-            (!selectedGroupId || task.id === selectedGroupId)
+            (!selectedGroupId || task.groupId === selectedGroupId)
           )
+
           .map(task => (
             <TodoTaskCard
               key={task.id}

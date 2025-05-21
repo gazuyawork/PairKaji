@@ -11,4 +11,5 @@ export type TodoOnlyTask = {
   frequency: '毎日' | '週次' | '不定期';
   todos: TodoItem[];
   visible: boolean;
+  groupId?: string;
 };
