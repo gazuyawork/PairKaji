@@ -19,8 +19,7 @@ export default function HomeView() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
-    const q = query(collection(db, 'tasks'), where('userId', '==', uid));
-
+    const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const taskList: Task[] = snapshot.docs.map((doc) => {
         const data = doc.data();

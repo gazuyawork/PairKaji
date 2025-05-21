@@ -1,3 +1,5 @@
+'use client';
+
 import Header from '@/components/Header';
 import { useState, useEffect } from 'react';
 import TaskCard from '@/components/TaskCard';
@@ -5,7 +7,18 @@ import EditTaskModal from '@/components/EditTaskModal';
 import type { Task, Period } from '@/types/Task';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
-import { collection, onSnapshot, query, where, updateDoc, deleteDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  doc,
+  setDoc,
+  getDocs,
+} from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
@@ -96,6 +109,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
         dates: cleanedDates,
         isTodo: updated.isTodo ?? false,
         updatedAt: serverTimestamp(),
+        userIds: updated.userIds ?? [auth.currentUser?.uid],
       });
 
       setEditTargetTask(null);
@@ -109,90 +123,110 @@ export default function TaskView({ initialSearch = '' }: Props) {
   }, []);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    const fetchTasks = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
 
-    const q = query(collection(db, 'tasks'), where('userId', '==', uid));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const storedProfileImage = localStorage.getItem('profileImage');
-      const storedPartnerImage = localStorage.getItem('partnerImage');
+      const pairsSnap = await getDocs(
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+      );
 
-      const rawTasks = snapshot.docs.map((doc): Task => {
+      const partnerUids = new Set<string>();
+      partnerUids.add(uid);
+
+      pairsSnap.forEach(doc => {
         const data = doc.data();
-        const user = data.users?.[0] ?? '未設定';
-        const period = data.frequency as Period;
-        const image =
-          user === '太郎'
-            ? storedProfileImage || '/images/taro.png'
-            : user === '花子'
-            ? storedPartnerImage || '/images/hanako.png'
-            : '/images/default.png';
-
-        return {
-          id: doc.id,
-          title: data.title ?? data.name ?? '',
-          name: data.name ?? '',
-          frequency: period,
-          point: data.point ?? 0,
-          done: data.done ?? false,
-          skipped: data.skipped ?? false,
-          completedAt: data.completedAt ?? '',
-          completedBy: data.completedBy ?? '',
-          person: user,
-          image,
-          daysOfWeek: data.daysOfWeek ?? [],
-          dates: data.dates ?? [],
-          isTodo: data.isTodo ?? false,
-          users: data.users ?? [],
-          period,
-          scheduledDate: data.dates?.[0] ?? '',
-          visible: data.visible ?? false, // ✅ 追加
-        };
+        if (Array.isArray(data.userIds)) {
+          data.userIds.forEach((id: string) => {
+            if (id !== uid) partnerUids.add(id);
+          });
+        }
       });
 
-      const updates: Promise<void>[] = [];
-      for (const task of rawTasks) {
-        if (task.completedAt) {
-          const completedDate = parseISO(task.completedAt);
-          const isTodayTask = isToday(completedDate);
-          if (!isTodayTask) {
-            const taskRef = doc(db, 'tasks', task.id);
-            updates.push(
-              updateDoc(taskRef, {
-                done: false,
-                skipped: false,
-                completedAt: null,
-                completedBy: '',
-              })
-            );
-            task.done = false;
-            task.skipped = false;
-            task.completedAt = '';
-            task.completedBy = '';
+      const q = query(collection(db, 'tasks'), where('userId', 'in', Array.from(partnerUids)));
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const storedProfileImage = localStorage.getItem('profileImage');
+        const storedPartnerImage = localStorage.getItem('partnerImage');
+
+        const rawTasks = snapshot.docs.map((doc): Task => {
+          const data = doc.data();
+          const user = data.users?.[0] ?? '未設定';
+          const period = data.frequency as Period;
+          const image =
+            user === '太郎'
+              ? storedProfileImage || '/images/taro.png'
+              : user === '花子'
+              ? storedPartnerImage || '/images/hanako.png'
+              : '/images/default.png';
+
+          return {
+            id: doc.id,
+            title: data.title ?? data.name ?? '',
+            name: data.name ?? '',
+            frequency: period,
+            point: data.point ?? 0,
+            done: data.done ?? false,
+            skipped: data.skipped ?? false,
+            completedAt: data.completedAt ?? '',
+            completedBy: data.completedBy ?? '',
+            person: user,
+            image,
+            daysOfWeek: data.daysOfWeek ?? [],
+            dates: data.dates ?? [],
+            isTodo: data.isTodo ?? false,
+            users: data.users ?? [],
+            period,
+            scheduledDate: data.dates?.[0] ?? '',
+            visible: data.visible ?? false,
+          };
+        });
+
+        const updates: Promise<void>[] = [];
+        for (const task of rawTasks) {
+          if (task.completedAt) {
+            const completedDate = parseISO(task.completedAt);
+            const isTodayTask = isToday(completedDate);
+            if (!isTodayTask) {
+              const taskRef = doc(db, 'tasks', task.id);
+              updates.push(
+                updateDoc(taskRef, {
+                  done: false,
+                  skipped: false,
+                  completedAt: null,
+                  completedBy: '',
+                })
+              );
+              task.done = false;
+              task.skipped = false;
+              task.completedAt = '';
+              task.completedBy = '';
+            }
           }
         }
-      }
 
-      await Promise.all(updates);
+        await Promise.all(updates);
 
-      const grouped: Record<Period, Task[]> = {
-        毎日: [],
-        週次: [],
-        不定期: [],
-      };
+        const grouped: Record<Period, Task[]> = {
+          毎日: [],
+          週次: [],
+          不定期: [],
+        };
 
-      for (const task of rawTasks) {
-        if (task.period === '毎日' || task.period === '週次' || task.period === '不定期') {
-          grouped[task.period].push(task);
-        } else {
-          console.warn('無効な period 値:', task.period, task);
+        for (const task of rawTasks) {
+          if (task.period === '毎日' || task.period === '週次' || task.period === '不定期') {
+            grouped[task.period].push(task);
+          } else {
+            console.warn('無効な period 値:', task.period, task);
+          }
         }
-      }
 
-      setTasksState(grouped);
-    });
+        setTasksState(grouped);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    };
+
+    fetchTasks().catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -202,7 +236,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none">
       <Header title="Task" currentIndex={1} />
-
 
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         <SearchBox value={searchTerm} onChange={setSearchTerm} />
@@ -223,7 +256,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
           const list = rawTasks.filter(task =>
             (!periodFilter || periodFilter === period) &&
             (!personFilter || task.person === personFilter) &&
-            (!searchTerm || task.name.includes(searchTerm)) // ← 追加行
+            (!searchTerm || task.name.includes(searchTerm))
           );
           if (list.length === 0) return null;
 
@@ -235,38 +268,34 @@ export default function TaskView({ initialSearch = '' }: Props) {
                 {period}（残り {remaining} 件）
               </h2>
               <ul className="space-y-2">
-{list.map((task, idx) => {
-  // ✅ visible が true のときに青枠を表示する
-  const isHighlighted = task.visible === true;
+                {list.map((task, idx) => {
+                  const isHighlighted = task.visible === true;
 
-  console.log(
-    `[DEBUG] name=${task.name}, visible=${task.visible}, isHighlighted=${isHighlighted}`
-  );
+                  console.log(
+                    `[DEBUG] name=${task.name}, visible=${task.visible}, isHighlighted=${isHighlighted}`
+                  );
 
-  return (
-    <TaskCard
-      key={task.id}
-      task={task}
-      period={period}
-      index={idx}
-      onToggleDone={toggleDone}
-      onDelete={deleteTask}
-      onEdit={() => setEditTargetTask({
-        ...task,
-        period: task.period,
-        daysOfWeek: task.daysOfWeek ?? [],
-        dates: task.dates ?? [],
-        isTodo: task.isTodo ?? false,
-      })}
-      menuOpenId={menuOpenId}
-      setMenuOpenId={setMenuOpenId}
-      highlighted={isHighlighted}
-    />
-  );
-})}
-
-
-
+                  return (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      period={period}
+                      index={idx}
+                      onToggleDone={toggleDone}
+                      onDelete={deleteTask}
+                      onEdit={() => setEditTargetTask({
+                        ...task,
+                        period: task.period,
+                        daysOfWeek: task.daysOfWeek ?? [],
+                        dates: task.dates ?? [],
+                        isTodo: task.isTodo ?? false,
+                      })}
+                      menuOpenId={menuOpenId}
+                      setMenuOpenId={setMenuOpenId}
+                      highlighted={isHighlighted}
+                    />
+                  );
+                })}
               </ul>
             </div>
           );

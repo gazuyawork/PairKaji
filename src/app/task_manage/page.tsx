@@ -435,7 +435,7 @@ const handleUserToggle = (id: string, user: string) => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+      const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
       const snapshot = await getDocs(q);
       const loadedTasks: Task[] = snapshot.docs.map((doc) => {
         const data = doc.data();

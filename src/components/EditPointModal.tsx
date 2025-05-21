@@ -34,7 +34,7 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     try {
-      const q = query(collection(db, 'tasks'), where('userId', '==', uid));
+      const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
       const snapshot = await getDocs(q);
       let total = 0;
       snapshot.docs.forEach(docSnap => {

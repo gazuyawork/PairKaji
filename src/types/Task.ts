@@ -28,4 +28,5 @@ export type Task = {
     done: boolean;
   }[];
   visible?: boolean;
+  userIds?: string[];
 };

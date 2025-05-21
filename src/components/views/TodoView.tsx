@@ -16,7 +16,8 @@ import {
   updateDoc,
   serverTimestamp,
   query,
-  where,  
+  where,
+  getDocs,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import Header from '@/components/Header';
@@ -43,28 +44,42 @@ export default function TodoView() {
   }, [tasks]);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    const fetchTasks = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
 
-    const tasksRef = collection(db, 'tasks');
-    const q = query(tasksRef, where('userId', '==', uid)); // ← 🔥 uidフィルター追加
+      const pairsSnap = await getDocs(
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+      );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
-        const data = doc.data() as Omit<TodoOnlyTask, 'id'>;
-        return {
-          id: doc.id,
-          ...data,
-          todos: Array.isArray(data.todos) ? data.todos : [],
-        };
+      const userIds = new Set<string>();
+      userIds.add(uid);
+      pairsSnap.forEach(doc => {
+        const data = doc.data();
+        if (Array.isArray(data.userIds)) {
+          data.userIds.forEach((id: string) => userIds.add(id));
+        }
       });
 
-      setTasks(newTasks);
-    });
+      const q = query(collection(db, 'tasks'), where('userId', 'in', Array.from(userIds)));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const newTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
+          const data = doc.data() as Omit<TodoOnlyTask, 'id'>;
+          return {
+            id: doc.id,
+            ...data,
+            todos: Array.isArray(data.todos) ? data.todos : [],
+          };
+        });
 
-    return () => unsubscribe();
+        setTasks(newTasks);
+      });
+
+      return () => unsubscribe();
+    };
+
+    fetchTasks().catch(console.error);
   }, []);
-
 
   useEffect(() => {
     if (focusedTodoId && todoRefs.current[focusedTodoId]) {
@@ -84,7 +99,6 @@ export default function TodoView() {
 
     const existing = tasks.find((t) => t.name.trim() === name);
     if (existing) {
-      // 既存タスクが非表示なら表示状態に戻す
       if (!existing.visible) {
         await updateDoc(doc(db, 'tasks', existing.id), {
           visible: true,
@@ -115,6 +129,7 @@ export default function TodoView() {
       isTodo: true,
       point: 10,
       userId,
+      userIds: [userId], 
       users: [],
       daysOfWeek: [],
       dates: [],
@@ -210,7 +225,6 @@ export default function TodoView() {
           </button>
         </div>
 
-        {/* グループ選択コンポーネント */}
         <GroupSelector
           selectedGroupId={selectedGroupId}
           onSelectGroup={setSelectedGroupId}
@@ -227,14 +241,11 @@ export default function TodoView() {
           </div>
         )}
 
-
-
         {tasks
           .filter(task =>
             task.visible &&
             (!selectedGroupId || task.groupId === selectedGroupId)
           )
-
           .map(task => (
             <TodoTaskCard
               key={task.id}
