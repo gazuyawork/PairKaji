@@ -202,17 +202,29 @@ export default function ProfilePage() {
     if (!confirmed) return;
 
     try {
+      const uid = auth.currentUser?.uid;
+      console.log('[DEBUG] currentUser.uid:', uid);
+
+      const snap = await getDoc(doc(db, 'pairs', pairDocId));
+      const data = snap.data();
+      console.log('[DEBUG] pairDoc:', {
+        userAId: data?.userAId,
+        userBId: data?.userBId,
+        userIds: data?.userIds,
+      });
+
       await updateDoc(doc(db, 'pairs', pairDocId), {
-        status: 'removed', 
+        status: 'removed',
         updatedAt: new Date(),
       });
+
       toast.success('ペアを解除しました');
       setIsPairConfirmed(false);
       setPartnerEmail('');
       setInviteCode('');
       setPairDocId(null);
     } catch (err: any) {
-      console.error(err);
+      console.error('[ERROR] handleRemovePair:', err);
       if (err.code === 'permission-denied') {
         toast.error('操作が許可されていません');
       } else {
@@ -220,6 +232,7 @@ export default function ProfilePage() {
       }
     }
   };
+
 
   const handleCancelInvite = async () => {
     if (!pairDocId) return;
