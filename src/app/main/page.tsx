@@ -1,4 +1,4 @@
-// ✅ 修正版 main/page.tsx（ペア設定ステータス対応 + ダイアログ修正 + 解除時に pairs ドキュメント削除）
+// ✅ 修正版 main/page.tsx（ペア設定ステータス対応 + ダイアログ修正 + 解除時に pairs ドキュメント削除 + ダイアログ即時反映）
 
 'use client';
 
@@ -44,7 +44,7 @@ function MainContent() {
   const [authReady, setAuthReady] = useState(false);
   const [fromSplash, setFromSplash] = useState(false);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
@@ -131,7 +131,7 @@ function MainContent() {
             });
 
             await Promise.all(pointUpdates);
-            router.push('/');
+            router.push('/splash');
           });
         }
 
@@ -169,7 +169,7 @@ function MainContent() {
 
             await Promise.all(pointUpdates);
             await deleteDoc(doc(db, 'pairs', pairId));
-            router.push('/');
+            router.push('/splash');
           });
         }
       });
@@ -229,8 +229,8 @@ function MainContent() {
           <div className="bg-white p-6 rounded shadow-md text-center max-w-sm w-full">
             <p className="mb-4 text-gray-800 font-semibold">{dialogMessage}</p>
             <button
-              onClick={() => {
-                confirmAction();
+              onClick={async () => {
+                await confirmAction();
                 setDialogMessage(null);
                 setConfirmAction(null);
               }}
