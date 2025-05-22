@@ -131,7 +131,7 @@ function MainContent() {
             });
 
             await Promise.all(pointUpdates);
-            router.push('/splash');
+            router.push('/');
           });
         }
 
@@ -169,7 +169,7 @@ function MainContent() {
 
             await Promise.all(pointUpdates);
             await deleteDoc(doc(db, 'pairs', pairId));
-            router.push('/splash');
+            router.push('/');
           });
         }
       });
