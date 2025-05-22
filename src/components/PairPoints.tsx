@@ -29,26 +29,50 @@ export default function PairPoints() {
     const fetchData = async () => {
       const uid = auth.currentUser?.uid;
       const email = auth.currentUser?.email;
+
+      // 👇 ここを追加
+      console.log('[DEBUG ①] auth.currentUser:', auth.currentUser);
+      console.log('[DEBUG ①] uid:', uid);
+      console.log('[DEBUG ①] email:', email);
+
+      if (!uid || !email) {
+        console.log('[DEBUG ①] ユーザー情報が取得できていません。早期returnします。');
+        return;
+      }
+
       if (!uid || !email) return;
 
       const pairsRef = collection(db, 'pairs');
 
-      let found = false;
-
-      // ✅ 1. 承認済みペア（userIdsに自分が含まれている）
+      // 1. 承認済みペアを取得
       const q1 = query(pairsRef, where('userIds', 'array-contains', uid));
       const snap1 = await getDocs(q1);
+
+      // 👇 ここを追加
+      console.log('[DEBUG ②] pairsクエリ件数:', snap1.docs.length);
+      snap1.docs.forEach((doc) => {
+        console.log('[DEBUG ②] ペアデータ:', doc.id, doc.data());
+      });
+
+      let pairUserIds: string[] | null = null;
+
       for (const doc of snap1.docs) {
         const data = doc.data();
+        console.log('[DEBUG ③] statusフィールドの値:', data.status);
         if (data.status === 'confirmed') {
+          console.log('[DEBUG ③] confirmedのペアが見つかりました:', doc.id);
           setPairStatus('confirmed');
-          found = true;
+
+          // 👇 この時点では「まだpairStatusは変わっていません」（非同期なので）
+          console.log('[DEBUG ④-1] この時点のpairStatus:', pairStatus); // ←おそらくまだ 'none'
+
+          pairUserIds = data.userIds;
           break;
         }
       }
 
-      if (found) {
-        // 👇 confirmed 時のみ task_logs 読み込み
+      if (pairUserIds) {
+        // ✅ task_logs を取得して集計
         const logsSnap = await getDocs(
           query(collection(db, 'task_logs'), where('userIds', 'array-contains', uid))
         );
@@ -58,6 +82,19 @@ export default function PairPoints() {
 
         const pointsMap: UserPoints = {};
 
+        // 初期化：2人分を0ptでセット
+        pairUserIds.forEach((userId) => {
+          const isCurrentUser = userId === uid;
+          pointsMap[userId] = {
+            name: '未設定',
+            points: 0,
+            image: isCurrentUser
+              ? localStorage.getItem('profileImage') || '/images/taro.png'
+              : localStorage.getItem('partnerImage') || '/images/hanako.png',
+          };
+        });
+
+        // ログからポイント加算
         logsSnap.docs.forEach((doc) => {
           const data = doc.data();
           const date = parseISO(data.completedAt);
@@ -65,29 +102,19 @@ export default function PairPoints() {
 
           const userId = data.userId;
           const point = data.point ?? 0;
-          const name = data.taskName ?? '未設定';
-
-          const profileImage =
-            userId === uid
-              ? localStorage.getItem('profileImage') || '/images/taro.png'
-              : localStorage.getItem('partnerImage') || '/images/hanako.png';
-
-          if (!pointsMap[userId]) {
-            pointsMap[userId] = {
-              name,
-              points: 0,
-              image: profileImage,
-            };
-          }
+          if (!pointsMap[userId]) return;
 
           pointsMap[userId].points += point;
         });
+
+        console.log('[DEBUG ⑤] 最終ポイントマップ:', pointsMap);
+
 
         setUserPoints(pointsMap);
         return;
       }
 
-      // ✅ 2. 招待された側（emailBが自分）でpending
+      // 2. 招待された側
       const q2 = query(pairsRef, where('emailB', '==', email));
       const snap2 = await getDocs(q2);
       for (const doc of snap2.docs) {
@@ -98,7 +125,7 @@ export default function PairPoints() {
         }
       }
 
-      // ✅ 3. 招待した側（userAIdが自分）でpending
+      // 3. 招待した側
       const q3 = query(pairsRef, where('userAId', '==', uid));
       const snap3 = await getDocs(q3);
       for (const doc of snap3.docs) {
@@ -109,16 +136,23 @@ export default function PairPoints() {
         }
       }
 
-      // 該当なし
       setPairStatus('none');
     };
 
     fetchData();
   }, []);
 
+
+  useEffect(() => {
+    console.log('[DEBUG ④-2] pairStatusが変更されました:', pairStatus);
+  }, [pairStatus]);
+
+
+
+
   const users = userPoints ? Object.values(userPoints) : [];
 
-  if (pairStatus === 'confirmed' && users.length === 2) {
+  if (pairStatus === 'confirmed') {
     return (
       <div
         onClick={() => router.push('/profile')}
