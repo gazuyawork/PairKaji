@@ -28,66 +28,89 @@ export default function PairPoints() {
   useEffect(() => {
     const fetchData = async () => {
       const uid = auth.currentUser?.uid;
-      if (!uid) return;
+      const email = auth.currentUser?.email;
+      if (!uid || !email) return;
 
-      // 🔍 ペア情報を取得（userIds に自分が含まれる）
-      const pairsSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
-      );
+      const pairsRef = collection(db, 'pairs');
 
-      let pairFound = false;
-      for (const docSnap of pairsSnap.docs) {
-        const data = docSnap.data();
+      let found = false;
+
+      // ✅ 1. 承認済みペア（userIdsに自分が含まれている）
+      const q1 = query(pairsRef, where('userIds', 'array-contains', uid));
+      const snap1 = await getDocs(q1);
+      for (const doc of snap1.docs) {
+        const data = doc.data();
         if (data.status === 'confirmed') {
           setPairStatus('confirmed');
-          pairFound = true;
+          found = true;
           break;
-        } else if (data.status === 'pending') {
-          setPairStatus('pending');
-          pairFound = true;
         }
       }
-      if (!pairFound) {
-        setPairStatus('none');
+
+      if (found) {
+        // 👇 confirmed 時のみ task_logs 読み込み
+        const logsSnap = await getDocs(
+          query(collection(db, 'task_logs'), where('userIds', 'array-contains', uid))
+        );
+
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+
+        const pointsMap: UserPoints = {};
+
+        logsSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          const date = parseISO(data.completedAt);
+          if (!isWithinInterval(date, { start: weekStart, end: weekEnd })) return;
+
+          const userId = data.userId;
+          const point = data.point ?? 0;
+          const name = data.taskName ?? '未設定';
+
+          const profileImage =
+            userId === uid
+              ? localStorage.getItem('profileImage') || '/images/taro.png'
+              : localStorage.getItem('partnerImage') || '/images/hanako.png';
+
+          if (!pointsMap[userId]) {
+            pointsMap[userId] = {
+              name,
+              points: 0,
+              image: profileImage,
+            };
+          }
+
+          pointsMap[userId].points += point;
+        });
+
+        setUserPoints(pointsMap);
         return;
       }
 
-      // 🔍 完了ログを取得（週内のポイント集計）
-      const logsSnap = await getDocs(
-        query(collection(db, 'task_logs'), where('userIds', 'array-contains', uid))
-      );
-
-      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
-
-      const pointsMap: UserPoints = {};
-
-      logsSnap.docs.forEach((doc) => {
+      // ✅ 2. 招待された側（emailBが自分）でpending
+      const q2 = query(pairsRef, where('emailB', '==', email));
+      const snap2 = await getDocs(q2);
+      for (const doc of snap2.docs) {
         const data = doc.data();
-        const date = parseISO(data.completedAt);
-        if (!isWithinInterval(date, { start: weekStart, end: weekEnd })) return;
-
-        const userId = data.userId;
-        const point = data.point ?? 0;
-        const name = data.taskName ?? '未設定';
-
-        const profileImage =
-          userId === uid
-            ? localStorage.getItem('profileImage') || '/images/taro.png'
-            : localStorage.getItem('partnerImage') || '/images/hanako.png';
-
-        if (!pointsMap[userId]) {
-          pointsMap[userId] = {
-            name,
-            points: 0,
-            image: profileImage,
-          };
+        if (data.status === 'pending') {
+          setPairStatus('pending');
+          return;
         }
+      }
 
-        pointsMap[userId].points += point;
-      });
+      // ✅ 3. 招待した側（userAIdが自分）でpending
+      const q3 = query(pairsRef, where('userAId', '==', uid));
+      const snap3 = await getDocs(q3);
+      for (const doc of snap3.docs) {
+        const data = doc.data();
+        if (data.status === 'pending') {
+          setPairStatus('pending');
+          return;
+        }
+      }
 
-      setUserPoints(pointsMap);
+      // 該当なし
+      setPairStatus('none');
     };
 
     fetchData();
@@ -95,7 +118,7 @@ export default function PairPoints() {
 
   const users = userPoints ? Object.values(userPoints) : [];
 
-  if (pairStatus === 'confirmed') {
+  if (pairStatus === 'confirmed' && users.length === 2) {
     return (
       <div
         onClick={() => router.push('/profile')}
