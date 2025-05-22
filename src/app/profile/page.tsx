@@ -156,6 +156,7 @@ export default function ProfilePage() {
         userAId: user.uid,
         emailB: partnerEmail.trim(),
         inviteCode: generatedCode,
+        status: 'pending',
         createdAt: new Date(),
       });
 
