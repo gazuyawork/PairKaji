@@ -1,11 +1,11 @@
-// ✅ 修正版 main/page.tsx（ペア設定ステータス対応 + ダイアログ修正 + 解除時に pairs ドキュメント削除 + ダイアログ即時反映）
+// ✅ 修正版 main/page.tsx（ダイアログOK押下で3秒ローディング表示、スプラッシュ遷移なし）
 
 'use client';
 
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { auth, db } from '@/lib/firebase';
@@ -28,7 +28,6 @@ function MainContent() {
   const searchParams = useSearchParams();
   const viewParam = searchParams.get("view");
   const searchKeyword = searchParams.get("search") ?? "";
-  const router = useRouter();
 
   const [index, setIndex] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -42,23 +41,15 @@ function MainContent() {
   });
 
   const [authReady, setAuthReady] = useState(false);
-  const [fromSplash, setFromSplash] = useState(false);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
       setAuthReady(true);
     });
     return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const splashFlag = sessionStorage.getItem('fromSplash');
-    if (splashFlag === '1') {
-      setFromSplash(true);
-      sessionStorage.removeItem('fromSplash');
-    }
   }, []);
 
   useEffect(() => {
@@ -101,9 +92,6 @@ function MainContent() {
         if (status === 'confirmed') {
           setDialogMessage('パートナーとタスクを共有するため、アプリを再起動します。');
           setConfirmAction(() => async () => {
-            const uid = auth.currentUser?.uid;
-            if (!uid) return;
-
             const tasksSnap = await getDocs(collection(db, 'tasks'));
             const taskUpdates: Promise<void>[] = [];
 
@@ -131,16 +119,12 @@ function MainContent() {
             });
 
             await Promise.all(pointUpdates);
-            router.push('/splash');
           });
         }
 
         if (status === 'removed') {
           setDialogMessage('パートナーとの共有が解除されました。共有情報を初期化します。');
           setConfirmAction(() => async () => {
-            const uid = auth.currentUser?.uid;
-            if (!uid) return;
-
             const tasksSnap = await getDocs(collection(db, 'tasks'));
             const taskUpdates: Promise<void>[] = [];
 
@@ -169,7 +153,6 @@ function MainContent() {
 
             await Promise.all(pointUpdates);
             await deleteDoc(doc(db, 'pairs', pairId));
-            router.push('/splash');
           });
         }
       });
@@ -228,33 +211,33 @@ function MainContent() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded shadow-md text-center max-w-sm w-full">
             <p className="mb-4 text-gray-800 font-semibold">{dialogMessage}</p>
-            <button
-              onClick={async () => {
-                await confirmAction();
-                setDialogMessage(null);
-                setConfirmAction(null);
-              }}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              OK
-            </button>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-8">
+                <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <button
+                onClick={async () => {
+                  setIsLoading(true);
+                  await confirmAction();
+                  setTimeout(() => {
+                    setDialogMessage(null);
+                    setConfirmAction(null);
+                    setIsLoading(false);
+                  }, 3000);
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                OK
+              </button>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 
-  return fromSplash ? (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 2.5 }}
-    >
-      {MainUI}
-    </motion.div>
-  ) : (
-    MainUI
-  );
+  return MainUI;
 }
 
 export default function MainView() {
