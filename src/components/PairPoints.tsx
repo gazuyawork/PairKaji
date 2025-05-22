@@ -1,5 +1,3 @@
-// src/components/PairPoints.tsx
-
 'use client';
 
 import Image from 'next/image';
@@ -25,33 +23,39 @@ interface UserPoints {
 export default function PairPoints() {
   const router = useRouter();
   const [userPoints, setUserPoints] = useState<UserPoints | null>(null);
-  const [pairStatus, setPairStatus] = useState<'pending' | 'active' | 'none'>('none');
+  const [pairStatus, setPairStatus] = useState<'confirmed' | 'pending' | 'none'>('none');
 
   useEffect(() => {
-    const fetchPairAndPoints = async () => {
+    const fetchData = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
+      // 🔍 ペア情報を取得（userIds に自分が含まれる）
       const pairsSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
       );
 
-      const userIds: string[] = [uid];
-      if (!pairsSnap.empty) {
-        const pairDoc = pairsSnap.docs[0];
-        const data = pairDoc.data();
-        if (Array.isArray(data.userIds)) {
-          data.userIds.forEach((id: string) => {
-            if (!userIds.includes(id)) userIds.push(id);
-          });
+      let pairFound = false;
+      for (const docSnap of pairsSnap.docs) {
+        const data = docSnap.data();
+        if (data.status === 'confirmed') {
+          setPairStatus('confirmed');
+          pairFound = true;
+          break;
+        } else if (data.status === 'pending') {
+          setPairStatus('pending');
+          pairFound = true;
         }
-        setPairStatus('active');
-      } else {
+      }
+      if (!pairFound) {
         setPairStatus('none');
+        return;
       }
 
-      const completionsRef = collection(db, 'task_logs');
-      const logsSnap = await getDocs(query(completionsRef, where('userIds', 'array-contains', uid)));
+      // 🔍 完了ログを取得（週内のポイント集計）
+      const logsSnap = await getDocs(
+        query(collection(db, 'task_logs'), where('userIds', 'array-contains', uid))
+      );
 
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
       const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
@@ -86,12 +90,12 @@ export default function PairPoints() {
       setUserPoints(pointsMap);
     };
 
-    fetchPairAndPoints();
+    fetchData();
   }, []);
 
   const users = userPoints ? Object.values(userPoints) : [];
 
-  if (pairStatus === 'active' && users.length === 2) {
+  if (pairStatus === 'confirmed' && users.length === 2) {
     return (
       <div
         onClick={() => router.push('/profile')}
@@ -127,8 +131,8 @@ export default function PairPoints() {
         onClick={() => router.push('/profile')}
         className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-4 py-16 text-center text-gray-500 font-sans text-sm h-full cursor-pointer hover:shadow-lg transition"
       >
-        ペア招待待機中です<br />
-        プロフィール画面で確認・承認を行ってください
+        ペア招待中です<br />
+        プロフィール画面で設定状況をご確認ください
       </div>
     );
   }
@@ -139,7 +143,7 @@ export default function PairPoints() {
       className="bg-white rounded-xl shadow-md border border-[#e5e5e5] px-4 py-16 text-center text-gray-500 font-sans text-sm h-full cursor-pointer hover:shadow-lg transition"
     >
       パートナー設定を行うと表示されます<br />
-      プロフィール画面から設定できます
+      プロフィール画面から設定してください
     </div>
   );
 }

@@ -271,9 +271,9 @@ export default function TaskView({ initialSearch = '' }: Props) {
                 {list.map((task, idx) => {
                   const isHighlighted = task.visible === true;
 
-                  console.log(
-                    `[DEBUG] name=${task.name}, visible=${task.visible}, isHighlighted=${isHighlighted}`
-                  );
+                  // console.log(
+                  //   `[DEBUG] name=${task.name}, visible=${task.visible}, isHighlighted=${isHighlighted}`
+                  // );
 
                   return (
                     <TaskCard

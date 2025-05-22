@@ -179,6 +179,7 @@ export default function ProfilePage() {
       await updateDoc(doc(db, 'pairs', pendingApproval.pairId), {
         userBId: user.uid,
         status: 'confirmed',
+        userIds: [pendingApproval.inviterUid, user.uid],
         updatedAt: new Date(),
       });
       toast.success('ペア設定を承認しました');

@@ -1,11 +1,13 @@
+// ✅ 修正版 main/page.tsx（ペア設定ステータス対応 + ダイアログ修正 + 解除時に pairs ドキュメント削除）
+
 'use client';
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { useSwipeable } from "react-swipeable";
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { useSwipeable } from 'react-swipeable';
 import { auth, db } from '@/lib/firebase';
 import {
   collection,
@@ -14,9 +16,10 @@ import {
   onSnapshot,
   query,
   updateDoc,
+  deleteDoc,
   where,
 } from 'firebase/firestore';
-import FooterNav from "@/components/FooterNav";
+import FooterNav from '@/components/FooterNav';
 import HomeView from '@/components/views/HomeView';
 import TaskView from '@/components/views/TaskView';
 import TodoView from '@/components/views/TodoView';
@@ -41,7 +44,7 @@ function MainContent() {
   const [authReady, setAuthReady] = useState(false);
   const [fromSplash, setFromSplash] = useState(false);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
-  const [onConfirm, setOnConfirm] = useState<(() => void) | null>(null);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
@@ -81,17 +84,26 @@ function MainContent() {
         const userAId = data.userAId;
         const userBId = data.userBId;
 
-        const previousStatus = localStorage.getItem(`pairStatus:${docSnap.id}`);
+        const pairId = docSnap.id;
+        const previousStatus = localStorage.getItem(`pairStatus:${pairId}`);
+        console.log('[PAIR DEBUG] pairId=' + pairId + ', status=' + status);
+        console.log('[PAIR DEBUG] previousStatus=' + previousStatus);
+
         if (previousStatus === null) {
-          localStorage.setItem(`pairStatus:${docSnap.id}`, status);
+          console.log('[PAIR DEBUG] 初回ステータス保存');
+          localStorage.setItem(`pairStatus:${pairId}`, status);
           return;
         }
         if (status === previousStatus) return;
-        localStorage.setItem(`pairStatus:${docSnap.id}`, status);
+
+        localStorage.setItem(`pairStatus:${pairId}`, status);
 
         if (status === 'confirmed') {
           setDialogMessage('パートナーとタスクを共有するため、アプリを再起動します。');
-          setOnConfirm(() => async () => {
+          setConfirmAction(() => async () => {
+            const uid = auth.currentUser?.uid;
+            if (!uid) return;
+
             const tasksSnap = await getDocs(collection(db, 'tasks'));
             const taskUpdates: Promise<void>[] = [];
 
@@ -119,20 +131,22 @@ function MainContent() {
             });
 
             await Promise.all(pointUpdates);
-
             router.push('/splash');
           });
         }
 
         if (status === 'removed') {
           setDialogMessage('パートナーとの共有が解除されました。共有情報を初期化します。');
-          setOnConfirm(() => async () => {
+          setConfirmAction(() => async () => {
+            const uid = auth.currentUser?.uid;
+            if (!uid) return;
+
             const tasksSnap = await getDocs(collection(db, 'tasks'));
             const taskUpdates: Promise<void>[] = [];
 
             tasksSnap.forEach(task => {
               const t = task.data();
-              if (t.userId === uid || (t.userIds ?? []).includes(uid)) {
+              if (t.userIds?.includes(uid)) {
                 taskUpdates.push(updateDoc(doc(db, 'tasks', task.id), {
                   userIds: [uid],
                 }));
@@ -146,7 +160,7 @@ function MainContent() {
 
             pointsSnap.forEach(point => {
               const p = point.data();
-              if (p.userId === uid || (p.userIds ?? []).includes(uid)) {
+              if (p.userIds?.includes(uid)) {
                 pointUpdates.push(updateDoc(doc(db, 'points', point.id), {
                   userIds: [uid],
                 }));
@@ -154,7 +168,7 @@ function MainContent() {
             });
 
             await Promise.all(pointUpdates);
-
+            await deleteDoc(doc(db, 'pairs', pairId));
             router.push('/splash');
           });
         }
@@ -210,12 +224,16 @@ function MainContent() {
         <FooterNav currentIndex={index} setIndex={setIndex} />
       </div>
 
-      {dialogMessage && onConfirm && (
+      {dialogMessage && confirmAction && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded shadow-md text-center max-w-sm w-full">
             <p className="mb-4 text-gray-800 font-semibold">{dialogMessage}</p>
             <button
-              onClick={onConfirm}
+              onClick={() => {
+                confirmAction();
+                setDialogMessage(null);
+                setConfirmAction(null);
+              }}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
             >
               OK
