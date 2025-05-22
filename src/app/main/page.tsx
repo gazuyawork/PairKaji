@@ -84,28 +84,42 @@ function MainContent() {
         const previousStatus = localStorage.getItem(`pairStatus:${docSnap.id}`);
         if (previousStatus === null) {
           localStorage.setItem(`pairStatus:${docSnap.id}`, status);
-          return; // 🔁 初回読み込みでは差分検知せず無視
+          return;
         }
         if (status === previousStatus) return;
         localStorage.setItem(`pairStatus:${docSnap.id}`, status);
-
 
         if (status === 'confirmed') {
           setDialogMessage('パートナーとタスクを共有するため、アプリを再起動します。');
           setOnConfirm(() => async () => {
             const tasksSnap = await getDocs(collection(db, 'tasks'));
-            const updates: Promise<void>[] = [];
+            const taskUpdates: Promise<void>[] = [];
 
             tasksSnap.forEach(task => {
               const t = task.data();
               if (t.userId === userAId || t.userId === userBId) {
-                updates.push(updateDoc(doc(db, 'tasks', task.id), {
+                taskUpdates.push(updateDoc(doc(db, 'tasks', task.id), {
                   userIds: [userAId, userBId],
                 }));
               }
             });
 
-            await Promise.all(updates);
+            await Promise.all(taskUpdates);
+
+            const pointsSnap = await getDocs(collection(db, 'points'));
+            const pointUpdates: Promise<void>[] = [];
+
+            pointsSnap.forEach(point => {
+              const p = point.data();
+              if (p.userId === userAId || p.userId === userBId) {
+                pointUpdates.push(updateDoc(doc(db, 'points', point.id), {
+                  userIds: [userAId, userBId],
+                }));
+              }
+            });
+
+            await Promise.all(pointUpdates);
+
             router.push('/splash');
           });
         }
@@ -114,18 +128,33 @@ function MainContent() {
           setDialogMessage('パートナーとの共有が解除されました。共有情報を初期化します。');
           setOnConfirm(() => async () => {
             const tasksSnap = await getDocs(collection(db, 'tasks'));
-            const updates: Promise<void>[] = [];
+            const taskUpdates: Promise<void>[] = [];
 
             tasksSnap.forEach(task => {
               const t = task.data();
-              const cleanedUsers = (t.users ?? []).filter((u: string) => u !== '太郎' && u !== '花子');
-              updates.push(updateDoc(doc(db, 'tasks', task.id), {
-                users: cleanedUsers,
-                userIds: [uid],
-              }));
+              if (t.userId === uid || (t.userIds ?? []).includes(uid)) {
+                taskUpdates.push(updateDoc(doc(db, 'tasks', task.id), {
+                  userIds: [uid],
+                }));
+              }
             });
 
-            await Promise.all(updates);
+            await Promise.all(taskUpdates);
+
+            const pointsSnap = await getDocs(collection(db, 'points'));
+            const pointUpdates: Promise<void>[] = [];
+
+            pointsSnap.forEach(point => {
+              const p = point.data();
+              if (p.userId === uid || (p.userIds ?? []).includes(uid)) {
+                pointUpdates.push(updateDoc(doc(db, 'points', point.id), {
+                  userIds: [uid],
+                }));
+              }
+            });
+
+            await Promise.all(pointUpdates);
+
             router.push('/splash');
           });
         }
@@ -134,7 +163,6 @@ function MainContent() {
 
     return () => unsubscribe();
   }, []);
-
 
   const handleSwipe = (direction: "left" | "right") => {
     if (direction === "left" && index < 2) setIndex(index + 1);
