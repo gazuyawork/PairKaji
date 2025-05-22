@@ -95,7 +95,7 @@ export default function PairPoints() {
 
   const users = userPoints ? Object.values(userPoints) : [];
 
-  if (pairStatus === 'confirmed' && users.length === 2) {
+  if (pairStatus === 'confirmed') {
     return (
       <div
         onClick={() => router.push('/profile')}

@@ -158,6 +158,7 @@ export default function ProfilePage() {
         inviteCode: generatedCode,
         status: 'pending',
         createdAt: new Date(),
+        userIds: [user.uid],
       });
 
       toast.success('招待コードを発行しました');
