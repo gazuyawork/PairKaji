@@ -1,5 +1,3 @@
-// ✅ 修正版 main/page.tsx（ダイアログOK押下で3秒ローディング表示、スプラッシュ遷移なし）
-
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -74,50 +72,31 @@ function MainContent() {
         const status = data.status;
         const userAId = data.userAId;
         const userBId = data.userBId;
-
         const pairId = docSnap.id;
-        const previousStatus = localStorage.getItem(`pairStatus:${pairId}`);
-        console.log('[PAIR DEBUG] pairId=' + pairId + ', status=' + status);
-        console.log('[PAIR DEBUG] previousStatus=' + previousStatus);
 
+        const previousStatus = localStorage.getItem(`pairStatus:${pairId}`);
         if (previousStatus === null) {
-          console.log('[PAIR DEBUG] 初回ステータス保存');
           localStorage.setItem(`pairStatus:${pairId}`, status);
           return;
         }
         if (status === previousStatus) return;
-
         localStorage.setItem(`pairStatus:${pairId}`, status);
 
         if (status === 'confirmed') {
           setDialogMessage('パートナーとタスクを共有するため、アプリを再起動します。');
           setConfirmAction(() => async () => {
-            const tasksSnap = await getDocs(collection(db, 'tasks'));
-            const taskUpdates: Promise<void>[] = [];
-
-            tasksSnap.forEach(task => {
-              const t = task.data();
-              if (t.userId === userAId || t.userId === userBId) {
-                taskUpdates.push(updateDoc(doc(db, 'tasks', task.id), {
-                  userIds: [userAId, userBId],
-                }));
-              }
-            });
-
+            const taskQuery = query(collection(db, 'tasks'), where('userId', 'in', [userAId, userBId]));
+            const tasksSnap = await getDocs(taskQuery);
+            const taskUpdates = tasksSnap.docs.map(task =>
+              updateDoc(doc(db, 'tasks', task.id), { userIds: [userAId, userBId] })
+            );
             await Promise.all(taskUpdates);
 
-            const pointsSnap = await getDocs(collection(db, 'points'));
-            const pointUpdates: Promise<void>[] = [];
-
-            pointsSnap.forEach(point => {
-              const p = point.data();
-              if (p.userId === userAId || p.userId === userBId) {
-                pointUpdates.push(updateDoc(doc(db, 'points', point.id), {
-                  userIds: [userAId, userBId],
-                }));
-              }
-            });
-
+            const pointQuery = query(collection(db, 'points'), where('userId', 'in', [userAId, userBId]));
+            const pointsSnap = await getDocs(pointQuery);
+            const pointUpdates = pointsSnap.docs.map(point =>
+              updateDoc(doc(db, 'points', point.id), { userIds: [userAId, userBId] })
+            );
             await Promise.all(pointUpdates);
           });
         }
@@ -125,33 +104,20 @@ function MainContent() {
         if (status === 'removed') {
           setDialogMessage('パートナーとの共有が解除されました。共有情報を初期化します。');
           setConfirmAction(() => async () => {
-            const tasksSnap = await getDocs(collection(db, 'tasks'));
-            const taskUpdates: Promise<void>[] = [];
-
-            tasksSnap.forEach(task => {
-              const t = task.data();
-              if (t.userIds?.includes(uid)) {
-                taskUpdates.push(updateDoc(doc(db, 'tasks', task.id), {
-                  userIds: [uid],
-                }));
-              }
-            });
-
+            const taskQuery = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
+            const tasksSnap = await getDocs(taskQuery);
+            const taskUpdates = tasksSnap.docs.map(task =>
+              updateDoc(doc(db, 'tasks', task.id), { userIds: [uid] })
+            );
             await Promise.all(taskUpdates);
 
-            const pointsSnap = await getDocs(collection(db, 'points'));
-            const pointUpdates: Promise<void>[] = [];
-
-            pointsSnap.forEach(point => {
-              const p = point.data();
-              if (p.userIds?.includes(uid)) {
-                pointUpdates.push(updateDoc(doc(db, 'points', point.id), {
-                  userIds: [uid],
-                }));
-              }
-            });
-
+            const pointQuery = query(collection(db, 'points'), where('userIds', 'array-contains', uid));
+            const pointsSnap = await getDocs(pointQuery);
+            const pointUpdates = pointsSnap.docs.map(point =>
+              updateDoc(doc(db, 'points', point.id), { userIds: [uid] })
+            );
             await Promise.all(pointUpdates);
+
             await deleteDoc(doc(db, 'pairs', pairId));
           });
         }
@@ -182,12 +148,11 @@ function MainContent() {
 
   if (!authReady) return null;
 
-  const MainUI = (
+  return (
     <div className="flex flex-col min-h-screen">
       <div className="flex-1 overflow-hidden relative">
         <motion.div
           className="flex w-[300vw] h-full transition-transform duration-300"
-          initial={{ x: `-${index * 100}vw` }}
           animate={{ x: `-${index * 100}vw` }}
           transition={{ type: "tween", duration: 0.2 }}
         >
@@ -216,28 +181,32 @@ function MainContent() {
                 <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              <button
-                onClick={async () => {
-                  setIsLoading(true);
-                  await confirmAction();
-                  setTimeout(() => {
-                    setDialogMessage(null);
-                    setConfirmAction(null);
-                    setIsLoading(false);
-                  }, 3000);
-                }}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-              >
-                OK
-              </button>
+            <button
+              onClick={async () => {
+                setIsLoading(true);
+                try {
+                  await confirmAction?.(); // null セーフティ
+                  await new Promise((res) => setTimeout(res, 3000));
+                  setDialogMessage(null);
+                  setConfirmAction(null);
+                } catch (err) {
+                  console.error('confirmAction 失敗:', err);
+                  // 任意でトースト通知など
+                } finally {
+                  setIsLoading(false); // 成否に関わらず必ずローディング終了
+                }
+              }}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              OK
+            </button>
+
             )}
           </div>
         </div>
       )}
     </div>
   );
-
-  return MainUI;
 }
 
 export default function MainView() {

@@ -78,7 +78,7 @@ export default function ProfilePage() {
         const pairDoc = pairSnap.docs[0];
         const pair = pairDoc.data();
         setInviteCode(pair.inviteCode);
-        setPartnerEmail(pair.emailB);
+        setPartnerEmail(pair.emailB ?? '');
         setPairDocId(pairDoc.id);
         if (pair.userBId) {
           setIsPairConfirmed(true);
@@ -203,9 +203,6 @@ export default function ProfilePage() {
 
     try {
       await updateDoc(doc(db, 'pairs', pairDocId), {
-        userBId: null,
-        emailB: null,
-        inviteCode: null,
         status: 'removed', 
         updatedAt: new Date(),
       });
@@ -222,7 +219,6 @@ export default function ProfilePage() {
         toast.error('予期せぬエラーが発生しました');
       }
     }
-
   };
 
   const handleCancelInvite = async () => {
