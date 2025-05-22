@@ -1,3 +1,5 @@
+// src/components/PairPoints.tsx
+
 'use client';
 
 import Image from 'next/image';
@@ -30,32 +32,26 @@ export default function PairPoints() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      // --- 🔍 ペア情報を取得 ---
-      const pairsRef = collection(db, 'pairs');
-      const q = query(pairsRef, where('userIds', 'array-contains', uid));
-      const snapshot = await getDocs(q);
+      const pairsSnap = await getDocs(
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+      );
 
-      let partnerUids: string[] = [uid];
-
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        if (data.status === 'confirmed') {
-          setPairStatus('active');
-        } else {
-          setPairStatus('pending');
-        }
-
+      const userIds: string[] = [uid];
+      if (!pairsSnap.empty) {
+        const pairDoc = pairsSnap.docs[0];
+        const data = pairDoc.data();
         if (Array.isArray(data.userIds)) {
-          partnerUids = data.userIds;
+          data.userIds.forEach((id: string) => {
+            if (!userIds.includes(id)) userIds.push(id);
+          });
         }
+        setPairStatus('active');
       } else {
         setPairStatus('none');
       }
 
-      // --- ✅ パートナーを含むユーザーの完了ログのみ取得 ---
-      const logsRef = collection(db, 'task_logs');
-      const logsQuery = query(logsRef, where('userId', 'in', partnerUids));
-      const logsSnap = await getDocs(logsQuery);
+      const completionsRef = collection(db, 'task_logs');
+      const logsSnap = await getDocs(query(completionsRef, where('userIds', 'array-contains', uid)));
 
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
       const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });

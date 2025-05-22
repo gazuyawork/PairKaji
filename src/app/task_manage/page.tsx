@@ -342,58 +342,65 @@ const handleUserToggle = (id: string, user: string) => {
     );
   };
 
-  const confirmTasks = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) {
-      toast.error('ログインしてください');
-      return;
-    }
+const confirmTasks = async () => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    toast.error('ログインしてください');
+    return;
+  }
 
-    let hasEmptyName = false;
+  let hasEmptyName = false;
 
-    setTasks(prev =>
-      prev.map(task => {
-        const isEmpty = !task.name.trim();
-        if (isEmpty) hasEmptyName = true;
-        return {
-          ...task,
-          nameError: isEmpty,
-        };
-      })
+  setTasks(prev =>
+    prev.map(task => {
+      const isEmpty = !task.name.trim();
+      if (isEmpty) hasEmptyName = true;
+      return {
+        ...task,
+        nameError: isEmpty,
+      };
+    })
+  );
+
+  if (hasEmptyName) return;
+
+  // 🔍 パートナー共有情報取得
+  let sharedUserIds: string[] = [uid];
+  try {
+    const pairSnap = await getDocs(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
     );
+    const confirmedPair = pairSnap.docs.find(doc => doc.data().status === 'confirmed');
+    if (confirmedPair) {
+      sharedUserIds = confirmedPair.data().userIds ?? [uid];
+    }
+  } catch (e) {
+    console.error('ペア情報の取得に失敗:', e);
+  }
 
-    if (hasEmptyName) return;
+  for (const task of tasks) {
+    const dayNameToNumber: Record<string, string> = {
+      '日': '0', '月': '1', '火': '2', '水': '3', '木': '4', '金': '5', '土': '6',
+    };
+    const daysOfWeek =
+      task.frequency === '週次'
+        ? task.daysOfWeek.map((d) => dayNameToNumber[d])
+        : task.daysOfWeek;
 
-    for (const task of tasks) {
+    const taskData = {
+      userId: uid,
+      userIds: sharedUserIds, // ✅ ここが重要
+      name: task.name,
+      frequency: task.frequency,
+      point: task.point,
+      users: task.users,
+      daysOfWeek,
+      dates: task.dates,
+      isTodo: task.isTodo ?? false,
+      updatedAt: serverTimestamp(),
+    };
 
-      const dayNameToNumber: Record<string, string> = {
-        '日': '0',
-        '月': '1',
-        '火': '2',
-        '水': '3',
-        '木': '4',
-        '金': '5',
-        '土': '6',
-      };
-
-      const daysOfWeek =
-        task.frequency === '週次'
-          ? task.daysOfWeek.map((d) => dayNameToNumber[d])
-          : task.daysOfWeek;
-
-      const taskData = {
-        userId: uid,
-        name: task.name,
-        frequency: task.frequency,
-        point: task.point,
-        users: task.users,
-        daysOfWeek,
-        dates: task.dates,
-        isTodo: task.isTodo ?? false,
-        updatedAt: serverTimestamp(),
-      };
-
-
+    try {
       if (task.isNew) {
         await addDoc(collection(db, 'tasks'), {
           ...taskData,
@@ -402,13 +409,16 @@ const handleUserToggle = (id: string, user: string) => {
       } else if (task.isEdited) {
         await updateDoc(doc(db, 'tasks', task.id), taskData);
       }
+    } catch (e) {
+      console.error('タスク保存失敗:', e);
     }
+  }
 
-    setTasks(prev =>
-      prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
-    );
-    toast.success('タスクを保存しました');
-  };
+  setTasks(prev =>
+    prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
+  );
+  toast.success('タスクを保存しました');
+};
 
   // const clearFilters = () => {
   //   setFilter(null);

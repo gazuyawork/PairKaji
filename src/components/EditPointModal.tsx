@@ -1,19 +1,18 @@
+// src/components/EditPointModal.tsx
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
-// import type { Task } from '@/types/Task';
 import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 
 interface Props {
   isOpen: boolean;
   initialPoint: number;
-  // tasks: Task[];
   onClose: () => void;
   onSave: (value: number) => void;
-  // onAutoCalculate: () => number;
 }
 
 export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }: Props) {
@@ -42,7 +41,6 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
         const point = data.point ?? 0;
         const freq = data.frequency;
         const days = data.daysOfWeek ?? [];
-        console.log('task:', { name: data.name, point, freq, days });
 
         if (freq === '毎日') {
           total += point * 7;
@@ -50,7 +48,6 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
           total += point * days.length;
         }
       });
-      console.log('自動算出ポイント:', total);
       const half = Math.floor(total / 2);
       const extra = total % 2;
       setPoint(total);
@@ -60,12 +57,10 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
     }
   };
 
-  const userPoints = useMemo(() => {
-    return [
-      { name: 'たろう', image: '/images/taro.png' },
-      { name: 'はなこ', image: '/images/hanako.png' },
-    ];
-  }, []);
+  const userPoints = useMemo(() => [
+    { name: 'たろう', image: '/images/taro.png' },
+    { name: 'はなこ', image: '/images/hanako.png' },
+  ], []);
 
   const partnerPoint = Math.max(0, point - selfPoint);
 
@@ -81,12 +76,28 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
     setError('');
 
     const uid = auth.currentUser?.uid;
-    console.log('保存対象UID:', uid);
     if (!uid) return;
 
     try {
+      const pairsSnap = await getDocs(query(
+        collection(db, 'pairs'),
+        where('userIds', 'array-contains', uid),
+        where('status', '==', 'confirmed')
+      ));
+
+      const userIds = [uid];
+      pairsSnap.forEach(doc => {
+        const data = doc.data();
+        if (Array.isArray(data.userIds)) {
+          data.userIds.forEach((id: string) => {
+            if (!userIds.includes(id)) userIds.push(id);
+          });
+        }
+      });
+
       await setDoc(doc(db, 'points', uid), {
-        userId: uid, // ✅ Firestoreルールを満たすために追加
+        userId: uid,
+        userIds: userIds,
         weeklyTargetPoint: point,
         selfPoint,
         partnerPoint,

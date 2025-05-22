@@ -1,3 +1,5 @@
+// src/components/WeeklyPoints.tsx
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -63,7 +65,8 @@ export default function WeeklyPoints() {
     const fetchMax = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
-      const docRef = doc(db, 'userSettings', uid);
+
+      const docRef = doc(db, 'points', uid); // ← ここを修正！
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data();
@@ -75,6 +78,7 @@ export default function WeeklyPoints() {
 
     fetchMax();
   }, []);
+
 
   // ✅ 自動計算ロジック（ポイントの合計）
   // const autoCalculate = () => {
@@ -97,7 +101,8 @@ export default function WeeklyPoints() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     setMaxPoints(newPoint);
-    await setDoc(doc(db, 'userSettings', uid), {
+    await setDoc(doc(db, 'points', uid), {
+      userId: uid, // 🔑 ルールの条件を満たすために必須
       weeklyTargetPoint: newPoint,
     }, { merge: true });
   };
