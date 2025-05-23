@@ -165,29 +165,35 @@ export default function TaskCard({
               : 'hover:shadow-md cursor-pointer',
             highlighted ? 'border-blue-400' : 'border-[#e5e5e5]'
           )}
-
-
-
         >
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {/* チェック状態 */}
           {task.done ? (
             <CheckCircle className="text-yellow-500" />
           ) : (
             <Circle className="text-gray-400" />
           )}
-          <span className="text-[#5E5E5E] font-medium font-sans">{task.title}</span>
+
+          {/* タイトル（省略防止） */}
+          <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[150px]">
+            {task.title}
+          </span>
+
+          {/* 日付 */}
           {task.scheduledDate && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-400 whitespace-nowrap">
               <Calendar size={12} className="inline mr-1" />
               {task.scheduledDate.replace(/-/g, '/').slice(5)}
             </span>
           )}
+
+          {/* 曜日バッジ（3つ並んで折り返し） */}
           {task.daysOfWeek && (
-            <div className="flex gap-1 ml-2">
+            <div className="flex flex-wrap gap-1 ml-2 max-w-[84px]">
               {[...task.daysOfWeek]
                 .sort((a, b) => {
-                  const order = ['1', '2', '3', '4', '5', '6', '0']; // 月〜日 順
+                  const order = ['1', '2', '3', '4', '5', '6', '0']; // 月〜日順
                   return order.indexOf(a) - order.indexOf(b);
                 })
                 .map((d, i) => (
@@ -200,8 +206,9 @@ export default function TaskCard({
                 ))}
             </div>
           )}
-
         </div>
+
+        {/* 右側：ポイントと画像（常に表示） */}
         <div className="flex items-center gap-3">
           <p className="font-bold text-[#5E5E5E] font-sans">
             {task.point} <span className="text-sm">pt</span>
@@ -214,6 +221,7 @@ export default function TaskCard({
             className="rounded-full border border-gray-300 object-cover aspect-square"
           />
         </div>
+
       </motion.li>
     </div>
   );
