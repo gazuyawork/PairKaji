@@ -69,7 +69,7 @@ export default function HomeView() {
           }
         }}
       >
-        <div className="h-[150px]">
+        <div className="min-h-[150px]">
           <WeeklyPoints />
         </div>
 
@@ -77,7 +77,7 @@ export default function HomeView() {
           <FinishDayTask tasks={tasks} />
         </div>
 
-        <div className="h-[174px] horizontal-scroll">
+        <div className="min-h-[164px] horizontal-scroll">
           <TaskCalendar
             tasks={tasks.map(({ id, name, frequency, dates, daysOfWeek }) => ({
               id,
@@ -89,7 +89,7 @@ export default function HomeView() {
           />
         </div>
 
-        <div className="h-[110px]">
+        <div className="min-h-[110px]">
           <PairPoints />
         </div>
       </main>
