@@ -273,8 +273,8 @@ export default function ProfilePage() {
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         <div className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6">
 
-        <p className="mb-6">
-          <label className="text-[#5E5E5E] font-semibold">パートナー設定</label>
+        <p className="ml-4 mb-6">
+          <label className="text-[#5E5E5E] font-semibold">プロフィール</label>
         </p>
 
         {isProfileLoading ? (
