@@ -4,24 +4,15 @@
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Trash2, Pencil } from 'lucide-react';
-import { useRef, useEffect, useState } from 'react';
+import { CheckCircle, Circle, Calendar, Pencil } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
-// import { format } from 'date-fns';
 import clsx from 'clsx';
 
-
 const dayNumberToName: Record<string, string> = {
-  '1': '月',
-  '2': '火',
-  '3': '水',
-  '4': '木',
-  '5': '金',
-  '6': '土',
-  '0': '日',
+  '1': '月', '2': '火', '3': '水', '4': '木', '5': '金', '6': '土', '0': '日',
 };
-
 
 type Props = {
   task: Task;
@@ -35,60 +26,37 @@ type Props = {
   highlighted?: boolean;
 };
 
-
-const isTaskActiveToday = (task: Task): boolean => {
-  // const today = new Date();
-  // const todayDay = today.getDay(); // 0=日〜6=土
-  // const todayStr = format(today, 'yyyy-MM-dd');
-
-  if (task.frequency === '毎日') {
-    // 今後、毎日の条件を追加予定
-    return true;
-  }
-
-  if (task.frequency === '週次') {
-    // 今後、週次の条件を追加予定
-    return true;
-  }
-
-  if (task.frequency === '不定期') {
-    // 今後、不定期の条件を追加予定
-    return true;
-  }
-
-  return true;
-};
-
+const isTaskActiveToday = (): boolean => true;
 
 export default function TaskCard({
-  task,
-  period,
-  index,
-  onToggleDone,
-  onDelete,
-  onEdit,
-  menuOpenId,
-  setMenuOpenId,
-  highlighted = false,
+  task, period, index, onToggleDone, onDelete, onEdit,
+  menuOpenId, setMenuOpenId, highlighted = false,
 }: Props) {
-  const handlers = useSwipeable({
-    onSwipedLeft: () => setMenuOpenId(task.id),
-    trackTouch: true,
-  });
-
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLongPress, setIsLongPress] = useState(false);
 
+  const swipeable = useSwipeable({
+    onSwipedLeft: () => {
+      setSwipeDirection('left');
+      setMenuOpenId(null);
+    },
+    onSwipedRight: () => {
+      setSwipeDirection('right');
+      setMenuOpenId(null);
+    },
+    trackTouch: true,
+  });
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuOpenId === task.id && menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpenId(null);
-      }
+      setSwipeDirection(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpenId, task.id, setMenuOpenId]);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleTouchStart = () => {
     const timer = setTimeout(() => {
@@ -100,7 +68,7 @@ export default function TaskCard({
 
   const handleTouchEnd = () => {
     if (longPressTimer) clearTimeout(longPressTimer);
-    setTimeout(() => setIsLongPress(false), 300); // 状態リセット
+    setTimeout(() => setIsLongPress(false), 300);
   };
 
   const handleClick = () => {
@@ -110,7 +78,7 @@ export default function TaskCard({
   };
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       {menuOpenId === task.id && (
         <div className="absolute right-0 top-0 w-30 bg-white border border-gray-200 rounded-xl shadow-lg z-30 px-3 py-1 pb-3">
           <button
@@ -124,63 +92,65 @@ export default function TaskCard({
             <Pencil className="w-4 h-4 text-gray-500" />
             <span>編集</span>
           </button>
+        </div>
+      )}
+
+      {swipeDirection === 'left' && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-full text-left px-3 py-1 flex items-center gap-2 text-red-500 hover:bg-red-100"
+            className="bg-red-500 text-white text-sm px-4 py-1 rounded-full shadow"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(period, task.id);
-              setMenuOpenId(null);
+              setSwipeDirection(null);
             }}
           >
-            <Trash2 className="w-4 h-4" />
-            <span>削除</span>
+            削除
           </button>
         </div>
       )}
 
-        <motion.li
-          {...handlers}
-          onClick={handleClick}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          onContextMenu={(e) => {
-            e.preventDefault();       // 右クリックのデフォルト抑制
-            setMenuOpenId(task.id);   // メニューを表示
-          }}
-          animate={
-            isLongPress
-              ? { scale: [1, 1.05, 0.97, 1], backgroundColor: '#ffffff' }
-              : {}
-          }
-          transition={
-            isLongPress
-              ? { duration: 0.4, times: [0, 0.2, 0.6, 1] }
-              : {}
-          }
-          className={clsx(
-            'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border', // ✅ ← border を追加
-            task.done && 'opacity-50 scale-[0.99]',
-            !isTaskActiveToday(task)
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:shadow-md cursor-pointer',
-            highlighted ? 'border-blue-400' : 'border-[#e5e5e5]'
-          )}
-        >
+      {swipeDirection === 'right' && (
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
+          <button
+            className="bg-blue-500 text-white text-sm px-4 py-1 rounded-full shadow"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSwipeDirection(null);
+            }}
+          >
+            TODO
+          </button>
+        </div>
+      )}
 
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          {/* チェック状態 */}
+      <motion.div
+        {...swipeable}
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenuOpenId(task.id);
+        }}
+        className={clsx(
+          'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border overflow-hidden',
+          task.done && 'opacity-50 scale-[0.99]',
+          !isTaskActiveToday(task) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md cursor-pointer',
+          highlighted ? 'border-blue-400' : 'border-[#e5e5e5]'
+        )}
+      >
+        <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
           {task.done ? (
             <CheckCircle className="text-yellow-500" />
           ) : (
             <Circle className="text-gray-400" />
           )}
 
-          {/* タイトル（省略防止） */}
-          <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[150px]">
+          <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[120px]">
             {task.title}
           </span>
 
-          {/* 日付 */}
           {task.scheduledDate && (
             <span className="text-xs text-gray-400 whitespace-nowrap">
               <Calendar size={12} className="inline mr-1" />
@@ -188,12 +158,11 @@ export default function TaskCard({
             </span>
           )}
 
-          {/* 曜日バッジ（3つ並んで折り返し） */}
           {task.daysOfWeek && (
             <div className="flex flex-wrap gap-1 ml-2 max-w-[84px]">
               {[...task.daysOfWeek]
                 .sort((a, b) => {
-                  const order = ['1', '2', '3', '4', '5', '6', '0']; // 月〜日順
+                  const order = ['1', '2', '3', '4', '5', '6', '0'];
                   return order.indexOf(a) - order.indexOf(b);
                 })
                 .map((d, i) => (
@@ -208,7 +177,6 @@ export default function TaskCard({
           )}
         </div>
 
-        {/* 右側：ポイントと画像（常に表示） */}
         <div className="flex items-center gap-3">
           <p className="font-bold text-[#5E5E5E] font-sans">
             {task.point} <span className="text-sm">pt</span>
@@ -221,8 +189,7 @@ export default function TaskCard({
             className="rounded-full border border-gray-300 object-cover aspect-square"
           />
         </div>
-
-      </motion.li>
+      </motion.div>
     </div>
   );
 }
