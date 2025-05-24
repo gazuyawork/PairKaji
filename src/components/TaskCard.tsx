@@ -26,8 +26,6 @@ type Props = {
   highlighted?: boolean;
 };
 
-const isTaskActiveToday = (): boolean => true;
-
 export default function TaskCard({
   task, period, index, onToggleDone, onDelete, onEdit,
   menuOpenId, setMenuOpenId, highlighted = false,
@@ -49,7 +47,7 @@ export default function TaskCard({
   });
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = () => {
       setSwipeDirection(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -72,7 +70,7 @@ export default function TaskCard({
   };
 
   const handleClick = () => {
-    if (!isLongPress && isTaskActiveToday(task)) {
+    if (!isLongPress) {
       onToggleDone(period, index);
     }
   };
@@ -136,40 +134,25 @@ export default function TaskCard({
         className={clsx(
           'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm bg-white border overflow-hidden',
           task.done && 'opacity-50 scale-[0.99]',
-          !isTaskActiveToday(task) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md cursor-pointer',
+          'hover:shadow-md cursor-pointer',
           highlighted ? 'border-blue-400' : 'border-[#e5e5e5]'
         )}
       >
         <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
-          {task.done ? (
-            <CheckCircle className="text-yellow-500" />
-          ) : (
-            <Circle className="text-gray-400" />
-          )}
-
-          <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[120px]">
-            {task.title}
-          </span>
-
+          {task.done ? <CheckCircle className="text-yellow-500" /> : <Circle className="text-gray-400" />}
+          <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[120px]">{task.title}</span>
           {task.scheduledDate && (
             <span className="text-xs text-gray-400 whitespace-nowrap">
               <Calendar size={12} className="inline mr-1" />
               {task.scheduledDate.replace(/-/g, '/').slice(5)}
             </span>
           )}
-
           {task.daysOfWeek && (
             <div className="flex flex-wrap gap-1 ml-2 max-w-[84px]">
               {[...task.daysOfWeek]
-                .sort((a, b) => {
-                  const order = ['1', '2', '3', '4', '5', '6', '0'];
-                  return order.indexOf(a) - order.indexOf(b);
-                })
+                .sort((a, b) => ['1', '2', '3', '4', '5', '6', '0'].indexOf(a) - ['1', '2', '3', '4', '5', '6', '0'].indexOf(b))
                 .map((d, i) => (
-                  <div
-                    key={i}
-                    className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center"
-                  >
+                  <div key={i} className="w-5 h-5 rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center">
                     {dayNumberToName[d] ?? d}
                   </div>
                 ))}
@@ -181,13 +164,7 @@ export default function TaskCard({
           <p className="font-bold text-[#5E5E5E] font-sans">
             {task.point} <span className="text-sm">pt</span>
           </p>
-          <Image
-            src={task.image ?? '/images/default.png'}
-            alt={`${task.person}のアイコン`}
-            width={38}
-            height={38}
-            className="rounded-full border border-gray-300 object-cover aspect-square"
-          />
+          <Image src={task.image ?? '/images/default.png'} alt={`${task.person}のアイコン`} width={38} height={38} className="rounded-full border border-gray-300 object-cover aspect-square" />
         </div>
       </motion.div>
     </div>
