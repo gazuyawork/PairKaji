@@ -1,39 +1,19 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
+import { ChevronRight, ChevronLeft } from 'lucide-react';
 
 type Props = {
+  tasks: TodoOnlyTask[];
   selectedGroupId: string | null;
   onSelectGroup: (id: string) => void;
 };
 
-export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props) {
+export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
-  const [groupList, setGroupList] = useState<TodoOnlyTask[]>([]);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, 'tasks'),
-      where('isTodo', '==', true),
-      where('visible', '==', true)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const results: TodoOnlyTask[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as Omit<TodoOnlyTask, 'id'>),
-      }));
-      setGroupList(results);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   const updateArrows = () => {
     const container = scrollRef.current;
@@ -53,24 +33,24 @@ export default function GroupSelector({ selectedGroupId, onSelectGroup }: Props)
     }
   }, []);
 
+  // グループ表示用にtasksをユニーク化
+  const filteredTasks = tasks.filter(task => task.visible && task.isTodo);
+
   return (
     <div className="relative py-0">
-      <div
-        ref={scrollRef}
-        className="overflow-x-auto whitespace-nowrap scroll-smooth px-4"
-      >
+      <div ref={scrollRef} className="overflow-x-auto whitespace-nowrap scroll-smooth px-4">
         <div className="flex gap-2 w-max">
-          {groupList.map((group) => (
+          {filteredTasks.map((task) => (
             <button
-              key={group.id}
-              onClick={() => onSelectGroup(group.id)}
+              key={task.id}
+              onClick={() => onSelectGroup(task.id)}
               className={`px-4 py-2 rounded-full text-sm border transition-all duration-150 whitespace-nowrap ${
-                selectedGroupId === group.id
+                selectedGroupId === task.id
                   ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
                   : 'bg-white text-[#5E5E5E] border-gray-300 hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
               }`}
             >
-              {group.name}
+              {task.name}
             </button>
           ))}
         </div>

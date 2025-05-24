@@ -35,12 +35,14 @@ interface Task {
   users: string[];
   daysOfWeek: string[];
   dates: string[];
+  groupId: string | null; // ← これが必要
   isNew: boolean;
   isEdited: boolean;
   showDelete: boolean;
-  isTodo?: boolean; // ← 追加（optional にしておく）
+  isTodo?: boolean;
   nameError?: boolean;
 }
+
 
 interface TaskCardProps {
   task: Task;
@@ -227,7 +229,8 @@ export default function TaskManagePage() {
   const [profileImage, setProfileImage] = useState<string>('/images/taro.png');
   const [partnerImage, setPartnerImage] = useState<string>('/images/hanako.png');
   const addTask = () => {
-  const newId = crypto.randomUUID(); // 例: "9a4b-xxx-..."
+    const newId = crypto.randomUUID();
+    const newGroupId = crypto.randomUUID(); // ← 追加（新しいgroupIdを生成）
     setTasks([
       {
         id: newId,
@@ -237,6 +240,7 @@ export default function TaskManagePage() {
         users: ['太郎', '花子'],
         daysOfWeek: [],
         dates: [],
+        groupId: newGroupId, // ← 追加
         isNew: true,
         isEdited: false,
         showDelete: false,
@@ -244,6 +248,7 @@ export default function TaskManagePage() {
       ...tasks,
     ]);
   };
+
   
 
   const updateTask = (
@@ -389,16 +394,18 @@ const confirmTasks = async () => {
 
     const taskData = {
       userId: uid,
-      userIds: sharedUserIds, // ✅ ここが重要
+      userIds: sharedUserIds,
       name: task.name,
       frequency: task.frequency,
       point: task.point,
       users: task.users,
       daysOfWeek,
       dates: task.dates,
+      groupId: task.groupId, // ← 追加
       isTodo: task.isTodo ?? false,
       updatedAt: serverTimestamp(),
     };
+
 
     try {
       if (task.isNew) {
@@ -450,14 +457,21 @@ const confirmTasks = async () => {
       const loadedTasks: Task[] = snapshot.docs.map((doc) => {
         const data = doc.data();
         return {
-          ...(data as Omit<Task, 'id' | 'isNew' | 'isEdited' | 'showDelete'>),
           id: doc.id,
+          name: data.name ?? '',
+          frequency: data.frequency ?? '毎日',
+          point: data.point ?? 1,
+          users: Array.isArray(data.users) ? data.users : [],
           daysOfWeek: (data.daysOfWeek ?? []).map((d: string) => dayNumberToName[d] ?? d),
+          dates: Array.isArray(data.dates) ? data.dates : [],
+          groupId: data.groupId ?? null, // ← 追加
+          isTodo: data.isTodo ?? false,
           isNew: false,
           isEdited: false,
           showDelete: false,
         };
       });
+
 
       setTasks(loadedTasks);
     };

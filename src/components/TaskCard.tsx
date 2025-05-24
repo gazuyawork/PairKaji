@@ -11,6 +11,8 @@ import Image from 'next/image';
 import clsx from 'clsx';
 import { confirmAlert } from 'react-confirm-alert';
 import 'react-confirm-alert/src/react-confirm-alert.css';
+import { useView } from '@/context/ViewContext'; // ← 追加
+
 
 const dayNumberToName: Record<string, string> = {
   '1': '月', '2': '火', '3': '水', '4': '木', '5': '金', '6': '土', '0': '日',
@@ -32,6 +34,7 @@ export default function TaskCard({
   task, period, index, onToggleDone, onDelete, onEdit,
   menuOpenId, setMenuOpenId, highlighted = false,
 }: Props) {
+  const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -100,6 +103,14 @@ export default function TaskCard({
     });
   };
 
+  // TODOボタンのクリック処理
+const handleTodoClick = () => {
+  setSelectedTaskName(task.name); // ← 選択したタスク名をセット
+  setIndex(2); // ← TodoView（index=2）を表示
+};
+
+  
+
   return (
     <div className="relative" ref={cardRef}>
       {menuOpenId === task.id && (
@@ -136,10 +147,7 @@ export default function TaskCard({
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
             className="bg-blue-500 text-white text-sm px-4 py-1 rounded-full shadow"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSwipeDirection(null);
-            }}
+            onClick={handleTodoClick}
           >
             TODO
           </button>

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   useState,
@@ -26,11 +26,15 @@ import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import GroupSelector from '@/components/GroupSelector';
+import { useView } from '@/context/ViewContext';
 
 export default function TodoView() {
+  const { selectedTaskName, setSelectedTaskName } = useView();
+  const [filterText, setFilterText] = useState('');
+
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [taskInput, setTaskInput] = useState('');
-  const [inputError, setInputError] = useState(false);
+  const [inputError, setInputError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
@@ -39,9 +43,14 @@ export default function TodoView() {
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const taskNameOptions = useMemo(() => {
-    const names = tasks.map(task => task.name).filter(Boolean);
+    const names = tasks
+      .filter(task => !task.visible) // 非表示（visible: false）のものだけサジェスト表示
+      .map(task => task.name)
+      .filter(Boolean);
     return Array.from(new Set(names));
   }, [tasks]);
+
+
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -90,14 +99,30 @@ export default function TodoView() {
     }
   }, [focusedTodoId]);
 
+  useEffect(() => {
+    if (selectedTaskName) {
+      setFilterText(selectedTaskName);
+      setSelectedTaskName('');
+    }
+  }, [selectedTaskName, setSelectedTaskName]);
+
+  useEffect(() => {
+    if (selectedGroupId && !tasks.some(task => task.id === selectedGroupId)) {
+      setSelectedGroupId(null);
+    }
+  }, [tasks, selectedGroupId]);
+
+
+
   const handleAddTask = useCallback(async () => {
     const name = taskInput.trim();
     if (!name) {
-      setInputError(true);
+      setInputError('タスク名を入力してください');
       return;
     }
 
     const existing = tasks.find((t) => t.name.trim() === name);
+
     if (existing) {
       if (!existing.visible) {
         await updateDoc(doc(db, 'tasks', existing.id), {
@@ -105,9 +130,11 @@ export default function TodoView() {
           updatedAt: serverTimestamp(),
         });
         toast.success('非表示のタスクを再表示しました。');
+      } else {
+        setInputError('同じ名前のタスクは登録できません');
       }
+
       setTaskInput('');
-      setInputError(false);
       return;
     }
 
@@ -129,7 +156,7 @@ export default function TodoView() {
       isTodo: true,
       point: 10,
       userId,
-      userIds: [userId], 
+      userIds: [userId],
       users: [],
       daysOfWeek: [],
       dates: [],
@@ -140,9 +167,12 @@ export default function TodoView() {
     toast.success('新しくタスクが登録されました。');
 
     setTaskInput('');
-    setInputError(false);
+    setInputError(null);
     setFocusedTodoId(null);
   }, [taskInput, tasks]);
+
+
+
 
   const handleTaskInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -164,7 +194,7 @@ export default function TodoView() {
                 value={taskInput}
                 onChange={(e) => {
                   setTaskInput(e.target.value);
-                  setInputError(false);
+                  setInputError(null);
                   setIsOpen(true);
                 }}
                 onKeyDown={handleTaskInputKeyDown}
@@ -192,7 +222,7 @@ export default function TodoView() {
 
               {isOpen && taskNameOptions.length > 0 && (
                 <ul
-                  className="absolute z-10 w-full bg-white border border-gray-300 rounded shadow mt-1 max-h-40 overflow-y-auto text-sm"
+                  className="absolute z-50 w-full bg-white border border-gray-300 rounded shadow mt-1 max-h-40 overflow-y-auto text-sm"
                   data-keep-open
                 >
                   {taskNameOptions.map((name) => (
@@ -201,7 +231,7 @@ export default function TodoView() {
                       onMouseDown={() => {
                         setTaskInput(name);
                         setIsOpen(false);
-                        setInputError(false);
+                        setInputError(null);
                       }}
                       className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                     >
@@ -212,8 +242,9 @@ export default function TodoView() {
               )}
             </div>
             {inputError && (
-              <p className="text-sm text-red-500 mt-1 px-1">タスク名を入力してください</p>
+              <p className="text-sm text-red-500 mt-1 px-1">{inputError}</p>
             )}
+
           </div>
 
           <button
@@ -226,11 +257,12 @@ export default function TodoView() {
         </div>
 
         <GroupSelector
+          tasks={tasks}
           selectedGroupId={selectedGroupId}
           onSelectGroup={setSelectedGroupId}
         />
 
-        {selectedGroupId && (
+        {selectedGroupId != null && (
           <div className="flex justify-center">
             <button
               onClick={() => setSelectedGroupId(null)}
@@ -241,10 +273,12 @@ export default function TodoView() {
           </div>
         )}
 
+
         {tasks
           .filter(task =>
             task.visible &&
-            (!selectedGroupId || task.groupId === selectedGroupId)
+            (!selectedGroupId || task.id === selectedGroupId) &&
+            (filterText.trim() === '' || task.name.includes(filterText))
           )
           .map(task => (
             <TodoTaskCard
@@ -298,9 +332,11 @@ export default function TodoView() {
               onDeleteTask={async () => {
                 await updateDoc(doc(db, 'tasks', task.id), {
                   visible: false,
+                  groupId: null, // ← 追加（または deleteField() を使用）
                   updatedAt: serverTimestamp(),
                 });
               }}
+
               todoRefs={todoRefs}
               focusedTodoId={focusedTodoId}
             />

@@ -21,22 +21,18 @@ import FooterNav from '@/components/FooterNav';
 import HomeView from '@/components/views/HomeView';
 import TaskView from '@/components/views/TaskView';
 import TodoView from '@/components/views/TodoView';
+import { ViewProvider } from '@/context/ViewContext'; 
+import { useView } from '@/context/ViewContext'; // ← ファイル冒頭の import 群に追加
 
 function MainContent() {
   const searchParams = useSearchParams();
-  const viewParam = searchParams.get("view");
+  // const viewParam = searchParams.get("view");
   const searchKeyword = searchParams.get("search") ?? "";
 
-  const [index, setIndex] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const fromTaskManage = sessionStorage.getItem('fromTaskManage');
-      if (fromTaskManage === 'true') {
-        sessionStorage.removeItem('fromTaskManage');
-        return 1;
-      }
-    }
-    return viewParam === "task" ? 1 : 0;
-  });
+
+
+  const { index, setIndex} = useView(); // ← この行を追加
+
 
   const [authReady, setAuthReady] = useState(false);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
@@ -209,10 +205,14 @@ function MainContent() {
   );
 }
 
+
+
 export default function MainView() {
   return (
-    <Suspense fallback={null}>
-      <MainContent />
-    </Suspense>
+    <ViewProvider>
+      <Suspense fallback={null}>
+        <MainContent />
+      </Suspense>
+    </ViewProvider>
   );
 }
