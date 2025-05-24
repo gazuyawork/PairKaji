@@ -5,10 +5,12 @@
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { CheckCircle, Circle, Calendar, Pencil } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import clsx from 'clsx';
+import { confirmAlert } from 'react-confirm-alert';
+import 'react-confirm-alert/src/react-confirm-alert.css';
 
 const dayNumberToName: Record<string, string> = {
   '1': '月', '2': '火', '3': '水', '4': '木', '5': '金', '6': '土', '0': '日',
@@ -30,6 +32,7 @@ export default function TaskCard({
   task, period, index, onToggleDone, onDelete, onEdit,
   menuOpenId, setMenuOpenId, highlighted = false,
 }: Props) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLongPress, setIsLongPress] = useState(false);
@@ -47,13 +50,13 @@ export default function TaskCard({
   });
 
   useEffect(() => {
-    const handleClickOutside = () => {
-      setSwipeDirection(null);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setSwipeDirection(null);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleTouchStart = () => {
@@ -75,8 +78,30 @@ export default function TaskCard({
     }
   };
 
+  const handleDelete = () => {
+    confirmAlert({
+      title: '削除の確認',
+      message: 'このタスクを削除しますか？',
+      buttons: [
+        {
+          label: '削除する',
+          onClick: () => {
+            onDelete(period, task.id);
+            setSwipeDirection(null);
+          },
+        },
+        {
+          label: 'キャンセル',
+          onClick: () => {
+            setSwipeDirection(null);
+          },
+        },
+      ],
+    });
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" ref={cardRef}>
       {menuOpenId === task.id && (
         <div className="absolute right-0 top-0 w-30 bg-white border border-gray-200 rounded-xl shadow-lg z-30 px-3 py-1 pb-3">
           <button
@@ -99,8 +124,7 @@ export default function TaskCard({
             className="bg-red-500 text-white text-sm px-4 py-1 rounded-full shadow"
             onClick={(e) => {
               e.stopPropagation();
-              onDelete(period, task.id);
-              setSwipeDirection(null);
+              handleDelete();
             }}
           >
             削除
