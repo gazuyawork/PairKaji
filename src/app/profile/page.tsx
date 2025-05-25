@@ -420,7 +420,7 @@ export default function ProfilePage() {
                   <button
                     onClick={pairDocId ? handleCancelInvite : handleSendInvite}
                     className={`w-full py-2 rounded shadow text-sm ${
-                      pairDocId ? 'bg-gray-300 text-red-500 hover:underline' : 'bg-[#FFCB7D] text-white'
+                      pairDocId ? 'bg-gray-500 text-white hover:underline' : 'bg-[#FFCB7D] text-white'
                     }`}
                   >
                     {pairDocId ? '招待を取り消す' : '招待コードを発行'}

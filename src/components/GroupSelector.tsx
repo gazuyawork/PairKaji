@@ -34,7 +34,7 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
   }, []);
 
   // グループ表示用にtasksをユニーク化
-  const filteredTasks = tasks.filter(task => task.visible && task.isTodo);
+  const filteredTasks = tasks.filter(task => task.visible && task.name.trim() !== '');
 
   return (
     <div className="relative py-0">
