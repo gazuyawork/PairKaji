@@ -4,14 +4,21 @@ import Header from '@/components/Header';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
 import Link from 'next/link';
-import type { Pair, PendingApproval } from '@/types/Pair';
-import { serverTimestamp } from 'firebase/firestore';
+import type { PendingApproval } from '@/types/Pair';
+// 既存の import 群の中に追加
+import { 
+  getUserProfile, createUserProfile, 
+  getUserPair, getPendingPairByEmail, 
+  createPairInvite, approvePair, 
+  removePair, deletePair, 
+  handleFirestoreError, generateInviteCode 
+} from '@/lib/firebaseUtils';
+
 
 export default function ProfilePage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -43,29 +50,21 @@ export default function ProfilePage() {
         refreshedUser?.providerData.some((p) => p.providerId === 'google.com') ?? false
       );
 
-      const ref = doc(db, 'users', user.uid);
-      const snap = await getDoc(ref);
-
+      const snap = await getUserProfile(user.uid);
       if (snap.exists()) {
         const data = snap.data();
         setName(data.name || user.email?.split('@')[0] || '');
       } else {
-        await setDoc(ref, {
-          name: user.email?.split('@')[0] || '',
-          createdAt: serverTimestamp(),
-        });
+        await createUserProfile(user.uid, user.email?.split('@')[0] || '');
         setName(user.email?.split('@')[0] || '');
       }
 
-      setEmail(user.email || '');
+      setEmail(user.email ?? '');
 
-      const pairsRef = collection(db, 'pairs');
-
-      const q = query(pairsRef, where('userAId', '==', user.uid));
-      const pairSnap = await getDocs(q);
+      const pairSnap = await getUserPair(user.uid);
       if (!pairSnap.empty) {
         const pairDoc = pairSnap.docs[0];
-        const pair = pairDoc.data() as Pair;
+        const pair = pairDoc.data();
         setInviteCode(pair.inviteCode);
         setPartnerEmail(pair.emailB ?? '');
         setPairDocId(pairDoc.id);
@@ -74,11 +73,14 @@ export default function ProfilePage() {
         }
       }
 
-      const q2 = query(pairsRef, where('emailB', '==', user.email));
-      const pendingSnap = await getDocs(q2);
+      if (!user.email) {
+        console.warn('[WARN] user.email が null です。pending ペア検索をスキップします');
+        return;
+      }
+      const pendingSnap = await getPendingPairByEmail(user.email);
       if (!pendingSnap.empty) {
         const docRef = pendingSnap.docs[0];
-        const pair = docRef.data() as Pair;
+        const pair = docRef.data();
         if (!pair.userBId && pair.userAId && pair.emailB && pair.inviteCode) {
           setPendingApproval({
             pairId: docRef.id,
@@ -90,6 +92,7 @@ export default function ProfilePage() {
           console.warn('[WARN] ペンディングデータが不完全です', pair);
         }
       }
+
       setIsProfileLoading(false);
       setIsPairLoading(false);
     };
@@ -109,15 +112,6 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   };
 
-  const generateInviteCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
-
   const handleSendInvite = async () => {
     const user = auth.currentUser;
     if (!user || !partnerEmail.trim()) {
@@ -129,27 +123,11 @@ export default function ProfilePage() {
     setInviteCode(generatedCode);
 
     try {
-      await addDoc(collection(db, 'pairs'), {
-        userAId: user.uid,
-        emailB: partnerEmail.trim(),
-        inviteCode: generatedCode,
-        status: 'pending',
-        createdAt: new Date(),
-        userIds: [user.uid],
-      });
-
+      const docRef = await createPairInvite(user.uid, partnerEmail.trim(), generatedCode);
+      setPairDocId(docRef.id);
       toast.success('招待コードを発行しました');
     } catch (err: unknown) {
-      if (err instanceof Error && 'code' in err && typeof (err as any).code === 'string') {
-        if ((err as any).code === 'permission-denied') {
-          toast.error('操作が許可されていません');
-        } else {
-          toast.error('予期せぬエラーが発生しました');
-        }
-      } else {
-        console.error(err);
-        toast.error('予期せぬエラーが発生しました');
-      }
+      handleFirestoreError(err);
     }
   };
 
@@ -158,27 +136,17 @@ export default function ProfilePage() {
     if (!user || !pendingApproval) return;
 
     try {
-      await updateDoc(doc(db, 'pairs', pendingApproval.pairId), {
-        userBId: user.uid,
-        status: 'confirmed',
-        userIds: [pendingApproval.inviterUid, user.uid],
-        updatedAt: new Date(),
-      });
+      if (!pendingApproval?.inviterUid) {
+        console.error('[ERROR] inviterUid が undefined です。処理をスキップします。');
+        toast.error('ペア情報が不完全なため、承認できません。');
+        return;
+      }
+      await approvePair(pendingApproval!.pairId, pendingApproval!.inviterUid, user.uid);
       toast.success('ペア設定を承認しました');
       setIsPairConfirmed(true);
       setPendingApproval(null);
     } catch (err: unknown) {
-      console.error(err);
-      if (err && typeof err === 'object' && 'code' in err && typeof (err as any).code === 'string') {
-        const code = (err as any).code;
-        if (code === 'permission-denied') {
-          toast.error('操作が許可されていません');
-        } else {
-          toast.error('予期せぬエラーが発生しました');
-        }
-      } else {
-        toast.error('予期せぬエラーが発生しました');
-      }
+      handleFirestoreError(err);
     }
   };
 
@@ -188,29 +156,16 @@ export default function ProfilePage() {
     if (!confirmed) return;
 
     try {
-      // const uid = auth.currentUser?.uid;
-      // const snap = await getDoc(doc(db, 'pairs', pairDocId));
-      // const data = snap.data();
-      await updateDoc(doc(db, 'pairs', pairDocId), {
-        status: 'removed',
-        updatedAt: new Date(),
-      });
-
+      await removePair(pairDocId);
       toast.success('ペアを解除しました');
       setIsPairConfirmed(false);
       setPartnerEmail('');
       setInviteCode('');
       setPairDocId(null);
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'code' in err) {
-        const code = (err as { code: string }).code;
-        if (code === 'permission-denied') {
-          toast.error('操作が許可されていません');
-        }
-      }
+      handleFirestoreError(err);
     }
   };
-
 
   const handleCancelInvite = async () => {
     if (!pairDocId) return;
@@ -218,23 +173,13 @@ export default function ProfilePage() {
     if (!confirmed) return;
 
     try {
-      await deleteDoc(doc(db, 'pairs', pairDocId));
+      await deletePair(pairDocId);
       toast.success('招待を取り消しました');
       setInviteCode('');
       setPartnerEmail('');
       setPairDocId(null);
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'code' in err && typeof (err as any).code === 'string') {
-        const code = (err as { code: string }).code;
-        if (code === 'permission-denied') {
-          toast.error('操作が許可されていません');
-        } else {
-          toast.error('予期せぬエラーが発生しました');
-        }
-      } else {
-        console.error(err);
-        toast.error('予期せぬエラーが発生しました');
-      }
+      handleFirestoreError(err);
     }
   };
 
@@ -244,24 +189,13 @@ export default function ProfilePage() {
     if (!confirmed) return;
 
     try {
-      await deleteDoc(doc(db, 'pairs', pendingApproval.pairId));
+      await deletePair(pendingApproval.pairId);
       toast.success('招待を拒否しました');
       setPendingApproval(null);
     } catch (err: unknown) {
-      console.error(err);
-      if (err && typeof err === 'object' && 'code' in err && typeof (err as any).code === 'string') {
-        const code = (err as { code: string }).code;
-        if (code === 'permission-denied') {
-          toast.error('操作が許可されていません');
-        } else {
-          toast.error('予期せぬエラーが発生しました');
-        }
-      } else {
-        toast.error('予期せぬエラーが発生しました');
-      }
+      handleFirestoreError(err);
     }
   };
-
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
