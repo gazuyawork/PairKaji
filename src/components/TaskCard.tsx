@@ -9,8 +9,6 @@ import { useEffect, useState, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import clsx from 'clsx';
-import { confirmAlert } from 'react-confirm-alert';
-import 'react-confirm-alert/src/react-confirm-alert.css';
 import { useView } from '@/context/ViewContext'; // ← 追加
 
 
@@ -81,27 +79,16 @@ export default function TaskCard({
     }
   };
 
-  const handleDelete = () => {
-    confirmAlert({
-      title: '削除の確認',
-      message: 'このタスクを削除しますか？',
-      buttons: [
-        {
-          label: '削除する',
-          onClick: () => {
-            onDelete(period, task.id);
-            setSwipeDirection(null);
-          },
-        },
-        {
-          label: 'キャンセル',
-          onClick: () => {
-            setSwipeDirection(null);
-          },
-        },
-      ],
-    });
-  };
+const handleDelete = () => {
+  const confirmed = window.confirm('このタスクを削除しますか？');
+  if (confirmed) {
+    onDelete(period, task.id);
+    setSwipeDirection(null);
+  } else {
+    setSwipeDirection(null);
+  }
+};
+
 
   // TODOボタンのクリック処理
 const handleTodoClick = () => {
