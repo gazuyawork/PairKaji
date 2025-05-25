@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
 import Link from 'next/link';
+import type { Pair, PendingApproval } from '@/types/Pair';
+import { serverTimestamp } from 'firebase/firestore';
 
 export default function ProfilePage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -20,18 +22,13 @@ export default function ProfilePage() {
   const [profileImage, setProfileImage] = useState<string | null>(
     typeof window !== 'undefined' ? localStorage.getItem('profileImage') : null
   );
-  const [partnerImage, setPartnerImage] = useState('/images/hanako_default.png');
+  const [partnerImage] = useState('/images/hanako_default.png');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [isPairConfirmed, setIsPairConfirmed] = useState(false);
-  const [pendingApproval, setPendingApproval] = useState<{
-    pairId: string;
-    inviterUid: string;
-    emailB: string;
-    inviteCode: string;
-  } | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pairDocId, setPairDocId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,22 +52,12 @@ export default function ProfilePage() {
       } else {
         await setDoc(ref, {
           name: user.email?.split('@')[0] || '',
-          createdAt: new Date(),
+          createdAt: serverTimestamp(),
         });
         setName(user.email?.split('@')[0] || '');
       }
 
       setEmail(user.email || '');
-
-      const storedImage = localStorage.getItem('profileImage');
-      if (storedImage) {
-        setProfileImage(storedImage);
-      } else {
-        setProfileImage('/images/default.png');
-      }
-
-      const storedPartnerImage = localStorage.getItem('partnerImage');
-      if (storedPartnerImage) setPartnerImage(storedPartnerImage);
 
       const pairsRef = collection(db, 'pairs');
 
@@ -78,7 +65,7 @@ export default function ProfilePage() {
       const pairSnap = await getDocs(q);
       if (!pairSnap.empty) {
         const pairDoc = pairSnap.docs[0];
-        const pair = pairDoc.data();
+        const pair = pairDoc.data() as Pair;
         setInviteCode(pair.inviteCode);
         setPartnerEmail(pair.emailB ?? '');
         setPairDocId(pairDoc.id);
@@ -91,21 +78,20 @@ export default function ProfilePage() {
       const pendingSnap = await getDocs(q2);
       if (!pendingSnap.empty) {
         const docRef = pendingSnap.docs[0];
-        const pair = docRef.data();
-        if (!pair.userBId) {
+        const pair = docRef.data() as Pair;
+        if (!pair.userBId && pair.userAId && pair.emailB && pair.inviteCode) {
           setPendingApproval({
             pairId: docRef.id,
             inviterUid: pair.userAId,
             emailB: pair.emailB,
             inviteCode: pair.inviteCode,
           });
+        } else {
+          console.warn('[WARN] ペンディングデータが不完全です', pair);
         }
       }
       setIsProfileLoading(false);
       setIsPairLoading(false);
-      // setTimeout(() => {
-      //   setIsPairLoading(false);
-      // }, 3000); // 1秒後にローディングを解除（確認用）
     };
     fetchProfile();
   }, []);
@@ -153,11 +139,15 @@ export default function ProfilePage() {
       });
 
       toast.success('招待コードを発行しました');
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'permission-denied') {
-        toast.error('操作が許可されていません');
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err && typeof (err as any).code === 'string') {
+        if ((err as any).code === 'permission-denied') {
+          toast.error('操作が許可されていません');
+        } else {
+          toast.error('予期せぬエラーが発生しました');
+        }
       } else {
+        console.error(err);
         toast.error('予期せぬエラーが発生しました');
       }
     }
@@ -177,15 +167,19 @@ export default function ProfilePage() {
       toast.success('ペア設定を承認しました');
       setIsPairConfirmed(true);
       setPendingApproval(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (err.code === 'permission-denied') {
-        toast.error('操作が許可されていません');
+      if (err && typeof err === 'object' && 'code' in err && typeof (err as any).code === 'string') {
+        const code = (err as any).code;
+        if (code === 'permission-denied') {
+          toast.error('操作が許可されていません');
+        } else {
+          toast.error('予期せぬエラーが発生しました');
+        }
       } else {
         toast.error('予期せぬエラーが発生しました');
       }
     }
-
   };
 
   const handleRemovePair = async () => {
@@ -194,17 +188,9 @@ export default function ProfilePage() {
     if (!confirmed) return;
 
     try {
-      const uid = auth.currentUser?.uid;
-      console.log('[DEBUG] currentUser.uid:', uid);
-
-      const snap = await getDoc(doc(db, 'pairs', pairDocId));
-      const data = snap.data();
-      console.log('[DEBUG] pairDoc:', {
-        userAId: data?.userAId,
-        userBId: data?.userBId,
-        userIds: data?.userIds,
-      });
-
+      // const uid = auth.currentUser?.uid;
+      // const snap = await getDoc(doc(db, 'pairs', pairDocId));
+      // const data = snap.data();
       await updateDoc(doc(db, 'pairs', pairDocId), {
         status: 'removed',
         updatedAt: new Date(),
@@ -215,12 +201,12 @@ export default function ProfilePage() {
       setPartnerEmail('');
       setInviteCode('');
       setPairDocId(null);
-    } catch (err: any) {
-      console.error('[ERROR] handleRemovePair:', err);
-      if (err.code === 'permission-denied') {
-        toast.error('操作が許可されていません');
-      } else {
-        toast.error('予期せぬエラーが発生しました');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err) {
+        const code = (err as { code: string }).code;
+        if (code === 'permission-denied') {
+          toast.error('操作が許可されていません');
+        }
       }
     }
   };
@@ -237,11 +223,16 @@ export default function ProfilePage() {
       setInviteCode('');
       setPartnerEmail('');
       setPairDocId(null);
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'permission-denied') {
-        toast.error('操作が許可されていません');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && typeof (err as any).code === 'string') {
+        const code = (err as { code: string }).code;
+        if (code === 'permission-denied') {
+          toast.error('操作が許可されていません');
+        } else {
+          toast.error('予期せぬエラーが発生しました');
+        }
       } else {
+        console.error(err);
         toast.error('予期せぬエラーが発生しました');
       }
     }
@@ -256,16 +247,21 @@ export default function ProfilePage() {
       await deleteDoc(doc(db, 'pairs', pendingApproval.pairId));
       toast.success('招待を拒否しました');
       setPendingApproval(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (err.code === 'permission-denied') {
-        toast.error('操作が許可されていません');
+      if (err && typeof err === 'object' && 'code' in err && typeof (err as any).code === 'string') {
+        const code = (err as { code: string }).code;
+        if (code === 'permission-denied') {
+          toast.error('操作が許可されていません');
+        } else {
+          toast.error('予期せぬエラーが発生しました');
+        }
       } else {
         toast.error('予期せぬエラーが発生しました');
       }
     }
-
   };
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
@@ -420,7 +416,7 @@ export default function ProfilePage() {
                   <button
                     onClick={pairDocId ? handleCancelInvite : handleSendInvite}
                     className={`w-full py-2 rounded shadow text-sm ${
-                      pairDocId ? 'bg-gray-500 text-white hover:underline' : 'bg-[#FFCB7D] text-white'
+                      pairDocId ? 'bg-gray-300 text-red-500 hover:underline' : 'bg-[#FFCB7D] text-white'
                     }`}
                   >
                     {pairDocId ? '招待を取り消す' : '招待コードを発行'}

@@ -45,12 +45,19 @@ export default function EmailEditModal({
 
       toast.success('確認メールを送信しました。メールをご確認ください。');
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('エラー内容：', err);
-      toast.error(`更新に失敗しました: ${err.message || '不明なエラー'}`);
+
+      let errorMessage = '不明なエラー';
+      if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = (err as { message: string }).message;
+      }
+
+      toast.error(`更新に失敗しました: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
+
   };
 
 

@@ -39,12 +39,17 @@ export default function PasswordEditModal({ open, onClose }: PasswordEditModalPr
       await updatePassword(user, newPassword);
       toast.success('パスワードを更新しました');
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(`更新に失敗しました: ${err.message || '不明なエラー'}`);
+      let errorMessage = '不明なエラー';
+      if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = (err as { message: string }).message;
+      }
+      toast.error(`更新に失敗しました: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
+
   };
 
   if (!open) return null;
