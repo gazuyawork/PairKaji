@@ -51,8 +51,12 @@ export default function DeleteAccountPage() {
 
       toast.success('アカウントを削除しました');
       router.push('/register');
-    } catch (error: any) {
-      console.error(error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error(error.message);
+      } else {
+        console.error(error);
+      }
       toast.error('アカウント削除に失敗しました');
     } finally {
       setIsLoading(false);

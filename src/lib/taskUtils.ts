@@ -29,10 +29,10 @@ export const buildFirestoreTaskData = (
     userId: uid,
     userIds,
     name: task.name,
-    frequency: task.frequency,
+    period: task.period ?? '毎日',
     point: task.point,
     users: task.users,
-    daysOfWeek: task.frequency === '週次'
+    daysOfWeek: task.period === '週次'
       ? task.daysOfWeek.map(d => dayNameToNumber[d]).filter((d): d is string => d !== undefined)
       : [],
     dates: task.dates,

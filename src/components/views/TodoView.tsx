@@ -149,7 +149,7 @@ export default function TodoView() {
 
     const newTaskData = {
       name,
-      frequency: '毎日',
+      period: '毎日',
       todos: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

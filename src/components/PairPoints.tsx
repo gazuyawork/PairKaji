@@ -12,6 +12,8 @@ import {
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { useProfileImages } from '@/hooks/useProfileImages';
+import type { Pair } from '@/types/Pair';
+
 
 
 interface UserPoints {
@@ -58,7 +60,7 @@ export default function PairPoints() {
       let pairUserIds: string[] | null = null;
 
       for (const doc of snap1.docs) {
-        const data = doc.data();
+        const data = doc.data() as Pair;
         console.log('[DEBUG ③] statusフィールドの値:', data.status);
         if (data.status === 'confirmed') {
           console.log('[DEBUG ③] confirmedのペアが見つかりました:', doc.id);
@@ -96,7 +98,12 @@ export default function PairPoints() {
 
         // ログからポイント加算
         logsSnap.docs.forEach((doc) => {
-          const data = doc.data();
+          const data = doc.data() as {
+            userId: string;
+            point: number;
+            completedAt: string;
+          };
+
           const date = parseISO(data.completedAt);
           if (!isWithinInterval(date, { start: weekStart, end: weekEnd })) return;
 
@@ -118,7 +125,7 @@ export default function PairPoints() {
       const q2 = query(pairsRef, where('emailB', '==', email));
       const snap2 = await getDocs(q2);
       for (const doc of snap2.docs) {
-        const data = doc.data();
+        const data = doc.data() as Pair;
         if (data.status === 'pending') {
           setPairStatus('pending');
           return;
@@ -129,7 +136,7 @@ export default function PairPoints() {
       const q3 = query(pairsRef, where('userAId', '==', uid));
       const snap3 = await getDocs(q3);
       for (const doc of snap3.docs) {
-        const data = doc.data();
+        const data = doc.data() as Pair;
         if (data.status === 'pending') {
           setPairStatus('pending');
           return;

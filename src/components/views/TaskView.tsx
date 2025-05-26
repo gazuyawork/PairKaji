@@ -16,12 +16,12 @@ import {
   deleteDoc,
   serverTimestamp,
   doc,
-  setDoc,
   getDocs,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
+import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -44,46 +44,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
 
   const toggleDone = async (period: Period, index: number) => {
     const task = tasksState[period][index];
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const newDone = !task.done;
-
-    await updateDoc(doc(db, 'tasks', task.id), {
-      done: newDone,
-      skipped: false,
-      completedAt: newDone ? now.toISOString() : '',
-    });
-
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-
-    const docId = `${task.id}_${uid}_${todayStr}`;
-    const targetDocRef = doc(db, 'taskCompletions', docId);
-    const logDocRef = doc(db, 'task_logs', docId);
-
-    if (newDone) {
-      await setDoc(targetDocRef, {
-        taskId: task.id,
-        userId: uid,
-        date: todayStr,
-        point: task.point,
-        taskName: task.name,
-        person: task.person,
-      });
-
-      await setDoc(logDocRef, {
-        taskId: task.id,
-        userId: uid,
-        taskName: task.name,
-        point: task.point,
-        period: task.period,
-        completedAt: now.toISOString(),
-        date: todayStr,
-      });
-    } else {
-      await deleteDoc(targetDocRef);
-      await deleteDoc(logDocRef);
-    }
+    await toggleTaskDoneStatus(task, !task.done);
   };
 
   const deleteTask = async (period: Period, id: string) => {
@@ -102,7 +63,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
 
       await updateDoc(doc(db, 'tasks', updated.id), {
         name: updated.name,
-        frequency: newPeriod,
+        period: newPeriod,
         point: updated.point,
         users: updated.users,
         daysOfWeek: cleanedDaysOfWeek,
@@ -151,7 +112,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
         const rawTasks = snapshot.docs.map((doc): Task => {
           const data = doc.data();
           const user = data.users?.[0] ?? '未設定';
-          const period = data.frequency as Period;
+          const period = data.period as Period;
           const image =
             user === '太郎'
               ? storedProfileImage || '/images/taro.png'
@@ -163,7 +124,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
             id: doc.id,
             title: data.title ?? data.name ?? '',
             name: data.name ?? '',
-            frequency: period,
+            period: period,
             point: data.point ?? 0,
             done: data.done ?? false,
             skipped: data.skipped ?? false,
@@ -175,7 +136,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
             dates: data.dates ?? [],
             isTodo: data.isTodo ?? false,
             users: data.users ?? [],
-            period,
             scheduledDate: data.dates?.[0] ?? '',
             visible: data.visible ?? false,
           };

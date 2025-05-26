@@ -9,7 +9,7 @@ import { useRef } from 'react';
 type CalendarTask = {
   id: string;
   name: string;
-  frequency: '毎日' | '週次' | '不定期';
+  period: '毎日' | '週次' | '不定期';
   dates?: string[];
   daysOfWeek?: string[];
 };
@@ -57,7 +57,7 @@ export default function TaskCalendar({ tasks }: Props) {
                 isSameDay(parseISO(dateStr), day)
               );
               const weeklyMatches =
-                task.frequency === '週次' &&
+                task.period === '週次' &&
                 task.daysOfWeek?.includes(String(day.getDay()));
               return dateMatches || weeklyMatches;
             });

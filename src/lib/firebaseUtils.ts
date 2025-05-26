@@ -4,9 +4,9 @@ import {
   doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, 
   collection, query, where, getDocs, serverTimestamp 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import type { FirestoreTask } from '@/types/Task';
-import { auth } from '@/lib/firebase'; // 必要なら追加
+import { auth, db } from '@/lib/firebase';
+import type { Task } from '@/types/Task';
 
 // 🔹 ユーザープロフィール取得
 export const getUserProfile = async (uid: string) => {
@@ -140,6 +140,53 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
 export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
   try {
     await deleteDoc(doc(db, 'tasks', taskId));
+  } catch (err) {
+    handleFirestoreError(err);
+  }
+};
+
+export const toggleTaskDoneStatus = async (task: Task, newDone: boolean) => {
+  try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('ログインしていません');
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // tasksコレクションの更新
+    await updateDoc(doc(db, 'tasks', task.id), {
+      done: newDone,
+      skipped: false,
+      completedAt: newDone ? now.toISOString() : '',
+    });
+
+    const docId = `${task.id}_${uid}_${todayStr}`;
+    const targetDocRef = doc(db, 'taskCompletions', docId);
+    const logDocRef = doc(db, 'task_logs', docId);
+
+    if (newDone) {
+      await setDoc(targetDocRef, {
+        taskId: task.id,
+        userId: uid,
+        date: todayStr,
+        point: task.point,
+        taskName: task.name,
+        person: task.person ?? '',
+      });
+
+      await setDoc(logDocRef, {
+        taskId: task.id,
+        userId: uid,
+        taskName: task.name,
+        point: task.point,
+        period: task.period,
+        completedAt: now.toISOString(),
+        date: todayStr,
+      });
+    } else {
+      await deleteDoc(targetDocRef);
+      await deleteDoc(logDocRef);
+    }
   } catch (err) {
     handleFirestoreError(err);
   }

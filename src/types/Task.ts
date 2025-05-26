@@ -1,4 +1,5 @@
 // /src/types/Task.ts
+import type { Timestamp } from 'firebase/firestore';
 
 export type Period = '毎日' | '週次' | '不定期';
 
@@ -7,15 +8,15 @@ export type FirestoreTask = {
   userId: string;
   userIds: string[];
   name: string;
-  frequency: Period;
+  period: Period;
   point: number;
   users: string[];
   daysOfWeek: string[]; // 数字形式（例: ["0", "1", "2"]）
   dates: string[];
   groupId?: string | null;
   isTodo: boolean;
-  createdAt?: any; // FirestoreのTimestamp型
-  updatedAt?: any;
+  createdAt?: Timestamp; // FirestoreのTimestamp型
+  updatedAt?: Timestamp;
   visible?: boolean;
 };
 
@@ -23,7 +24,6 @@ export type FirestoreTask = {
 export type Task = {
   id: string;
   name: string;
-  frequency: Period;
   point: number;
   users: string[];
   daysOfWeek: string[]; // 日本語表記（例: ["月", "火"]）

@@ -39,7 +39,7 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
       snapshot.docs.forEach(docSnap => {
         const data = docSnap.data();
         const point = data.point ?? 0;
-        const freq = data.frequency;
+        const freq = data.period;
         const days = data.daysOfWeek ?? [];
 
         if (freq === '毎日') {

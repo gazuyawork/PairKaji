@@ -29,7 +29,7 @@ export default function HomeView() {
           id: doc.id,
           name: data.name ?? '',
           title: data.name ?? '',
-          frequency: data.frequency,
+          period: data.period,
           point: data.point ?? 0,
           users: data.users ?? [],
           daysOfWeek: data.daysOfWeek ?? [],
@@ -44,7 +44,6 @@ export default function HomeView() {
               : user === '花子'
               ? localStorage.getItem('hanakoImage') ?? '/images/hanako.png'
               : '/images/default.png',
-          period: data.frequency,
           scheduledDate: data.dates?.[0] ?? '',
         };
       });
@@ -79,10 +78,10 @@ export default function HomeView() {
 
         <div className="min-h-[164px] horizontal-scroll">
           <TaskCalendar
-            tasks={tasks.map(({ id, name, frequency, dates, daysOfWeek }) => ({
+            tasks={tasks.map(({ id, name, period, dates, daysOfWeek }) => ({
               id,
               name,
-              frequency,
+              period: period ?? '毎日', // ← undefined の場合は '毎日' にする
               dates,
               daysOfWeek,
             }))}

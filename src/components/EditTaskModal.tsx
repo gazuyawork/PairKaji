@@ -29,7 +29,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
         daysOfWeek: task.daysOfWeek?.map(num => dayNumberToName[num]) ?? [],
         dates: task.dates ?? [],
         users: task.users ?? [],
-        period: task.period ?? task.frequency,
+        period: task.period ?? task.period,
       });
     }
   }, [task]);

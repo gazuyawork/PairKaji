@@ -33,7 +33,7 @@ export default function TaskManagePage() {
       {
         id: newId,
         name: '',
-        frequency: '毎日',
+        period: '毎日',
         point: 10,
         users: ['太郎', '花子'],
         daysOfWeek: [],
@@ -176,7 +176,7 @@ export default function TaskManagePage() {
       const loadedTasks: Task[] = fetched.map(({ id, data }) => ({
         id,
         name: data.name,
-        frequency: data.frequency,
+        period: data.period,
         point: data.point,
         users: data.users,
         daysOfWeek: data.daysOfWeek.map(d => dayNumberToName[d] ?? d),
@@ -190,7 +190,6 @@ export default function TaskManagePage() {
         skipped: false,
         person: '',
         image: '',
-        period: data.frequency,
       }));
 
       setTasks(loadedTasks);
@@ -226,7 +225,7 @@ export default function TaskManagePage() {
 
         <div className="space-y-2.5 pb-40">
           {tasks
-            .filter(task => !filter || task.frequency === filter)
+            .filter(task => !filter || task.period === filter)
             .filter(task => !personFilter || task.users.includes(personFilter))
             .filter(task => (task.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
             .map(task => (

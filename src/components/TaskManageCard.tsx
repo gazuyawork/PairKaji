@@ -5,6 +5,8 @@
 import { useSwipeable } from 'react-swipeable';
 import Image from 'next/image';
 import type { TaskManageTask } from '@/types/Task';
+import type { Period } from '@/types/Task';
+
 
 type Props = {
   task: TaskManageTask;
@@ -83,14 +85,20 @@ export default function TaskManageCard({
 
       <div className="flex items-center justify-between">
         <select
-          value={task.frequency}
-          onChange={(e) => onChange(task.id, 'frequency', e.target.value as TaskManageTask['frequency'])}
+          value={task.period ?? ''}
+            onChange={(e) => {
+              const newValue = e.target.value as Period;
+              onChange(task.id, 'period', newValue);
+            }}
           className="bg-transparent outline-none border-b border-gray-300"
         >
           {['毎日', '週次', '不定期'].map((f) => (
-            <option key={f} value={f}>{f}</option>
+            <option key={f} value={f}>
+              {f}
+            </option>
           ))}
         </select>
+
 
         <div className="flex items-center w-20">
           <select
@@ -141,7 +149,7 @@ export default function TaskManageCard({
         </div>
       </div>
 
-      {task.frequency === '週次' && (
+      {task.period === '週次' && (
         <div className="flex gap-2 pt-1">
           {dayNames.map((day) => (
             <button
@@ -159,7 +167,7 @@ export default function TaskManageCard({
         </div>
       )}
 
-      {task.frequency === '不定期' && (
+      {task.period === '不定期' && (
         <div className="pt-1">
           <label className="text-sm text-gray-600">日付選択：</label>
           <input

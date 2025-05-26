@@ -8,7 +8,7 @@ export type TodoItem = {
 export type TodoOnlyTask = {
   id: string;
   name: string;
-  frequency: '毎日' | '週次' | '不定期';
+  period: '毎日' | '週次' | '不定期';
   todos: TodoItem[];
   visible: boolean;
   isTodo: boolean;

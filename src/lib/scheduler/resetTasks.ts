@@ -24,7 +24,7 @@ export const resetCompletedTasks = async () => {
 
     let shouldReset = false;
 
-    if (task.frequency === '毎日' || task.frequency === '週次') {
+    if (task.period === '毎日' || task.period === '週次') {
       if (completedAt && !isDoneToday) shouldReset = true;
     }
 
