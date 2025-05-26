@@ -18,6 +18,9 @@ import {
   removePair, deletePair, 
   handleFirestoreError, generateInviteCode 
 } from '@/lib/firebaseUtils';
+import ProfileCard from '@/components/profile/ProfileCard';
+import PartnerSettings from '@/components/profile/PartnerSettings';
+
 
 
 export default function ProfilePage() {
@@ -37,6 +40,18 @@ export default function ProfilePage() {
   const [isPairConfirmed, setIsPairConfirmed] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pairDocId, setPairDocId] = useState<string | null>(null);
+
+  const onEditNameHandler = () => {
+    toast.success('氏名の編集機能は未実装です'); // 必要ならロジック追加
+  };
+
+  const onEditEmailHandler = () => {
+    setIsEmailModalOpen(true);
+  };
+
+  const onEditPasswordHandler = () => {
+    setIsPasswordModalOpen(true);
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -201,186 +216,34 @@ export default function ProfilePage() {
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Profile" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
-        <div className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6">
 
-        <p className="ml-4 mb-6">
-          <label className="text-[#5E5E5E] font-semibold">プロフィール</label>
-        </p>
+        <ProfileCard
+          profileImage={profileImage}
+          setProfileImage={setProfileImage} // ←追加
+          name={name}
+          setName={setName}
+          isGoogleUser={isGoogleUser}
+          onEditName={onEditNameHandler}
+          onEditEmail={onEditEmailHandler}
+          onEditPassword={onEditPasswordHandler}
+          email={email}
+        />
 
-        {isProfileLoading ? (
-        <div className="flex items-center justify-center min-h-[260px] text-gray-400 text-sm">
-          <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-        </div>
-        ) : (
-          <>
-
-            <div className="flex flex-row flex-nowrap items-center gap-6 overflow-x-auto">
-              <div className="relative shrink-0">
-                <Image
-                  src={profileImage || '/images/default.png'}
-                  alt="プロフィール画像"
-                  width={100}
-                  height={100}
-                  className="h-24 aspect-square rounded-full object-cover border border-gray-300"
-                />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
-                />
-              </div>
-              <div className="flex-1 space-y-1 min-w-0">
-                <label className="text-[#5E5E5E] font-semibold">氏名</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="min-w-0 flex-grow text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
-                  />
-                  <button
-                    className="w-12 h-8 rounded-sm text-sm bg-[#FFCB7D] text-white shadow"
-                  >
-                    変更
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[#5E5E5E] font-semibold flex items-center gap-2">
-                  メールアドレス
-                  {isGoogleUser && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
-                      Googleログインでは変更不可
-                    </span>
-                  )}
-                </label>
-                <div className="flex gap-2 items-center">
-                  <p className="flex-1 text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
-                  {!isGoogleUser && (
-                    <button
-                      onClick={() => setIsEmailModalOpen(true)}
-                      className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
-                    >
-                      変更
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[#5E5E5E] font-semibold flex items-center gap-2">
-                  パスワード
-                  {isGoogleUser && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
-                      Googleログインでは変更不可
-                    </span>
-                  )}
-                </label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="password"
-                    value={'●●●●●●●●'}
-                    readOnly
-                    className="flex-1 text-[#5E5E5E] border-b border-gray-300 py-1 tracking-widest focus:outline-none"
-                  />
-                  {!isGoogleUser && (
-                    <button
-                      onClick={() => setIsPasswordModalOpen(true)}
-                      className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
-                    >
-                      変更
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-        </div>
-
-        <div className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-3">
-          <p className="mb-6">
-            <label className="text-[#5E5E5E] font-semibold">パートナー設定</label>
-          </p>
-          {isPairLoading ? (
-            <div className="flex items-center justify-center text-gray-400 text-sm">
-              <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-            </div>
-
-          ) : (
-            <>
-              {pendingApproval && (
-                <>
-                  <p className="text-gray-600 text-sm">{pendingApproval.emailB} さんとして招待されています</p>
-                  <p className="text-gray-600 text-sm">招待コード: {pendingApproval.inviteCode}</p>
-                  <button
-                    onClick={handleApprovePair}
-                    className="w-full bg-[#FFCB7D] text-white py-2 rounded shadow text-sm"
-                  >
-                    承認する
-                  </button>
-                  <button
-                    onClick={handleRejectPair}
-                    className="w-full bg-gray-300 text-white py-2 rounded shadow text-sm"
-                  >
-                    拒否する
-                  </button>
-                </>
-              )}
-
-              {!isPairConfirmed && !pendingApproval && (
-                <>
-                  <div>
-                    <input
-                      type="email"
-                      value={partnerEmail}
-                      onChange={(e) => setPartnerEmail(e.target.value)}
-                      placeholder="partner@example.com"
-                      className="w-full border-b border-gray-300 py-1 px-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[#5E5E5E] font-semibold">招待コード（自動生成）</label>
-                    <p className="text-[#5E5E5E] border-b border-b-gray-200 py-1 tracking-widest">
-                      {inviteCode || '未設定'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={pairDocId ? handleCancelInvite : handleSendInvite}
-                    className={`w-full py-2 rounded shadow text-sm ${
-                      pairDocId ? 'bg-gray-300 text-red-500 hover:underline' : 'bg-[#FFCB7D] text-white'
-                    }`}
-                  >
-                    {pairDocId ? '招待を取り消す' : '招待コードを発行'}
-                  </button>
-                </>
-              )}
-
-              {isPairConfirmed && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Image
-                      src={partnerImage}
-                      alt="パートナー画像"
-                      width={60}
-                      height={60}
-                      className="w-16 h-16 rounded-full object-cover border border-gray-300"
-                    />
-                    <div className="text-[#5E5E5E]">
-                      <p className="font-semibold">パートナー承認済み</p>
-                      <p>{partnerEmail}</p>
-                    </div>
-                  </div>
-                  <button onClick={handleRemovePair} className="text-red-500">
-                    <X size={24} />
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <PartnerSettings
+          isPairLoading={isPairLoading}
+          pendingApproval={pendingApproval}
+          isPairConfirmed={isPairConfirmed}
+          partnerEmail={partnerEmail}
+          partnerImage={partnerImage}
+          inviteCode={inviteCode}
+          pairDocId={pairDocId}
+          onApprovePair={handleApprovePair}
+          onRejectPair={handleRejectPair}
+          onCancelInvite={handleCancelInvite}
+          onSendInvite={handleSendInvite}
+          onRemovePair={handleRemovePair}
+          onChangePartnerEmail={setPartnerEmail}
+        />
 
       </main>
       <div className="text-center mt-auto mb-10">

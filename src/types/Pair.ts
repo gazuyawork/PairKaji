@@ -14,7 +14,7 @@ export interface Pair {
 
 export interface PendingApproval {
   pairId: string;
-  inviterUid?: string;
-  emailB?: string;
-  inviteCode?: string;
+  inviterUid: string;
+  emailB: string;
+  inviteCode: string;
 }
