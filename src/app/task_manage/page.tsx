@@ -8,23 +8,15 @@ import { useState, useEffect } from 'react';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import type { Period } from '@/types/Task';
-import { db, auth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { toast } from 'sonner'; 
-import { fetchTasksForUser, saveTaskToFirestore } from '@/lib/firebaseUtils';
-import type { FirestoreTask } from '@/types/Task';
+import { fetchTasksForUser } from '@/lib/firebaseUtils';
 import { deleteTaskFromFirestore } from '@/lib/firebaseUtils';
-import { getDocs, query, where, collection } from 'firebase/firestore';
 import type { Task } from '@/types/Task';
 import TaskManageCard from '@/components/TaskManageCard'; 
 import type { TaskManageTask } from '@/types/Task';
-
-const dayNumberToName: Record<string, string> = {
-  '0': '日','1': '月','2': '火','3': '水','4': '木','5': '金','6': '土',
-};
-
-const dayNameToNumber: Record<string, string> = {
-  '日': '0','月': '1','火': '2','水': '3','木': '4','金': '5','土': '6',
-};
+import { dayNumberToName } from '@/lib/constants';
+import { fetchPairUserIds, saveAllTasks } from '@/lib/taskUtils';
 
 export default function TaskManagePage() {
   const [tasks, setTasks] = useState<TaskManageTask[]>([]);
@@ -107,43 +99,22 @@ export default function TaskManagePage() {
   };
   
   const handleUserToggle = (id: string, user: string) => {
-    setTasks(prev =>
-      prev.map(task => {
-        if (task.id !== id) return task;
-
-        const isSelected = task.users.includes(user);
-        if (isSelected) {
-          // OFFにする
-          return {
-            ...task,
-            users: task.users.filter(u => u !== user),
-            isEdited: !task.isNew ? true : task.isEdited,
-          };
-        } else {
-          // ONにする
-          return {
-            ...task,
-            users: [...task.users, user],
-            isEdited: !task.isNew ? true : task.isEdited,
-          };
-        }
-      })
-    );
+    updateTaskField(id, task => ({
+      users: task.users.includes(user)
+        ? task.users.filter(u => u !== user)
+        : [...task.users, user]
+    }));
   };
+
 
   const toggleDay = (id: string, day: string) => {
-    setTasks(prev =>
-      prev.map(task => {
-        if (task.id === id) {
-          const newDays = task.daysOfWeek.includes(day)
-            ? task.daysOfWeek.filter(d => d !== day)
-            : [...task.daysOfWeek, day];
-          return { ...task, daysOfWeek: newDays, isEdited: !task.isNew ? true : task.isEdited };
-        }
-        return task;
-      })
-    );
+    updateTaskField(id, task => ({
+      daysOfWeek: task.daysOfWeek.includes(day)
+        ? task.daysOfWeek.filter(d => d !== day)
+        : [...task.daysOfWeek, day]
+    }));
   };
+
 
   const toggleShowDelete = (id: string) => {
     setTasks(prev =>
@@ -151,6 +122,19 @@ export default function TaskManagePage() {
         ...task,
         showDelete: task.id === id ? !task.showDelete : false,
       }))
+    );
+  };
+
+  const updateTaskField = (
+    id: string,
+    updater: (task: TaskManageTask) => Partial<TaskManageTask>
+  ) => {
+    setTasks(prev =>
+      prev.map(task =>
+        task.id === id
+          ? { ...task, ...updater(task), isEdited: !task.isNew ? true : task.isEdited }
+          : task
+      )
     );
   };
 
@@ -173,45 +157,8 @@ export default function TaskManagePage() {
 
     if (hasEmptyName) return;
 
-    // 🔍 パートナー共有情報取得
-    let sharedUserIds: string[] = [uid];
-    try {
-      const pairSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
-      );
-      const confirmedPair = pairSnap.docs.find(doc => doc.data().status === 'confirmed');
-      if (confirmedPair) {
-        sharedUserIds = confirmedPair.data().userIds ?? [uid];
-      }
-    } catch (e) {
-      console.error('ペア情報の取得に失敗:', e);
-    }
-
-    for (const task of tasks) {
-      const daysOfWeek = task.frequency === '週次'
-        ? task.daysOfWeek.map(d => dayNameToNumber[d]).filter((d): d is string => d !== undefined)
-        : [];
-
-
-      const taskData: FirestoreTask = {
-        userId: uid,
-        userIds: sharedUserIds,
-        name: task.name,
-        frequency: task.frequency,
-        point: task.point,
-        users: task.users,
-        daysOfWeek,
-        dates: task.dates,
-        groupId: task.groupId ?? null,
-        isTodo: task.isTodo ?? false,
-      };
-
-      try {
-        await saveTaskToFirestore(task.isNew ? null : task.id, taskData);
-      } catch (e) {
-        console.error('タスク保存失敗:', e);
-      }
-    }
+    const sharedUserIds = await fetchPairUserIds(uid);
+    await saveAllTasks(tasks, uid, sharedUserIds);
 
     setTasks(prev =>
       prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))

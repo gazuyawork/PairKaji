@@ -1,0 +1,54 @@
+// /lib/taskUtils.ts
+
+import { getDocs, query, where, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { saveTaskToFirestore } from '@/lib/firebaseUtils';
+import type { TaskManageTask, FirestoreTask } from '@/types/Task';
+import { dayNameToNumber } from '@/lib/constants';
+import { toast } from 'sonner';
+
+export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
+  try {
+    const pairSnap = await getDocs(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
+    );
+    const confirmedPair = pairSnap.docs.find(doc => doc.data().status === 'confirmed');
+    return confirmedPair?.data().userIds ?? [uid];
+  } catch (e) {
+    console.error('ペア情報の取得に失敗:', e);
+    return [uid];
+  }
+};
+
+export const buildFirestoreTaskData = (
+  task: TaskManageTask,
+  uid: string,
+  userIds: string[]
+): FirestoreTask => {
+  return {
+    userId: uid,
+    userIds,
+    name: task.name,
+    frequency: task.frequency,
+    point: task.point,
+    users: task.users,
+    daysOfWeek: task.frequency === '週次'
+      ? task.daysOfWeek.map(d => dayNameToNumber[d]).filter((d): d is string => d !== undefined)
+      : [],
+    dates: task.dates,
+    groupId: task.groupId ?? null,
+    isTodo: task.isTodo ?? false,
+  };
+};
+
+export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds: string[]) => {
+  for (const task of tasks) {
+    const taskData = buildFirestoreTaskData(task, uid, userIds);
+    try {
+      await saveTaskToFirestore(task.isNew ? null : task.id, taskData);
+    } catch (e) {
+      console.error('タスク保存失敗:', e);
+      toast.error('タスクの保存に失敗しました');
+    }
+  }
+};

@@ -19,41 +19,34 @@ export type FirestoreTask = {
   visible?: boolean;
 };
 
-// アプリでの共通表示用Task型（画面全体で使う基本の型）
+// アプリ共通で使うTask型（画面表示用ベース型）
 export type Task = {
   id: string;
   name: string;
   frequency: Period;
   point: number;
   users: string[];
-  daysOfWeek: string[]; // 曜日名で持つ（例: ["月", "火"]）
+  daysOfWeek: string[]; // 日本語表記（例: ["月", "火"]）
   dates: string[];
   isTodo: boolean;
-  done?: boolean;
-  skipped?: boolean;
-  person?: string;
-  image?: string;
+  done?: boolean; // 完了済みフラグ
+  skipped?: boolean; // スキップ済みフラグ
+  person?: string; // 割り当てユーザー（表示用）
+  image?: string; // ユーザーアイコン（表示用）
   groupId?: string | null;
-  period?: Period; // 表示用の補助
-  scheduledDate?: string; // 不定期用
+  period?: Period; // 表示用補助（必要なら）
+  scheduledDate?: string; // 不定期用（必要なら）
   visible?: boolean; // Firestoreから取得する値
-  userIds?: string[];
-  completedAt?: string;
-  completedBy?: string;
-  title?: string;
+  userIds?: string[]; // FirestoreのuserIds（必要なら）
+  completedAt?: string; // 完了日時（必要なら）
+  completedBy?: string; // 完了者（必要なら）
+  title?: string; // 表示用タイトル（必要なら）
 };
 
-// Task管理画面専用（TaskManageTask）: Task + 管理用フラグ
+// タスク管理画面専用の型（Task + 管理画面用の一時フラグ）
 export type TaskManageTask = Task & {
-  isNew?: boolean;
-  isEdited?: boolean;
-  showDelete?: boolean;
-  nameError?: boolean;
+  isNew?: boolean; // 新規作成フラグ
+  isEdited?: boolean; // 編集フラグ
+  showDelete?: boolean; // 削除ボタン表示用
+  nameError?: boolean; // 名前未入力エラー用
 };
-
-// Task表示画面専用（TaskViewTask）: Task + 完了情報
-// export type TaskViewTask = Task & {
-//   completedAt?: string;
-//   completedBy?: string;
-//   userIds?: string[];
-// };
