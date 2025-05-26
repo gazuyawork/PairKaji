@@ -5,6 +5,8 @@
 import Image from 'next/image';
 import { ReactNode } from 'react';
 import type { Period } from '@/types/Task';
+import { useProfileImages } from '@/hooks/useProfileImages';
+
 
 interface Props {
   personFilter: string | null;
@@ -26,9 +28,10 @@ export default function FilterControls({
   extraButton,
 }: Props) {
   const periods = ['毎日', '週次', '不定期'] as const;
+  const { profileImage, partnerImage } = useProfileImages();
   const users = [
-    { name: '太郎', image: '/images/taro.png' },
-    { name: '花子', image: '/images/hanako.png' },
+    { name: '太郎', image: profileImage },
+    { name: '花子', image: partnerImage },
   ];
 
   const showClear = !!(periodFilter || personFilter || searchTerm);

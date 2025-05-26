@@ -7,6 +7,7 @@ import { parseISO, isSameDay } from 'date-fns';
 import Image from 'next/image';
 import type { Task } from '@/types/Task';
 import { onSnapshot } from 'firebase/firestore';
+import { useProfileImages } from '@/hooks/useProfileImages';
 
 interface CompletionLog {
   taskId: string;
@@ -24,6 +25,7 @@ type Props = {
 
 export default function FinishDayTask({ tasks }: Props) {
   const [logs, setLogs] = useState<CompletionLog[]>([]);
+  const { profileImage, partnerImage } = useProfileImages();
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -64,12 +66,6 @@ export default function FinishDayTask({ tasks }: Props) {
     fetchLogs();
   }, [tasks]); // ← tasksが変わるたびに再取得
 
-  const getProfileImage = (person?: string) => {
-    if (person === '太郎') return localStorage.getItem('profileImage') || '/images/taro.png';
-    if (person === '花子') return localStorage.getItem('partnerImage') || '/images/hanako.png';
-    return '/images/default.png';
-  };
-
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-md overflow-hidden max-h-[300px]">
       {/* 固定ヘッダー */}
@@ -84,10 +80,7 @@ export default function FinishDayTask({ tasks }: Props) {
         ) : (
           <ul className="space-y-2 text-left">
             {logs.map((log, idx) => (
-              <li
-                key={idx}
-                className="flex items-center gap-4 border-b pb-1 text-[#5E5E5E]"
-              >
+              <li key={idx} className="flex items-center gap-4 border-b pb-1 text-[#5E5E5E]">
                 <div className="w-[100px] truncate text-ellipsis overflow-hidden whitespace-nowrap">
                   {log.taskName ?? '（タスク名なし）'}
                 </div>
@@ -95,7 +88,13 @@ export default function FinishDayTask({ tasks }: Props) {
                   <div className="w-[60px] text-right text-gray-600 pr-4">{log.point}pt</div>
                   <div className="w-[36px] h-[36px] flex-shrink-0">
                     <Image
-                      src={getProfileImage(log.person)}
+                      src={
+                        log.person === '太郎'
+                          ? profileImage
+                          : log.person === '花子'
+                            ? partnerImage
+                            : '/images/default.png'
+                      }
                       alt="icon"
                       width={38}
                       height={38}

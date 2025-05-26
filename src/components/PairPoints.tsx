@@ -11,6 +11,8 @@ import {
   where,
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { useProfileImages } from '@/hooks/useProfileImages';
+
 
 interface UserPoints {
   [userId: string]: {
@@ -24,6 +26,7 @@ export default function PairPoints() {
   const router = useRouter();
   const [userPoints, setUserPoints] = useState<UserPoints | null>(null);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'pending' | 'none'>('none');
+  const { profileImage, partnerImage } = useProfileImages();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,8 +42,6 @@ export default function PairPoints() {
         console.log('[DEBUG ①] ユーザー情報が取得できていません。早期returnします。');
         return;
       }
-
-      if (!uid || !email) return;
 
       const pairsRef = collection(db, 'pairs');
 
@@ -82,15 +83,14 @@ export default function PairPoints() {
 
         const pointsMap: UserPoints = {};
 
+
         // 初期化：2人分を0ptでセット
         pairUserIds.forEach((userId) => {
           const isCurrentUser = userId === uid;
           pointsMap[userId] = {
             name: '未設定',
             points: 0,
-            image: isCurrentUser
-              ? localStorage.getItem('profileImage') || '/images/taro.png'
-              : localStorage.getItem('partnerImage') || '/images/hanako.png',
+            image: isCurrentUser ? profileImage : partnerImage,
           };
         });
 

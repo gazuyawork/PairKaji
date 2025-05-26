@@ -17,14 +17,15 @@ import TaskManageCard from '@/components/TaskManageCard';
 import type { TaskManageTask } from '@/types/Task';
 import { dayNumberToName } from '@/lib/constants';
 import { fetchPairUserIds, saveAllTasks } from '@/lib/taskUtils';
+import { useProfileImages } from '@/hooks/useProfileImages';
+
 
 export default function TaskManagePage() {
   const [tasks, setTasks] = useState<TaskManageTask[]>([]);
   const [filter, setFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [profileImage, setProfileImage] = useState<string>('/images/taro.png');
-  const [partnerImage, setPartnerImage] = useState<string>('/images/hanako.png');
+  const { profileImage, partnerImage } = useProfileImages();
   const addTask = () => {
     const newId = crypto.randomUUID();
     const newGroupId = crypto.randomUUID();
@@ -165,18 +166,6 @@ export default function TaskManagePage() {
     );
     toast.success('タスクを保存しました');
   };
-
-  useEffect(() => {
-    const storedProfileImage = localStorage.getItem('profileImage');
-    const storedPartnerImage = localStorage.getItem('partnerImage');
-
-    if (storedProfileImage) {
-      setProfileImage(storedProfileImage);
-    }
-    if (storedPartnerImage) {
-      setPartnerImage(storedPartnerImage);
-    }
-  }, []);
 
   useEffect(() => {
     const fetchTasks = async () => {
