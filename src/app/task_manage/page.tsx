@@ -5,224 +5,29 @@
 import Header from '@/components/Header';
 import { Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import type { Period } from '@/types/Task';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { useSwipeable } from 'react-swipeable';
 import { toast } from 'sonner'; 
-import { deleteDoc } from 'firebase/firestore';
+import { fetchTasksForUser, saveTaskToFirestore } from '@/lib/firebaseUtils';
+import type { FirestoreTask } from '@/types/Task';
+import { deleteTaskFromFirestore } from '@/lib/firebaseUtils';
+import { getDocs, query, where, collection } from 'firebase/firestore';
+import type { Task } from '@/types/Task';
+import TaskManageCard from '@/components/TaskManageCard'; 
+import type { TaskManageTask } from '@/types/Task';
 
 const dayNumberToName: Record<string, string> = {
-  '0': '日',
-  '1': '月',
-  '2': '火',
-  '3': '水',
-  '4': '木',
-  '5': '金',
-  '6': '土',
+  '0': '日','1': '月','2': '火','3': '水','4': '木','5': '金','6': '土',
 };
 
-
-interface Task {
-  id: string;
-  name: string;
-  frequency: '毎日' | '週次' | '不定期';
-  point: number;
-  users: string[];
-  daysOfWeek: string[];
-  dates: string[];
-  groupId: string | null; // ← これが必要
-  isNew: boolean;
-  isEdited: boolean;
-  showDelete: boolean;
-  isTodo?: boolean;
-  nameError?: boolean;
-}
-
-
-interface TaskCardProps {
-  task: Task;
-  onChange: (id: string, key: keyof Task, value: string | number | string[] | boolean) => void;
-  onRemove: (id: string) => void;
-  onToggleUser: (id: string, user: string) => void;
-  onToggleDay: (id: string, day: string) => void;
-  onToggleDelete: (id: string) => void;
-  profileImage: string;
-  partnerImage: string;
-}
-
-const TaskCard: React.FC<TaskCardProps> = ({
-  task,
-  onChange,
-  onRemove,
-  onToggleUser,
-  onToggleDay,
-  onToggleDelete,
-  profileImage,
-  partnerImage,
-}) => {
-  const days = ['月', '火', '水', '木', '金', '土', '日'];
-
-
-  const handlers = useSwipeable({
-    onSwipedLeft: () => onToggleDelete(task.id),
-    delta: 50,
-  });
-
-
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDate = e.target.value;
-    onChange(task.id, 'dates', [newDate]);
-  };
-
-  return (
-    <div
-      {...handlers}
-      onClick={() => task.showDelete && onToggleDelete(task.id)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onToggleDelete(task.id); // ✅ 右クリックで削除トグル
-      }}
-      className="relative bg-white shadow rounded-2xl px-4 py-3 space-y-2 flex flex-col"
-    >
-      {(task.isNew || task.isEdited) && (
-        <div
-          className={`absolute -top-2 -left-2 w-4 h-4 rounded-full ${
-            task.isNew ? 'bg-red-400' : 'bg-blue-400'
-          }`}
-        />
-      )}
-
-      {task.showDelete && (
-        <button
-          className="absolute right-2 top-2 w-20 h-18 bg-[#ff6347] text-white font-bold rounded-xl shadow-md flex items-center justify-center z-10"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove(task.id);
-          }}
-        >
-          削除
-        </button>
-      )}
-
-      <div className="flex flex-col flex-1">
-        <input
-          type="text"
-          value={task.name}
-          placeholder="ここに家事を入力する"
-          onChange={(e) => onChange(task.id, 'name', e.target.value)}
-          className="text-[#5E5E5E] placeholder-gray-300 outline-none bg-transparent border-b border-gray-300"
-        />
-        {task.nameError && (
-          <p className="text-red-500 text-xs mt-1">タスク名を入力してください</p>
-        )}
-      </div>
-
-
-      <div className="flex items-center justify-between">
-        <select
-          value={task.frequency}
-          onChange={(e) => onChange(task.id, 'frequency', e.target.value as Task['frequency'])}
-          className="bg-transparent outline-none border-b border-gray-300"
-        >
-          {['毎日', '週次', '不定期'].map((f) => (
-            <option key={f} value={f}>{f}</option>
-          ))}
-        </select>
-
-        <div className="flex items-center w-20">
-          <select
-            value={task.point}
-            onChange={(e) => onChange(task.id, 'point', Number(e.target.value))}
-            className="w-20 bg-transparent outline-none border-b border-gray-300"
-          >
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => (
-              <option key={val} value={val}>{val}</option>
-            ))}
-          </select>
-          <span className="ml-1">pt</span>
-        </div>
-
-        <div className="flex gap-2">
-          {[{ name: '太郎', image: profileImage }, { name: '花子', image: partnerImage }].map((user, _, array) => (
-            <button
-              key={user.name}
-              onClick={() => {
-                const isSelected = task.users.includes(user.name);
-                const other = array.find(u => u.name !== user.name);
-                const isOtherSelected = other ? task.users.includes(other.name) : false;
-
-                if (isSelected && !isOtherSelected) {
-                  // 自分だけ ON → 自分を OFF、相手を ON
-                  onToggleUser(task.id, user.name);     // OFF
-                  if (other) onToggleUser(task.id, other.name); // ON
-                } else if (isSelected && isOtherSelected) {
-                  // 両方 ON → 自分だけ OFF
-                  onToggleUser(task.id, user.name);     // OFF
-                } else if (!isSelected) {
-                  // 自分が OFF → 自分を ON
-                  onToggleUser(task.id, user.name);     // ON
-                }
-              }}
-              className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
-                task.users.includes(user.name)
-                  ? 'border-[#FFCB7D] opacity-100'
-                  : 'border-gray-300 opacity-30'
-              }`}
-            >
-              <Image
-                src={user.image}
-                alt={`${user.name}のフィルター`}
-                width={32}
-                height={32}
-                className="object-cover w-full h-full"
-              />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {task.frequency === '週次' && (
-        <div className="flex gap-2 pt-1">
-          {days.map((day) => (
-            <button
-              key={day}
-              onClick={() => onToggleDay(task.id, day)}
-              className={`w-6 h-6 rounded-full text-xs font-bold ${
-                task.daysOfWeek.includes(day)
-                  ? 'bg-[#5E5E5E] text-white'
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {day}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {task.frequency === '不定期' && (
-        <div className="pt-1">
-          <label className="text-sm text-gray-600">日付選択：</label>
-          <input
-            type="date"
-            value={task.dates[0] || ''}
-            onChange={handleDateChange}
-            className="ml-2 border-b border-gray-300 px-2 py-1 text-sm bg-transparent focus:outline-none"
-          />
-        </div>
-      )}
-    </div>
-  );
+const dayNameToNumber: Record<string, string> = {
+  '日': '0','月': '1','火': '2','水': '3','木': '4','金': '5','土': '6',
 };
-
-TaskCard.displayName = 'TaskCard';
 
 export default function TaskManagePage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskManageTask[]>([]);
   const [filter, setFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -230,7 +35,7 @@ export default function TaskManagePage() {
   const [partnerImage, setPartnerImage] = useState<string>('/images/hanako.png');
   const addTask = () => {
     const newId = crypto.randomUUID();
-    const newGroupId = crypto.randomUUID(); // ← 追加（新しいgroupIdを生成）
+    const newGroupId = crypto.randomUUID();
     setTasks([
       {
         id: newId,
@@ -240,7 +45,12 @@ export default function TaskManagePage() {
         users: ['太郎', '花子'],
         daysOfWeek: [],
         dates: [],
-        groupId: newGroupId, // ← 追加
+        isTodo: false,
+        done: false,
+        skipped: false,
+        person: '',
+        image: '',
+        groupId: newGroupId,
         isNew: true,
         isEdited: false,
         showDelete: false,
@@ -249,13 +59,12 @@ export default function TaskManagePage() {
     ]);
   };
 
-  
+    const updateTask = (
+      id: string,
+      key: keyof TaskManageTask, // 修正
+      value: string | number | string[] | boolean
+    ) => {
 
-  const updateTask = (
-    id: string,
-    key: keyof Task,
-    value: string | number | string[] | boolean
-  ) => {
     setTasks(prev =>
       prev.map(task =>
         task.id === id
@@ -270,14 +79,13 @@ export default function TaskManagePage() {
     );
   };
 
-
   const removeTask = async (id: string) => {
     const taskToRemove = tasks.find(task => task.id === id);
     if (!taskToRemove) return;
 
     if (!taskToRemove.isNew) {
       try {
-        await deleteDoc(doc(db, 'tasks', id));
+        await deleteTaskFromFirestore(id);
         toast.success('タスクを削除しました');
       } catch (error) {
         console.error('Firestoreからの削除に失敗:', error);
@@ -298,31 +106,30 @@ export default function TaskManagePage() {
     setPersonFilter(prev => (prev === person ? null : person));
   };
   
-const handleUserToggle = (id: string, user: string) => {
-  setTasks(prev =>
-    prev.map(task => {
-      if (task.id !== id) return task;
+  const handleUserToggle = (id: string, user: string) => {
+    setTasks(prev =>
+      prev.map(task => {
+        if (task.id !== id) return task;
 
-      const isSelected = task.users.includes(user);
-      if (isSelected) {
-        // OFFにする
-        return {
-          ...task,
-          users: task.users.filter(u => u !== user),
-          isEdited: !task.isNew ? true : task.isEdited,
-        };
-      } else {
-        // ONにする
-        return {
-          ...task,
-          users: [...task.users, user],
-          isEdited: !task.isNew ? true : task.isEdited,
-        };
-      }
-    })
-  );
-};
-
+        const isSelected = task.users.includes(user);
+        if (isSelected) {
+          // OFFにする
+          return {
+            ...task,
+            users: task.users.filter(u => u !== user),
+            isEdited: !task.isNew ? true : task.isEdited,
+          };
+        } else {
+          // ONにする
+          return {
+            ...task,
+            users: [...task.users, user],
+            isEdited: !task.isNew ? true : task.isEdited,
+          };
+        }
+      })
+    );
+  };
 
   const toggleDay = (id: string, day: string) => {
     setTasks(prev =>
@@ -347,91 +154,70 @@ const handleUserToggle = (id: string, user: string) => {
     );
   };
 
-const confirmTasks = async () => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) {
-    toast.error('ログインしてください');
-    return;
-  }
-
-  let hasEmptyName = false;
-
-  setTasks(prev =>
-    prev.map(task => {
-      const isEmpty = !task.name.trim();
-      if (isEmpty) hasEmptyName = true;
-      return {
-        ...task,
-        nameError: isEmpty,
-      };
-    })
-  );
-
-  if (hasEmptyName) return;
-
-  // 🔍 パートナー共有情報取得
-  let sharedUserIds: string[] = [uid];
-  try {
-    const pairSnap = await getDocs(
-      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
-    );
-    const confirmedPair = pairSnap.docs.find(doc => doc.data().status === 'confirmed');
-    if (confirmedPair) {
-      sharedUserIds = confirmedPair.data().userIds ?? [uid];
+  const confirmTasks = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      toast.error('ログインしてください');
+      return;
     }
-  } catch (e) {
-    console.error('ペア情報の取得に失敗:', e);
-  }
 
-  for (const task of tasks) {
-    const dayNameToNumber: Record<string, string> = {
-      '日': '0', '月': '1', '火': '2', '水': '3', '木': '4', '金': '5', '土': '6',
-    };
-    const daysOfWeek =
-      task.frequency === '週次'
-        ? task.daysOfWeek.map((d) => dayNameToNumber[d])
-        : task.daysOfWeek;
+    let hasEmptyName = false;
 
-    const taskData = {
-      userId: uid,
-      userIds: sharedUserIds,
-      name: task.name,
-      frequency: task.frequency,
-      point: task.point,
-      users: task.users,
-      daysOfWeek,
-      dates: task.dates,
-      groupId: task.groupId, // ← 追加
-      isTodo: task.isTodo ?? false,
-      updatedAt: serverTimestamp(),
-    };
+    setTasks(prev =>
+      prev.map(task => {
+        const isEmpty = !task.name.trim();
+        if (isEmpty) hasEmptyName = true;
+        return { ...task, nameError: isEmpty };
+      })
+    );
 
+    if (hasEmptyName) return;
 
+    // 🔍 パートナー共有情報取得
+    let sharedUserIds: string[] = [uid];
     try {
-      if (task.isNew) {
-        await addDoc(collection(db, 'tasks'), {
-          ...taskData,
-          createdAt: serverTimestamp(),
-        });
-      } else if (task.isEdited) {
-        await updateDoc(doc(db, 'tasks', task.id), taskData);
+      const pairSnap = await getDocs(
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
+      );
+      const confirmedPair = pairSnap.docs.find(doc => doc.data().status === 'confirmed');
+      if (confirmedPair) {
+        sharedUserIds = confirmedPair.data().userIds ?? [uid];
       }
     } catch (e) {
-      console.error('タスク保存失敗:', e);
+      console.error('ペア情報の取得に失敗:', e);
     }
-  }
 
-  setTasks(prev =>
-    prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
-  );
-  toast.success('タスクを保存しました');
-};
+    for (const task of tasks) {
+      const daysOfWeek = task.frequency === '週次'
+        ? task.daysOfWeek.map(d => dayNameToNumber[d]).filter((d): d is string => d !== undefined)
+        : [];
 
-  // const clearFilters = () => {
-  //   setFilter(null);
-  //   setPersonFilter(null);
-  //   setSearchTerm('');
-  // };
+
+      const taskData: FirestoreTask = {
+        userId: uid,
+        userIds: sharedUserIds,
+        name: task.name,
+        frequency: task.frequency,
+        point: task.point,
+        users: task.users,
+        daysOfWeek,
+        dates: task.dates,
+        groupId: task.groupId ?? null,
+        isTodo: task.isTodo ?? false,
+      };
+
+      try {
+        await saveTaskToFirestore(task.isNew ? null : task.id, taskData);
+      } catch (e) {
+        console.error('タスク保存失敗:', e);
+      }
+    }
+
+    setTasks(prev =>
+      prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
+    );
+    toast.success('タスクを保存しました');
+  };
 
   useEffect(() => {
     const storedProfileImage = localStorage.getItem('profileImage');
@@ -445,33 +231,31 @@ const confirmTasks = async () => {
     }
   }, []);
 
-
-
   useEffect(() => {
     const fetchTasks = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
-      const snapshot = await getDocs(q);
-      const loadedTasks: Task[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name ?? '',
-          frequency: data.frequency ?? '毎日',
-          point: data.point ?? 1,
-          users: Array.isArray(data.users) ? data.users : [],
-          daysOfWeek: (data.daysOfWeek ?? []).map((d: string) => dayNumberToName[d] ?? d),
-          dates: Array.isArray(data.dates) ? data.dates : [],
-          groupId: data.groupId ?? null, // ← 追加
-          isTodo: data.isTodo ?? false,
-          isNew: false,
-          isEdited: false,
-          showDelete: false,
-        };
-      });
-
+      const fetched = await fetchTasksForUser(uid);
+      const loadedTasks: Task[] = fetched.map(({ id, data }) => ({
+        id,
+        name: data.name,
+        frequency: data.frequency,
+        point: data.point,
+        users: data.users,
+        daysOfWeek: data.daysOfWeek.map(d => dayNumberToName[d] ?? d),
+        dates: data.dates,
+        groupId: data.groupId,
+        isTodo: data.isTodo ?? false,
+        isNew: false,
+        isEdited: false,
+        showDelete: false,
+        done: false,
+        skipped: false,
+        person: '',
+        image: '',
+        period: data.frequency,
+      }));
 
       setTasks(loadedTasks);
     };
@@ -510,7 +294,7 @@ const confirmTasks = async () => {
             .filter(task => !personFilter || task.users.includes(personFilter))
             .filter(task => (task.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
             .map(task => (
-              <TaskCard
+              <TaskManageCard
                 key={task.id}
                 task={task}
                 onChange={updateTask}

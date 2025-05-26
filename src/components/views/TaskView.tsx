@@ -308,7 +308,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
           isOpen={!!editTargetTask}
           task={editTargetTask}
           onClose={() => setEditTargetTask(null)}
-          onSave={(updated) => updateTask(editTargetTask.period, updated)}
+          onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
         />
       )}
     </div>

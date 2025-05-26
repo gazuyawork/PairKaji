@@ -5,6 +5,8 @@ import {
   collection, query, where, getDocs, serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import type { FirestoreTask } from '@/types/Task';
+import { auth } from '@/lib/firebase'; // 必要なら追加
 
 // 🔹 ユーザープロフィール取得
 export const getUserProfile = async (uid: string) => {
@@ -90,3 +92,55 @@ export const generateInviteCode = (length = 6): string => {
   return code;
 };
 
+export const fetchTasksForUser = async (uid: string): Promise<{ id: string; data: FirestoreTask }[]> => {
+  try {
+    const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(docSnap => ({
+      id: docSnap.id,
+      data: docSnap.data() as FirestoreTask,
+    }));
+  } catch (err) {
+    handleFirestoreError(err);
+    return [];
+  }
+};
+
+export const saveTaskToFirestore = async (taskId: string | null, taskData: FirestoreTask): Promise<void> => {
+  try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('ログインしていません');
+
+    // userIds を常に含める
+    const userIds = taskData.userIds ?? [uid];
+
+    const commonData = {
+      ...taskData,
+      userIds, // 追加: 必ず含める
+    };
+
+    if (taskId) {
+      await updateDoc(doc(db, 'tasks', taskId), {
+        ...commonData,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      await addDoc(collection(db, 'tasks'), {
+        ...commonData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (err) {
+    handleFirestoreError(err);
+  }
+};
+
+
+export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'tasks', taskId));
+  } catch (err) {
+    handleFirestoreError(err);
+  }
+};

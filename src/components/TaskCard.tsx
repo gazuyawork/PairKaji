@@ -159,7 +159,7 @@ const handleTodoClick = () => {
       >
         <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
           {task.done ? <CheckCircle className="text-yellow-500" /> : <Circle className="text-gray-400" />}
-          <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[120px]">{task.title}</span>
+          <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[120px]">{task.name}</span>
           {task.scheduledDate && (
             <span className="text-xs text-gray-400 whitespace-nowrap">
               <Calendar size={12} className="inline mr-1" />

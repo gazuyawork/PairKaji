@@ -1,8 +1,6 @@
 'use client';
 
 import Header from '@/components/Header';
-import { X } from 'lucide-react';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
@@ -24,7 +22,7 @@ import PartnerSettings from '@/components/profile/PartnerSettings';
 
 
 export default function ProfilePage() {
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  // const [setIsProfileLoading] = useState(true);
   const [isPairLoading, setIsPairLoading] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -108,24 +106,24 @@ export default function ProfilePage() {
         }
       }
 
-      setIsProfileLoading(false);
+      // setIsProfileLoading(false);
       setIsPairLoading(false);
     };
     fetchProfile();
   }, []);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      localStorage.setItem('profileImage', base64);
-      setProfileImage(base64);
-    };
-    reader.readAsDataURL(file);
-  };
+  //   const reader = new FileReader();
+  //   reader.onloadend = () => {
+  //     const base64 = reader.result as string;
+  //     localStorage.setItem('profileImage', base64);
+  //     setProfileImage(base64);
+  //   };
+  //   reader.readAsDataURL(file);
+  // };
 
   const handleSendInvite = async () => {
     const user = auth.currentUser;
