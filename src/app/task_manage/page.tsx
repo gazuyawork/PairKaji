@@ -27,8 +27,15 @@ export default function TaskManagePage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { profileImage, partnerImage } = useProfileImages();
   const addTask = () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      toast.error('ログインしてください');
+      return;
+    }
+
     const newId = crypto.randomUUID();
     const newGroupId = crypto.randomUUID();
+
     setTasks([
       {
         id: newId,
@@ -36,6 +43,7 @@ export default function TaskManagePage() {
         period: '毎日',
         point: 10,
         users: ['太郎', '花子'],
+        userIds: [uid],
         daysOfWeek: [],
         dates: [],
         isTodo: false,
@@ -51,6 +59,7 @@ export default function TaskManagePage() {
       ...tasks,
     ]);
   };
+
 
     const updateTask = (
       id: string,
@@ -158,8 +167,13 @@ export default function TaskManagePage() {
 
     if (hasEmptyName) return;
 
-    const sharedUserIds = await fetchPairUserIds(uid);
+  const sharedUserIds = await fetchPairUserIds(uid);
+
+    if (!sharedUserIds.includes(uid)) {
+      sharedUserIds.push(uid);
+    }
     await saveAllTasks(tasks, uid, sharedUserIds);
+
 
     setTasks(prev =>
       prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))

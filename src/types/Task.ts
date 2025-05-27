@@ -45,8 +45,9 @@ export type Task = {
 
 // タスク管理画面専用の型（Task + 管理画面用の一時フラグ）
 export type TaskManageTask = Task & {
-  isNew?: boolean; // 新規作成フラグ
-  isEdited?: boolean; // 編集フラグ
-  showDelete?: boolean; // 削除ボタン表示用
-  nameError?: boolean; // 名前未入力エラー用
+  userIds?: string[]; // 🔥 保険で明示的に入れる
+  isNew?: boolean;
+  isEdited?: boolean;
+  showDelete?: boolean;
+  nameError?: boolean;
 };

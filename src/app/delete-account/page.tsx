@@ -1,7 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import {
   deleteUser,
   GoogleAuthProvider,
@@ -10,7 +10,6 @@ import {
   reauthenticateWithCredential,
   User,
 } from 'firebase/auth';
-import { deleteDoc, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -26,7 +25,7 @@ export default function DeleteAccountPage() {
     const confirmed = confirm('本当にアカウントを削除しますか？この操作は元に戻せません。');
     if (!confirmed) return;
 
-    await deleteAccountWithReauth(user as User);
+    await deleteAccountWithReauth(user);
   };
 
   const deleteAccountWithReauth = async (user: User) => {
@@ -39,24 +38,20 @@ export default function DeleteAccountPage() {
         const provider = new GoogleAuthProvider();
         await reauthenticateWithPopup(user, provider);
       } else if (providerId === 'password') {
-        const password = prompt('セキュリティのためパスワードを再入力してください:');
+        const password = prompt('アカウント削除のため、パスワードを再度入力してください。');
         if (!password || !user.email) throw new Error('パスワードが入力されていません');
 
         const credential = EmailAuthProvider.credential(user.email, password);
         await reauthenticateWithCredential(user, credential);
       }
 
-      await deleteDoc(doc(db, 'users', user.uid));
+      // 🔥 Firestore削除はCloud Functionsで行う
       await deleteUser(user);
 
       toast.success('アカウントを削除しました');
       router.push('/register');
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error(error.message);
-      } else {
-        console.error(error);
-      }
+      console.error(error);
       toast.error('アカウント削除に失敗しました');
     } finally {
       setIsLoading(false);
@@ -70,7 +65,6 @@ export default function DeleteAccountPage() {
         <p className="text-[#5E5E5E] text-sm">
           アカウントを削除すると、これまでのすべての情報（タスク、ポイントなど）が失われます。
         </p>
-
 
         <button
           onClick={handleDeleteAccount}
