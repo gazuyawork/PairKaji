@@ -57,6 +57,7 @@ export default function TaskManagePage() {
           visible: false,
           person: '',
           image: '',
+          userId: uid,
           isNew: true,
           isEdited: false,
           showDelete: false,

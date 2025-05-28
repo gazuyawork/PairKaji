@@ -46,7 +46,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
 
   const toggleDone = async (period: Period, index: number) => {
     const task = tasksState[period][index];
-    await toggleTaskDoneStatus(task, !task.done);
+    await toggleTaskDoneStatus(task.id, task.userId, !task.done);
   };
 
   const deleteTask = async (period: Period, id: string) => {

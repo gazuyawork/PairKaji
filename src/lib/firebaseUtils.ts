@@ -6,7 +6,6 @@ import {
 } from 'firebase/firestore';
 import type { FirestoreTask } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
-import type { Task } from '@/types/Task';
 
 // 🔹 ユーザープロフィール取得
 export const getUserProfile = async (uid: string) => {
@@ -152,50 +151,45 @@ export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => 
   }
 };
 
-export const toggleTaskDoneStatus = async (task: Task, newDone: boolean) => {
+export const toggleTaskDoneStatus = async (taskId: string, userId: string, done: boolean) => {
   try {
-    const uid = auth.currentUser?.uid;
-    if (!uid) throw new Error('ログインしていません');
+    const taskRef = doc(db, 'tasks', taskId);
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
-    // tasksコレクションの更新
-    await updateDoc(doc(db, 'tasks', task.id), {
-      done: newDone,
-      skipped: false,
-      completedAt: newDone ? now.toISOString() : '',
-    });
-
-    const docId = `${task.id}_${uid}_${todayStr}`;
-    const targetDocRef = doc(db, 'taskCompletions', docId);
-    const logDocRef = doc(db, 'task_logs', docId);
-
-    if (newDone) {
-      await setDoc(targetDocRef, {
-        taskId: task.id,
-        userId: uid,
-        date: todayStr,
-        point: task.point,
-        taskName: task.name,
-        person: task.person ?? '',
+    if (done) {
+      // 完了にする場合
+      await updateDoc(taskRef, {
+        done: true,
+        completedAt: new Date().toISOString(),
+        completedBy: userId,
       });
 
-      await setDoc(logDocRef, {
-        taskId: task.id,
-        userId: uid,
-        taskName: task.name,
-        point: task.point,
-        period: task.period,
-        completedAt: now.toISOString(),
-        date: todayStr,
-      });
+      // taskCompletions に履歴を追加（既存の追加処理を呼ぶ or 新規実装が必要）
+
     } else {
-      await deleteDoc(targetDocRef);
-      await deleteDoc(logDocRef);
+      // 未処理に戻す場合
+      await updateDoc(taskRef, {
+        done: false,
+        completedAt: null,
+        completedBy: '',
+      });
+
+      // taskCompletions から履歴削除
+      const q = query(
+        collection(db, 'taskCompletions'),
+        where('taskId', '==', taskId),
+        where('userId', '==', userId)
+      );
+
+      const snapshot = await getDocs(q);
+
+      const deletePromises = snapshot.docs.map((doc) =>
+        deleteDoc(doc.ref)
+      );
+
+      await Promise.all(deletePromises);
     }
-  } catch (_err: unknown) {
-    handleFirestoreError(_err);
+  } catch (error) {
+    handleFirestoreError(error);
   }
 };
 

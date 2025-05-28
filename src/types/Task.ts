@@ -44,6 +44,7 @@ export type Task = {
   userIds?: string[];
   completedAt?: string | null;
   completedBy?: string;
+  userId: string;
 };
 
 

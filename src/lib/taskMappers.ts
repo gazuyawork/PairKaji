@@ -26,5 +26,6 @@ export const mapFirestoreDocToTask = (doc: DocumentData): Task => {
     users: data.users ?? [],
     scheduledDate: data.dates?.[0] ?? '',
     visible: data.visible ?? false,
+    userId: data.userId ?? '',
   };
 };

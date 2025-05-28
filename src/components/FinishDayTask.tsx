@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore'; // ⭐ onSnapshotをまとめてimport
 import { parseISO, isSameDay } from 'date-fns';
 import Image from 'next/image';
 import type { Task } from '@/types/Task';
-import { onSnapshot } from 'firebase/firestore';
 import { useProfileImages } from '@/hooks/useProfileImages';
+import { fetchPairUserIds } from '@/lib/taskUtils'; // ⭐ 追加
 
 interface CompletionLog {
   taskId: string;
@@ -28,22 +28,40 @@ export default function FinishDayTask({ tasks }: Props) {
   const { profileImage, partnerImage } = useProfileImages();
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    const fetchAndSubscribe = async () => { // ⭐ 関数をまとめて定義
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
 
-    const q = query(collection(db, 'taskCompletions'), where('userId', '==', uid));
+      const partnerUids = await fetchPairUserIds(uid); // ⭐ ペアユーザーID取得
+      if (!partnerUids.includes(uid)) partnerUids.push(uid); // ⭐ 自分も含める
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const q = query(
+        collection(db, 'taskCompletions'),
+        where('userId', 'in', partnerUids) // ⭐ 修正: 自分 + ペア相手
+      );
+
       const today = new Date();
-      const todayLogs = snapshot.docs
-        .map(doc => doc.data() as CompletionLog)
-        .filter(log => isSameDay(parseISO(log.date), today))
-        .sort((a, b) => b.date.localeCompare(a.date));
 
-      setLogs(todayLogs);
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const todayLogs = snapshot.docs
+          .map(doc => doc.data() as CompletionLog)
+          .filter(log => isSameDay(parseISO(log.date), today))
+          .sort((a, b) => b.date.localeCompare(a.date));
+
+        setLogs(todayLogs);
+      });
+
+      return unsubscribe; // ⭐ サブスク解除
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    fetchAndSubscribe().then(unsub => {
+      unsubscribe = unsub;
     });
 
-    return () => unsubscribe(); // クリーンアップ
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -51,7 +69,14 @@ export default function FinishDayTask({ tasks }: Props) {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const q = query(collection(db, 'taskCompletions'), where('userId', '==', uid));
+      const partnerUids = await fetchPairUserIds(uid); // ⭐ ペアユーザーID取得
+      if (!partnerUids.includes(uid)) partnerUids.push(uid); // ⭐ 自分も含める
+
+      const q = query(
+        collection(db, 'taskCompletions'),
+        where('userId', 'in', partnerUids) // ⭐ 修正: 自分 + ペア相手
+      );
+
       const snapshot = await getDocs(q);
 
       const today = new Date();
@@ -64,7 +89,7 @@ export default function FinishDayTask({ tasks }: Props) {
     };
 
     fetchLogs();
-  }, [tasks]); // ← tasksが変わるたびに再取得
+  }, [tasks]); // tasksが変わるたびに再取得
 
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-md overflow-hidden max-h-[300px]">
@@ -110,5 +135,4 @@ export default function FinishDayTask({ tasks }: Props) {
       </div>
     </div>
   );
-
 }
