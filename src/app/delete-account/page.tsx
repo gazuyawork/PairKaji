@@ -32,19 +32,20 @@ export default function DeleteAccountPage() {
     try {
       setIsLoading(true);
 
-      const providerId = user.providerData[0]?.providerId;
+    const providerId = user.providerData[0]?.providerId;
 
-      if (providerId === 'google.com') {
-        const provider = new GoogleAuthProvider();
-        await reauthenticateWithPopup(user, provider);
-      } else if (providerId === 'password') {
-        const password = prompt('アカウント削除のため、パスワードを再度入力してください。');
-        if (!password || !user.email) throw new Error('パスワードが入力されていません');
+    if (providerId === 'google.com') {
+      const provider = new GoogleAuthProvider();
+      await reauthenticateWithPopup(user, provider);
+    } else if (providerId === 'password') {
+      const password = prompt('アカウント削除のため、パスワードを再度入力してください。');
+      if (!password || !user.email) throw new Error('パスワードが入力されていません');
 
-        const credential = EmailAuthProvider.credential(user.email, password);
-        await reauthenticateWithCredential(user, credential);
-      }
-
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+    } else {
+      throw new Error('サポートされていないログイン方法です');
+    }
       // 🔥 Firestore削除はCloud Functionsで行う
       await deleteUser(user);
 

@@ -8,7 +8,6 @@ import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
 import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
-// 既存の import 群の中に追加
 import { 
   getUserProfile, createUserProfile, 
   getUserPair, getPendingPairByEmail, 
@@ -18,11 +17,11 @@ import {
 } from '@/lib/firebaseUtils';
 import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
+import { saveUserNameToFirestore } from '@/lib/firebaseUtils';
 
 
 
 export default function ProfilePage() {
-  // const [setIsProfileLoading] = useState(true);
   const [isPairLoading, setIsPairLoading] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -30,7 +29,9 @@ export default function ProfilePage() {
   const [profileImage, setProfileImage] = useState<string | null>(
     typeof window !== 'undefined' ? localStorage.getItem('profileImage') : null
   );
-  const [partnerImage] = useState('/images/hanako_default.png');
+  const [partnerImage, setPartnerImage] = useState<string | null>(
+    typeof window !== 'undefined' ? localStorage.getItem('partnerImage') : null
+  ); // ← 追加部分
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
@@ -39,8 +40,19 @@ export default function ProfilePage() {
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pairDocId, setPairDocId] = useState<string | null>(null);
 
-  const onEditNameHandler = () => {
-    toast.success('氏名の編集機能は未実装です'); // 必要ならロジック追加
+  const onEditNameHandler = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error('ユーザー情報が取得できません');
+      return;
+    }
+
+    try {
+      await saveUserNameToFirestore(user.uid, name);
+      toast.success('氏名を更新しました');
+    } catch {
+      toast.error('氏名の更新に失敗しました');
+    }
   };
 
   const onEditEmailHandler = () => {
@@ -49,6 +61,12 @@ export default function ProfilePage() {
 
   const onEditPasswordHandler = () => {
     setIsPasswordModalOpen(true);
+  };
+
+  // パートナー画像の変更ハンドラ
+  const handlePartnerImageChange = (image: string) => {
+    localStorage.setItem('partnerImage', image);
+    setPartnerImage(image);
   };
 
   useEffect(() => {
@@ -105,25 +123,10 @@ export default function ProfilePage() {
           console.warn('[WARN] ペンディングデータが不完全です', pair);
         }
       }
-
-      // setIsProfileLoading(false);
       setIsPairLoading(false);
     };
     fetchProfile();
   }, []);
-
-  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0];
-  //   if (!file) return;
-
-  //   const reader = new FileReader();
-  //   reader.onloadend = () => {
-  //     const base64 = reader.result as string;
-  //     localStorage.setItem('profileImage', base64);
-  //     setProfileImage(base64);
-  //   };
-  //   reader.readAsDataURL(file);
-  // };
 
   const handleSendInvite = async () => {
     const user = auth.currentUser;
@@ -139,8 +142,8 @@ export default function ProfilePage() {
       const docRef = await createPairInvite(user.uid, partnerEmail.trim(), generatedCode);
       setPairDocId(docRef.id);
       toast.success('招待コードを発行しました');
-    } catch (err: unknown) {
-      handleFirestoreError(err);
+    } catch (_err: unknown) {
+      handleFirestoreError(_err);
     }
   };
 
@@ -158,8 +161,8 @@ export default function ProfilePage() {
       toast.success('ペア設定を承認しました');
       setIsPairConfirmed(true);
       setPendingApproval(null);
-    } catch (err: unknown) {
-      handleFirestoreError(err);
+    } catch (_err: unknown) {
+      handleFirestoreError(_err);
     }
   };
 
@@ -175,8 +178,8 @@ export default function ProfilePage() {
       setPartnerEmail('');
       setInviteCode('');
       setPairDocId(null);
-    } catch (err: unknown) {
-      handleFirestoreError(err);
+    } catch (_err: unknown) {
+      handleFirestoreError(_err);
     }
   };
 
@@ -191,8 +194,8 @@ export default function ProfilePage() {
       setInviteCode('');
       setPartnerEmail('');
       setPairDocId(null);
-    } catch (err: unknown) {
-      handleFirestoreError(err);
+    } catch (_err: unknown) {
+      handleFirestoreError(_err);
     }
   };
 
@@ -205,8 +208,8 @@ export default function ProfilePage() {
       await deletePair(pendingApproval.pairId);
       toast.success('招待を拒否しました');
       setPendingApproval(null);
-    } catch (err: unknown) {
-      handleFirestoreError(err);
+    } catch (_err: unknown) {
+      handleFirestoreError(_err);
     }
   };
 
@@ -232,7 +235,7 @@ export default function ProfilePage() {
           pendingApproval={pendingApproval}
           isPairConfirmed={isPairConfirmed}
           partnerEmail={partnerEmail}
-          partnerImage={partnerImage}
+          partnerImage={partnerImage || '/images/hanako_default.png'}
           inviteCode={inviteCode}
           pairDocId={pairDocId}
           onApprovePair={handleApprovePair}
@@ -241,6 +244,7 @@ export default function ProfilePage() {
           onSendInvite={handleSendInvite}
           onRemovePair={handleRemovePair}
           onChangePartnerEmail={setPartnerEmail}
+          onChangePartnerImage={handlePartnerImageChange}
         />
 
       </main>

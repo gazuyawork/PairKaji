@@ -51,7 +51,8 @@ export default function TaskHistory() {
     };
 
     fetchLogs();
-  }, [weekOffset]);
+  }, [weekStart, weekEnd]);
+
 
   const getProfileImage = (person?: string) => {
     if (person === '太郎') return localStorage.getItem('profileImage') || '/images/taro.png';

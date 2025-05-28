@@ -10,7 +10,6 @@ export const metadata = {
   title: 'PairKaji',
   description: '家事を2人で分担するアプリ',
   manifest: '/manifest.json',
-  themeColor: '#5E8BC7',
   icons: {
     icon: '/icons/icon-192.png',
     shortcut: '/icons/icon-192.png',
@@ -21,6 +20,11 @@ export const metadata = {
     title: 'PairKaji',
     statusBarStyle: 'default',
   },
+};
+
+// 👇 追加
+export const viewport = {
+  themeColor: '#5E8BC7',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -55,7 +55,7 @@ function MainContent() {
     } else if (view === 'todo') {
       setIndex(2);
     }
-  }, [searchParams]);
+  }, [searchParams, setIndex]);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;

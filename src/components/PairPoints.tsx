@@ -147,12 +147,13 @@ export default function PairPoints() {
     };
 
     fetchData();
-  }, []);
+  }, [pairStatus, partnerImage, profileImage]);
 
 
   useEffect(() => {
     console.log('[DEBUG ④-2] pairStatusが変更されました:', pairStatus);
-  }, [pairStatus]);
+  }, [pairStatus, partnerImage, profileImage]);
+
 
 
 

@@ -2,6 +2,7 @@
 'use client';
 
 import Image from 'next/image';
+import { toast } from 'sonner';
 
 type ProfileCardProps = {
   profileImage: string | null;
@@ -26,6 +27,8 @@ export default function ProfileCard({
   onEditPassword,
   email,
 }: ProfileCardProps) {
+
+  
   return (
     <div className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6">
       <p className="ml-4 mb-6">
@@ -41,22 +44,34 @@ export default function ProfileCard({
             height={100}
             className="h-24 aspect-square rounded-full object-cover border border-gray-300"
           />
-            <input
-                type="file"
-                accept="image/*"
-                className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onloadend = () => {
+          <input
+            type="file"
+            accept="image/*"
+            className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+
+              if (!file.type.startsWith('image/')) {
+                toast.error('画像ファイルを選択してください');
+                return;
+              }
+
+              if (file.size > 5 * 1024 * 1024) { // 5MB制限
+                toast.error('画像サイズは5MB以下にしてください');
+                return;
+              }
+
+              const reader = new FileReader();
+              reader.onloadend = () => {
                 const base64 = reader.result as string;
                 localStorage.setItem('profileImage', base64);
                 setProfileImage(base64);
-                };
-                reader.readAsDataURL(file);
+              };
+              reader.readAsDataURL(file);
             }}
-            />
+          />
+
         </div>
         <div className="flex-1 space-y-1 min-w-0">
           <label className="text-[#5E5E5E] font-semibold">氏名</label>

@@ -52,7 +52,7 @@ export default function SplashScreen() {
         sessionStorage.setItem('fromSplash', '1');
         router.replace(isAuthenticated ? '/main' : '/login');
       }, 800); // アニメーション完了後に遷移
-    }, 30000);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [authChecked, isAuthenticated, router]);

@@ -68,19 +68,14 @@ export const deletePair = async (pairId: string) => {
 };
 
 // lib/firebaseUtils.ts
-export const handleFirestoreError = (err: unknown) => {
-  console.error(err);
-  if (err && typeof err === 'object' && 'code' in err && typeof (err as any).code === 'string') {
-    const code = (err as { code: string }).code;
-    if (code === 'permission-denied') {
-      toast.error('操作が許可されていません');
-    } else {
-      toast.error('予期せぬエラーが発生しました');
-    }
+export const handleFirestoreError = (error: unknown): void => {
+  if (error instanceof Error) {
+    toast.error(`Firestoreエラー: ${error.message}`);
   } else {
-    toast.error('予期せぬエラーが発生しました');
+    toast.error('Firestoreエラーが発生しました');
   }
 };
+
 
 // lib/firebaseUtils.ts
 export const generateInviteCode = (length = 6): string => {
@@ -100,8 +95,8 @@ export const fetchTasksForUser = async (uid: string): Promise<{ id: string; data
       id: docSnap.id,
       data: docSnap.data() as FirestoreTask,
     }));
-  } catch (err) {
-    handleFirestoreError(err);
+  } catch (_err: unknown) {
+    handleFirestoreError(_err);
     return [];
   }
 };
@@ -131,8 +126,8 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
         updatedAt: serverTimestamp(),
       });
     }
-  } catch (err) {
-    handleFirestoreError(err);
+  } catch (_err: unknown) {
+    handleFirestoreError(_err);
   }
 };
 
@@ -140,8 +135,8 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
 export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
   try {
     await deleteDoc(doc(db, 'tasks', taskId));
-  } catch (err) {
-    handleFirestoreError(err);
+  } catch (_err: unknown) {
+    handleFirestoreError(_err);
   }
 };
 
@@ -187,7 +182,24 @@ export const toggleTaskDoneStatus = async (task: Task, newDone: boolean) => {
       await deleteDoc(targetDocRef);
       await deleteDoc(logDocRef);
     }
+  } catch (_err: unknown) {
+    handleFirestoreError(_err);
+  }
+};
+
+/**
+ * ユーザーの氏名をFirestoreに保存する
+ * @param uid - ユーザーID
+ * @param name - 氏名
+ */
+export const saveUserNameToFirestore = async (uid: string, name: string) => {
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      name,
+      updatedAt: serverTimestamp(),
+    });
   } catch (err) {
-    handleFirestoreError(err);
+    console.error('Failed to update user name:', err);
+    throw err;
   }
 };

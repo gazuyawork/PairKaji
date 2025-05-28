@@ -33,7 +33,7 @@ export default function TodoTaskCard({
   focusedTodoId,
 }: Props) {
   const router = useRouter();
-  const todos = task.todos ?? [];
+  const todos = useMemo(() => task.todos ?? [], [task.todos]);
   const [isComposing, setIsComposing] = useState(false);
 
   const undoneCount = todos.filter(todo => !todo.done).length;

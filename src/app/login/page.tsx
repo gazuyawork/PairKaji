@@ -28,7 +28,7 @@ export default function LoginPage() {
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/main');
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof FirebaseError) {
         alert('ログインに失敗しました: ' + error.message);
       } else {
@@ -43,9 +43,9 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.push('/main');
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof FirebaseError) {
-        alert('Googleログインに失敗しました: ' + error.message);
+        alert('ログインに失敗しました: ' + error.message);
       } else {
         alert('予期せぬエラーが発生しました');
       }

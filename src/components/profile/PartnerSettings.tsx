@@ -6,7 +6,7 @@ import type { PendingApproval } from '@/types/Pair';
 
 type PartnerSettingsProps = {
   isPairLoading: boolean;
-  pendingApproval: PendingApproval | null;  // ← ここを修正
+  pendingApproval: PendingApproval | null;
   isPairConfirmed: boolean;
   partnerEmail: string;
   partnerImage: string;
@@ -18,6 +18,7 @@ type PartnerSettingsProps = {
   onSendInvite: () => void;
   onRemovePair: () => void;
   onChangePartnerEmail: (email: string) => void;
+  onChangePartnerImage: (image: string) => void; // 追加！
 };
 
 export default function PartnerSettings({
@@ -34,7 +35,16 @@ export default function PartnerSettings({
   onSendInvite,
   onRemovePair,
   onChangePartnerEmail,
+  onChangePartnerImage, // 追加！
 }: PartnerSettingsProps) {
+  // サンプル画像リスト
+  const partnerImageOptions = [
+    '/images/hanako_default.png',
+    '/images/penguin.png',
+    '/images/cat.png',
+    '/images/dog.png',
+  ];
+
   return (
     <div className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-3">
       <p className="mb-6">
@@ -94,7 +104,7 @@ export default function PartnerSettings({
           )}
 
           {isPairConfirmed && (
-            <div className="flex items-center justify-between">
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Image
                   src={partnerImage}
@@ -107,10 +117,27 @@ export default function PartnerSettings({
                   <p className="font-semibold">パートナー承認済み</p>
                   <p>{partnerEmail}</p>
                 </div>
+                <button onClick={onRemovePair} className="text-red-500">
+                  <X size={24} />
+                </button>
               </div>
-              <button onClick={onRemovePair} className="text-red-500">
-                <X size={24} />
-              </button>
+
+              <div>
+                <label className="text-[#5E5E5E] font-semibold text-sm">パートナー画像を選択</label>
+                <div className="flex gap-2 mt-2">
+                  {partnerImageOptions.map((img) => (
+                    <button
+                      key={img}
+                      onClick={() => onChangePartnerImage(img)}
+                      className={`border rounded-full p-1 ${
+                        partnerImage === img ? 'ring-2 ring-[#FFCB7D]' : ''
+                      }`}
+                    >
+                      <Image src={img} alt="選択画像" width={40} height={40} className="rounded-full" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </>

@@ -45,7 +45,7 @@ export default function RegisterPage() {
       const user = userCredential.user;
       await sendEmailVerification(user);
       router.push('/verify');
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof FirebaseError) {
         setEmailError('登録に失敗しました: ' + error.message);
       } else {
