@@ -1,5 +1,3 @@
-// src/components/TodoTaskCard.tsx
-
 'use client';
 
 import { CheckCircle, Circle, Trash2, Plus } from 'lucide-react';
@@ -123,27 +121,27 @@ export default function TodoTaskCard({
 
           {filteredTodos.map(todo => (
             <div key={todo.id} className="flex items-center gap-2">
-<motion.div
-  className="cursor-pointer"
-  onClick={() => {
-    setAnimatingTodoId(todo.id);
-    setTimeout(() => {
-      onToggleDone(todo.id); // ← アニメーション後に状態変更
-      setAnimatingTodoId(null);
-    }, 600);
-  }}
-  initial={false}
-  animate={animatingTodoId === todo.id ? { rotate: 360, scale: [1, 1.3, 1] } : { rotate: 0, scale: 1 }}
-  transition={{ duration: 0.6, ease: 'easeInOut' }}
->
-  {animatingTodoId === todo.id ? (
-    <CheckCircle className="text-yellow-500" />
-  ) : todo.done ? (
-    <CheckCircle className="text-yellow-500" />
-  ) : (
-    <Circle className="text-gray-400" />
-  )}
-</motion.div>
+              <motion.div
+                className="cursor-pointer"
+                onClick={() => {
+                  setAnimatingTodoId(todo.id);
+                  setTimeout(() => {
+                    onToggleDone(todo.id);
+                    setAnimatingTodoId(null);
+                  }, 1000);
+                }}
+                initial={false}
+                animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
+                transition={{ duration: 0.6, ease: 'easeInOut' }}
+              >
+                {animatingTodoId === todo.id ? (
+                  <CheckCircle className="text-yellow-500" />
+                ) : todo.done ? (
+                  <CheckCircle className="text-yellow-500" />
+                ) : (
+                  <Circle className="text-gray-400" />
+                )}
+              </motion.div>
 
               <input
                 type="text"
@@ -169,6 +167,7 @@ export default function TodoTaskCard({
                 }}
                 className={clsx(
                   'flex-1 border-b bg-transparent outline-none border-gray-200',
+                  'h-8',
                   todo.done ? 'text-gray-400 line-through' : 'text-black'
                 )}
                 placeholder="TODOを入力"
