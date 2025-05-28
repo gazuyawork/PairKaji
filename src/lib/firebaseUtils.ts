@@ -89,12 +89,20 @@ export const generateInviteCode = (length = 6): string => {
 
 export const fetchTasksForUser = async (uid: string): Promise<{ id: string; data: FirestoreTask }[]> => {
   try {
-    const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(docSnap => ({
-      id: docSnap.id,
-      data: docSnap.data() as FirestoreTask,
-    }));
+    // userId で取得
+    const q1 = query(collection(db, 'tasks'), where('userId', '==', uid));
+    const snap1 = await getDocs(q1);
+
+    // userIds で取得
+    const q2 = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
+    const snap2 = await getDocs(q2);
+
+    // ドキュメントをマージ（重複削除）
+    const docsMap = new Map<string, FirestoreTask>();
+    snap1.docs.forEach(docSnap => docsMap.set(docSnap.id, docSnap.data() as FirestoreTask));
+    snap2.docs.forEach(docSnap => docsMap.set(docSnap.id, docSnap.data() as FirestoreTask));
+
+    return Array.from(docsMap.entries()).map(([id, data]) => ({ id, data }));
   } catch (_err: unknown) {
     handleFirestoreError(_err);
     return [];
@@ -102,6 +110,7 @@ export const fetchTasksForUser = async (uid: string): Promise<{ id: string; data
 };
 
 export const saveTaskToFirestore = async (taskId: string | null, taskData: FirestoreTask): Promise<void> => {
+  console.log('[DEBUG] saveTaskToFirestoreでのuserId:', taskData.userId);
   try {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');
@@ -117,15 +126,18 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
     if (taskId) {
       await updateDoc(doc(db, 'tasks', taskId), {
         ...commonData,
+        userId: uid, // ← 追加
         updatedAt: serverTimestamp(),
       });
     } else {
       await addDoc(collection(db, 'tasks'), {
         ...commonData,
+        userId: uid, // ← 追加
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
     }
+
   } catch (_err: unknown) {
     handleFirestoreError(_err);
   }

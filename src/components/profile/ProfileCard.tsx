@@ -1,8 +1,8 @@
-// components/ProfileCard.tsx
 'use client';
 
 import Image from 'next/image';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 
 type ProfileCardProps = {
   profileImage: string | null;
@@ -14,6 +14,7 @@ type ProfileCardProps = {
   onEditEmail: () => void;
   onEditPassword: () => void;
   email: string;
+  isLoading: boolean; // ←追加
 };
 
 export default function ProfileCard({
@@ -26,69 +27,83 @@ export default function ProfileCard({
   onEditEmail,
   onEditPassword,
   email,
+  isLoading, // ←追加
 }: ProfileCardProps) {
-
-  
   return (
-    <div className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6">
+    <motion.div
+      className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+    >
       <p className="ml-4 mb-6">
         <label className="text-[#5E5E5E] font-semibold">プロフィール</label>
       </p>
 
       <div className="flex flex-row flex-nowrap items-center gap-6 overflow-x-auto">
         <div className="relative shrink-0">
-          <Image
-            src={profileImage || '/images/default.png'}
-            alt="プロフィール画像"
-            width={100}
-            height={100}
-            className="h-24 aspect-square rounded-full object-cover border border-gray-300"
-          />
-          <input
-            type="file"
-            accept="image/*"
-            className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
+          {isLoading ? (
+            <div className="w-24 h-24 bg-gray-200 animate-pulse rounded-full" />
+          ) : (
+            <>
+              <Image
+                src={profileImage || '/images/default.png'}
+                alt="プロフィール画像"
+                width={100}
+                height={100}
+                className="h-24 aspect-square rounded-full object-cover border border-gray-300"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
 
-              if (!file.type.startsWith('image/')) {
-                toast.error('画像ファイルを選択してください');
-                return;
-              }
+                  if (!file.type.startsWith('image/')) {
+                    toast.error('画像ファイルを選択してください');
+                    return;
+                  }
 
-              if (file.size > 5 * 1024 * 1024) { // 5MB制限
-                toast.error('画像サイズは5MB以下にしてください');
-                return;
-              }
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast.error('画像サイズは5MB以下にしてください');
+                    return;
+                  }
 
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const base64 = reader.result as string;
-                localStorage.setItem('profileImage', base64);
-                setProfileImage(base64);
-              };
-              reader.readAsDataURL(file);
-            }}
-          />
-
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const base64 = reader.result as string;
+                    localStorage.setItem('profileImage', base64);
+                    setProfileImage(base64);
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </>
+          )}
         </div>
+
         <div className="flex-1 space-y-1 min-w-0">
           <label className="text-[#5E5E5E] font-semibold">氏名</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="min-w-0 flex-grow text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
-            />
-            <button
-              onClick={onEditName}
-              className="w-12 h-8 rounded-sm text-sm bg-[#FFCB7D] text-white shadow"
-            >
-              変更
-            </button>
-          </div>
+          {isLoading ? (
+            <div className="h-8 bg-gray-200 animate-pulse rounded" />
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="min-w-0 flex-grow text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
+              />
+              <button
+                onClick={onEditName}
+                className="w-12 h-8 rounded-sm text-sm bg-[#FFCB7D] text-white shadow"
+              >
+                変更
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -102,17 +117,21 @@ export default function ProfileCard({
               </span>
             )}
           </label>
-          <div className="flex gap-2 items-center">
-            <p className="flex-1 text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
-            {!isGoogleUser && (
-              <button
-                onClick={onEditEmail}
-                className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
-              >
-                変更
-              </button>
-            )}
-          </div>
+          {isLoading ? (
+            <div className="h-6 bg-gray-200 animate-pulse rounded" />
+          ) : (
+            <div className="flex gap-2 items-center">
+              <p className="flex-1 text-[#5E5E5E] border-b border-b-gray-200 py-1">{email}</p>
+              {!isGoogleUser && (
+                <button
+                  onClick={onEditEmail}
+                  className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
+                >
+                  変更
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -124,24 +143,28 @@ export default function ProfileCard({
               </span>
             )}
           </label>
-          <div className="flex gap-2 items-center">
-            <input
-              type="password"
-              value="●●●●●●●●"
-              readOnly
-              className="flex-1 text-[#5E5E5E] border-b border-gray-300 py-1 tracking-widest focus:outline-none"
-            />
-            {!isGoogleUser && (
-              <button
-                onClick={onEditPassword}
-                className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
-              >
-                変更
-              </button>
-            )}
-          </div>
+          {isLoading ? (
+            <div className="h-6 bg-gray-200 animate-pulse rounded" />
+          ) : (
+            <div className="flex gap-2 items-center">
+              <input
+                type="password"
+                value="●●●●●●●●"
+                readOnly
+                className="flex-1 text-[#5E5E5E] border-b border-gray-300 py-1 tracking-widest focus:outline-none"
+              />
+              {!isGoogleUser && (
+                <button
+                  onClick={onEditPassword}
+                  className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
+                >
+                  変更
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

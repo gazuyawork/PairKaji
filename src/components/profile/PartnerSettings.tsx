@@ -3,8 +3,10 @@
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import type { PendingApproval } from '@/types/Pair';
+import { motion } from 'framer-motion';
 
 type PartnerSettingsProps = {
+  isLoading: boolean;
   isPairLoading: boolean;
   pendingApproval: PendingApproval | null;
   isPairConfirmed: boolean;
@@ -18,7 +20,7 @@ type PartnerSettingsProps = {
   onSendInvite: () => void;
   onRemovePair: () => void;
   onChangePartnerEmail: (email: string) => void;
-  onChangePartnerImage: (image: string) => void; // 追加！
+  onChangePartnerImage: (image: string) => void;
 };
 
 export default function PartnerSettings({
@@ -46,7 +48,12 @@ export default function PartnerSettings({
   ];
 
   return (
-    <div className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-3">
+    <motion.div
+      className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-3"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+    >
       <p className="mb-6">
         <label className="text-[#5E5E5E] font-semibold">パートナー設定</label>
       </p>
@@ -142,6 +149,6 @@ export default function PartnerSettings({
           )}
         </>
       )}
-    </div>
+    </motion.div>
   );
 }

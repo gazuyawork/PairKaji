@@ -1,5 +1,3 @@
-// /lib/taskUtils.ts
-
 import { getDocs, query, where, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
@@ -22,13 +20,14 @@ export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
 
 export const buildFirestoreTaskData = (
   task: TaskManageTask,
-  uid: string,
-  userIds: string[]
+  userIds: string[],
+  uid: string // ← ここに型を明示的に追加
 ): FirestoreTask => {
   return {
-    userId: uid,
+    userId: uid, // ← これでOK！
     userIds,
     name: task.name,
+    title: task.title ?? '',
     period: task.period ?? '毎日',
     point: task.point,
     users: task.users,
@@ -36,14 +35,20 @@ export const buildFirestoreTaskData = (
       ? task.daysOfWeek.map(d => dayNameToNumber[d]).filter((d): d is string => d !== undefined)
       : [],
     dates: task.dates,
-    groupId: task.groupId ?? null,
     isTodo: task.isTodo ?? false,
+    done: task.done ?? false,
+    skipped: task.skipped ?? false,
+    groupId: task.groupId ?? null,
+    completedAt: task.completedAt ?? '',
+    completedBy: task.completedBy ?? '',
+    visible: task.visible ?? false,
+    todos: [],
   };
 };
 
 export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds: string[]) => {
   for (const task of tasks) {
-    const taskData = buildFirestoreTaskData(task, uid, userIds);
+    const taskData = buildFirestoreTaskData(task, userIds, uid); // ← uid を渡す
     try {
       await saveTaskToFirestore(task.isNew ? null : task.id, taskData);
     } catch (e) {

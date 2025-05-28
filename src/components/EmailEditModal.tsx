@@ -38,11 +38,7 @@ export default function EmailEditModal({
 
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
-
-      console.log('再認証完了');
       await verifyBeforeUpdateEmail(user, newEmail);
-      console.log('verifyBeforeUpdateEmail 完了');
-
       toast.success('確認メールを送信しました。メールをご確認ください。');
       onClose();
     } catch (err: unknown) {

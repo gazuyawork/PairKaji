@@ -22,6 +22,8 @@ import { auth, db } from '@/lib/firebase';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
 import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
+import { mapFirestoreDocToTask } from '@/lib/taskMappers';
+
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -106,41 +108,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
 
       const q = query(collection(db, 'tasks'), where('userId', 'in', Array.from(partnerUids)));
       const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const storedProfileImage = localStorage.getItem('profileImage');
-        const storedPartnerImage = localStorage.getItem('partnerImage');
-
-        const rawTasks = snapshot.docs.map((doc): Task => {
-          const data = doc.data();
-          const user = data.users?.[0] ?? '未設定';
-          const period = data.period as Period;
-          const image =
-            user === '太郎'
-              ? storedProfileImage || '/images/taro.png'
-              : user === '花子'
-              ? storedPartnerImage || '/images/hanako.png'
-              : '/images/default.png';
-
-          return {
-            id: doc.id,
-            title: data.title ?? data.name ?? '',
-            name: data.name ?? '',
-            period: period,
-            point: data.point ?? 0,
-            done: data.done ?? false,
-            skipped: data.skipped ?? false,
-            completedAt: data.completedAt ?? '',
-            completedBy: data.completedBy ?? '',
-            person: user,
-            image,
-            daysOfWeek: data.daysOfWeek ?? [],
-            dates: data.dates ?? [],
-            isTodo: data.isTodo ?? false,
-            users: data.users ?? [],
-            scheduledDate: data.dates?.[0] ?? '',
-            visible: data.visible ?? false,
-          };
-        });
-
+        const rawTasks = snapshot.docs.map(mapFirestoreDocToTask);
         const updates: Promise<void>[] = [];
         for (const task of rawTasks) {
           if (task.completedAt) {

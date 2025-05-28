@@ -9,8 +9,7 @@ import { useEffect, useState, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import clsx from 'clsx';
-import { useView } from '@/context/ViewContext'; // ← 追加
-
+import { useView } from '@/context/ViewContext';
 
 const dayNumberToName: Record<string, string> = {
   '1': '月', '2': '火', '3': '水', '4': '木', '5': '金', '6': '土', '0': '日',
@@ -37,6 +36,7 @@ export default function TaskCard({
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLongPress, setIsLongPress] = useState(false);
+  const [animateTrigger, setAnimateTrigger] = useState(0);
 
   const swipeable = useSwipeable({
     onSwipedLeft: () => {
@@ -75,28 +75,32 @@ export default function TaskCard({
 
   const handleClick = () => {
     if (!isLongPress) {
+      if (task.done) {
+        const confirmed = window.confirm('このタスクを未処理に戻しますか？');
+        if (!confirmed) {
+          return;
+        }
+      } else {
+        setAnimateTrigger((prev) => prev + 1); // ← 未処理 → 完了 の場合はアニメーショントリガー更新
+      }
       onToggleDone(period, index);
     }
   };
 
-const handleDelete = () => {
-  const confirmed = window.confirm('このタスクを削除しますか？');
-  if (confirmed) {
-    onDelete(period, task.id);
-    setSwipeDirection(null);
-  } else {
-    setSwipeDirection(null);
-  }
-};
+  const handleDelete = () => {
+    const confirmed = window.confirm('このタスクを削除しますか？');
+    if (confirmed) {
+      onDelete(period, task.id);
+      setSwipeDirection(null);
+    } else {
+      setSwipeDirection(null);
+    }
+  };
 
-
-  // TODOボタンのクリック処理
-const handleTodoClick = () => {
-  setSelectedTaskName(task.name); // ← 選択したタスク名をセット
-  setIndex(2); // ← TodoView（index=2）を表示
-};
-
-  
+  const handleTodoClick = () => {
+    setSelectedTaskName(task.name);
+    setIndex(2);
+  };
 
   return (
     <div className="relative" ref={cardRef}>
@@ -158,8 +162,21 @@ const handleTodoClick = () => {
         )}
       >
         <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
-          {task.done ? <CheckCircle className="text-yellow-500" /> : <Circle className="text-gray-400" />}
+          <motion.div
+            key={animateTrigger}
+            initial={{ rotate: 0, scale: 1 }}
+            animate={{ rotate: 360, scale: [1, 1.3, 1] }}
+            transition={{ duration: 0.6, ease: 'easeInOut' }}
+          >
+            {task.done ? (
+              <CheckCircle className="text-yellow-500" />
+            ) : (
+              <Circle className="text-gray-400" />
+            )}
+          </motion.div>
+
           <span className="text-[#5E5E5E] font-medium font-sans truncate max-w-[120px]">{task.name}</span>
+
           {task.scheduledDate && (
             <span className="text-xs text-gray-400 whitespace-nowrap">
               <Calendar size={12} className="inline mr-1" />

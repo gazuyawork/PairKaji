@@ -22,6 +22,7 @@ import { saveUserNameToFirestore } from '@/lib/firebaseUtils';
 
 
 export default function ProfilePage() {
+  const [isLoading, setIsLoading] = useState(true);
   const [isPairLoading, setIsPairLoading] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -71,62 +72,70 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-      await user.reload();
-      const refreshedUser = auth.currentUser;
+        await user.reload();
+        const refreshedUser = auth.currentUser;
 
-      setIsGoogleUser(
-        refreshedUser?.providerData.some((p) => p.providerId === 'google.com') ?? false
-      );
+        setIsGoogleUser(
+          refreshedUser?.providerData.some((p) => p.providerId === 'google.com') ?? false
+        );
 
-      const snap = await getUserProfile(user.uid);
-      if (snap.exists()) {
-        const data = snap.data();
-        setName(data.name || user.email?.split('@')[0] || '');
-      } else {
-        await createUserProfile(user.uid, user.email?.split('@')[0] || '');
-        setName(user.email?.split('@')[0] || '');
-      }
-
-      setEmail(user.email ?? '');
-
-      const pairSnap = await getUserPair(user.uid);
-      if (!pairSnap.empty) {
-        const pairDoc = pairSnap.docs[0];
-        const pair = pairDoc.data();
-        setInviteCode(pair.inviteCode);
-        setPartnerEmail(pair.emailB ?? '');
-        setPairDocId(pairDoc.id);
-        if (pair.userBId) {
-          setIsPairConfirmed(true);
-        }
-      }
-
-      if (!user.email) {
-        console.warn('[WARN] user.email が null です。pending ペア検索をスキップします');
-        return;
-      }
-      const pendingSnap = await getPendingPairByEmail(user.email);
-      if (!pendingSnap.empty) {
-        const docRef = pendingSnap.docs[0];
-        const pair = docRef.data();
-        if (!pair.userBId && pair.userAId && pair.emailB && pair.inviteCode) {
-          setPendingApproval({
-            pairId: docRef.id,
-            inviterUid: pair.userAId,
-            emailB: pair.emailB,
-            inviteCode: pair.inviteCode,
-          });
+        const snap = await getUserProfile(user.uid);
+        if (snap.exists()) {
+          const data = snap.data();
+          setName(data.name || user.email?.split('@')[0] || '');
         } else {
-          console.warn('[WARN] ペンディングデータが不完全です', pair);
+          await createUserProfile(user.uid, user.email?.split('@')[0] || '');
+          setName(user.email?.split('@')[0] || '');
         }
+
+        setEmail(user.email ?? '');
+
+        const pairSnap = await getUserPair(user.uid);
+        if (!pairSnap.empty) {
+          const pairDoc = pairSnap.docs[0];
+          const pair = pairDoc.data();
+          setInviteCode(pair.inviteCode);
+          setPartnerEmail(pair.emailB ?? '');
+          setPairDocId(pairDoc.id);
+          if (pair.userBId) {
+            setIsPairConfirmed(true);
+          }
+        }
+
+        if (!user.email) {
+          console.warn('[WARN] user.email が null です。pending ペア検索をスキップします');
+          return;
+        }
+        const pendingSnap = await getPendingPairByEmail(user.email);
+        if (!pendingSnap.empty) {
+          const docRef = pendingSnap.docs[0];
+          const pair = docRef.data();
+          if (!pair.userBId && pair.userAId && pair.emailB && pair.inviteCode) {
+            setPendingApproval({
+              pairId: docRef.id,
+              inviterUid: pair.userAId,
+              emailB: pair.emailB,
+              inviteCode: pair.inviteCode,
+            });
+          } else {
+            console.warn('[WARN] ペンディングデータが不完全です', pair);
+          }
+        }
+      } catch (err) {
+        handleFirestoreError(err);
+      } finally {
+        setIsLoading(false);
+        setIsPairLoading(false);
       }
-      setIsPairLoading(false);
     };
+
     fetchProfile();
   }, []);
+
 
   const handleSendInvite = async () => {
     const user = auth.currentUser;
@@ -218,34 +227,44 @@ export default function ProfilePage() {
       <Header title="Profile" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
 
-        <ProfileCard
-          profileImage={profileImage}
-          setProfileImage={setProfileImage} // ←追加
-          name={name}
-          setName={setName}
-          isGoogleUser={isGoogleUser}
-          onEditName={onEditNameHandler}
-          onEditEmail={onEditEmailHandler}
-          onEditPassword={onEditPasswordHandler}
-          email={email}
-        />
+        {isLoading ? (
+          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
+            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            <ProfileCard
+              profileImage={profileImage}
+              setProfileImage={setProfileImage} // ←追加
+              name={name}
+              setName={setName}
+              isGoogleUser={isGoogleUser}
+              onEditName={onEditNameHandler}
+              onEditEmail={onEditEmailHandler}
+              onEditPassword={onEditPasswordHandler}
+              email={email}
+              isLoading={isLoading}
+            />
 
-        <PartnerSettings
-          isPairLoading={isPairLoading}
-          pendingApproval={pendingApproval}
-          isPairConfirmed={isPairConfirmed}
-          partnerEmail={partnerEmail}
-          partnerImage={partnerImage || '/images/hanako_default.png'}
-          inviteCode={inviteCode}
-          pairDocId={pairDocId}
-          onApprovePair={handleApprovePair}
-          onRejectPair={handleRejectPair}
-          onCancelInvite={handleCancelInvite}
-          onSendInvite={handleSendInvite}
-          onRemovePair={handleRemovePair}
-          onChangePartnerEmail={setPartnerEmail}
-          onChangePartnerImage={handlePartnerImageChange}
-        />
+            <PartnerSettings
+              isLoading={isLoading}
+              isPairLoading={isPairLoading}
+              pendingApproval={pendingApproval}
+              isPairConfirmed={isPairConfirmed}
+              partnerEmail={partnerEmail}
+              partnerImage={partnerImage || '/images/hanako_default.png'}
+              inviteCode={inviteCode}
+              pairDocId={pairDocId}
+              onApprovePair={handleApprovePair}
+              onRejectPair={handleRejectPair}
+              onCancelInvite={handleCancelInvite}
+              onSendInvite={handleSendInvite}
+              onRemovePair={handleRemovePair}
+              onChangePartnerEmail={setPartnerEmail}
+              onChangePartnerImage={handlePartnerImageChange}
+            />
+          </>
+      )}
 
       </main>
       <div className="text-center mt-auto mb-10">

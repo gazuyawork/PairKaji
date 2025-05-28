@@ -8,16 +8,16 @@ import { useState, useEffect } from 'react';
 import SearchBox from '@/components/SearchBox';
 import FilterControls from '@/components/FilterControls';
 import type { Period } from '@/types/Task';
-import { auth } from '@/lib/firebase';
 import { toast } from 'sonner'; 
-import { fetchTasksForUser } from '@/lib/firebaseUtils';
 import { deleteTaskFromFirestore } from '@/lib/firebaseUtils';
-import type { Task } from '@/types/Task';
 import TaskManageCard from '@/components/TaskManageCard'; 
 import type { TaskManageTask } from '@/types/Task';
-import { dayNumberToName } from '@/lib/constants';
 import { fetchPairUserIds, saveAllTasks } from '@/lib/taskUtils';
 import { useProfileImages } from '@/hooks/useProfileImages';
+import { mapFirestoreDocToTask } from '@/lib/taskMappers';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+
 
 
 export default function TaskManagePage() {
@@ -28,38 +28,41 @@ export default function TaskManagePage() {
   const { profileImage, partnerImage } = useProfileImages();
   const addTask = () => {
     const uid = auth.currentUser?.uid;
+    console.log('[DEBUG] addTaskでのuid:', uid); // ← これを追加！
     if (!uid) {
       toast.error('ログインしてください');
       return;
     }
 
     const newId = crypto.randomUUID();
-    const newGroupId = crypto.randomUUID();
 
-    setTasks([
-      {
-        id: newId,
-        name: '',
-        period: '毎日',
-        point: 10,
-        users: ['太郎', '花子'],
-        userIds: [uid],
-        daysOfWeek: [],
-        dates: [],
-        isTodo: false,
-        done: false,
-        skipped: false,
-        person: '',
-        image: '',
-        groupId: newGroupId,
-        isNew: true,
-        isEdited: false,
-        showDelete: false,
-      },
-      ...tasks,
-    ]);
+      setTasks(prev => [
+        ...prev,
+        {
+          id: newId,
+          title: '',
+          name: '',
+          period: '毎日',
+          point: 0,
+          users: [],
+          userIds: [uid],
+          daysOfWeek: [],
+          dates: [],
+          isTodo: false,
+          done: false,
+          skipped: false,
+          groupId: null,
+          completedAt: null,    // ← これでOK
+          completedBy: '',
+          visible: false,
+          person: '',
+          image: '',
+          isNew: true,
+          isEdited: false,
+          showDelete: false,
+        },
+      ]);
   };
-
 
     const updateTask = (
       id: string,
@@ -186,31 +189,32 @@ export default function TaskManagePage() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const fetched = await fetchTasksForUser(uid);
-      const loadedTasks: Task[] = fetched.map(({ id, data }) => ({
-        id,
-        name: data.name,
-        period: data.period,
-        point: data.point,
-        users: data.users,
-        daysOfWeek: data.daysOfWeek.map(d => dayNumberToName[d] ?? d),
-        dates: data.dates,
-        groupId: data.groupId,
-        isTodo: data.isTodo ?? false,
+      // ✅ ペアユーザーIDを取得
+      const partnerUids = await fetchPairUserIds(uid);
+      if (!partnerUids.includes(uid)) {
+        partnerUids.push(uid);
+      }
+
+      // ✅ Firestoreからタスク取得（TaskViewと同じ条件に変更）
+      const q = query(
+        collection(db, 'tasks'),
+        where('userId', 'in', partnerUids)
+      );
+
+      const snapshot = await getDocs(q);
+      const loadedTasks = snapshot.docs.map(doc => ({
+        ...mapFirestoreDocToTask(doc),
         isNew: false,
         isEdited: false,
         showDelete: false,
-        done: false,
-        skipped: false,
-        person: '',
-        image: '',
       }));
 
       setTasks(loadedTasks);
     };
 
-    fetchTasks();
+    fetchTasks().catch(console.error);
   }, []);
+
 
   const isConfirmDisabled = !tasks.some(task => task.isNew || task.isEdited);
 

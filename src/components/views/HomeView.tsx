@@ -10,6 +10,7 @@ import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -21,33 +22,7 @@ export default function HomeView() {
 
     const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const taskList: Task[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        const user = data.users?.[0] ?? '未設定';
-
-        return {
-          id: doc.id,
-          name: data.name ?? '',
-          title: data.name ?? '',
-          period: data.period,
-          point: data.point ?? 0,
-          users: data.users ?? [],
-          daysOfWeek: data.daysOfWeek ?? [],
-          dates: data.dates ?? [],
-          isTodo: data.isTodo ?? false,
-          done: false,
-          skipped: false,
-          person: user,
-          image:
-            user === '太郎'
-              ? localStorage.getItem('taroImage') ?? '/images/taro.png'
-              : user === '花子'
-              ? localStorage.getItem('hanakoImage') ?? '/images/hanako.png'
-              : '/images/default.png',
-          scheduledDate: data.dates?.[0] ?? '',
-        };
-      });
-
+      const taskList = snapshot.docs.map(mapFirestoreDocToTask);
       setTasks(taskList);
     });
 
