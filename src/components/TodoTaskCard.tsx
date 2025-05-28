@@ -1,9 +1,13 @@
+// src/components/TodoTaskCard.tsx
+
+'use client';
+
 import { CheckCircle, Circle, Trash2, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
-
+import { motion } from 'framer-motion';
 
 interface Props {
   task: TodoOnlyTask;
@@ -45,6 +49,7 @@ export default function TodoTaskCard({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isScrollable, setIsScrollable] = useState(false);
+  const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -118,13 +123,28 @@ export default function TodoTaskCard({
 
           {filteredTodos.map(todo => (
             <div key={todo.id} className="flex items-center gap-2">
-              <div className="cursor-pointer" onClick={() => onToggleDone(todo.id)}>
-                {todo.done ? (
-                  <CheckCircle className="text-yellow-500" />
-                ) : (
-                  <Circle className="text-gray-400" />
-                )}
-              </div>
+<motion.div
+  className="cursor-pointer"
+  onClick={() => {
+    setAnimatingTodoId(todo.id);
+    setTimeout(() => {
+      onToggleDone(todo.id); // ← アニメーション後に状態変更
+      setAnimatingTodoId(null);
+    }, 600);
+  }}
+  initial={false}
+  animate={animatingTodoId === todo.id ? { rotate: 360, scale: [1, 1.3, 1] } : { rotate: 0, scale: 1 }}
+  transition={{ duration: 0.6, ease: 'easeInOut' }}
+>
+  {animatingTodoId === todo.id ? (
+    <CheckCircle className="text-yellow-500" />
+  ) : todo.done ? (
+    <CheckCircle className="text-yellow-500" />
+  ) : (
+    <Circle className="text-gray-400" />
+  )}
+</motion.div>
+
               <input
                 type="text"
                 defaultValue={todo.text}
