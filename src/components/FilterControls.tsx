@@ -3,10 +3,10 @@
 'use client';
 
 import Image from 'next/image';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import type { Period } from '@/types/Task';
 import { useProfileImages } from '@/hooks/useProfileImages';
-
+import { motion } from 'framer-motion';
 
 interface Props {
   personFilter: string | null;
@@ -36,26 +36,38 @@ export default function FilterControls({
 
   const showClear = !!(periodFilter || personFilter || searchTerm);
 
+  const [periodClickKey, setPeriodClickKey] = useState(0);
+  const [personClickKey, setPersonClickKey] = useState(0);
 
   return (
     <div className="w-full flex flex-col items-center gap-2">
       <div className="flex justify-center items-center gap-2 flex-wrap">
         {periods.map(period => (
-          <button
-            key={period}
-            onClick={() => onTogglePeriod(period)}
+          <motion.button
+            key={period + periodClickKey}
+            onClick={() => {
+              setPeriodClickKey(prev => prev + 1);
+              onTogglePeriod(period);
+            }}
+            whileTap={{ scale: 1.2 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 10 }}
             className={`px-4 py-2 rounded-full font-sans border ${
               periodFilter === period ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
             }`}
           >
             {period}
-          </button>
+          </motion.button>
         ))}
 
         {users.map(user => (
-          <button
-            key={user.name}
-            onClick={() => onTogglePerson(user.name)}
+          <motion.button
+            key={user.name + personClickKey}
+            onClick={() => {
+              setPersonClickKey(prev => prev + 1);
+              onTogglePerson(user.name);
+            }}
+            whileTap={{ scale: 1.2 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 10 }}
             className={`w-10 h-10 rounded-full overflow-hidden border ${
               personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
             }`}
@@ -67,7 +79,7 @@ export default function FilterControls({
               height={40}
               className="object-cover"
             />
-          </button>
+          </motion.button>
         ))}
 
         {extraButton}
