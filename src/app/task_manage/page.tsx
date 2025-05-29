@@ -28,43 +28,79 @@ export default function TaskManagePage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { profileImage, partnerImage } = useProfileImages();
   const [isSaving, setIsSaving] = useState(false);
-  const addTask = () => {
+
+  const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
+
+  useEffect(() => {
+    const fetchPairStatus = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      try {
+        const pairsSnap = await getDocs(
+          query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
+        );
+
+        let foundConfirmed = false;
+        pairsSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.status === 'confirmed') {
+            foundConfirmed = true;
+          }
+        });
+
+        setPairStatus(foundConfirmed ? 'confirmed' : 'none');
+      } catch (error) {
+        console.error('ペアステータスの取得に失敗:', error);
+        setPairStatus('none');
+      }
+    };
+
+    fetchPairStatus();
+  }, []);
+
+  const addTask = async () => {
     const uid = auth.currentUser?.uid;
-    console.log('[DEBUG] addTaskでのuid:', uid); // ← これを追加！
+    console.log('[DEBUG] addTaskでのuid:', uid);
     if (!uid) {
       toast.error('ログインしてください');
       return;
     }
 
+    let sharedUserIds: string[] = [uid];
+    if (pairStatus === 'confirmed') {
+      sharedUserIds = await fetchPairUserIds(uid);
+    }
+
     const newId = crypto.randomUUID();
 
-      setTasks(prev => [
-        ...prev,
-        {
-          id: newId,
-          title: '',
-          name: '',
-          period: '毎日',
-          point: 5,
-          users: [],
-          userIds: [uid],
-          daysOfWeek: [],
-          dates: [],
-          isTodo: false,
-          done: false,
-          skipped: false,
-          groupId: null,
-          completedAt: null,    // ← これでOK
-          completedBy: '',
-          visible: false,
-          person: '',
-          image: '',
-          userId: uid,
-          isNew: true,
-          isEdited: false,
-          showDelete: false,
-        },
-      ]);
+    setTasks(prev => [
+      ...prev,
+      {
+        id: newId,
+        title: '',
+        name: '',
+        period: '毎日',
+        point: 5,
+        users: sharedUserIds,     // ✅ 担当者設定
+        userIds: sharedUserIds,   // ✅ Firestore保存用
+        daysOfWeek: [],
+        dates: [],
+        isTodo: false,
+        done: false,
+        skipped: false,
+        groupId: null,
+        completedAt: null,
+        completedBy: '',
+        visible: false,
+        person: '',
+        image: '',
+        userId: uid,
+        isNew: true,
+        isEdited: false,
+        showDelete: false,
+      },
+    ]);
   };
 
     const updateTask = (
@@ -251,6 +287,7 @@ export default function TaskManagePage() {
           personFilter={personFilter}
           onTogglePeriod={toggleFilter}
           onTogglePerson={togglePerson}
+          pairStatus={pairStatus}
         />
 
 

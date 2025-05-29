@@ -40,6 +40,35 @@ export default function TaskView({ initialSearch = '' }: Props) {
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
+  const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
+
+  useEffect(() => {
+    const fetchPairStatus = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      try {
+        const pairsSnap = await getDocs(
+          query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
+        );
+
+        let foundConfirmed = false;
+        pairsSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.status === 'confirmed') {
+            foundConfirmed = true;
+          }
+        });
+
+        setPairStatus(foundConfirmed ? 'confirmed' : 'none');
+      } catch (error) {
+        console.error('ペアステータスの取得に失敗:', error);
+        setPairStatus('none');
+      }
+    };
+
+    fetchPairStatus();
+  }, []);
 
   const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
   const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
@@ -182,6 +211,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
           onTogglePerson={togglePerson}
           searchTerm={searchTerm}
           onClearSearch={() => setSearchTerm('')} 
+          pairStatus={pairStatus}
         />
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />

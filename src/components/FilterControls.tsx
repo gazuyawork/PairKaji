@@ -16,6 +16,7 @@ interface Props {
   searchTerm?: string;  
   onClearSearch?: () => void;
   extraButton?: ReactNode;
+  pairStatus: 'confirmed' | 'none';
 }
 
 export default function FilterControls({
@@ -26,6 +27,7 @@ export default function FilterControls({
   searchTerm,
   onClearSearch,
   extraButton,
+  pairStatus, 
 }: Props) {
   const periods = ['毎日', '週次', '不定期'] as const;
   const { profileImage, partnerImage } = useProfileImages();
@@ -59,28 +61,29 @@ export default function FilterControls({
           </motion.button>
         ))}
 
-        {users.map(user => (
-          <motion.button
-            key={user.name + personClickKey}
-            onClick={() => {
-              setPersonClickKey(prev => prev + 1);
-              onTogglePerson(user.name);
-            }}
-            whileTap={{ scale: 1.2 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 10 }}
-            className={`w-10 h-10 rounded-full overflow-hidden border ${
-              personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
-            }`}
-          >
-            <Image
-              src={user.image}
-              alt={`${user.name}のフィルター`}
-              width={40}
-              height={40}
-              className="object-cover"
-            />
-          </motion.button>
-        ))}
+        {pairStatus === 'confirmed' &&
+          users.map(user => (
+            <motion.button
+              key={user.name + personClickKey}
+              onClick={() => {
+                setPersonClickKey(prev => prev + 1);
+                onTogglePerson(user.name);
+              }}
+              whileTap={{ scale: 1.2 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+              className={`w-10 h-10 rounded-full overflow-hidden border ${
+                personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
+              }`}
+            >
+              <Image
+                src={user.image}
+                alt={`${user.name}のフィルター`}
+                width={40}
+                height={40}
+                className="object-cover"
+              />
+            </motion.button>
+          ))}
 
         {extraButton}
       </div>
