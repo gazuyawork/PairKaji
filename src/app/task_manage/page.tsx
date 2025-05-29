@@ -17,6 +17,7 @@ import { useProfileImages } from '@/hooks/useProfileImages';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { RotateCcw } from 'lucide-react'; 
 
 
 
@@ -26,6 +27,7 @@ export default function TaskManagePage() {
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { profileImage, partnerImage } = useProfileImages();
+  const [isSaving, setIsSaving] = useState(false);
   const addTask = () => {
     const uid = auth.currentUser?.uid;
     console.log('[DEBUG] addTaskでのuid:', uid); // ← これを追加！
@@ -153,9 +155,13 @@ export default function TaskManagePage() {
   };
 
   const confirmTasks = async () => {
+    if (isSaving) return; // 二重送信防止
+    setIsSaving(true);
+
     const uid = auth.currentUser?.uid;
     if (!uid) {
       toast.error('ログインしてください');
+      setIsSaving(false);
       return;
     }
 
@@ -169,21 +175,30 @@ export default function TaskManagePage() {
       })
     );
 
-    if (hasEmptyName) return;
-
-  const sharedUserIds = await fetchPairUserIds(uid);
-
-    if (!sharedUserIds.includes(uid)) {
-      sharedUserIds.push(uid);
+    if (hasEmptyName) {
+      setIsSaving(false);
+      return;
     }
-    await saveAllTasks(tasks, uid, sharedUserIds);
 
+    try {
+      const sharedUserIds = await fetchPairUserIds(uid);
+      if (!sharedUserIds.includes(uid)) {
+        sharedUserIds.push(uid);
+      }
+      await saveAllTasks(tasks, uid, sharedUserIds);
 
-    setTasks(prev =>
-      prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
-    );
-    toast.success('タスクを保存しました');
+      setTasks(prev =>
+        prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
+      );
+      toast.success('タスクを保存しました');
+    } catch (error) {
+      console.error(error);
+      toast.error('保存に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -266,14 +281,21 @@ export default function TaskManagePage() {
       <div className="mt-auto py-10 px-4 flex justify-center items-center gap-4">
         <button
           onClick={confirmTasks}
-          disabled={isConfirmDisabled}
-          className={`w-[300px] font-bold py-3 rounded-xl shadow-lg ${
-            isConfirmDisabled
+          disabled={isConfirmDisabled || isSaving}
+          className={`w-[300px] font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 ${
+            isConfirmDisabled || isSaving
               ? 'bg-gray-300 text-white cursor-not-allowed'
               : 'bg-[#FFCB7D] text-white'
           }`}
         >
-          OK
+          {isSaving ? (
+            <>
+              <RotateCcw className="w-5 h-5 animate-spin" />
+              保存中...
+            </>
+          ) : (
+            'OK'
+          )}
         </button>
 
         <button
