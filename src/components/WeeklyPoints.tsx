@@ -22,12 +22,13 @@ import {
   format,
 } from 'date-fns';
 import EditPointModal from './EditPointModal';
+import { fetchPairUserIds } from '@/lib/taskUtils';
+
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [targetPoint, setTargetPoint] = useState(0); // 実績
   const [maxPoints, setMaxPoints] = useState(100);   // 目標
-  // const [tasks] = useState<Task[]>([]);
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -35,27 +36,46 @@ export default function WeeklyPoints() {
 
   // ✅ 実績ポイントを取得
   useEffect(() => {
-    const fetchPoints = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+const fetchPoints = async () => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    console.log('❌ fetchPoints: ユーザー未認証');
+    return;
+  }
 
-      const completionsRef = collection(db, 'taskCompletions');
-      const q = query(completionsRef, where('userId', '==', uid));
-      const snapshot = await getDocs(q);
+  try {
+    const partnerUids = await fetchPairUserIds(uid);
+    if (!partnerUids.includes(uid)) partnerUids.push(uid);
+    console.log('✅ fetchPoints: partnerUids =', partnerUids);
 
-      const pointsThisWeek = snapshot.docs.reduce((sum, doc) => {
-        const data = doc.data();
-        const date = parseISO(data.date);
-        const point = data.point ?? 0;
+    const completionsRef = collection(db, 'taskCompletions');
+    const q = query(completionsRef, where('userId', 'in', partnerUids));
+    const snapshot = await getDocs(q);
+    console.log('✅ fetchPoints: taskCompletions 件数 =', snapshot.docs.length);
 
-        if (isWithinInterval(date, { start: weekStart, end: weekEnd })) {
-          return sum + point;
-        }
-        return sum;
-      }, 0);
+    let pointsThisWeek = 0;
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      console.log('🔍 taskCompletions データ:', data);
 
-      setTargetPoint(pointsThisWeek);
-    };
+      const dateRaw = data.date;
+      const dateParsed = parseISO(dateRaw);
+      const point = data.point ?? 0;
+      const isInWeek = isWithinInterval(dateParsed, { start: weekStart, end: weekEnd });
+
+      console.log(`  ➜ date: ${dateRaw}, parsed: ${dateParsed}, inWeek: ${isInWeek}, point: ${point}`);
+
+      if (isInWeek) {
+        pointsThisWeek += point;
+      }
+    });
+
+    console.log('✅ 今週のポイント合計 =', pointsThisWeek);
+    setTargetPoint(pointsThisWeek);
+  } catch (error) {
+    console.error('❌ fetchPoints: エラー =', error);
+  }
+};
 
     fetchPoints();
   }, [weekStart, weekEnd]);
@@ -66,44 +86,44 @@ export default function WeeklyPoints() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const docRef = doc(db, 'points', uid); // ← ここを修正！
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.weeklyTargetPoint) {
-          setMaxPoints(data.weeklyTargetPoint);
+      const partnerUids = await fetchPairUserIds(uid);
+      if (!partnerUids.includes(uid)) partnerUids.push(uid);
+
+      let latestPoint = 100; // デフォルト
+      let latestUpdatedAt = 0;
+
+      for (const userId of partnerUids) {
+        const docRef = doc(db, 'points', userId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          const updatedAt = data.updatedAt?.toMillis?.() ?? 0;
+          if (updatedAt > latestUpdatedAt && data.weeklyTargetPoint !== undefined) {
+            latestPoint = data.weeklyTargetPoint;
+            latestUpdatedAt = updatedAt;
+          }
         }
       }
-    };
 
+      setMaxPoints(latestPoint);
+    };
     fetchMax();
   }, []);
 
-
-  // ✅ 自動計算ロジック（ポイントの合計）
-  // const autoCalculate = () => {
-  //   let daily = 0;
-  //   let weekly = 0;
-
-  //   tasks.forEach(task => {
-  //     if (task.period === '毎日') {
-  //       daily += task.point * 7;
-  //     } else if (task.period === '週次') {
-  //       weekly += task.point * task.daysOfWeek.length;
-  //     }
-  //   });
-
-  //   return daily + weekly;
-  // };
-
   // ✅ 目標ポイント保存
-  const handleSave = async (newPoint: number) => {
+  const handleSave: (newPoint: number) => Promise<void> = async (newPoint: number) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
+
+    const partnerUids = await fetchPairUserIds(uid);
+    if (!partnerUids.includes(uid)) partnerUids.push(uid);
+
     setMaxPoints(newPoint);
     await setDoc(doc(db, 'points', uid), {
-      userId: uid, // 🔑 ルールの条件を満たすために必須
+      userId: uid, // 🔑 自分ID
+      userIds: partnerUids, // 🔑 ペアIDを含める
       weeklyTargetPoint: newPoint,
+      updatedAt: new Date(),
     }, { merge: true });
   };
 
@@ -133,10 +153,8 @@ export default function WeeklyPoints() {
       <EditPointModal
         isOpen={isModalOpen}
         initialPoint={maxPoints}
-        // tasks={tasks}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
-        // onAutoCalculate={autoCalculate}
       />
     </>
   );

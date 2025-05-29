@@ -43,7 +43,7 @@ export default function TaskManagePage() {
           title: '',
           name: '',
           period: '毎日',
-          point: 0,
+          point: 5,
           users: [],
           userIds: [uid],
           daysOfWeek: [],
