@@ -1,4 +1,4 @@
-import { getDocs, query, where, collection } from 'firebase/firestore';
+import { getDocs, query, where, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import type { TaskManageTask, FirestoreTask } from '@/types/Task';
@@ -57,3 +57,27 @@ export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds
     }
   }
 };
+
+export const addTaskCompletion = async (
+  taskId: string,
+  userId: string,
+  taskName: string,
+  point: number,
+  person: string
+) => {
+  try {
+    const todayISO = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    await addDoc(collection(db, 'taskCompletions'), {
+      taskId,
+      userId,
+      taskName,
+      point,
+      person,
+      date: todayISO,
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('タスク完了履歴の追加に失敗:', error);
+  }
+};
+

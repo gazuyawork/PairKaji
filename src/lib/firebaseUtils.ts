@@ -6,6 +6,8 @@ import {
 } from 'firebase/firestore';
 import type { FirestoreTask } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
+import { addTaskCompletion } from './taskUtils';
+
 
 // 🔹 ユーザープロフィール取得
 export const getUserProfile = async (uid: string) => {
@@ -151,7 +153,14 @@ export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => 
   }
 };
 
-export const toggleTaskDoneStatus = async (taskId: string, userId: string, done: boolean) => {
+export const toggleTaskDoneStatus = async (
+    taskId: string,
+    userId: string,
+    done: boolean,
+    taskName?: string,
+    point?: number,
+    person?: string
+  ) => {
   try {
     const taskRef = doc(db, 'tasks', taskId);
 
@@ -162,9 +171,9 @@ export const toggleTaskDoneStatus = async (taskId: string, userId: string, done:
         completedAt: new Date().toISOString(),
         completedBy: userId,
       });
-
-      // taskCompletions に履歴を追加（既存の追加処理を呼ぶ or 新規実装が必要）
-
+      if (taskName && point !== undefined && person) {
+        await addTaskCompletion(taskId, userId, taskName, point, person);
+      }
     } else {
       // 未処理に戻す場合
       await updateDoc(taskRef, {
