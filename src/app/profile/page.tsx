@@ -22,6 +22,7 @@ import type { Pair } from '@/types/Pair';
 import { removePartnerFromUserTasks } from '@/lib/firebaseUtils';
 import { approvePair } from '@/lib/firebaseUtils';
 import { getDocs, Query, QuerySnapshot } from 'firebase/firestore';
+import { getPendingPairByEmail } from '@/lib/firebaseUtils'; // など
 
 
 
