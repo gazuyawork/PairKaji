@@ -10,7 +10,7 @@ import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
 import { 
   getUserProfile, createUserProfile, 
-  getUserPair, getPendingPairByEmail, 
+  getPendingPairByEmail, 
   createPairInvite, 
   removePair, deletePair, 
   handleFirestoreError, generateInviteCode 
@@ -22,6 +22,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
 import { removePartnerFromUserTasks } from '@/lib/firebaseUtils';
 import { approvePair } from '@/lib/firebaseUtils';
+import { getDocs, Query, QuerySnapshot } from 'firebase/firestore';
 
 
 
@@ -98,17 +99,24 @@ export default function ProfilePage() {
 
         setEmail(user.email ?? '');
 
-        const pairSnap = await getUserPair(user.uid);
+        const pairQuery = query(
+          collection(db, 'pairs'),
+          where('userIds', 'array-contains', user.uid)
+        ) as Query<Pair>;
+        const pairSnap: QuerySnapshot<Pair> = await getDocs(pairQuery);
+
         if (!pairSnap.empty) {
           const pairDoc = pairSnap.docs[0];
-          const pair = pairDoc.data();
+          const pair = pairDoc.data() as Pair;
+
           setInviteCode(pair.inviteCode);
           setPartnerEmail(pair.emailB ?? '');
           setPairDocId(pairDoc.id);
-          if (pair.userBId) {
-            setIsPairConfirmed(true);
-          }
+          setIsPairConfirmed(pair.status === 'confirmed');
+        } else {
+          setIsPairConfirmed(false);
         }
+
 
         if (!user.email) {
           console.warn('[WARN] user.email が null です。pending ペア検索をスキップします');
@@ -144,17 +152,18 @@ export default function ProfilePage() {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(collection(db, 'pairs'), where('userAId', '==', user.uid)); // ← user.uidエラーなし
+    const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid));
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         if (!snapshot.empty) {
           const pairDoc = snapshot.docs[0];
-          const pair = pairDoc.data() as Pair;
+          const pair = pairDoc.data() as Pair; // 👈 明示的に型アサーションOK
           setInviteCode(pair.inviteCode);
           setPartnerEmail(pair.emailB ?? '');
           setPairDocId(pairDoc.id);
-          setIsPairConfirmed(!!pair.userBId);
+          setIsPairConfirmed(pair.status === 'confirmed'); // 👈 status確認追加
         } else {
           setInviteCode('');
           setPartnerEmail('');
