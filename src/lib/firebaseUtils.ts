@@ -7,7 +7,13 @@ import {
 import type { FirestoreTask } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
 import { addTaskCompletion } from './taskUtils';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '@/lib/firebase'; // Firebase app 初期化済みのものをimport
 
+interface ShareTasksResponse {
+  success: boolean;
+  updatedCount: number;
+}
 
 // 🔹 ユーザープロフィール取得
 export const getUserProfile = async (uid: string) => {
@@ -216,5 +222,41 @@ export const saveUserNameToFirestore = async (uid: string, name: string) => {
   } catch (err) {
     console.error('Failed to update user name:', err);
     throw err;
+  }
+};
+
+// 🔹 ペア解除時: 自分のタスクからパートナーUIDを削除
+export const removePartnerFromUserTasks = async (partnerUid: string) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('ユーザー情報が取得できません');
+
+  const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', user.uid));
+  const snapshot = await getDocs(q);
+
+  const batchUpdates = snapshot.docs.map(async (docRef) => {
+    const task = docRef.data();
+    const newUserIds = (task.userIds || []).filter((id: string) => id !== partnerUid);
+    await updateDoc(doc(db, 'tasks', docRef.id), { userIds: newUserIds });
+  });
+
+  await Promise.all(batchUpdates);
+};
+
+export const callShareTasksWithPartner = async (
+  userId: string,
+  partnerId: string
+): Promise<ShareTasksResponse> => {
+  const functions = getFunctions(app);
+  const shareTasksFn = httpsCallable<{ userId: string; partnerId: string }, ShareTasksResponse>(
+    functions,
+    'shareTasksWithPartner'
+  );
+
+  try {
+    const result = await shareTasksFn({ userId, partnerId });
+    return result.data;
+  } catch (error) {
+    console.error('Error calling shareTasksWithPartner:', error);
+    throw error;
   }
 };

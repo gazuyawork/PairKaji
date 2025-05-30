@@ -1,7 +1,7 @@
-// layout.tsx
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import { Toaster } from 'sonner';
+import PairListener from '@/components/PairListener'; // ← 追加
 
 const zenMaruGothic = Zen_Maru_Gothic({ subsets: ['latin'], weight: ['400'], variable: '--font-zen' });
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font-pacifico' });
@@ -22,7 +22,6 @@ export const metadata = {
   },
 };
 
-// 👇 追加
 export const viewport = {
   themeColor: '#5E8BC7',
 };
@@ -32,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}>
       <body className="font-sans bg-white text-gray-800 h-full overflow-hidden antialiased">
         <div className="flex flex-col h-full overscroll-none">
-          {/* 子要素側でスクロールを許可する場合に overflow-y-auto を使う */}
+          <PairListener /> {/* ← ペア監視リスナーをここに置く */}
           {children}
           <Toaster />
         </div>

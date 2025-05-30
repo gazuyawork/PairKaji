@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import type { PendingApproval } from '@/types/Pair';
 import { motion } from 'framer-motion';
+import { useRef } from 'react';
 
 type PartnerSettingsProps = {
   isLoading: boolean;
@@ -37,15 +38,26 @@ export default function PartnerSettings({
   onSendInvite,
   onRemovePair,
   onChangePartnerEmail,
-  onChangePartnerImage, // 追加！
+  onChangePartnerImage,
 }: PartnerSettingsProps) {
-  // サンプル画像リスト
-  const partnerImageOptions = [
-    '/images/hanako_default.png',
-    '/images/penguin.png',
-    '/images/cat.png',
-    '/images/dog.png',
-  ];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result && typeof reader.result === 'string') {
+          onChangePartnerImage(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <motion.div
@@ -113,12 +125,23 @@ export default function PartnerSettings({
           {isPairConfirmed && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <Image
-                  src={partnerImage}
-                  alt="パートナー画像"
-                  width={60}
-                  height={60}
-                  className="w-16 h-16 rounded-full object-cover border border-gray-300"
+                <button
+                  onClick={handleImageClick}
+                  className="relative w-16 h-16 rounded-full border border-gray-300 overflow-hidden"
+                >
+                  <Image
+                    src={partnerImage}
+                    alt="パートナー画像"
+                    fill
+                    className="object-cover"
+                  />
+                </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileChange}
                 />
                 <div className="text-[#5E5E5E]">
                   <p className="font-semibold">パートナー承認済み</p>
@@ -127,23 +150,6 @@ export default function PartnerSettings({
                 <button onClick={onRemovePair} className="text-red-500">
                   <X size={24} />
                 </button>
-              </div>
-
-              <div>
-                <label className="text-[#5E5E5E] font-semibold text-sm">パートナー画像を選択</label>
-                <div className="flex gap-2 mt-2">
-                  {partnerImageOptions.map((img) => (
-                    <button
-                      key={img}
-                      onClick={() => onChangePartnerImage(img)}
-                      className={`border rounded-full p-1 ${
-                        partnerImage === img ? 'ring-2 ring-[#FFCB7D]' : ''
-                      }`}
-                    >
-                      <Image src={img} alt="選択画像" width={40} height={40} className="rounded-full" />
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           )}

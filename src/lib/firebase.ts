@@ -26,4 +26,4 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
 const db = getFirestore(app);
 const storage = getStorage(app); // ✅ 追加
 
-export { auth, db, storage }; // ✅ 追加した storage を export
+export { auth, db, storage, app }; // ✅ 追加した storage を export

@@ -2,7 +2,7 @@
 
 import Header from '@/components/Header';
 import { useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
@@ -11,13 +11,16 @@ import type { PendingApproval } from '@/types/Pair';
 import { 
   getUserProfile, createUserProfile, 
   getUserPair, getPendingPairByEmail, 
-  createPairInvite, approvePair, 
+  createPairInvite, 
   removePair, deletePair, 
   handleFirestoreError, generateInviteCode 
 } from '@/lib/firebaseUtils';
 import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
 import { saveUserNameToFirestore } from '@/lib/firebaseUtils';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import type { Pair } from '@/types/Pair';
+import { removePartnerFromUserTasks } from '@/lib/firebaseUtils';
 
 
 
@@ -114,7 +117,7 @@ export default function ProfilePage() {
         if (!pendingSnap.empty) {
           const docRef = pendingSnap.docs[0];
           const pair = docRef.data();
-          if (!pair.userBId && pair.userAId && pair.emailB && pair.inviteCode) {
+          if (pair.status === 'pending' && !pair.userBId && pair.userAId && pair.emailB && pair.inviteCode) {
             setPendingApproval({
               pairId: docRef.id,
               inviterUid: pair.userAId,
@@ -122,8 +125,9 @@ export default function ProfilePage() {
               inviteCode: pair.inviteCode,
             });
           } else {
-            console.warn('[WARN] ペンディングデータが不完全です', pair);
+            setPendingApproval(null);
           }
+
         }
       } catch (err) {
         handleFirestoreError(err);
@@ -134,6 +138,37 @@ export default function ProfilePage() {
     };
 
     fetchProfile();
+
+    // 🔥 onSnapshotはfetchProfile内で取得したuserではなく、再度取得する
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = query(collection(db, 'pairs'), where('userAId', '==', user.uid)); // ← user.uidエラーなし
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const pairDoc = snapshot.docs[0];
+          const pair = pairDoc.data() as Pair;
+          setInviteCode(pair.inviteCode);
+          setPartnerEmail(pair.emailB ?? '');
+          setPairDocId(pairDoc.id);
+          setIsPairConfirmed(!!pair.userBId);
+        } else {
+          setInviteCode('');
+          setPartnerEmail('');
+          setPairDocId(null);
+          setIsPairConfirmed(false);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
 
@@ -166,7 +201,7 @@ export default function ProfilePage() {
         toast.error('ペア情報が不完全なため、承認できません。');
         return;
       }
-      await approvePair(pendingApproval!.pairId, pendingApproval!.inviterUid, user.uid);
+
       toast.success('ペア設定を承認しました');
       setIsPairConfirmed(true);
       setPendingApproval(null);
@@ -182,6 +217,13 @@ export default function ProfilePage() {
 
     try {
       await removePair(pairDocId);
+
+      // 🆕 ペア解除後にタスク共有解除処理
+      const user = auth.currentUser;
+      if (user) {
+        await removePartnerFromUserTasks(user.uid);
+      }
+
       toast.success('ペアを解除しました');
       setIsPairConfirmed(false);
       setPartnerEmail('');
