@@ -10,7 +10,6 @@ import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
 import { 
   getUserProfile, createUserProfile, 
-  getPendingPairByEmail, 
   createPairInvite, 
   removePair, deletePair, 
   handleFirestoreError, generateInviteCode 
