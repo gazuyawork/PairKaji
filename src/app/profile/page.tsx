@@ -21,6 +21,7 @@ import { saveUserNameToFirestore } from '@/lib/firebaseUtils';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
 import { removePartnerFromUserTasks } from '@/lib/firebaseUtils';
+import { approvePair } from '@/lib/firebaseUtils';
 
 
 
@@ -201,6 +202,9 @@ export default function ProfilePage() {
         toast.error('ペア情報が不完全なため、承認できません。');
         return;
       }
+
+      // Firestoreのペア情報を更新
+      await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
 
       toast.success('ペア設定を承認しました');
       setIsPairConfirmed(true);
