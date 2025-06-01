@@ -127,21 +127,21 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');
 
-    // 🔑 ペア情報取得（必要ならセッションストレージ or fetchPairIdで）
-    let userIds = taskData.userIds ?? [uid];
+    // 🔑 ペア情報を必ずFirestoreから取得
+    let userIds: string[] = [uid];
 
     const pairId = sessionStorage.getItem('pairId'); // またはfetchPairId()で取得
     if (pairId) {
       const pairDoc = await getDoc(doc(db, 'pairs', pairId));
       const pairData = pairDoc.data();
       if (pairData?.userIds) {
-        userIds = pairData.userIds; // 🔥 ペア情報をuserIdsにセット
+        userIds = pairData.userIds; // 🔥 必ず最新のペア情報をセット
       }
     }
 
     const commonData = {
       ...taskData,
-      userIds, // 必ず「自分＋ペア」のUIDを含める
+      userIds, // ✅ 最新の「自分＋ペア」のUIDを含める
     };
 
     if (taskId) {
@@ -163,6 +163,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
     handleFirestoreError(_err);
   }
 };
+
 
 export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
   try {
@@ -196,11 +197,10 @@ export const toggleTaskDoneStatus = async (
     } else {
       // 未処理に戻す場合
       await updateDoc(taskRef, {
-        done: false,
-        completedAt: null,
-        completedBy: '',
+        done: true,
+        completedAt: serverTimestamp(), // ← 🔥 これが最も正確！
+        completedBy: userId,
       });
-
       // taskCompletions から履歴削除
       const q = query(
         collection(db, 'taskCompletions'),
