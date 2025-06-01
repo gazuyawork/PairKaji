@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { parseISO, isSameDay } from 'date-fns';
 import Image from 'next/image';
 import type { Task } from '@/types/Task';
 import { useProfileImages } from '@/hooks/useProfileImages';
@@ -16,6 +15,7 @@ interface CompletionLog {
   userId: string;
   completedAt?: string;
   person?: string;
+  __docId?: string; // FirestoreのドキュメントID
 }
 
 type Props = {
@@ -31,31 +31,66 @@ export default function FinishDayTask({ tasks }: Props) {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      // ✅ 表示対象タスクのID一覧を作成
-      // 本日の完了タスク取得用。タスク作成者や完了者に関係なく表示するため、taskIdベースで取得
       const taskIds = tasks.map(task => task.id);
       if (taskIds.length === 0) return;
 
-      // ✅ taskCompletionsコレクションから、対象タスクの完了履歴を取得（リアルタイム更新）
-      // Firestoreのinクエリは最大10件までのため、今後は分割対応を検討する
-      const q = query(
+      const today = new Date().toISOString().split('T')[0];
+
+      let logsBufferQ1: CompletionLog[] = [];
+      let logsBufferQ2: CompletionLog[] = [];
+
+      const updateLogs = () => {
+        const combined = [...logsBufferQ1, ...logsBufferQ2];
+        const uniqueLogs = Array.from(new Map(combined.map(log => [log.__docId, log])).values());
+        setLogs(uniqueLogs.sort((a, b) => b.date.localeCompare(a.date)));
+      };
+
+      const q1 = query(
         collection(db, 'taskCompletions'),
-        where('taskId', 'in', taskIds)
+        where('taskId', 'in', taskIds),
+        where('userId', '==', uid)
       );
 
-      const today = new Date();
+      const q2 = query(
+        collection(db, 'taskCompletions'),
+        where('taskId', 'in', taskIds),
+        where('userIds', 'array-contains', uid)
+      );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        // 今日の日付に該当する完了ログのみをフィルタリングし、日時順にソート
-        const todayLogs = snapshot.docs
-          .map(doc => doc.data() as CompletionLog)
-          .filter(log => isSameDay(parseISO(log.date), today))
-          .sort((a, b) => b.date.localeCompare(a.date));
-
-        setLogs(todayLogs);
+      const unsubscribe1 = onSnapshot(q1, (snapshot1) => {
+        snapshot1.docChanges().forEach(change => {
+          const log = { ...(change.doc.data() as CompletionLog), __docId: change.doc.id };
+          if (log.date === today) {
+            if (change.type === 'removed') {
+              logsBufferQ1 = logsBufferQ1.filter(l => l.__docId !== log.__docId);
+            } else {
+              logsBufferQ1 = logsBufferQ1.filter(l => l.__docId !== log.__docId);
+              logsBufferQ1.push(log);
+            }
+          }
+        });
+        updateLogs();
       });
 
-      return unsubscribe;
+      const unsubscribe2 = onSnapshot(q2, (snapshot2) => {
+        snapshot2.docChanges().forEach(change => {
+          const log = { ...(change.doc.data() as CompletionLog), __docId: change.doc.id };
+          if (log.date === today) {
+            if (change.type === 'removed') {
+              logsBufferQ2 = logsBufferQ2.filter(l => l.__docId !== log.__docId);
+            } else {
+              logsBufferQ2 = logsBufferQ2.filter(l => l.__docId !== log.__docId);
+              logsBufferQ2.push(log);
+            }
+          }
+        });
+        updateLogs();
+      });
+
+      return () => {
+        unsubscribe1();
+        unsubscribe2();
+      };
     };
 
     let unsubscribe: (() => void) | undefined;
@@ -63,27 +98,24 @@ export default function FinishDayTask({ tasks }: Props) {
       unsubscribe = unsub;
     });
 
-    // ✅ クリーンアップ処理（コンポーネントアンマウント時にonSnapshot購読解除）
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [tasks]); // 🔄 タスクリストが変更されるたびに再取得
+  }, [tasks]);
 
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-md overflow-hidden max-h-[300px]">
-      {/* ✅ 固定ヘッダー */}
       <div className="bg-white p-4 shadow sticky top-0 z-10 text-center border-b">
         <h2 className="text-lg font-bold text-[#5E5E5E]">本日の完了タスク</h2>
       </div>
 
-      {/* ✅ 完了タスク表示リスト（スクロール可能） */}
       <div className="overflow-y-auto p-4">
         {logs.length === 0 ? (
           <p className="text-gray-400 mb-10">本日の履歴はありません</p>
         ) : (
           <ul className="space-y-2 text-left">
-            {logs.map((log, idx) => (
-              <li key={idx} className="flex items-center gap-4 border-b pb-1 text-[#5E5E5E]">
+            {logs.map((log) => (
+              <li key={log.__docId} className="flex items-center gap-4 border-b pb-1 text-[#5E5E5E]">
                 <div className="w-[100px] truncate text-ellipsis overflow-hidden whitespace-nowrap">
                   {log.taskName ?? '（タスク名なし）'}
                 </div>
