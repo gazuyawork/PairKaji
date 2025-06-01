@@ -1,15 +1,12 @@
-// src/components/WeeklyPoints.tsx
-
 'use client';
 
 import { useEffect, useState } from 'react';
-// import type { Task } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
 import {
   collection,
-  getDocs,
   query,
   where,
+  onSnapshot,
   doc,
   getDoc,
   setDoc,
@@ -17,13 +14,10 @@ import {
 import {
   startOfWeek,
   endOfWeek,
-  isWithinInterval,
-  parseISO,
   format,
 } from 'date-fns';
 import EditPointModal from './EditPointModal';
 import { fetchPairUserIds } from '@/lib/taskUtils';
-
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,44 +27,82 @@ export default function WeeklyPoints() {
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
 
-  // ✅ 実績ポイントを取得
+  // ✅ 実績ポイントを取得（リアルタイム対応）
   useEffect(() => {
-const fetchPoints = async () => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) {
-    return;
-  }
+    let unsubscribe1: (() => void) | null = null;
+    let unsubscribe2: (() => void) | null = null;
 
-  try {
-    const pairId = sessionStorage.getItem('pairId');
-    if (!pairId) return;
-    const partnerUids = await fetchPairUserIds(pairId);
-    // if (!partnerUids.includes(uid)) partnerUids.push(uid);
+    const fetchPoints = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
 
-    const completionsRef = collection(db, 'taskCompletions');
-    const q = query(completionsRef, where('userId', 'in', partnerUids));
-    const snapshot = await getDocs(q);
+      const pairId = sessionStorage.getItem('pairId');
+      if (!pairId) return;
+      const partnerUids = await fetchPairUserIds(pairId);
 
-    let pointsThisWeek = 0;
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data();
-      const dateRaw = data.date;
-      const dateParsed = parseISO(dateRaw);
-      const point = data.point ?? 0;
-      const isInWeek = isWithinInterval(dateParsed, { start: weekStart, end: weekEnd });
+      const weekStartISO = weekStart.toISOString().split('T')[0];
+      const weekEndISO = weekEnd.toISOString().split('T')[0];
 
-      if (isInWeek) {
-        pointsThisWeek += point;
-      }
-    });
+      let pointsBufferQ1: { id: string; point: number }[] = [];
+      let pointsBufferQ2: { id: string; point: number }[] = [];
 
-    setTargetPoint(pointsThisWeek);
-  } catch (error) {
-    console.error('❌ fetchPoints: エラー =', error);
-  } };
+      const updatePoints = () => {
+        const combined = [...pointsBufferQ1, ...pointsBufferQ2];
+        const uniqueMap = new Map<string, number>();
+        combined.forEach(({ id, point }) => {
+          uniqueMap.set(id, point);
+        });
+        const total = Array.from(uniqueMap.values()).reduce((sum, p) => sum + p, 0);
+        setTargetPoint(total);
+      };
+
+      // 🔹 userIdクエリ
+      const q1 = query(
+        collection(db, 'taskCompletions'),
+        where('userId', 'in', partnerUids)
+      );
+
+      // 🔹 userIdsクエリ
+      const q2 = query(
+        collection(db, 'taskCompletions'),
+        where('userIds', 'array-contains', uid)
+      );
+
+      unsubscribe1 = onSnapshot(q1, (snapshot) => {
+        pointsBufferQ1 = [];
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const date = data.date;
+          const point = data.point ?? 0;
+          if (date >= weekStartISO && date <= weekEndISO) {
+            pointsBufferQ1.push({ id: docSnap.id, point });
+          }
+        });
+        updatePoints();
+      });
+
+      unsubscribe2 = onSnapshot(q2, (snapshot) => {
+        pointsBufferQ2 = [];
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const date = data.date;
+          const point = data.point ?? 0;
+          if (date >= weekStartISO && date <= weekEndISO) {
+            pointsBufferQ2.push({ id: docSnap.id, point });
+          }
+        });
+        updatePoints();
+      });
+    };
 
     fetchPoints();
+
+    return () => {
+      if (unsubscribe1) unsubscribe1();
+      if (unsubscribe2) unsubscribe2();
+    };
   }, [weekStart, weekEnd]);
 
   // ✅ 目標ポイントを取得
@@ -82,7 +114,6 @@ const fetchPoints = async () => {
       const pairId = sessionStorage.getItem('pairId');
       if (!pairId) return;
       const partnerUids = await fetchPairUserIds(pairId);
-      // if (!partnerUids.includes(uid)) partnerUids.push(uid);
 
       let latestPoint = 100; // デフォルト
       let latestUpdatedAt = 0;
@@ -112,19 +143,17 @@ const fetchPoints = async () => {
     const pairId = sessionStorage.getItem('pairId');
     if (!pairId) return;
     const partnerUids = await fetchPairUserIds(pairId);
-    // if (!partnerUids.includes(uid)) partnerUids.push(uid);
 
     setMaxPoints(newPoint);
     await setDoc(doc(db, 'points', uid), {
-      userId: uid, // 🔑 自分ID
-      userIds: partnerUids, // 🔑 ペアIDを含める
+      userId: uid,
+      userIds: partnerUids,
       weeklyTargetPoint: newPoint,
       updatedAt: new Date(),
     }, { merge: true });
   };
 
   const percent = maxPoints === 0 ? 0 : (targetPoint / maxPoints) * 100;
-  const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
 
   return (
     <>
