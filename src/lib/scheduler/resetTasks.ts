@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, query, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { parseISO, isToday } from 'date-fns';
 import type { Task } from '@/types/Task';
@@ -19,7 +19,25 @@ export const resetCompletedTasks = async () => {
     };
 
     const taskRef = doc(db, 'tasks', docSnap.id);
-    const completedAt = task.completedAt ? parseISO(task.completedAt) : null;
+
+let completedAt: Date | null = null;
+
+    if (task.completedAt != null) {
+      if (typeof task.completedAt === 'string') {
+        try {
+          completedAt = parseISO(task.completedAt);
+        } catch {
+          console.warn('parseISO失敗:', task.completedAt);
+        }
+      } else if (task.completedAt instanceof Timestamp) {
+        completedAt = task.completedAt.toDate();
+      } else if (typeof task.completedAt === 'object' && typeof (task.completedAt as Timestamp).toDate === 'function') {
+        completedAt = (task.completedAt as Timestamp).toDate();
+      } else {
+        console.warn('不明な completedAt の型:', task.completedAt);
+      }
+    }
+
     const isDoneToday = completedAt && isToday(completedAt);
 
     let shouldReset = false;
@@ -27,8 +45,6 @@ export const resetCompletedTasks = async () => {
     if (task.period === '毎日' || task.period === '週次') {
       if (completedAt && !isDoneToday) shouldReset = true;
     }
-
-    // 不定期はリセットしない
 
     if (shouldReset) {
       updates.push(

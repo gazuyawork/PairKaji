@@ -23,7 +23,8 @@ import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
 import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-
+import { Timestamp } from 'firebase/firestore';
+import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -144,13 +145,37 @@ export default function TaskView({ initialSearch = '' }: Props) {
 
       const q = query(collection(db, 'tasks'), where('userId', 'in', Array.from(partnerUids)));
       const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const rawTasks = snapshot.docs.map(mapFirestoreDocToTask);
+        const rawTasks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
+          mapFirestoreDocToTask(doc)
+        );
+
         const updates: Promise<void>[] = [];
         for (const task of rawTasks) {
-          if (task.completedAt) {
-            const completedDate = parseISO(task.completedAt);
-            const isTodayTask = isToday(completedDate);
-            if (!isTodayTask) {
+
+          if (task.completedAt != null) { // ← nullとundefined両方を除外
+
+            let completedDate: Date | null = null;
+
+            if (typeof task.completedAt === 'string') {
+              try {
+                completedDate = parseISO(task.completedAt);
+              } catch {
+                console.warn('parseISO失敗:', task.completedAt);
+              }
+            } else if (task.completedAt instanceof Timestamp) {
+              completedDate = task.completedAt.toDate();
+            } else if (
+              task.completedAt &&
+              typeof task.completedAt === 'object' &&
+              'toDate' in task.completedAt &&
+              typeof (task.completedAt as Timestamp).toDate === 'function'
+            ) {
+              completedDate = (task.completedAt as Timestamp).toDate();
+            } else {
+              console.warn('不明な completedAt の型:', task.completedAt);
+            }
+
+            if (completedDate !== null && !isToday(completedDate)) {
               const taskRef = doc(db, 'tasks', task.id);
               updates.push(
                 updateDoc(taskRef, {
@@ -162,7 +187,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
               );
               task.done = false;
               task.skipped = false;
-              task.completedAt = '';
+              task.completedAt = null;
               task.completedBy = '';
             }
           }

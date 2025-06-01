@@ -1,4 +1,5 @@
 // /src/types/Task.ts
+import { Timestamp } from 'firebase/firestore';
 
 export type Period = '毎日' | '週次' | '不定期';
 
@@ -15,7 +16,7 @@ export type FirestoreTask = {
   isTodo?: boolean;
   done?: boolean;
   skipped?: boolean;
-  completedAt?: string | null;
+  completedAt?: string | Timestamp | null;
   completedBy?: string;
   visible?: boolean;
   groupId?: string | null;
@@ -42,7 +43,7 @@ export type Task = {
   scheduledDate?: string;
   visible?: boolean;
   userIds?: string[];
-  completedAt?: string | null;
+  completedAt?: string | Timestamp | null;
   completedBy?: string;
   userId: string;
 };

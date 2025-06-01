@@ -9,6 +9,7 @@ import { auth, db } from '@/lib/firebase';
 import { addTaskCompletion } from './taskUtils';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/lib/firebase'; // Firebase app 初期化済みのものをimport
+import { deleteField } from 'firebase/firestore'; 
 
 interface ShareTasksResponse {
   success: boolean;
@@ -174,13 +175,13 @@ export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => 
 };
 
 export const toggleTaskDoneStatus = async (
-    taskId: string,
-    userId: string,
-    done: boolean,
-    taskName?: string,
-    point?: number,
-    person?: string
-  ) => {
+  taskId: string,
+  userId: string,
+  done: boolean,
+  taskName?: string,
+  point?: number,
+  person?: string
+) => {
   try {
     const taskRef = doc(db, 'tasks', taskId);
 
@@ -188,7 +189,7 @@ export const toggleTaskDoneStatus = async (
       // 完了にする場合
       await updateDoc(taskRef, {
         done: true,
-        completedAt: new Date().toISOString(),
+        completedAt: serverTimestamp(),
         completedBy: userId,
       });
       if (taskName && point !== undefined && person) {
@@ -197,10 +198,11 @@ export const toggleTaskDoneStatus = async (
     } else {
       // 未処理に戻す場合
       await updateDoc(taskRef, {
-        done: true,
-        completedAt: serverTimestamp(), // ← 🔥 これが最も正確！
-        completedBy: userId,
+        done: false,  // ← 修正！
+        completedAt: deleteField(),  // ← 修正！
+        completedBy: '',    // ← 修正！
       });
+
       // taskCompletions から履歴削除
       const q = query(
         collection(db, 'taskCompletions'),
@@ -220,6 +222,7 @@ export const toggleTaskDoneStatus = async (
     handleFirestoreError(error);
   }
 };
+
 
 /**
  * ユーザーの氏名をFirestoreに保存する
