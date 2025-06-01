@@ -249,8 +249,11 @@ export default function TaskManagePage() {
       // ✅ Firestoreからタスク取得（TaskViewと同じ条件に変更）
       const q = query(
         collection(db, 'tasks'),
-        where('userId', 'in', partnerUids)
+        where('userIds', 'array-contains', uid) // 自分が含まれるタスクすべて
       );
+
+
+
 
       const snapshot = await getDocs(q);
       const loadedTasks = snapshot.docs.map(doc => ({
