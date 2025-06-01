@@ -1,9 +1,8 @@
-// ✅ TaskCalendar.tsx 全体（props対応）
-
 'use client';
 
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { useRef } from 'react';
+import { dayNumberToName } from '@/lib/constants'; // 🔹 追加
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -56,9 +55,11 @@ export default function TaskCalendar({ tasks }: Props) {
               const dateMatches = task.dates?.some(dateStr =>
                 isSameDay(parseISO(dateStr), day)
               );
+
               const weeklyMatches =
                 task.period === '週次' &&
-                task.daysOfWeek?.includes(String(day.getDay()));
+                task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
+
               return dateMatches || weeklyMatches;
             });
 
