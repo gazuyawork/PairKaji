@@ -9,7 +9,7 @@ import { auth, db } from '@/lib/firebase';
 import { addTaskCompletion } from './taskUtils';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/lib/firebase'; // Firebase app 初期化済みのものをimport
-import { deleteField } from 'firebase/firestore'; 
+// import { deleteField } from 'firebase/firestore'; 
 
 interface ShareTasksResponse {
   success: boolean;
@@ -185,22 +185,35 @@ export const toggleTaskDoneStatus = async (
   try {
     const taskRef = doc(db, 'tasks', taskId);
 
+    // 🔸 ペア情報を取得して userIds を用意
+    let userIds = [userId];
+    const pairId = sessionStorage.getItem('pairId');
+
+    if (pairId) {
+      const pairDoc = await getDoc(doc(db, 'pairs', pairId));
+      const pairData = pairDoc.data();
+      if (pairData?.userIds) {
+        userIds = pairData.userIds; // ペアの userIds をセット
+      }
+    }
+
     if (done) {
-      // 完了にする場合
+      // 🔸 完了にする場合
       await updateDoc(taskRef, {
         done: true,
         completedAt: serverTimestamp(),
         completedBy: userId,
       });
+
       if (taskName && point !== undefined && person) {
-        await addTaskCompletion(taskId, userId, taskName, point, person);
+        await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
       }
     } else {
-      // 未処理に戻す場合
+      // 🔸 未処理に戻す場合
       await updateDoc(taskRef, {
-        done: false,  // ← 修正！
-        completedAt: deleteField(),  // ← 修正！
-        completedBy: '',    // ← 修正！
+        done: false,
+        completedAt: null,
+        completedBy: '',
       });
 
       // taskCompletions から履歴削除
@@ -211,17 +224,14 @@ export const toggleTaskDoneStatus = async (
       );
 
       const snapshot = await getDocs(q);
-
-      const deletePromises = snapshot.docs.map((doc) =>
-        deleteDoc(doc.ref)
-      );
-
+      const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref));
       await Promise.all(deletePromises);
     }
   } catch (error) {
     handleFirestoreError(error);
   }
 };
+
 
 
 /**
