@@ -17,7 +17,6 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
   if (!userAId || !userBId) return;
 
   if (beforeStatus !== 'confirmed' && afterStatus === 'confirmed') {
-    console.log(`Pair ${event.params.pairId} confirmed. Adding userIds to tasks.`);
     await Promise.all([
       updateUserTasks(userAId, userBId, 'add'),
       updateUserTasks(userBId, userAId, 'add'),
@@ -25,7 +24,6 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
   }
 
   if (beforeStatus !== 'removed' && afterStatus === 'removed') {
-    console.log(`Pair ${event.params.pairId} removed. Removing userIds from tasks.`);
     await Promise.all([
       updateUserTasks(userAId, userBId, 'remove'),
       updateUserTasks(userBId, userAId, 'remove'),

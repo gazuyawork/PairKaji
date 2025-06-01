@@ -39,43 +39,34 @@ export default function WeeklyPoints() {
 const fetchPoints = async () => {
   const uid = auth.currentUser?.uid;
   if (!uid) {
-    console.log('❌ fetchPoints: ユーザー未認証');
     return;
   }
 
   try {
     const partnerUids = await fetchPairUserIds(uid);
     if (!partnerUids.includes(uid)) partnerUids.push(uid);
-    console.log('✅ fetchPoints: partnerUids =', partnerUids);
 
     const completionsRef = collection(db, 'taskCompletions');
     const q = query(completionsRef, where('userId', 'in', partnerUids));
     const snapshot = await getDocs(q);
-    console.log('✅ fetchPoints: taskCompletions 件数 =', snapshot.docs.length);
 
     let pointsThisWeek = 0;
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
-      console.log('🔍 taskCompletions データ:', data);
-
       const dateRaw = data.date;
       const dateParsed = parseISO(dateRaw);
       const point = data.point ?? 0;
       const isInWeek = isWithinInterval(dateParsed, { start: weekStart, end: weekEnd });
-
-      console.log(`  ➜ date: ${dateRaw}, parsed: ${dateParsed}, inWeek: ${isInWeek}, point: ${point}`);
 
       if (isInWeek) {
         pointsThisWeek += point;
       }
     });
 
-    console.log('✅ 今週のポイント合計 =', pointsThisWeek);
     setTargetPoint(pointsThisWeek);
   } catch (error) {
     console.error('❌ fetchPoints: エラー =', error);
-  }
-};
+  } };
 
     fetchPoints();
   }, [weekStart, weekEnd]);

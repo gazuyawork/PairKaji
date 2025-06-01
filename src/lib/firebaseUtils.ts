@@ -117,7 +117,6 @@ export const fetchTasksForUser = async (uid: string): Promise<{ id: string; data
 };
 
 export const saveTaskToFirestore = async (taskId: string | null, taskData: FirestoreTask): Promise<void> => {
-  console.log('[DEBUG] saveTaskToFirestoreでのuserId:', taskData.userId);
   try {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');

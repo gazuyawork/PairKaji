@@ -35,13 +35,7 @@ export default function PairPoints() {
       const uid = auth.currentUser?.uid;
       const email = auth.currentUser?.email;
 
-      // 👇 ここを追加
-      console.log('[DEBUG ①] auth.currentUser:', auth.currentUser);
-      console.log('[DEBUG ①] uid:', uid);
-      console.log('[DEBUG ①] email:', email);
-
       if (!uid || !email) {
-        console.log('[DEBUG ①] ユーザー情報が取得できていません。早期returnします。');
         return;
       }
 
@@ -51,24 +45,13 @@ export default function PairPoints() {
       const q1 = query(pairsRef, where('userIds', 'array-contains', uid));
       const snap1 = await getDocs(q1);
 
-      // 👇 ここを追加
-      console.log('[DEBUG ②] pairsクエリ件数:', snap1.docs.length);
-      snap1.docs.forEach((doc) => {
-        console.log('[DEBUG ②] ペアデータ:', doc.id, doc.data());
-      });
-
       let pairUserIds: string[] | null = null;
 
       for (const doc of snap1.docs) {
         const data = doc.data() as Pair;
-        console.log('[DEBUG ③] statusフィールドの値:', data.status);
         if (data.status === 'confirmed') {
-          console.log('[DEBUG ③] confirmedのペアが見つかりました:', doc.id);
           setPairStatus('confirmed');
-
           // 👇 この時点では「まだpairStatusは変わっていません」（非同期なので）
-          console.log('[DEBUG ④-1] この時点のpairStatus:', pairStatus); // ←おそらくまだ 'none'
-
           pairUserIds = data.userIds;
           break;
         }
@@ -114,9 +97,6 @@ export default function PairPoints() {
           pointsMap[userId].points += point;
         });
 
-        console.log('[DEBUG ⑤] 最終ポイントマップ:', pointsMap);
-
-
         setUserPoints(pointsMap);
         return;
       }
@@ -151,12 +131,7 @@ export default function PairPoints() {
 
 
   useEffect(() => {
-    console.log('[DEBUG ④-2] pairStatusが変更されました:', pairStatus);
   }, [pairStatus, partnerImage, profileImage]);
-
-
-
-
 
   const users = userPoints ? Object.values(userPoints) : [];
 

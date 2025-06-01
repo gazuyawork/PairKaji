@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, type DocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { callShareTasksWithPartner } from '@/lib/firebaseUtils';
 import { toast } from 'sonner';
 
@@ -12,10 +12,12 @@ export default function PairListener() {
     if (!uid) return;
 
     const pairRef = doc(db, 'pairs', uid);
-    const unsubscribe = onSnapshot(pairRef, (snapshot) => {
+    const unsubscribe = onSnapshot(pairRef, (snapshot: DocumentSnapshot<DocumentData>) => {
       if (!snapshot.exists()) return;
 
       const data = snapshot.data();
+      if (!data) return;
+
       if (data.status === 'confirmed') {
         const partnerId = data.userAId === uid ? data.userBId : data.userAId;
         if (!partnerId) return;
@@ -30,8 +32,9 @@ export default function PairListener() {
                 toast.error('タスク共有に失敗しました。');
               }
             })
-            .catch((err: any) => {
-              toast.error(`タスク共有に失敗しました: ${err.message}`);
+            .catch((err: unknown) => {
+              const error = err as Error;
+              toast.error(`タスク共有に失敗しました: ${error.message}`);
             });
         }
       }

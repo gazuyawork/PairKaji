@@ -61,7 +61,6 @@ export default function TaskManagePage() {
 
   const addTask = async () => {
     const uid = auth.currentUser?.uid;
-    console.log('[DEBUG] addTaskでのuid:', uid);
     if (!uid) {
       toast.error('ログインしてください');
       return;
