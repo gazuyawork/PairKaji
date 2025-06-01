@@ -98,22 +98,22 @@ export const addTaskCompletion = async (
     const todayISO = new Date().toISOString().split('T')[0]; // 日付（YYYY-MM-DD形式）
 
     // 🔑 ペア情報からuserIdsを取得（デフォルトは自分のみ）
-    const pairId = sessionStorage.getItem('pairId');
-    let userIds: string[] = [userId];
+    // const pairId = sessionStorage.getItem('pairId');
+    // let userIds: string[] = [userId];
 
-    if (pairId) {
-      const pairDoc = await getDoc(doc(db, 'pairs', pairId));
-      const pairData = pairDoc.data();
-      if (pairData?.userIds) {
-        userIds = pairData.userIds; // ペア情報があればuserIdsを上書き
-      }
-    }
+    // if (pairId) {
+    //   const pairDoc = await getDoc(doc(db, 'pairs', pairId));
+    //   const pairData = pairDoc.data();
+    //   if (pairData?.userIds) {
+    //     userIds = pairData.userIds; // ペア情報があればuserIdsを上書き
+    //   }
+    // }
 
     // taskCompletionsに履歴を追加
     await addDoc(collection(db, 'taskCompletions'), {
       taskId,           // 対象タスクID
       userId,           // 操作ユーザーID
-      userIds,          // 関連ユーザーID
+      // userIds,          // 関連ユーザーID
       taskName,         // タスク名
       point,            // 獲得ポイント
       person,           // 完了者表示名

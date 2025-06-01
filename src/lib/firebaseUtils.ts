@@ -127,24 +127,33 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');
 
-    // userIds を常に含める
-    const userIds = taskData.userIds ?? [uid];
+    // 🔑 ペア情報取得（必要ならセッションストレージ or fetchPairIdで）
+    let userIds = taskData.userIds ?? [uid];
+
+    const pairId = sessionStorage.getItem('pairId'); // またはfetchPairId()で取得
+    if (pairId) {
+      const pairDoc = await getDoc(doc(db, 'pairs', pairId));
+      const pairData = pairDoc.data();
+      if (pairData?.userIds) {
+        userIds = pairData.userIds; // 🔥 ペア情報をuserIdsにセット
+      }
+    }
 
     const commonData = {
       ...taskData,
-      userIds, // 追加: 必ず含める
+      userIds, // 必ず「自分＋ペア」のUIDを含める
     };
 
     if (taskId) {
       await updateDoc(doc(db, 'tasks', taskId), {
         ...commonData,
-        userId: uid, // ← 追加
+        userId: uid,
         updatedAt: serverTimestamp(),
       });
     } else {
       await addDoc(collection(db, 'tasks'), {
         ...commonData,
-        userId: uid, // ← 追加
+        userId: uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -154,7 +163,6 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
     handleFirestoreError(_err);
   }
 };
-
 
 export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
   try {
