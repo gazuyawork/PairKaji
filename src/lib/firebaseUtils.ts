@@ -265,3 +265,14 @@ export const callShareTasksWithPartner = async (
     throw error;
   }
 };
+
+export const fetchPairId = async (): Promise<string | null> => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+
+  const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
+  const snap = await getDocs(q);
+  const doc = snap.docs.find(d => d.data().status === 'confirmed');
+
+  return doc?.id ?? null;
+};
