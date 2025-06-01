@@ -28,16 +28,18 @@ export default function FinishDayTask({ tasks }: Props) {
   const { profileImage, partnerImage } = useProfileImages();
 
   useEffect(() => {
-    const fetchAndSubscribe = async () => { // ⭐ 関数をまとめて定義
+    const fetchAndSubscribe = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const partnerUids = await fetchPairUserIds(uid); // ⭐ ペアユーザーID取得
-      if (!partnerUids.includes(uid)) partnerUids.push(uid); // ⭐ 自分も含める
+      // 表示対象タスクのID一覧を作成
+      const taskIds = tasks.map(task => task.id);
+      if (taskIds.length === 0) return;
 
+      // Firestoreの仕様で `in` クエリは最大10件までなので、分割処理も視野に（今はシンプルに対応）
       const q = query(
         collection(db, 'taskCompletions'),
-        where('userId', 'in', partnerUids) // ⭐ 修正: 自分 + ペア相手
+        where('taskId', 'in', taskIds) // ⭐ ここをtaskIdベースに変更
       );
 
       const today = new Date();
@@ -51,7 +53,7 @@ export default function FinishDayTask({ tasks }: Props) {
         setLogs(todayLogs);
       });
 
-      return unsubscribe; // ⭐ サブスク解除
+      return unsubscribe;
     };
 
     let unsubscribe: (() => void) | undefined;
@@ -62,7 +64,8 @@ export default function FinishDayTask({ tasks }: Props) {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [tasks]); // ⭐ tasksを依存に追加
+
 
   useEffect(() => {
     const fetchLogs = async () => {
