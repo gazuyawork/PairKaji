@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore'; // ⭐ onSnapshotをまとめてimport
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { parseISO, isSameDay } from 'date-fns';
 import Image from 'next/image';
 import type { Task } from '@/types/Task';
 import { useProfileImages } from '@/hooks/useProfileImages';
-import { fetchPairUserIds } from '@/lib/taskUtils'; // ⭐ 追加
 
 interface CompletionLog {
   taskId: string;
@@ -32,19 +31,22 @@ export default function FinishDayTask({ tasks }: Props) {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      // 表示対象タスクのID一覧を作成
+      // ✅ 表示対象タスクのID一覧を作成
+      // 本日の完了タスク取得用。タスク作成者や完了者に関係なく表示するため、taskIdベースで取得
       const taskIds = tasks.map(task => task.id);
       if (taskIds.length === 0) return;
 
-      // Firestoreの仕様で `in` クエリは最大10件までなので、分割処理も視野に（今はシンプルに対応）
+      // ✅ taskCompletionsコレクションから、対象タスクの完了履歴を取得（リアルタイム更新）
+      // Firestoreのinクエリは最大10件までのため、今後は分割対応を検討する
       const q = query(
         collection(db, 'taskCompletions'),
-        where('taskId', 'in', taskIds) // ⭐ ここをtaskIdベースに変更
+        where('taskId', 'in', taskIds)
       );
 
       const today = new Date();
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
+        // 今日の日付に該当する完了ログのみをフィルタリングし、日時順にソート
         const todayLogs = snapshot.docs
           .map(doc => doc.data() as CompletionLog)
           .filter(log => isSameDay(parseISO(log.date), today))
@@ -61,47 +63,20 @@ export default function FinishDayTask({ tasks }: Props) {
       unsubscribe = unsub;
     });
 
+    // ✅ クリーンアップ処理（コンポーネントアンマウント時にonSnapshot購読解除）
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [tasks]); // ⭐ tasksを依存に追加
-
-
-  useEffect(() => {
-    const fetchLogs = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
-
-      const partnerUids = await fetchPairUserIds(uid); // ⭐ ペアユーザーID取得
-      if (!partnerUids.includes(uid)) partnerUids.push(uid); // ⭐ 自分も含める
-
-      const q = query(
-        collection(db, 'taskCompletions'),
-        where('userId', 'in', partnerUids) // ⭐ 修正: 自分 + ペア相手
-      );
-
-      const snapshot = await getDocs(q);
-
-      const today = new Date();
-      const todayLogs = snapshot.docs
-        .map(doc => doc.data() as CompletionLog)
-        .filter(log => isSameDay(parseISO(log.date), today))
-        .sort((a, b) => b.date.localeCompare(a.date));
-
-      setLogs(todayLogs);
-    };
-
-    fetchLogs();
-  }, [tasks]); // tasksが変わるたびに再取得
+  }, [tasks]); // 🔄 タスクリストが変更されるたびに再取得
 
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-md overflow-hidden max-h-[300px]">
-      {/* 固定ヘッダー */}
+      {/* ✅ 固定ヘッダー */}
       <div className="bg-white p-4 shadow sticky top-0 z-10 text-center border-b">
         <h2 className="text-lg font-bold text-[#5E5E5E]">本日の完了タスク</h2>
       </div>
 
-      {/* スクロール可能エリア */}
+      {/* ✅ 完了タスク表示リスト（スクロール可能） */}
       <div className="overflow-y-auto p-4">
         {logs.length === 0 ? (
           <p className="text-gray-400 mb-10">本日の履歴はありません</p>
