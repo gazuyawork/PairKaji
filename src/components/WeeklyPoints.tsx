@@ -43,7 +43,9 @@ const fetchPoints = async () => {
   }
 
   try {
-    const partnerUids = await fetchPairUserIds(uid);
+    const pairId = sessionStorage.getItem('pairId');
+    if (!pairId) return;
+    const partnerUids = await fetchPairUserIds(pairId);
     if (!partnerUids.includes(uid)) partnerUids.push(uid);
 
     const completionsRef = collection(db, 'taskCompletions');
@@ -77,7 +79,9 @@ const fetchPoints = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const partnerUids = await fetchPairUserIds(uid);
+      const pairId = sessionStorage.getItem('pairId');
+      if (!pairId) return;
+      const partnerUids = await fetchPairUserIds(pairId);
       if (!partnerUids.includes(uid)) partnerUids.push(uid);
 
       let latestPoint = 100; // デフォルト
@@ -105,8 +109,9 @@ const fetchPoints = async () => {
   const handleSave: (newPoint: number) => Promise<void> = async (newPoint: number) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-
-    const partnerUids = await fetchPairUserIds(uid);
+    const pairId = sessionStorage.getItem('pairId');
+    if (!pairId) return;
+    const partnerUids = await fetchPairUserIds(pairId);
     if (!partnerUids.includes(uid)) partnerUids.push(uid);
 
     setMaxPoints(newPoint);

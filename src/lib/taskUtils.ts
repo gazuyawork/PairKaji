@@ -1,22 +1,27 @@
-import { getDocs, query, where, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import type { TaskManageTask, FirestoreTask } from '@/types/Task';
 import { dayNameToNumber } from '@/lib/constants';
 import { toast } from 'sonner';
 
-export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
+import { doc, getDoc } from 'firebase/firestore';
+
+export const fetchPairUserIds = async (pairId: string): Promise<string[]> => {
   try {
-    const pairSnap = await getDocs(
-      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
-    );
-    const confirmedPair = pairSnap.docs.find(doc => doc.data().status === 'confirmed');
-    return confirmedPair?.data().userIds ?? [uid];
+    const pairDoc = await getDoc(doc(db, 'pairs', pairId));
+    if (!pairDoc.exists()) return [];
+
+    const data = pairDoc.data();
+    if (data?.status !== 'confirmed') return [];
+
+    return data.userIds ?? [];
   } catch (e) {
     console.error('ペア情報の取得に失敗:', e);
-    return [uid];
+    return [];
   }
 };
+
 
 export const buildFirestoreTaskData = (
   task: TaskManageTask,

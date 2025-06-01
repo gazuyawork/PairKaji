@@ -41,7 +41,7 @@ export const getPendingPairByEmail = async (email: string) => {
 
 // 🔹 招待コード発行
 export const createPairInvite = async (uid: string, emailB: string, inviteCode: string) => {
-  return await addDoc(collection(db, 'pairs'), {
+  const docRef = await addDoc(collection(db, 'pairs'), {
     userAId: uid,
     emailB,
     inviteCode,
@@ -49,7 +49,13 @@ export const createPairInvite = async (uid: string, emailB: string, inviteCode: 
     createdAt: serverTimestamp(),
     userIds: [uid],
   });
+
+  // pairId を sessionStorage に保存
+  sessionStorage.setItem('pairId', docRef.id);
+
+  return docRef;
 };
+
 
 // 🔹 ペア承認
 export const approvePair = async (pairId: string, inviterUid: string, userUid: string) => {

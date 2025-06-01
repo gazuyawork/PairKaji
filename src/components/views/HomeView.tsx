@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
-import PairPoints from '@/components/PairPoints';
+// import PairPoints from '@/components/PairPoints';
 // import TaskHistory from '@/components/TaskHistory';
 import FinishDayTask from '@/components/FinishDayTask';
 import TaskCalendar from '@/components/TaskCalendar';
@@ -63,9 +63,10 @@ export default function HomeView() {
           />
         </div>
 
-        <div className="min-h-[110px]">
+        {/* 一旦不要とする。 */}
+        {/* <div className="min-h-[110px]">
           <PairPoints />
-        </div>
+        </div> */}
       </main>
     </div>
   );
