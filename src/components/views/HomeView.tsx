@@ -66,9 +66,9 @@ export default function HomeView() {
           }}
         >
           <motion.div
-            initial={{ opacity: 0, y: 200 }}
+            initial={{ opacity: 0, y: 130 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
+            transition={{ duration: 0.1, ease: 'easeOut' }}
             className="min-h-[150px]"
           >
             <WeeklyPoints />
@@ -76,9 +76,9 @@ export default function HomeView() {
 
           <motion.div
             onClick={() => setIsExpanded((prev) => !prev)}
-            initial={{ opacity: 0, y: 250 }}
+            initial={{ opacity: 0, y: 200 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0, ease: 'easeOut' }}
+            transition={{ duration: 0.1, delay: 0, ease: 'easeOut' }}
             className={`overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
               isExpanded ? 'max-h-[600px]' : 'max-h-[300px]'
             }`}
@@ -87,9 +87,9 @@ export default function HomeView() {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 300 }}
+            initial={{ opacity: 0, y: 250 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.8, ease: 'easeOut' }}
+            transition={{ duration: 0.1, delay: 0.6, ease: 'easeOut' }}
             className="min-h-[150px] max-h-[500px] overflow-y-auto horizontal-scroll bg-white rounded-lg shadow-md"
           >
             <TaskCalendar
