@@ -12,12 +12,11 @@ import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-import { motion } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isDataReady, setIsDataReady] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false); // 完了タスクの展開状態
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -25,17 +24,14 @@ export default function HomeView() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
-    setLoading(true);
-
     const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const taskList = snapshot.docs.map(mapFirestoreDocToTask);
       setTasks(taskList);
 
       setTimeout(() => {
-        setLoading(false);
-        setIsDataReady(true);
-      }, 500); // 遅延調整（必要に応じて変更可）
+        setIsLoading(false);
+      }, 300);
     });
 
     return () => unsubscribe();
@@ -45,75 +41,67 @@ export default function HomeView() {
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative">
       <Header title="Home" />
 
-      {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
-          <div className="w-16 h-16 border-4 border-t-transparent border-gray-500 rounded-full animate-spin" />
-        </div>
-      )}
+      <main
+        className="flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20"
+        ref={scrollRef}
+        onTouchStart={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('.horizontal-scroll')) {
+            e.stopPropagation();
+          }
+        }}
+      >
+        {isLoading ? (
+          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
+            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
 
-      {isDataReady && (
-        <motion.main
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20"
-          ref={scrollRef}
-          onTouchStart={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('.horizontal-scroll')) {
-              e.stopPropagation();
-            }
-          }}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 130 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.1, ease: 'easeOut' }}
-            className="min-h-[150px]"
-          >
-            <WeeklyPoints />
-          </motion.div>
+            <div className="min-h-[150px]">
+              <WeeklyPoints />
+            </div>
 
-          <motion.div
-            onClick={() => setIsExpanded((prev) => !prev)}
-            initial={{ opacity: 0, y: 200 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.1, delay: 0, ease: 'easeOut' }}
-            className={`overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-              isExpanded ? 'max-h-[600px]' : 'max-h-[300px]'
-            }`}
-          >
-            <FinishDayTask tasks={tasks} />
-          </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 250 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.1, delay: 0.6, ease: 'easeOut' }}
-            className="min-h-[150px] max-h-[500px] overflow-y-auto horizontal-scroll bg-white rounded-lg shadow-md"
-          >
-            <TaskCalendar
-              tasks={tasks.map(({ id, name, period, dates, daysOfWeek }) => ({
-                id,
-                name,
-                period: period ?? '毎日',
-                dates,
-                daysOfWeek,
-              }))}
-            />
-          </motion.div>
+            <div className="min-h-[150px] max-h-[500px] overflow-y-auto horizontal-scroll bg-white rounded-lg shadow-md">
+              <TaskCalendar
+                tasks={tasks.map(({ id, name, period, dates, daysOfWeek }) => ({
+                  id,
+                  name,
+                  period: period ?? '毎日',
+                  dates,
+                  daysOfWeek,
+                }))}
+              />
+            </div>
 
-          {/* 一旦不要とする */}
-          {/* <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
-            className="min-h-[110px]"
-          >
-            <PairPoints />
-          </motion.div> */}
-        </motion.main>
-      )}
+
+                        <div
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+                isExpanded ? 'max-h-[300px] overflow-y-auto' : 'max-h-[124px]'
+              }`}
+            >
+              <FinishDayTask tasks={tasks} />
+
+              {/* 開閉アイコン */}
+              <div className="absolute top-5 right-6 pointer-events-none z-10">
+                <ChevronDown
+                  className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
+                    isExpanded ? 'rotate-180' : ''
+                  }`}
+                />
+              </div>
+            </div>
+
+
+            {/* 一旦不要とする */}
+            {/* <div className="min-h-[110px]">
+              <PairPoints />
+            </div> */}
+          </>
+        )}
+      </main>
     </div>
   );
 }
