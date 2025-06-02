@@ -291,13 +291,23 @@ const handleAddTask = useCallback(async () => {
         )}
 
 
-        {tasks
-          .filter(task =>
-            task.visible &&
-            (!selectedGroupId || task.id === selectedGroupId) &&
-            (filterText.trim() === '' || task.name.includes(filterText))
-          )
-          .map(task => (
+        {(() => {
+          const filteredTasks = tasks
+            .filter(task =>
+              task.visible &&
+              (!selectedGroupId || task.id === selectedGroupId) &&
+              (filterText.trim() === '' || task.name.includes(filterText))
+            );
+
+          if (filteredTasks.length === 0) {
+            return (
+              <p className="text-center text-gray-500 mt-4">
+                TODOはありません。
+              </p>
+            );
+          }
+
+          return filteredTasks.map(task => (
             <TodoTaskCard
               key={task.id}
               task={task}
@@ -349,15 +359,16 @@ const handleAddTask = useCallback(async () => {
               onDeleteTask={async () => {
                 await updateDoc(doc(db, 'tasks', task.id), {
                   visible: false,
-                  groupId: null, // ← 追加（または deleteField() を使用）
+                  groupId: null,
                   updatedAt: serverTimestamp(),
                 });
               }}
-
               todoRefs={todoRefs}
               focusedTodoId={focusedTodoId}
             />
-          ))}
+          ));
+        })()}
+
       </main>
     </div>
   );
