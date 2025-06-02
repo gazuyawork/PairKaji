@@ -114,62 +114,79 @@ export default function TodoView() {
 
 
 
-  const handleAddTask = useCallback(async () => {
-    const name = taskInput.trim();
-    if (!name) {
-      setInputError('タスク名を入力してください');
-      return;
+const handleAddTask = useCallback(async () => {
+  const name = taskInput.trim();
+  if (!name) {
+    setInputError('タスク名を入力してください');
+    return;
+  }
+
+  const existing = tasks.find((t) => t.name.trim() === name);
+
+  if (existing) {
+    if (!existing.visible) {
+      await updateDoc(doc(db, 'tasks', existing.id), {
+        visible: true,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success('非表示のタスクを再表示しました。');
+    } else {
+      setInputError('同じ名前のタスクは登録できません');
     }
-
-    const existing = tasks.find((t) => t.name.trim() === name);
-
-    if (existing) {
-      if (!existing.visible) {
-        await updateDoc(doc(db, 'tasks', existing.id), {
-          visible: true,
-          updatedAt: serverTimestamp(),
-        });
-        toast.success('非表示のタスクを再表示しました。');
-      } else {
-        setInputError('同じ名前のタスクは登録できません');
-      }
-
-      setTaskInput('');
-      return;
-    }
-
-    const userId = auth.currentUser?.uid;
-    if (!userId) {
-      alert("ユーザー情報が取得できません");
-      return;
-    }
-
-    const tasksRef = collection(db, 'tasks');
-    const newTaskRef = doc(tasksRef);
-
-    const newTaskData = {
-      name,
-      period: '毎日',
-      todos: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      isTodo: true,
-      point: 10,
-      userId,
-      userIds: [userId],
-      users: [],
-      daysOfWeek: [],
-      dates: [],
-      visible: true,
-    };
-
-    await setDoc(newTaskRef, newTaskData);
-    toast.success('新しくタスクが登録されました。');
 
     setTaskInput('');
-    setInputError(null);
-    setFocusedTodoId(null);
-  }, [taskInput, tasks]);
+    return;
+  }
+
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    alert("ユーザー情報が取得できません");
+    return;
+  }
+
+  // 🔹 userIdsの取得処理追加
+  let userIds = [userId];
+  try {
+    const pairSnap = await getDocs(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', userId), where('status', '==', 'confirmed'))
+    );
+    pairSnap.forEach(doc => {
+      const data = doc.data();
+      if (Array.isArray(data.userIds)) {
+        userIds = data.userIds;
+      }
+    });
+  } catch (e) {
+    console.error('ペア情報の取得に失敗:', e);
+  }
+
+  const tasksRef = collection(db, 'tasks');
+  const newTaskRef = doc(tasksRef);
+
+  const newTaskData = {
+    name,
+    period: '毎日',
+    todos: [],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    isTodo: true,
+    point: 10,
+    userId,
+    userIds, // 🔹 ここでペアのuserIdsをセット
+    users: [],
+    daysOfWeek: [],
+    dates: [],
+    visible: true,
+  };
+
+  await setDoc(newTaskRef, newTaskData);
+  toast.success('新しくタスクが登録されました。');
+
+  setTaskInput('');
+  setInputError(null);
+  setFocusedTodoId(null);
+}, [taskInput, tasks]);
+
 
 
 

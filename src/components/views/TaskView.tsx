@@ -94,29 +94,45 @@ export default function TaskView({ initialSearch = '' }: Props) {
     }
   };
 
-  const updateTask = async (oldPeriod: Period, updated: Task) => {
-    try {
-      const newPeriod = updated.period as Period;
-      const cleanedDaysOfWeek = newPeriod === '不定期' || newPeriod === '毎日' ? [] : updated.daysOfWeek ?? [];
-      const cleanedDates = newPeriod === '週次' || newPeriod === '毎日' ? [] : updated.dates ?? [];
+const updateTask = async (oldPeriod: Period, updated: Task) => {
+  try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-      await updateDoc(doc(db, 'tasks', updated.id), {
-        name: updated.name,
-        period: newPeriod,
-        point: updated.point,
-        users: updated.users,
-        daysOfWeek: cleanedDaysOfWeek,
-        dates: cleanedDates,
-        isTodo: updated.isTodo ?? false,
-        updatedAt: serverTimestamp(),
-        userIds: updated.userIds ?? [auth.currentUser?.uid],
-      });
+    // 🔹 ペアの userIds を取得
+    let userIds = [uid];
+    const pairsSnap = await getDocs(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+    );
+    pairsSnap.forEach(doc => {
+      const data = doc.data();
+      if (Array.isArray(data.userIds)) {
+        userIds = data.userIds;
+      }
+    });
 
-      setEditTargetTask(null);
-    } catch (error) {
-      console.error('タスク更新に失敗しました:', error);
-    }
-  };
+    const newPeriod = updated.period as Period;
+    const cleanedDaysOfWeek = newPeriod === '不定期' || newPeriod === '毎日' ? [] : updated.daysOfWeek ?? [];
+    const cleanedDates = newPeriod === '週次' || newPeriod === '毎日' ? [] : updated.dates ?? [];
+
+    await updateDoc(doc(db, 'tasks', updated.id), {
+      name: updated.name,
+      period: newPeriod,
+      point: updated.point,
+      users: updated.users,
+      daysOfWeek: cleanedDaysOfWeek,
+      dates: cleanedDates,
+      isTodo: updated.isTodo ?? false,
+      updatedAt: serverTimestamp(),
+      userIds, // 🔹 最新の userIds を反映
+    });
+
+    setEditTargetTask(null);
+  } catch (error) {
+    console.error('タスク更新に失敗しました:', error);
+  }
+};
+
 
   useEffect(() => {
     resetCompletedTasks().catch(console.error);
