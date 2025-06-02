@@ -40,7 +40,7 @@ export default function TaskCalendar({ tasks }: Props) {
   };
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-md text-center mb-3">
+    <div className="bg-white p-4 rounded-xl text-center mb-3">
       <h2 className="text-lg font-bold text-[#5E5E5E] mb-4">今後7日間のタスク</h2>
       <div
         className="overflow-x-auto horizontal-scroll"
@@ -49,7 +49,7 @@ export default function TaskCalendar({ tasks }: Props) {
         onTouchEnd={handleTouchEnd}
         onTouchMove={preventScrollPropagation}
       >
-        <div className="flex w-max text-xs text-center gap-2">
+        <div className="flex w-full text-xs text-center gap-2">
           {days.map((day, idx) => {
             const dailyTasks = tasks.filter(task => {
               const dateMatches = task.dates?.some(dateStr =>
