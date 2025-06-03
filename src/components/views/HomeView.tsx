@@ -43,7 +43,7 @@ export default function HomeView() {
       <Header title="Home" />
 
       <main
-        className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20"
+        className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20 pb-50"
         ref={scrollRef}
         onTouchStart={(e) => {
           const target = e.target as HTMLElement;
@@ -58,11 +58,22 @@ export default function HomeView() {
           </div>
         ) : (
           <>
-
-            <div className="min-h-[150px]">
-              <WeeklyPoints />
+            <div
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+                isExpanded ? 'max-h-[300px] overflow-y-auto' : 'max-h-[150px]'
+              }`}
+            >
+              <FinishDayTask tasks={tasks} />
+              {/* 開閉アイコン */}
+              <div className="absolute top-5 right-6 pointer-events-none z-10">
+                <ChevronDown
+                  className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
+                    isExpanded ? 'rotate-180' : ''
+                  }`}
+                />
+              </div>
             </div>
-
 
             <div className="min-h-[150px] max-h-[500px] overflow-y-auto horizontal-scroll bg-white rounded-lg shadow-md">
               <TaskCalendar
@@ -76,24 +87,10 @@ export default function HomeView() {
               />
             </div>
 
-
-                        <div
-              onClick={() => setIsExpanded((prev) => !prev)}
-              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-                isExpanded ? 'max-h-[300px] overflow-y-auto' : 'max-h-[124px]'
-              }`}
-            >
-              <FinishDayTask tasks={tasks} />
-
-              {/* 開閉アイコン */}
-              <div className="absolute top-5 right-6 pointer-events-none z-10">
-                <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                />
-              </div>
+            <div className="min-h-[150px]">
+              <WeeklyPoints />
             </div>
+
 
 
             {/* 一旦不要とする */}
