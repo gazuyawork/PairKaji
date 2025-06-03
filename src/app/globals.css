@@ -151,4 +151,5 @@ html, body {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: none;
   overflow-y: auto;
+  min-height: 100%; /* 追加！ */
 }
