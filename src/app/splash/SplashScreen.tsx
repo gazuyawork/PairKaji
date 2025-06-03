@@ -52,7 +52,7 @@ export default function SplashScreen() {
         sessionStorage.setItem('fromSplash', '1');
         router.replace(isAuthenticated ? '/main' : '/login');
       }, 800); // アニメーション完了後に遷移
-    }, 2300);
+    }, 2200);
 
     return () => clearTimeout(timer);
   }, [authChecked, isAuthenticated, router]);
@@ -115,7 +115,7 @@ export default function SplashScreen() {
             repeatType: 'loop',
           }}
         >
-          タップでスタート
+          {/* タップでスタート */}
         </motion.p>
       </motion.div>
 

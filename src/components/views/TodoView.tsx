@@ -276,13 +276,20 @@ const handleAddTask = useCallback(async () => {
         <GroupSelector
           tasks={tasks}
           selectedGroupId={selectedGroupId}
-          onSelectGroup={setSelectedGroupId}
+          onSelectGroup={(groupId) => {
+            setSelectedGroupId(groupId);
+            setFilterText(''); // ← ここでフィルタを解除
+          }}
         />
 
-        {selectedGroupId != null && (
+
+        {(selectedGroupId != null || filterText.trim() !== '') && (
           <div className="flex justify-center">
             <button
-              onClick={() => setSelectedGroupId(null)}
+              onClick={() => {
+                setSelectedGroupId(null);
+                setFilterText('');
+              }}
               className="text-xs px-3 py-1 mt-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
             >
               フィルター解除
