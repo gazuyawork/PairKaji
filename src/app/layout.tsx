@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import PairListener from '@/components/PairListener';
 import PairInit from '@/components/PairInit';
 import PreventBounce from '@/components/PreventBounce';
+import SetViewportHeight from '@/components/SetViewportHeight';
 
 const zenMaruGothic = Zen_Maru_Gothic({ subsets: ['latin'], weight: ['400'], variable: '--font-zen' });
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font-pacifico' });
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}>
       <body className="font-sans bg-white text-gray-800 h-full antialiased">
         <PreventBounce />
+        <SetViewportHeight />
         <div className="flex flex-col h-full overscroll-none">
           <PairInit />
           <PairListener />

@@ -148,8 +148,8 @@ html, body {
 }
 
 .main-content {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: none;
+  height: calc(var(--vh, 1vh) * 100);
   overflow-y: auto;
-  min-height: 100vh; /* ← これが効くはず！ */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
