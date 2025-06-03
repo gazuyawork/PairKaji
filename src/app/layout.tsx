@@ -3,6 +3,7 @@ import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import { Toaster } from 'sonner';
 import PairListener from '@/components/PairListener';
 import PairInit from '@/components/PairInit';
+import { useEffect } from 'react';
 
 const zenMaruGothic = Zen_Maru_Gothic({ subsets: ['latin'], weight: ['400'], variable: '--font-zen' });
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font-pacifico' });
@@ -32,9 +33,21 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+
+    useEffect(() => {
+    const preventBounce = (e: TouchEvent) => {
+      if (e.touches.length > 1) return; // 2本指ズームは許可
+      e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventBounce, { passive: false });
+
+    return () => {
+      document.removeEventListener('touchmove', preventBounce);
+    };
+  }, []);
+
   return (
     <html lang="ja" className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}>
-      {/* <body className="font-sans bg-white text-gray-800 h-full overflow-hidden antialiased"> */}
       <body className="font-sans bg-white text-gray-800 h-full antialiased">
 
         <div className="flex flex-col h-full overscroll-none">
