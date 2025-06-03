@@ -327,11 +327,11 @@ const confirmTasks = async () => {
       </main>
 
       {/* ✅ 固定表示のボタンコンテナ */}
-      <div className="fixed bottom-8 left-0 right-0 flex justify-center items-center gap-4 z-50 px-4">
+      <div className="fixed bottom-10 left-0 right-0 flex justify-center items-center gap-8 z-50 px-4">
         <button
           onClick={confirmTasks}
           disabled={isConfirmDisabled || isSaving}
-          className={`w-[300px] font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 ${
+          className={`w-[200px] font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 ${
             isConfirmDisabled || isSaving
               ? 'bg-gray-300 text-white cursor-not-allowed'
               : 'bg-[#FFCB7D] text-white'
