@@ -187,10 +187,6 @@ const handleAddTask = useCallback(async () => {
   setFocusedTodoId(null);
 }, [taskInput, tasks]);
 
-
-
-
-
   const handleTaskInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleAddTask();
@@ -199,7 +195,7 @@ const handleAddTask = useCallback(async () => {
   };
 
   return (
-    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 overflow-hidden">
+    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
       <Header title="Todo" />
       <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
         <div className="flex gap-2 items-start">
