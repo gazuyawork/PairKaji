@@ -38,7 +38,8 @@ export default function HomeView() {
   }, []);
 
   return (
-    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative">
+    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
+
       <Header title="Home" />
 
       <main
