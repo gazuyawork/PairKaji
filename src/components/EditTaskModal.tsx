@@ -19,7 +19,6 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
     if (task) {
       setEditedTask({
         ...task,
-        // 🔥 数値文字列を曜日名に変換
         daysOfWeek: task.daysOfWeek?.map(num => dayNumberToName[num] || num) ?? [],
         dates: task.dates ?? [],
         users: task.users ?? [],
@@ -35,10 +34,14 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
   };
 
   const toggleUser = (user: string) => {
-    const newUsers = editedTask.users.includes(user)
-      ? editedTask.users.filter(u => u !== user)
-      : [...editedTask.users, user];
-    update('users', newUsers);
+    const currentUser = editedTask.users[0] || null;
+    if (currentUser === user) {
+      // 同じ担当者をもう一度押したら解除（共通タスク状態に戻す）
+      update('users', []);
+    } else {
+      // 選んだ担当者だけをセット
+      update('users', [user]);
+    }
   };
 
   const toggleDay = (day: string) => {
@@ -140,20 +143,21 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">担当者：</label>
             <div className="flex gap-2">
-              {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(user => (
-                <button
-                  key={user.name}
-                  type="button"
-                  onClick={() => toggleUser(user.name)}
-                  className={`w-12 h-12 rounded-full border overflow-hidden ${
-                    editedTask.users.includes(user.name)
-                      ? 'border-[#FFCB7D] opacity-100'
-                      : 'border-gray-300 opacity-30'
-                  }`}
-                >
-                  <Image src={user.image} alt={user.name} width={48} height={48} />
-                </button>
-              ))}
+              {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(user => {
+                const isSelected = editedTask.users[0] === user.name;
+                return (
+                  <button
+                    key={user.name}
+                    type="button"
+                    onClick={() => toggleUser(user.name)}
+                    className={`w-12 h-12 rounded-full border overflow-hidden ${
+                      isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                    }`}
+                  >
+                    <Image src={user.image} alt={user.name} width={48} height={48} />
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
