@@ -143,6 +143,8 @@ html, body {
 html, body {
   height: 100%;
   overscroll-behavior: none !important;
+  -webkit-touch-callout: none; /* 長押しメニュー無効化 */
+  user-select: none; /* 選択無効化（必要なら） */
 }
 
 .main-content {
