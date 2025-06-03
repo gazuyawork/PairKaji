@@ -53,7 +53,7 @@ export default function HomeView() {
         }}
       >
         {isLoading ? (
-          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
+          <div className="flex items-center justify-center text-gray-400 text-sm h-150">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
