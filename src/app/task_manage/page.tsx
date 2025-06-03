@@ -189,50 +189,61 @@ export default function TaskManagePage() {
     );
   };
 
-  const confirmTasks = async () => {
-    if (isSaving) return; // 二重送信防止
-    setIsSaving(true);
+const confirmTasks = async () => {
+  if (isSaving) return; // 二重送信防止
+  setIsSaving(true);
 
-    const uid = auth.currentUser?.uid;
-    if (!uid) {
-      toast.error('ログインしてください');
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    toast.error('ログインしてください');
+    setIsSaving(false);
+    return;
+  }
+
+  let hasEmptyName = false;
+
+  setTasks(prev =>
+    prev.map(task => {
+      const isEmpty = !task.name.trim();
+      if (isEmpty) hasEmptyName = true;
+      return { ...task, nameError: isEmpty };
+    })
+  );
+
+  if (hasEmptyName) {
+    setIsSaving(false);
+    return;
+  }
+
+  try {
+    const sharedUserIds = await fetchPairUserIds(uid);
+    if (!sharedUserIds.includes(uid)) {
+      sharedUserIds.push(uid);
+    }
+
+    // ✅ 修正: 変更のあったタスクのみを抽出
+    const tasksToSave = tasks.filter(task => task.isNew || task.isEdited);
+    if (tasksToSave.length === 0) {
+      toast.success('変更がありませんでした');
       setIsSaving(false);
       return;
     }
 
-    let hasEmptyName = false;
+    await saveAllTasks(tasksToSave, uid, sharedUserIds);
 
     setTasks(prev =>
-      prev.map(task => {
-        const isEmpty = !task.name.trim();
-        if (isEmpty) hasEmptyName = true;
-        return { ...task, nameError: isEmpty };
-      })
+      prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
     );
 
-    if (hasEmptyName) {
-      setIsSaving(false);
-      return;
-    }
+    toast.success('タスクを保存しました');
+  } catch (error) {
+    console.error(error);
+    toast.error('保存に失敗しました');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
-    try {
-      const sharedUserIds = await fetchPairUserIds(uid);
-      if (!sharedUserIds.includes(uid)) {
-        sharedUserIds.push(uid);
-      }
-      await saveAllTasks(tasks, uid, sharedUserIds);
-
-      setTasks(prev =>
-        prev.map(task => ({ ...task, isNew: false, isEdited: false, showDelete: false }))
-      );
-      toast.success('タスクを保存しました');
-    } catch (error) {
-      console.error(error);
-      toast.error('保存に失敗しました');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
 
   useEffect(() => {

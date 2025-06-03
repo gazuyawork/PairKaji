@@ -25,6 +25,8 @@ import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { Timestamp } from 'firebase/firestore';
 import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { saveSingleTask } from '@/lib/taskUtils';
+import { toast } from 'sonner'; // 既に import されている場合はOK
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -99,37 +101,14 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
-    // 🔹 ペアの userIds を取得
-    let userIds = [uid];
-    const pairsSnap = await getDocs(
-      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
-    );
-    pairsSnap.forEach(doc => {
-      const data = doc.data();
-      if (Array.isArray(data.userIds)) {
-        userIds = data.userIds;
-      }
-    });
+    await saveSingleTask(updated, uid); // 保存処理
 
-    const newPeriod = updated.period as Period;
-    const cleanedDaysOfWeek = newPeriod === '不定期' || newPeriod === '毎日' ? [] : updated.daysOfWeek ?? [];
-    const cleanedDates = newPeriod === '週次' || newPeriod === '毎日' ? [] : updated.dates ?? [];
+    toast.success('編集内容を保存しました'); // 🎉 追加！
 
-    await updateDoc(doc(db, 'tasks', updated.id), {
-      name: updated.name,
-      period: newPeriod,
-      point: updated.point,
-      users: updated.users,
-      daysOfWeek: cleanedDaysOfWeek,
-      dates: cleanedDates,
-      isTodo: updated.isTodo ?? false,
-      updatedAt: serverTimestamp(),
-      userIds, // 🔹 最新の userIds を反映
-    });
-
-    setEditTargetTask(null);
+    setEditTargetTask(null); // モーダルを閉じる
   } catch (error) {
     console.error('タスク更新に失敗しました:', error);
+    toast.error('タスクの保存に失敗しました'); // 🎉 エラー時も
   }
 };
 

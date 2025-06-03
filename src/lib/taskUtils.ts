@@ -1,10 +1,11 @@
 // Firebase関連のインポート
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
-import type { TaskManageTask, FirestoreTask } from '@/types/Task';
 import { dayNameToNumber } from '@/lib/constants';
 import { toast } from 'sonner';
+import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
+
 
 /**
  * 指定されたpairIdのペアに属するuserIdsを取得する関数
@@ -34,30 +35,33 @@ export const fetchPairUserIds = async (pairId: string): Promise<string[]> => {
  * @returns FirestoreTaskオブジェクト
  */
 export const buildFirestoreTaskData = (
-  task: TaskManageTask,
+  task: Task | TaskManageTask,
   userIds: string[],
   uid: string
 ): FirestoreTask => {
+  const convertedDaysOfWeek =
+    task.period === '週次'
+      ? (task.daysOfWeek ?? []).map(d => dayNameToNumber[d] ?? d) // ✅ 日本語→数値文字列変換
+      : [];
+
   return {
-    userId: uid, // タスク所有者のUID
-    userIds,     // 関連ユーザー（ペア共有含む）
-    name: task.name, // タスク名
-    title: task.title ?? '', // タイトル（任意）
-    period: task.period ?? '毎日', // 繰り返し周期（デフォルトは毎日）
-    point: task.point, // ポイント
-    users: task.users, // ユーザー表示名の配列
-    daysOfWeek: task.period === '週次'
-      ? task.daysOfWeek.map(d => dayNameToNumber[d]).filter((d): d is string => d !== undefined) // 週次の場合のみ曜日を数値に変換
-      : [],
-    dates: task.dates, // 日付指定の配列
-    isTodo: task.isTodo ?? false, // TODOタスクフラグ
-    done: task.done ?? false,     // 完了フラグ
-    skipped: task.skipped ?? false, // スキップフラグ
-    groupId: task.groupId ?? null,  // グループID（任意）
-    completedAt: task.completedAt ?? '', // 完了日時
-    completedBy: task.completedBy ?? '', // 完了したユーザーID
-    visible: task.visible ?? false, // 表示フラグ
-    todos: [], // TODO: 未使用（将来拡張用）
+    userId: uid,
+    userIds,
+    name: task.name ?? '',
+    title: task.title ?? '',
+    period: task.period ?? '毎日',
+    point: task.point ?? 0,
+    users: task.users ?? [],
+    daysOfWeek: convertedDaysOfWeek,
+    dates: task.dates ?? [],
+    isTodo: task.isTodo ?? false,
+    done: task.done ?? false,
+    skipped: task.skipped ?? false,
+    groupId: task.groupId ?? null,
+    completedAt: task.completedAt ?? null,
+    completedBy: task.completedBy ?? '',
+    visible: task.visible ?? false,
+    todos: [],
   };
 };
 
@@ -111,5 +115,32 @@ export const addTaskCompletion = async (
     });
   } catch (error) {
     console.error('タスク完了履歴の追加に失敗:', error);
+  }
+};
+
+/**
+ * 単一タスクをFirestoreに保存する関数（TaskView用）
+ * @param task 保存対象のタスク
+ * @param uid 操作ユーザーのID
+ */
+export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
+  try {
+    // 🔹 ペアの userIds を取得
+    let userIds = [uid];
+    const pairsSnap = await getDocs(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+    );
+    pairsSnap.forEach(doc => {
+      const data = doc.data();
+      if (Array.isArray(data.userIds)) {
+        userIds = data.userIds;
+      }
+    });
+
+    const taskData = buildFirestoreTaskData(task, userIds, uid);
+    await saveTaskToFirestore(task.id, taskData);
+  } catch (error) {
+    console.error('タスク保存失敗:', error);
+    throw error;
   }
 };

@@ -3,14 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
-
-const dayNameToNumber: Record<string, string> = {
-  '日': '0', '月': '1', '火': '2', '水': '3', '木': '4', '金': '5', '土': '6',
-};
-
-const dayNumberToName: Record<string, string> = {
-  '0': '日', '1': '月', '2': '火', '3': '水', '4': '木', '5': '金', '6': '土',
-};
+import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 
 type Props = {
   isOpen: boolean;
@@ -26,7 +19,8 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
     if (task) {
       setEditedTask({
         ...task,
-        daysOfWeek: task.daysOfWeek?.map(num => dayNumberToName[num]) ?? [],
+        // 🔥 数値文字列を曜日名に変換
+        daysOfWeek: task.daysOfWeek?.map(num => dayNumberToName[num] || num) ?? [],
         dates: task.dates ?? [],
         users: task.users ?? [],
         period: task.period ?? task.period,
@@ -45,6 +39,13 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
       ? editedTask.users.filter(u => u !== user)
       : [...editedTask.users, user];
     update('users', newUsers);
+  };
+
+  const toggleDay = (day: string) => {
+    const newDays = editedTask.daysOfWeek.includes(day)
+      ? editedTask.daysOfWeek.filter(d => d !== day)
+      : [...editedTask.daysOfWeek, day];
+    update('daysOfWeek', newDays);
   };
 
   return (
@@ -97,12 +98,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
                   <button
                     key={day}
                     type="button"
-                    onClick={() => {
-                      const newDays = editedTask.daysOfWeek.includes(day)
-                        ? editedTask.daysOfWeek.filter(d => d !== day)
-                        : [...editedTask.daysOfWeek, day];
-                      update('daysOfWeek', newDays);
-                    }}
+                    onClick={() => toggleDay(day)}
                     className={`w-6 h-6 rounded-full text-xs font-bold ${
                       editedTask.daysOfWeek.includes(day)
                         ? 'bg-[#5E5E5E] text-white'
@@ -167,7 +163,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
             onClick={() => {
               const transformed = {
                 ...editedTask,
-                daysOfWeek: editedTask.daysOfWeek.map(d => dayNameToNumber[d]),
+                daysOfWeek: editedTask.daysOfWeek.map(d => dayNameToNumber[d] || d),
               };
               onSave(transformed);
               onClose();
