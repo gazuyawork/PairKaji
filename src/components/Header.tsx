@@ -12,6 +12,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 
 type HeaderProps = {
   title: string;
@@ -42,13 +43,13 @@ export default function Header({ title, saveStatus = 'idle', currentIndex }: Hea
 
         {/* ✅ TaskView 表示時だけタスク編集ボタン */}
         {pathname === '/main' && currentIndex === 1 && (
-          <button
+          <motion.button
             onClick={() => router.push('/task_manage')}
-            className="text-[#5E5E5E]"
-            aria-label="タスク編集"
+            whileTap={{ scale: 0.85, rotate: -5 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
-            <Pencil size={20} />
-          </button>
+            <Pencil className="w-5 h-5 text-gray-600" />
+          </motion.button>
         )}
       </div>
 

@@ -289,10 +289,10 @@ const confirmTasks = async () => {
 
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] relative">
       <Header title="Edit" />
 
-      <main className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
+      <main className="flex-1 px-4 py-6 space-y-4 overflow-y-auto pb-25">
         <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
         <FilterControls
@@ -303,11 +303,9 @@ const confirmTasks = async () => {
           pairStatus={pairStatus}
         />
 
-
-
         <hr className="border-t border-gray-300 opacity-50 my-4" />
 
-        <div className="space-y-2.5 pb-40">
+        <div className="space-y-2.5">
           {tasks
             .filter(task => !filter || task.period === filter)
             .filter(task => !personFilter || task.users.includes(personFilter))
@@ -328,7 +326,8 @@ const confirmTasks = async () => {
         </div>
       </main>
 
-      <div className="mt-auto py-10 px-4 flex justify-center items-center gap-4">
+      {/* ✅ 固定表示のボタンコンテナ */}
+      <div className="fixed bottom-8 left-0 right-0 flex justify-center items-center gap-4 z-50 px-4">
         <button
           onClick={confirmTasks}
           disabled={isConfirmDisabled || isSaving}
@@ -357,4 +356,5 @@ const confirmTasks = async () => {
       </div>
     </div>
   );
+
 }

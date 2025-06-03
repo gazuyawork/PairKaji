@@ -148,17 +148,17 @@ function MainContent() {
     <div className="flex flex-col min-h-screen">
       <div className="flex-1 overflow-hidden relative">
         <motion.div
-          className="flex w-[300vw] h-full transition-transform duration-300"
+          className="flex w-[300vw] h-full transition-transform"
           animate={{ x: `-${index * 100}vw` }}
           transition={{ type: "tween", duration: 0.2 }}
         >
-          <div className="w-screen flex-shrink-0 h-full overflow-y-auto bg-[#fffaf1]">
+          <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <HomeView />
           </div>
-          <div className="w-screen flex-shrink-0 h-full overflow-y-auto bg-[#fffaf1]">
+          <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <TaskView initialSearch={searchKeyword} />
           </div>
-          <div className="w-screen flex-shrink-0 h-full overflow-y-auto bg-[#fffaf1]">
+          <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <TodoView />
           </div>
         </motion.div>
