@@ -144,3 +144,9 @@ html, body {
   height: 100%;
   overscroll-behavior: none !important;
 }
+
+.main-content {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  overflow-y: auto;
+}
