@@ -42,7 +42,7 @@ export default function HomeView() {
       <Header title="Home" />
 
       <main
-        className="flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20"
+        className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20"
         ref={scrollRef}
         onTouchStart={(e) => {
           const target = e.target as HTMLElement;
