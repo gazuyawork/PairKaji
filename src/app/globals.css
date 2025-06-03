@@ -141,5 +141,6 @@ html, body {
 
 
 html, body {
-  overscroll-behavior: none;
+  height: 100%;
+  overscroll-behavior: none !important;
 }

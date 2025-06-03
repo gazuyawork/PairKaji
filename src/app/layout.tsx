@@ -24,13 +24,19 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: '#5E8BC7',
+  themeColor: '#ffd375',   // ブラウザのテーマ色（ステータスバーの色等）
+  width: 'device-width',   // 表示幅をデバイスの画面幅に合わせる
+  initialScale: 1,         // 初期のズーム倍率を1（100%表示）に設定
+  maximumScale: 1,         // ユーザーによるズームの最大倍率を1（ズーム禁止）に設定
+  userScalable: 'no',      // ユーザーがピンチでズームする操作を禁止
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}>
-      <body className="font-sans bg-white text-gray-800 h-full overflow-hidden antialiased">
+      {/* <body className="font-sans bg-white text-gray-800 h-full overflow-hidden antialiased"> */}
+      <body className="font-sans bg-white text-gray-800 h-full antialiased">
+
         <div className="flex flex-col h-full overscroll-none">
           <PairInit />
           <PairListener />
