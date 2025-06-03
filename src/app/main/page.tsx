@@ -147,11 +147,15 @@ function MainContent() {
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex-1 overflow-hidden relative">
-        <motion.div
-          className="flex w-[300vw] h-full transition-transform"
-          animate={{ x: `-${index * 100}vw` }}
-          transition={{ type: "tween", duration: 0.2 }}
-        >
+          <motion.div
+            className="flex w-[300vw] h-full"
+            animate={{ x: `-${index * 100}vw` }}
+            transition={{
+              type: 'spring',
+              stiffness: 300,
+              damping: 30,
+            }}
+          >
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <HomeView />
           </div>
