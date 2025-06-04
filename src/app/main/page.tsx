@@ -142,7 +142,13 @@ function MainContent() {
     trackMouse: true,
   });
 
-  if (!authReady) return null;
+  // if (!authReady) return null;
+  if (!authReady) {
+    return (
+      <div className="w-screen h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]" />
+    );
+  }
+
 
   return (
     <div className="flex flex-col min-h-screen">

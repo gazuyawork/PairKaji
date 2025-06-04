@@ -4,8 +4,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
-// import PairPoints from '@/components/PairPoints';
-// import TaskHistory from '@/components/TaskHistory';
 import FinishDayTask from '@/components/FinishDayTask';
 import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
@@ -13,6 +11,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { ChevronDown } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -31,7 +30,7 @@ export default function HomeView() {
 
       setTimeout(() => {
         setIsLoading(false);
-      }, 300);
+      }, 300); // ローディング猶予
     });
 
     return () => unsubscribe();
@@ -39,7 +38,6 @@ export default function HomeView() {
 
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
-
       <Header title="Home" />
 
       <main
@@ -52,30 +50,42 @@ export default function HomeView() {
           }
         }}
       >
-        {isLoading ? (
-          <div className="flex items-center justify-center text-gray-400 text-sm h-150">
-            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
-            <div
-              onClick={() => setIsExpanded((prev) => !prev)}
-              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-                isExpanded ? 'max-h-[300px] overflow-y-auto' : 'max-h-[150px]'
-              }`}
-            >
-              <FinishDayTask tasks={tasks} />
-              {/* 開閉アイコン */}
-              <div className="absolute top-5 right-6 pointer-events-none z-10">
-                <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isLoading ? 0 : 1 }}
+          transition={{ duration: 0.6 }}
+          className="space-y-4"
+        >
+          <div
+            onClick={() => setIsExpanded((prev) => !prev)}
+            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+              isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+            }`}
+          >
+            {isLoading ? (
+              <div className="p-6">
+                <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse" />
+                <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
               </div>
-            </div>
+            ) : (
+              <FinishDayTask tasks={tasks} />
+            )}
 
-            <div className="min-h-[150px] max-h-[500px] overflow-y-auto horizontal-scroll bg-white rounded-lg shadow-md">
+            <div className="absolute top-5 right-6 pointer-events-none z-10">
+              <ChevronDown
+                className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
+              />
+            </div>
+          </div>
+
+            {isLoading ? (
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                <div className="h-4 bg-gray-200 rounded w-2/4 animate-pulse" />
+              </div>
+            ) : (
               <TaskCalendar
                 tasks={tasks.map(({ id, name, period, dates, daysOfWeek }) => ({
                   id,
@@ -85,20 +95,14 @@ export default function HomeView() {
                   daysOfWeek,
                 }))}
               />
-            </div>
+            )}
 
-            <div className="min-h-[150px]">
-              <WeeklyPoints />
-            </div>
-
-
-
-            {/* 一旦不要とする */}
-            {/* <div className="min-h-[110px]">
-              <PairPoints />
-            </div> */}
-          </>
-        )}
+          {isLoading ? (
+            <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
+          ) : (
+            <WeeklyPoints />
+          )}
+        </motion.div>
       </main>
     </div>
   );
