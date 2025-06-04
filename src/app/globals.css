@@ -160,3 +160,15 @@ html, body {
   min-height: 100vh;                        /* ✅ コンテンツが少ない時の対策 */
   width: 100%;                              /* ✅ 横スクロール防止 */
 }
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
