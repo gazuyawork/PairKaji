@@ -9,7 +9,7 @@ const OPTIONS = ['A', 'B', 'C'];
 export default function RouletteWheel() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
-  const [ _, setSelectedIndex] = useState<number | null>(null);
+  const [ , setSelectedIndex] = useState<number | null>(null);
 
   const handleSpin = () => {
     const index = Math.floor(Math.random() * OPTIONS.length);

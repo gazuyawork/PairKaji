@@ -28,6 +28,8 @@ export default function WeeklyPoints() {
   const [showRoulette, setShowRoulette] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showGoalButton, setShowGoalButton] = useState(false);
+  const [, setIsLoadingPoints] = useState(true);
+
 
 
   const today = new Date();
