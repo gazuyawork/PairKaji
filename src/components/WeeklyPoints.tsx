@@ -16,6 +16,8 @@ import EditPointModal from './EditPointModal';
 import { fetchPairUserIds } from '@/lib/taskUtils';
 import { motion } from 'framer-motion';
 import RouletteWheel from '@/components/RouletteWheel';
+import Confetti from 'react-confetti';
+import { useWindowSize } from 'react-use';
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,9 +30,9 @@ export default function WeeklyPoints() {
   const [showRoulette, setShowRoulette] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showGoalButton, setShowGoalButton] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [, setIsLoadingPoints] = useState(true);
-
-
+  const { width, height } = useWindowSize();
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -71,7 +73,7 @@ export default function WeeklyPoints() {
 
           setSelfPoints(bufferSelf);
           setPartnerPoints(bufferPartner);
-          setIsLoadingPoints(false); // ✅ 読み込み完了後に表示制御
+          setIsLoadingPoints(false);
         }
       );
     };
@@ -128,12 +130,11 @@ export default function WeeklyPoints() {
     if (selfPoints + partnerPoints >= maxPoints && !showGoalButton) {
       const timer = setTimeout(() => {
         setShowGoalButton(true);
-      }, 1300); // ✅ これで「即表示」に近くなる
+        setShowConfetti(true); // 🎉 コンフェッティ表示開始
+      }, 1300);
       return () => clearTimeout(timer);
     }
   }, [selfPoints, partnerPoints, maxPoints, showGoalButton]);
-
-
 
   const total = animatedSelfPoints + animatedPartnerPoints;
   const percent = maxPoints === 0 ? 0 : (total / maxPoints) * 100;
@@ -159,13 +160,15 @@ export default function WeeklyPoints() {
     );
   };
 
-  const handleGoalAchieved = () => {
-    setIsSpinning(true);
-    setTimeout(() => {
-      setShowRoulette(true);
-      setIsSpinning(false);
-    }, 1000);
-  };
+const handleGoalAchieved = () => {
+  setIsSpinning(true);
+  setTimeout(() => {
+    setShowRoulette(true);
+    setIsSpinning(false);
+    // setShowConfetti(false); ← 🔴 これを削除！
+  }, 1000);
+};
+
 
   return (
     <>
@@ -178,9 +181,12 @@ export default function WeeklyPoints() {
         }}
       >
 
+
+
         <p className="text-lg font-bold text-[#5E5E5E] mb-4">
           今週の合計ポイント {weekLabel}
         </p>
+
         <div className="mt-4 h-6 w-full bg-gray-200 rounded-full overflow-hidden flex">
           <div
             className="h-full bg-[#FFA552]"
@@ -193,9 +199,11 @@ export default function WeeklyPoints() {
             />
           )}
         </div>
+
         <p className="text-2xl font-bold text-[#5E5E5E] mt-2 font-sans">
           {Math.round(animatedSelfPoints + animatedPartnerPoints)} / {maxPoints} pt
         </p>
+
         {hasPartner && (
           <div className="flex justify-center gap-4 mt-4 text-sm text-[#5E5E5E]">
             <div className="flex items-center gap-1">
@@ -211,7 +219,6 @@ export default function WeeklyPoints() {
 
         {(showGoalButton || showRoulette) && (
           <div className="absolute inset-0 z-40">
-            {/* ✅ 背景は showGoalButton または showRoulette 時に表示 */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -219,7 +226,21 @@ export default function WeeklyPoints() {
               className="absolute inset-0 bg-white/10 backdrop-blur-sm z-0 rounded-xl pointer-events-none"
             />
 
-            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            {/* 🎊 Confetti（紙吹雪） */}
+            {showConfetti && (
+              <div className="absolute inset-0 z-10 pointer-events-none">
+                <Confetti
+                  width={width}
+                  height={height}
+                  numberOfPieces={120} // 🎉 増やす
+                  colors={['#FFD700', '#FFA500', '#FF69B4', '#87CEFA', '#90EE90']} // 🎨 明るいポップ系
+                  gravity={0.05} // 下スピード
+                  recycle={true} // 一回だけ表示
+                />
+              </div>
+            )}
+
+            <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
               <div className="pointer-events-auto">
                 {!showRoulette ? (
                   <motion.div
@@ -232,38 +253,36 @@ export default function WeeklyPoints() {
                     className="w-40 h-40 relative perspective-1000"
                     style={{ transformStyle: 'preserve-3d' }}
                   >
-                    {/* ✅ ボタンは showGoalButton のときだけ表示 */}
-                      {showGoalButton && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.5 }}
-                          animate={{
-                            opacity: 1,
-                            scale: 1,
-                            rotate: [0, 2, -2, 0], // ゆらゆら
-                          }}
-                          transition={{
-                            opacity: { duration: 0.6 },
-                            scale: { duration: 0.6 },
-                            rotate: {
-                              duration: 2.4,  // ゆらゆら周期
-                              ease: 'easeInOut',
-                              repeat: Infinity,
-                              repeatType: 'loop',
-                            },
-                          }}
-                          className="absolute w-full h-full flex items-center justify-center"
-                        >
-                          <div className="bg-yellow-400 text-white font-bold text-lg rounded-full w-40 h-40 flex items-center justify-center shadow-[inset_0_0_8px_rgba(255,255,255,0.7),_0_4px_6px_rgba(0,0,0,0.3)] border-[3px] border-yellow-500">
-                            目標達成
-                          </div>
-                        </motion.div>
-                      )}
-
-
+                    {showGoalButton && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{
+                          opacity: 1,
+                          scale: 1,
+                          rotate: [0, 2, -2, 0],
+                        }}
+                        transition={{
+                          opacity: { duration: 0.6 },
+                          scale: { duration: 0.6 },
+                          rotate: {
+                            duration: 2.4,
+                            ease: 'easeInOut',
+                            repeat: Infinity,
+                            repeatType: 'loop',
+                          },
+                        }}
+                        className="absolute w-full h-full flex items-center justify-center"
+                      >
+                        <div className="bg-yellow-400 text-white font-bold text-lg rounded-full w-40 h-40 flex items-center justify-center shadow-[inset_0_0_8px_rgba(255,255,255,0.7),_0_4px_6px_rgba(0,0,0,0.3)] border-[3px] border-yellow-500">
+                          目標達成
+                        </div>
+                      </motion.div>
+                    )}
                     <div className="absolute w-full h-full backface-hidden rotate-y-180 flex items-center justify-center rounded-full">
                       <RouletteWheel
                         setShowRoulette={setShowRoulette}
                         setShowGoalButton={setShowGoalButton}
+                        setShowConfetti={setShowConfetti} // ✅ 追加！
                       />
 
                     </div>
@@ -273,13 +292,11 @@ export default function WeeklyPoints() {
                     setShowRoulette={setShowRoulette}
                     setShowGoalButton={setShowGoalButton}
                   />
-
                 )}
               </div>
             </div>
           </div>
         )}
-
       </div>
 
       <EditPointModal

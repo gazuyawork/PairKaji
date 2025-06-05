@@ -7,11 +7,18 @@ import clsx from 'clsx';
 const OPTIONS = ['A', 'B', 'C'];
 
 type Props = {
-  setShowRoulette: (value: boolean) => void;
-  setShowGoalButton: (value: boolean) => void;
+  setShowRoulette: (v: boolean) => void;
+  setShowGoalButton: (v: boolean) => void;
+  setShowConfetti?: (v: boolean) => void; // ✅ 追加
 };
 
-export default function RouletteWheel({ setShowRoulette, setShowGoalButton }: Props) {
+
+export default function RouletteWheel({
+  setShowRoulette,
+  setShowGoalButton,
+  setShowConfetti, // ✅ これを忘れずに受け取る！
+}: Props) {
+
   const [isSpinning, setIsSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -126,6 +133,7 @@ const handleSpin = () => {
                 setShowResult(false);
                 setShowRoulette(false);
                 setShowGoalButton(false);
+                setShowConfetti?.(false);
               }}
               className="mt-3 px-4 py-1 bg-yellow-400 text-white rounded-full hover:bg-yellow-500 transition"
             >
