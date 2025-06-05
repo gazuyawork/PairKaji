@@ -22,7 +22,9 @@ export default function RouletteWheel({ setShowRoulette, setShowGoalButton }: Pr
     const index = Math.floor(Math.random() * OPTIONS.length);
     const spins = 7;
     const segmentAngle = 360 / OPTIONS.length;
-    const targetAngle = 360 * spins + index * segmentAngle + segmentAngle / 2;
+    const correctedOffset = 90; // ← ポインター（上）に合わせて補正
+    const targetAngle =
+      360 * spins + index * segmentAngle + segmentAngle / 2 - correctedOffset;
 
     setAngle(targetAngle);
     setIsSpinning(true);
@@ -35,6 +37,7 @@ export default function RouletteWheel({ setShowRoulette, setShowGoalButton }: Pr
       setShowResult(true); // ← ルーレット終了時にポップアップ表示
     }, 3000);
   };
+
 
   return (
     <div className="relative w-40 h-40 rounded-full overflow-hidden bg-white shadow-lg">
