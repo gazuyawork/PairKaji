@@ -131,7 +131,7 @@ export default function WeeklyPoints() {
       const timer = setTimeout(() => {
         setShowGoalButton(true);
         setShowConfetti(true); // 🎉 コンフェッティ表示開始
-      }, 1300);
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [selfPoints, partnerPoints, maxPoints, showGoalButton]);
@@ -160,15 +160,13 @@ export default function WeeklyPoints() {
     );
   };
 
-const handleGoalAchieved = () => {
-  setIsSpinning(true);
-  setTimeout(() => {
-    setShowRoulette(true);
-    setIsSpinning(false);
-    // setShowConfetti(false); ← 🔴 これを削除！
-  }, 1000);
-};
-
+  const handleGoalAchieved = () => {
+    setIsSpinning(true);
+    setTimeout(() => {
+      setShowRoulette(true);
+      setIsSpinning(false);
+    }, 1000);
+  };
 
   return (
     <>
@@ -232,8 +230,15 @@ const handleGoalAchieved = () => {
                 <Confetti
                   width={width}
                   height={height}
-                  numberOfPieces={120} // 🎉 増やす
-                  colors={['#FFD700', '#FFA500', '#FF69B4', '#87CEFA', '#90EE90']} // 🎨 明るいポップ系
+                  numberOfPieces={130} // 🎉 増やす
+                  colors={[
+                    '#FFFACD', // レモンシフォン（柔らかい黄色）
+                    '#FFD1DC', // ベビーピンク
+                    '#B5EAD7', // パステルグリーン
+                    '#C7CEEA', // ラベンダー系のパステルブルー
+                    '#FFDAC1'  // アプリコット系ピーチ
+                  ]}
+
                   gravity={0.05} // 下スピード
                   recycle={true} // 一回だけ表示
                 />
