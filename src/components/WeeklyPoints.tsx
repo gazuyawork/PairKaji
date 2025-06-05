@@ -125,13 +125,14 @@ export default function WeeklyPoints() {
   }, [selfPoints, partnerPoints]);
 
   useEffect(() => {
-  if (animatedSelfPoints + animatedPartnerPoints >= maxPoints && !showGoalButton) {
-    const timer = setTimeout(() => {
-      setShowGoalButton(true);
-    }, 600); // 表示遅延（ms単位）調整可
-    return () => clearTimeout(timer);
-  }
-}, [animatedSelfPoints, animatedPartnerPoints, maxPoints, showGoalButton]);
+    if (selfPoints + partnerPoints >= maxPoints && !showGoalButton) {
+      const timer = setTimeout(() => {
+        setShowGoalButton(true);
+      }, 1300); // ✅ これで「即表示」に近くなる
+      return () => clearTimeout(timer);
+    }
+  }, [selfPoints, partnerPoints, maxPoints, showGoalButton]);
+
 
 
   const total = animatedSelfPoints + animatedPartnerPoints;
@@ -255,11 +256,19 @@ export default function WeeklyPoints() {
 
 
                     <div className="absolute w-full h-full backface-hidden rotate-y-180 flex items-center justify-center rounded-full">
-                      <RouletteWheel />
+                      <RouletteWheel
+                        setShowRoulette={setShowRoulette}
+                        setShowGoalButton={setShowGoalButton}
+                      />
+
                     </div>
                   </motion.div>
                 ) : (
-                  <RouletteWheel />
+                  <RouletteWheel
+                    setShowRoulette={setShowRoulette}
+                    setShowGoalButton={setShowGoalButton}
+                  />
+
                 )}
               </div>
             </div>

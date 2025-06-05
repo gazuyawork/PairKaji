@@ -6,79 +6,113 @@ import clsx from 'clsx';
 
 const OPTIONS = ['A', 'B', 'C'];
 
-export default function RouletteWheel() {
+type Props = {
+  setShowRoulette: (value: boolean) => void;
+  setShowGoalButton: (value: boolean) => void;
+};
+
+
+export default function RouletteWheel({ setShowRoulette, setShowGoalButton }: Props) {
   const [isSpinning, setIsSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
-  const [ , setSelectedIndex] = useState<number | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [showResult, setShowResult] = useState(false);
 
   const handleSpin = () => {
     const index = Math.floor(Math.random() * OPTIONS.length);
-    const spins = 7; // ← 多めにして慣性を表現
+    const spins = 7;
     const segmentAngle = 360 / OPTIONS.length;
     const targetAngle = 360 * spins + index * segmentAngle + segmentAngle / 2;
 
     setAngle(targetAngle);
     setIsSpinning(true);
     setSelectedIndex(null);
+    setShowResult(false);
 
     setTimeout(() => {
       setIsSpinning(false);
       setSelectedIndex(index);
-    }, 2000);
+      setShowResult(true); // ← ルーレット終了時にポップアップ表示
+    }, 3000);
   };
 
   return (
     <div className="relative w-40 h-40 rounded-full overflow-hidden bg-white shadow-lg">
-      {/* 回転する円 */}
-        <motion.div
+      {/* 回転円 */}
+      <motion.div
         animate={{ rotate: angle }}
-        transition={{
-            duration: 3,
-            ease: [0.1, 1, 0.3, 1], // ← ← ← 超スロー停止
-        }}
-        className="w-full h-full rounded-full"
+        transition={{ duration: 3, ease: [0.1, 1, 0.3, 1] }}
+        className="w-full h-full rounded-full relative"
         style={{
-            background: `conic-gradient(
+          background: `conic-gradient(
             #a0e7e5 0% 33.33%,
             #fbe7c6 33.33% 66.66%,
             #ffaaa7 66.66% 100%
-            )`,
+          )`,
         }}
-        />
-
-
-
-      {/* セグメントラベル */}
-      <div className="absolute inset-0">
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-xs font-bold text-white">
-          A
-        </div>
-        <div className="absolute bottom-4 left-3 text-xs font-bold text-white">
-          B
-        </div>
-        <div className="absolute bottom-4 right-3 text-xs font-bold text-white">
-          C
-        </div>
-      </div>
+      >
+        {/* ラベル */}
+        {OPTIONS.map((label, i) => {
+          const segmentAngle = 360 / OPTIONS.length;
+          const rotation = i * segmentAngle + segmentAngle / 2;
+          return (
+            <div
+              key={label}
+              className="absolute left-[45%] top-[45%] text-sm font-bold text-white pointer-events-none"
+              style={{
+                transform: `rotate(${rotation}deg) translateY(-200%) rotate(180deg)`,
+                transformOrigin: 'center center',
+              }}
+            >
+              {label}
+            </div>
+          );
+        })}
+      </motion.div>
 
       {/* ポインター */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-red-600 w-1.5 h-3 rounded-b z-10" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-red-100 w-1.5 h-3 rounded-b z-10" />
 
-        {/* ルーレット全体をボタンにする */}
-        <button
+      {/* スピンボタン */}
+      <button
         onClick={(e) => {
-            e.stopPropagation();
-            handleSpin();
+          e.stopPropagation();
+          handleSpin();
         }}
         disabled={isSpinning}
         className={clsx(
-            'absolute inset-0 rounded-full flex items-center justify-center text-sm font-bold text-white',
-            isSpinning ? 'bg-transparent cursor-not-allowed' : 'hover:bg-white/10'
+          'absolute inset-0 rounded-full flex items-center justify-center text-sm font-bold text-white',
+          isSpinning ? 'bg-transparent cursor-not-allowed' : 'hover:bg-white/10'
         )}
-        >
+      >
         {isSpinning ? 'スピン中...' : 'Tap!'}
-        </button>
+      </button>
 
+      {/* ✅ 当選結果モーダル */}
+        {showResult && selectedIndex !== null && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+            <motion.div
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+            className="bg-white rounded-full w-41 h-41 shadow-xl flex flex-col items-center justify-center text-center px-4 py-4"
+            >
+            <p className="text-lg font-bold mb-2">当たり！</p>
+            <p className="text-2xl text-yellow-500 font-bold">{OPTIONS[selectedIndex]}</p>
+            <button
+            onClick={(e) => {
+                e.stopPropagation();         // 親クリック伝播防止
+                setShowResult(false);        // ポップアップを閉じる
+                setShowRoulette(false);      // ルーレットカードを閉じる
+                setShowGoalButton(false);    // 目標達成ボタンを非表示
+            }}
+            className="mt-3 px-4 py-1 bg-yellow-400 text-white rounded-full hover:bg-yellow-500 transition"
+            >
+            閉じる
+            </button>
+            </motion.div>
+        </div>
+        )}
     </div>
   );
 }
