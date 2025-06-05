@@ -171,8 +171,13 @@ export default function WeeklyPoints() {
     <>
       <div
         className="relative bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 text-center mb-3 cursor-pointer hover:shadow-lg transition overflow-hidden"
-        onClick={() => setIsModalOpen(true)}
+        onClick={() => {
+          if (!showGoalButton && !showRoulette) {
+            setIsModalOpen(true);
+          }
+        }}
       >
+
         <p className="text-lg font-bold text-[#5E5E5E] mb-4">
           今週の合計ポイント {weekLabel}
         </p>

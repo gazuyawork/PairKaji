@@ -71,22 +71,37 @@ export default function RouletteWheel({ setShowRoulette, setShowGoalButton }: Pr
       </motion.div>
 
       {/* ポインター */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-red-100 w-1.5 h-3 rounded-b z-10" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-4 bg-red-500 rotate-45 rotate-180 z-20" />
+
+
+
 
       {/* スピンボタン */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleSpin();
-        }}
-        disabled={isSpinning}
-        className={clsx(
-          'absolute inset-0 rounded-full flex items-center justify-center text-sm font-bold text-white',
-          isSpinning ? 'bg-transparent cursor-not-allowed' : 'hover:bg-white/10'
-        )}
-      >
-        {isSpinning ? 'スピン中...' : 'Tap!'}
-      </button>
+        <button
+            onClick={(e) => {
+                e.stopPropagation();
+                handleSpin();
+            }}
+            disabled={isSpinning}
+            className={clsx(
+                'absolute inset-0 rounded-full flex items-center justify-center font-bold',
+                isSpinning ? 'bg-transparent cursor-not-allowed' : 'hover:bg-black/5'
+            )}
+            >
+            {isSpinning ? (
+                ''
+            ) : (
+                <motion.span
+                initial={{ opacity: 1 }}
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+                className="text-white text-2xl"
+                >
+                Tap!
+                </motion.span>
+            )}
+        </button>
+
 
       {/* ✅ 当選結果モーダル */}
         {showResult && selectedIndex !== null && (
