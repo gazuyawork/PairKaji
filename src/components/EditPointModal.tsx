@@ -80,10 +80,28 @@ export default function EditPointModal({
       setError('1以上の数値を入力してください');
       return;
     }
+    
     if (selfPoint > point) {
       setError('目標値以下で入力してください');
       return;
     }
+
+    if (rouletteEnabled) {
+      const hasAtLeastOne = rouletteOptions.some(opt => opt.trim() !== '');
+      const hasEmpty = rouletteOptions.some(opt => opt.trim() === '');
+
+      if (!hasAtLeastOne) {
+        setError('1件以上のご褒美を入力してください');
+        return;
+      }
+
+      if (hasEmpty) {
+        setError('ご褒美に空欄があります。');
+        return;
+      }
+    }
+
+
     setError('');
 
     const uid = auth.currentUser?.uid;
@@ -197,31 +215,78 @@ export default function EditPointModal({
 
           {/* ✅ ルーレットトグル */}
           <div className="flex items-center justify-between mt-4">
-            <label className="text-gray-600 font-bold">ルーレットを使用</label>
-            <input
-              type="checkbox"
-              checked={rouletteEnabled}
-              onChange={(e) => setRouletteEnabled(e.target.checked)}
-              className="w-5 h-5"
-            />
+            <label className="flex items-center cursor-pointer">
+              <span className="mr-3 text-sm text-gray-700">ルーレットを有効にする</span>
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={rouletteEnabled}
+                  onChange={() => setRouletteEnabled(!rouletteEnabled)}
+                />
+                <div
+                  className={`w-11 h-6 bg-gray-300 rounded-full shadow-inner transition-colors duration-300 ${
+                    rouletteEnabled ? 'bg-yellow-400' : ''
+                  }`}
+                ></div>
+                <div
+                  className={`dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${
+                    rouletteEnabled ? 'translate-x-5' : ''
+                  }`}
+                ></div>
+              </div>
+            </label>
           </div>
 
-          {/* ✅ ルーレット結果入力欄 */}
+          {/* ✅ ご褒美入力欄 */}
           {rouletteEnabled && (
             <div className="space-y-2 mt-4">
-              <p className="text-gray-600 font-bold">ご褒美の内容（3つ）</p>
+              <p className="text-gray-600 font-bold">ご褒美の内容（1件以上）</p>
+
               {rouletteOptions.map((value, index) => (
-                <input
-                  key={index}
-                  type="text"
-                  value={value}
-                  onChange={(e) => handleRouletteOptionChange(index, e.target.value)}
-                  placeholder={`ご褒美 ${index + 1}`}
-                  className="w-full border-b border-gray-300 py-1 px-2 outline-none"
-                />
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => {
+                      const newOptions = [...rouletteOptions];
+                      newOptions[index] = e.target.value;
+                      setRouletteOptions(newOptions);
+                    }}
+                    placeholder={`ご褒美 ${index + 1}`}
+                    className="flex-1 border-b border-gray-300 py-1 px-2 outline-none"
+                  />
+                  {rouletteOptions.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newOptions = rouletteOptions.filter((_, i) => i !== index);
+                        setRouletteOptions(newOptions);
+                      }}
+                      className="text-sm text-red-500 hover:underline"
+                    >
+                      ✖
+                    </button>
+                  )}
+                </div>
               ))}
+
+              {/* ✅ ご褒美が5件未満なら追加ボタンを表示 */}
+              {rouletteOptions.length < 5 ? (
+                <button
+                  type="button"
+                  onClick={() => setRouletteOptions([...rouletteOptions, ''])}
+                  className="text-blue-500 text-sm mt-1 hover:underline"
+                >
+                  ＋ ご褒美を追加
+                </button>
+              ) : (
+                <p className="text-sm text-gray-400">※ご褒美は最大5件までです</p>
+              )}
             </div>
           )}
+
+
 
           {error && <p className="text-red-500 text-center text-sm pt-2">{error}</p>}
         </div>
