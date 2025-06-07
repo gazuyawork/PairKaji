@@ -150,11 +150,11 @@ export default function EditPointModal({
     setSelfPoint(half + extra);
   };
 
-  const handleRouletteOptionChange = (index: number, value: string) => {
-    const newOptions = [...rouletteOptions];
-    newOptions[index] = value;
-    setRouletteOptions(newOptions);
-  };
+  // const handleRouletteOptionChange = (index: number, value: string) => {
+  //   const newOptions = [...rouletteOptions];
+  //   newOptions[index] = value;
+  //   setRouletteOptions(newOptions);
+  // };
 
   if (!isOpen) return null;
 
