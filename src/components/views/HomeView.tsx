@@ -18,6 +18,7 @@ export default function HomeView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false); // 完了タスクの展開状態
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;

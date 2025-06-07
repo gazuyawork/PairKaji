@@ -1,5 +1,3 @@
-// src/components/EditPointModal.tsx
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -13,9 +11,22 @@ interface Props {
   initialPoint: number;
   onClose: () => void;
   onSave: (value: number) => void;
+  rouletteOptions: string[];
+  setRouletteOptions: (options: string[]) => void;
+  rouletteEnabled: boolean;
+  setRouletteEnabled: (enabled: boolean) => void;
 }
 
-export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }: Props) {
+export default function EditPointModal({
+  isOpen,
+  initialPoint,
+  onClose,
+  onSave,
+  rouletteOptions,
+  setRouletteOptions,
+  rouletteEnabled,
+  setRouletteEnabled,
+}: Props) {
   const [point, setPoint] = useState<number>(0);
   const [selfPoint, setSelfPoint] = useState<number>(0);
   const [error, setError] = useState<string>('');
@@ -121,11 +132,17 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
     setSelfPoint(half + extra);
   };
 
+  const handleRouletteOptionChange = (index: number, value: string) => {
+    const newOptions = [...rouletteOptions];
+    newOptions[index] = value;
+    setRouletteOptions(newOptions);
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-      <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative">
+    <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex justify-center items-center">
+      <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative overflow-y-auto max-h-[95vh]">
         <div className="space-y-6 mt-4 mx-3">
           <div className="text-center">
             <p className="text-lg font-bold text-[#5E5E5E] font-sans">目標ポイントを設定</p>
@@ -177,6 +194,34 @@ export default function EditPointModal({ isOpen, initialPoint, onClose, onSave }
               ))}
             </div>
           </div>
+
+          {/* ✅ ルーレットトグル */}
+          <div className="flex items-center justify-between mt-4">
+            <label className="text-gray-600 font-bold">ルーレットを使用</label>
+            <input
+              type="checkbox"
+              checked={rouletteEnabled}
+              onChange={(e) => setRouletteEnabled(e.target.checked)}
+              className="w-5 h-5"
+            />
+          </div>
+
+          {/* ✅ ルーレット結果入力欄 */}
+          {rouletteEnabled && (
+            <div className="space-y-2 mt-4">
+              <p className="text-gray-600 font-bold">ご褒美の内容（3つ）</p>
+              {rouletteOptions.map((value, index) => (
+                <input
+                  key={index}
+                  type="text"
+                  value={value}
+                  onChange={(e) => handleRouletteOptionChange(index, e.target.value)}
+                  placeholder={`ご褒美 ${index + 1}`}
+                  className="w-full border-b border-gray-300 py-1 px-2 outline-none"
+                />
+              ))}
+            </div>
+          )}
 
           {error && <p className="text-red-500 text-center text-sm pt-2">{error}</p>}
         </div>

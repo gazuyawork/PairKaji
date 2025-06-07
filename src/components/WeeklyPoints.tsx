@@ -33,6 +33,9 @@ export default function WeeklyPoints() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [, setIsLoadingPoints] = useState(true);
   const { width, height } = useWindowSize();
+  const [rouletteOptions, setRouletteOptions] = useState(['ご褒美A', 'ご褒美B', 'ご褒美C']);
+  const [rouletteEnabled, setRouletteEnabled] = useState(true); // ← デフォルトON
+
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -127,14 +130,15 @@ export default function WeeklyPoints() {
   }, [selfPoints, partnerPoints]);
 
   useEffect(() => {
-    if (selfPoints + partnerPoints >= maxPoints && !showGoalButton) {
+    if (rouletteEnabled && selfPoints + partnerPoints >= maxPoints && !showGoalButton) {
       const timer = setTimeout(() => {
         setShowGoalButton(true);
-        setShowConfetti(true); // 🎉 コンフェッティ表示開始
+        setShowConfetti(true);
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [selfPoints, partnerPoints, maxPoints, showGoalButton]);
+  }, [selfPoints, partnerPoints, maxPoints, showGoalButton, rouletteEnabled]);
+
 
   const total = animatedSelfPoints + animatedPartnerPoints;
   const percent = maxPoints === 0 ? 0 : (total / maxPoints) * 100;
@@ -161,6 +165,7 @@ export default function WeeklyPoints() {
   };
 
   const handleGoalAchieved = () => {
+    if (!rouletteEnabled) return;
     setIsSpinning(true);
     setTimeout(() => {
       setShowRoulette(true);
@@ -215,7 +220,7 @@ export default function WeeklyPoints() {
           </div>
         )}
 
-        {(showGoalButton || showRoulette) && (
+        {rouletteEnabled && (showGoalButton || showRoulette) && (
           <div className="absolute inset-0 z-40">
             <motion.div
               initial={{ opacity: 0 }}
@@ -287,16 +292,22 @@ export default function WeeklyPoints() {
                       <RouletteWheel
                         setShowRoulette={setShowRoulette}
                         setShowGoalButton={setShowGoalButton}
-                        setShowConfetti={setShowConfetti} // ✅ 追加！
+                        setShowConfetti={setShowConfetti}
+                        options={rouletteOptions}
+                        rouletteEnabled={rouletteEnabled}
                       />
+
 
                     </div>
                   </motion.div>
                 ) : (
-                  <RouletteWheel
-                    setShowRoulette={setShowRoulette}
-                    setShowGoalButton={setShowGoalButton}
-                  />
+                    <RouletteWheel
+                      setShowRoulette={setShowRoulette}
+                      setShowGoalButton={setShowGoalButton}
+                      setShowConfetti={setShowConfetti}
+                      options={rouletteOptions}
+                      rouletteEnabled={rouletteEnabled}
+                    />
                 )}
               </div>
             </div>
@@ -309,7 +320,12 @@ export default function WeeklyPoints() {
         initialPoint={maxPoints}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
+        rouletteOptions={rouletteOptions}
+        setRouletteOptions={setRouletteOptions}
+        rouletteEnabled={rouletteEnabled}
+        setRouletteEnabled={setRouletteEnabled}
       />
+
     </>
   );
 }
