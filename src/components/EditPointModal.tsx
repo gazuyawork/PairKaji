@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
-import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, setDoc, getDocs, getDoc, collection, query, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 
 interface Props {
@@ -38,7 +38,30 @@ export default function EditPointModal({
     } else {
       fetchTasksAndCalculate();
     }
+
+    // 🔸 Firestoreからルーレット設定を読み込み
+    const fetchRouletteSettings = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      try {
+        const docSnap = await getDoc(doc(db, 'points', uid));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (typeof data.rouletteEnabled === 'boolean') {
+            setRouletteEnabled(data.rouletteEnabled);
+          }
+          if (Array.isArray(data.rouletteOptions)) {
+            setRouletteOptions(data.rouletteOptions);
+          }
+        }
+      } catch (err) {
+        console.error('ルーレット設定の取得に失敗:', err);
+      }
+    };
+
+    fetchRouletteSettings(); // 🔸 実行
   }, [initialPoint]);
+
 
   const fetchTasksAndCalculate = async () => {
     const uid = auth.currentUser?.uid;
@@ -130,6 +153,8 @@ export default function EditPointModal({
         weeklyTargetPoint: point,
         selfPoint,
         partnerPoint,
+        rouletteEnabled,
+        rouletteOptions, 
       }, { merge: true });
     } catch (error) {
       console.error('Firebaseへの保存に失敗:', error);
