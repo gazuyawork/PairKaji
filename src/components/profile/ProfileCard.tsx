@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { auth } from '@/lib/firebase';
+import { uploadProfileImage } from '@/lib/firebaseUtils'; 
 
 type ProfileCardProps = {
   profileImage: string | null;
@@ -53,6 +55,7 @@ export default function ProfileCard({
                 height={100}
                 className="h-24 aspect-square rounded-full object-cover border border-gray-300"
               />
+
               <input
                 type="file"
                 accept="image/*"
@@ -71,15 +74,25 @@ export default function ProfileCard({
                     return;
                   }
 
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const base64 = reader.result as string;
-                    localStorage.setItem('profileImage', base64);
-                    setProfileImage(base64);
-                  };
-                  reader.readAsDataURL(file);
+                  const user = auth.currentUser;
+                  if (!user) {
+                    toast.error('ログイン状態が確認できません');
+                    return;
+                  }
+
+                  uploadProfileImage(user.uid, file, 'user')
+                    .then((downloadUrl) => {
+                      setProfileImage(downloadUrl);
+                      toast.success('プロフィール画像を更新しました');
+                    })
+                    .catch((err) => {
+                      console.error('画像アップロード失敗', err);
+                      toast.error('プロフィール画像の更新に失敗しました');
+                    });
                 }}
               />
+
+
             </>
           )}
         </div>

@@ -56,6 +56,8 @@ const withPWA = require('next-pwa')({
 
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    domains: ['firebasestorage.googleapis.com'], // ✅ ここを追加
+  },
 };
-
 module.exports = withPWA(nextConfig);

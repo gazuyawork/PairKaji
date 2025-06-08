@@ -223,7 +223,13 @@ export default function TaskCard({
           <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
             {task.point} <span className="text-sm">pt</span>
           </p>
-          <Image src={task.image ?? '/images/default.png'} alt={`${task.person}のアイコン`} width={38} height={38} className="rounded-full border border-gray-300 object-cover aspect-square" />
+          <Image 
+            src={task.image ?? '/images/default.png'} 
+            alt={`${task.person}のアイコン`} 
+            width={38} 
+            height={38} 
+            className="rounded-full border border-gray-300 object-cover aspect-square" 
+          />
         </div>
       </motion.div>
     </div>

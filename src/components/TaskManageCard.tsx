@@ -138,7 +138,7 @@ export default function TaskManageCard({
               }`}
             >
               <Image
-                src={user.image}
+                src={user.image || '/images/default.png'}
                 alt={`${user.name}のフィルター`}
                 width={32}
                 height={32}

@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import type { PendingApproval } from '@/types/Pair';
 import { motion } from 'framer-motion';
-import { useRef } from 'react';
+import { useProfileImages } from '@/hooks/useProfileImages'; // ✅ 修正
 
 type PartnerSettingsProps = {
   isLoading: boolean;
@@ -12,7 +12,6 @@ type PartnerSettingsProps = {
   pendingApproval: PendingApproval | null;
   isPairConfirmed: boolean;
   partnerEmail: string;
-  partnerImage: string;
   inviteCode: string;
   pairDocId: string | null;
   onApprovePair: () => void;
@@ -21,7 +20,7 @@ type PartnerSettingsProps = {
   onSendInvite: () => void;
   onRemovePair: () => void;
   onChangePartnerEmail: (email: string) => void;
-  onChangePartnerImage: (image: string) => void;
+  partnerImage: string;
 };
 
 export default function PartnerSettings({
@@ -29,7 +28,6 @@ export default function PartnerSettings({
   pendingApproval,
   isPairConfirmed,
   partnerEmail,
-  partnerImage,
   inviteCode,
   pairDocId,
   onApprovePair,
@@ -38,26 +36,8 @@ export default function PartnerSettings({
   onSendInvite,
   onRemovePair,
   onChangePartnerEmail,
-  onChangePartnerImage,
 }: PartnerSettingsProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImageClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (reader.result && typeof reader.result === 'string') {
-          onChangePartnerImage(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const { partnerImage } = useProfileImages(); // ✅ 修正ポイント
 
   return (
     <motion.div
@@ -69,6 +49,7 @@ export default function PartnerSettings({
       <p className="mb-6">
         <label className="text-[#5E5E5E] font-semibold">パートナー設定</label>
       </p>
+
       {isPairLoading ? (
         <div className="flex items-center justify-center text-gray-400 text-sm">
           <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -125,24 +106,14 @@ export default function PartnerSettings({
           {isPairConfirmed && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <button
-                  onClick={handleImageClick}
-                  className="relative w-16 h-16 rounded-full border border-gray-300 overflow-hidden"
-                >
+                <div className="relative w-16 h-16 rounded-full border border-gray-300 overflow-hidden">
                   <Image
-                    src={partnerImage}
+                    src={partnerImage || '/images/default.png'} // ✅ fallback対応
                     alt="パートナー画像"
                     fill
                     className="object-cover"
                   />
-                </button>
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
+                </div>
                 <div className="text-[#5E5E5E]">
                   <p className="font-semibold">パートナー承認済み</p>
                   <p>{partnerEmail}</p>

@@ -154,7 +154,12 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
                       isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
                     }`}
                   >
-                    <Image src={user.image} alt={user.name} width={48} height={48} />
+                    <Image 
+                      src={user.image || '/images/default.png'} 
+                      alt={user.name} 
+                      width={48} 
+                      height={48} 
+                    />
                   </button>
                 );
               })}

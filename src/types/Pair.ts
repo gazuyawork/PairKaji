@@ -10,6 +10,7 @@ export interface Pair {
   inviteCode: string;
   status: PairStatus;
   userIds: string[];
+  partnerImageUrl?: string;
   createdAt?: Timestamp; // 作成日時
   updatedAt?: Timestamp; // 更新日時
 }

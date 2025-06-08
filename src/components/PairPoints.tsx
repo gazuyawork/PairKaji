@@ -145,7 +145,7 @@ export default function PairPoints() {
           {users.map((user, idx) => (
             <div key={idx} className="flex items-center gap-4">
               <Image
-                src={user.image}
+                src={user.image || '/images/default.png'}
                 alt={`${user.name}のアイコン`}
                 width={68}
                 height={68}

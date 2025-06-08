@@ -238,7 +238,7 @@ export default function EditPointModal({
               {userPoints.map(user => (
                 <div key={user.name} className="flex items-center gap-2">
                   <Image
-                    src={user.image}
+                    src={user.image || '/images/default.png'}
                     alt={user.name}
                     width={40}
                     height={42}

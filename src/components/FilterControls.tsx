@@ -76,7 +76,7 @@ export default function FilterControls({
               }`}
             >
               <Image
-                src={user.image}
+                src={user.image || '/images/default.png'}
                 alt={`${user.name}のフィルター`}
                 width={40}
                 height={40}

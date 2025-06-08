@@ -8,22 +8,24 @@ import EmailEditModal from '@/components/EmailEditModal';
 import PasswordEditModal from '@/components/PasswordEditModal';
 import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
-import { 
-  getUserProfile, createUserProfile, 
-  createPairInvite, 
-  removePair, deletePair, 
-  handleFirestoreError, generateInviteCode 
-} from '@/lib/firebaseUtils';
 import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
-import { saveUserNameToFirestore } from '@/lib/firebaseUtils';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
-import { removePartnerFromUserTasks } from '@/lib/firebaseUtils';
-import { approvePair } from '@/lib/firebaseUtils';
 import { getDocs, Query, QuerySnapshot } from 'firebase/firestore';
-import { getPendingPairByEmail } from '@/lib/firebaseUtils'; // など
-
+import {
+  getUserProfile,
+  createUserProfile,
+  createPairInvite,
+  removePair,
+  deletePair,
+  handleFirestoreError,
+  generateInviteCode,
+  saveUserNameToFirestore,
+  removePartnerFromUserTasks,
+  approvePair,
+  getPendingPairByEmail,
+} from '@/lib/firebaseUtils';
 
 
 export default function ProfilePage() {
@@ -37,7 +39,8 @@ export default function ProfilePage() {
   );
   const [partnerImage, setPartnerImage] = useState<string | null>(
     typeof window !== 'undefined' ? localStorage.getItem('partnerImage') : null
-  ); // ← 追加部分
+  );
+
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
@@ -69,12 +72,6 @@ export default function ProfilePage() {
     setIsPasswordModalOpen(true);
   };
 
-  // パートナー画像の変更ハンドラ
-  const handlePartnerImageChange = (image: string) => {
-    localStorage.setItem('partnerImage', image);
-    setPartnerImage(image);
-  };
-
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -89,9 +86,16 @@ export default function ProfilePage() {
         );
 
         const snap = await getUserProfile(user.uid);
+
         if (snap.exists()) {
           const data = snap.data();
           setName(data.name || user.email?.split('@')[0] || '');
+
+          if (data.profileImageUrl) {
+            setProfileImage(data.profileImageUrl);
+            localStorage.setItem('profileImage', data.profileImageUrl);
+          }
+
         } else {
           await createUserProfile(user.uid, user.email?.split('@')[0] || '');
           setName(user.email?.split('@')[0] || '');
@@ -113,10 +117,15 @@ export default function ProfilePage() {
           setPartnerEmail(pair.emailB ?? '');
           setPairDocId(pairDoc.id);
           setIsPairConfirmed(pair.status === 'confirmed');
-        } else {
-          setIsPairConfirmed(false);
-        }
 
+          if (pair.partnerImageUrl) {
+            setPartnerImage(pair.partnerImageUrl);
+            localStorage.setItem('partnerImage', pair.partnerImageUrl);
+          } else {
+            setPartnerImage(null);
+            localStorage.removeItem('partnerImage');
+          }
+        }
 
         if (!user.email) {
           console.warn('[WARN] user.email が null です。pending ペア検索をスキップします');
@@ -154,27 +163,40 @@ export default function ProfilePage() {
 
     const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid));
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const pairDoc = snapshot.docs[0];
-          const pair = pairDoc.data() as Pair; // 👈 明示的に型アサーションOK
-          setInviteCode(pair.inviteCode);
-          setPartnerEmail(pair.emailB ?? '');
-          setPairDocId(pairDoc.id);
-          setIsPairConfirmed(pair.status === 'confirmed'); // 👈 status確認追加
-        } else {
-          setInviteCode('');
-          setPartnerEmail('');
-          setPairDocId(null);
-          setIsPairConfirmed(false);
-        }
-      },
-      (error) => {
-        handleFirestoreError(error);
+const unsubscribe = onSnapshot(
+  q,
+  (snapshot) => {
+    if (!snapshot.empty) {
+      const pairDoc = snapshot.docs[0];
+      const pair = pairDoc.data() as Pair;
+      setInviteCode(pair.inviteCode);
+      setPartnerEmail(pair.emailB ?? '');
+      setPairDocId(pairDoc.id);
+      setIsPairConfirmed(pair.status === 'confirmed');
+
+      if (pair.partnerImageUrl) {
+        setPartnerImage(pair.partnerImageUrl);
+        localStorage.setItem('partnerImage', pair.partnerImageUrl);
+      } else {
+        setPartnerImage(null); // 🔥 忘れずに null を代入
+        localStorage.removeItem('partnerImage');
       }
-    );
+
+
+    } else {
+      setInviteCode('');
+      setPartnerEmail('');
+      setPairDocId(null);
+      setIsPairConfirmed(false);
+      setPartnerImage(null);
+      localStorage.removeItem('partnerImage');
+    }
+  },
+  (error) => {
+    handleFirestoreError(error);
+  }
+);
+
 
     return () => {
       unsubscribe();
@@ -307,7 +329,7 @@ export default function ProfilePage() {
               pendingApproval={pendingApproval}
               isPairConfirmed={isPairConfirmed}
               partnerEmail={partnerEmail}
-              partnerImage={partnerImage || '/images/hanako_default.png'}
+              partnerImage={partnerImage ?? '/images/default.png'}
               inviteCode={inviteCode}
               pairDocId={pairDocId}
               onApprovePair={handleApprovePair}
@@ -316,7 +338,6 @@ export default function ProfilePage() {
               onSendInvite={handleSendInvite}
               onRemovePair={handleRemovePair}
               onChangePartnerEmail={setPartnerEmail}
-              onChangePartnerImage={handlePartnerImageChange}
             />
           </>
       )}
