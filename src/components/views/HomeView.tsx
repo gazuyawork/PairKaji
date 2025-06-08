@@ -18,7 +18,6 @@ export default function HomeView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false); // 完了タスクの展開状態
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -54,7 +53,7 @@ export default function HomeView() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: isLoading ? 0 : 1 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.2 }}
           className="space-y-4"
         >
           <div

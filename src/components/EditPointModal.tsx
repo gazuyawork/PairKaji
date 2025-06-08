@@ -3,20 +3,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
-import { doc, getDocs, getDoc, collection, query, where } from 'firebase/firestore';
+import { doc, getDocs, collection, query, where, onSnapshot  } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { savePointsToBothUsers } from '@/lib/firebaseUtils';
-
-// const handleSave = async () => {
-//   if (!uid) return;
-
-//   await savePointsToBothUsers(uid, partnerUid, {
-//     rouletteEnabled,
-//     rouletteOptions,
-//     updatedAt: serverTimestamp(),
-//   });
-// };
-
 
 interface Props {
   isOpen: boolean;
@@ -51,28 +40,39 @@ export default function EditPointModal({
       fetchTasksAndCalculate();
     }
 
-    // 🔸 Firestoreからルーレット設定を読み込み
-    const fetchRouletteSettings = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
-      try {
-        const docSnap = await getDoc(doc(db, 'points', uid));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (typeof data.rouletteEnabled === 'boolean') {
-            setRouletteEnabled(data.rouletteEnabled);
-          }
-          if (Array.isArray(data.rouletteOptions)) {
-            setRouletteOptions(data.rouletteOptions);
-          }
-        }
-      } catch (err) {
-        console.error('ルーレット設定の取得に失敗:', err);
-      }
-    };
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-    fetchRouletteSettings(); // 🔸 実行
-  }, [initialPoint]);
+    const unsubscribe = onSnapshot(doc(db, 'points', uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+
+        // 🔄 目標ポイント情報をリアルタイム反映
+        if (typeof data.weeklyTargetPoint === 'number') {
+          setPoint(data.weeklyTargetPoint);
+        }
+
+        if (typeof data.selfPoint === 'number') {
+          setSelfPoint(data.selfPoint);
+        }
+
+        // ※ partnerPoint は setState 不要（計算から導出するため）
+        // どうしても表示したい場合は setPartnerPoint を追加してもよい
+
+        if (typeof data.rouletteEnabled === 'boolean') {
+          setRouletteEnabled(data.rouletteEnabled);
+        }
+
+        if (Array.isArray(data.rouletteOptions)) {
+          setRouletteOptions(data.rouletteOptions);
+        }
+      }
+    });
+
+
+    return () => unsubscribe(); // クリーンアップ
+  }, [initialPoint, setRouletteEnabled, setRouletteOptions]);
+
 
 
   const fetchTasksAndCalculate = async () => {

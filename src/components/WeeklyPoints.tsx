@@ -8,7 +8,6 @@ import {
   where,
   onSnapshot,
   doc,
-  getDoc,
   setDoc,
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
@@ -18,6 +17,7 @@ import { motion } from 'framer-motion';
 import RouletteWheel from '@/components/RouletteWheel';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,34 +87,37 @@ export default function WeeklyPoints() {
     };
   }, [weekStart, weekEnd]);
 
+
   useEffect(() => {
-    const fetchMax = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) return;
 
-      const pairId = sessionStorage.getItem('pairId');
-      const partnerUids = pairId ? await fetchPairUserIds(pairId) : [uid];
+      const uid = user.uid;
 
-      let latestPoint = 100;
-      let latestUpdatedAt = 0;
-
-      for (const userId of partnerUids) {
-        const docRef = doc(db, 'points', userId);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          const updatedAt = data.updatedAt?.toMillis?.() ?? 0;
-          if (updatedAt > latestUpdatedAt && data.weeklyTargetPoint !== undefined) {
-            latestPoint = data.weeklyTargetPoint;
-            latestUpdatedAt = updatedAt;
+      const unsubscribePoints = onSnapshot(doc(db, 'points', uid), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (typeof data.weeklyTargetPoint === 'number') {
+            setMaxPoints(data.weeklyTargetPoint);
+          }
+          if (typeof data.rouletteEnabled === 'boolean') {
+            setRouletteEnabled(data.rouletteEnabled);
+          }
+          if (Array.isArray(data.rouletteOptions)) {
+            setRouletteOptions(data.rouletteOptions);
           }
         }
-      }
+      });
 
-      setMaxPoints(latestPoint);
-    };
-    fetchMax();
+      // 🔁 Firestore リスナー解除
+      return () => unsubscribePoints();
+    });
+
+    // 🔁 auth リスナー解除
+    return () => unsubscribeAuth();
   }, []);
+
+
 
   useEffect(() => {
     let frameId: number;
