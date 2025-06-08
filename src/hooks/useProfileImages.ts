@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
+
 
 export const useProfileImages = () => {
   const [profileImage, setProfileImage] = useState<string>('');
@@ -22,11 +23,25 @@ export const useProfileImages = () => {
 
     // ペアの画像を取得
     const fetchPartnerImage = async () => {
-      const pairsSnapshot = await getDoc(doc(db, 'pairs', uid));
-      const pairData = pairsSnapshot.data();
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        console.warn('pairs ドキュメントが存在しません');
+        setPartnerImage('');
+        localStorage.removeItem('partnerImage');
+        return;
+      }
+
+      const pairDoc = snapshot.docs[0];
+      const pairData = pairDoc.data();
       const partnerId = pairData?.userIds?.find((id: string) => id !== uid);
 
       if (!partnerId) {
+        console.warn('partnerId の取得に失敗');
         setPartnerImage('');
         localStorage.removeItem('partnerImage');
         return;
@@ -34,14 +49,13 @@ export const useProfileImages = () => {
 
       const unsubscribePartner = onSnapshot(doc(db, 'users', partnerId), (partnerSnap) => {
         const partnerData = partnerSnap.data();
+        console.log('partnerData:', partnerData);
         const partnerImageUrl = partnerData?.imageUrl || '';
         setPartnerImage(partnerImageUrl);
         localStorage.setItem('partnerImage', partnerImageUrl);
       });
 
-      return () => {
-        unsubscribePartner?.();
-      };
+      return () => unsubscribePartner();
     };
 
     const cleanup = fetchPartnerImage();
