@@ -30,7 +30,7 @@ export default function HomeView() {
 
       setTimeout(() => {
         setIsLoading(false);
-      }, 300); // ローディング猶予
+      }, 150); // ローディング猶予
     });
 
     return () => unsubscribe();
@@ -73,7 +73,7 @@ export default function HomeView() {
 
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
+                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
                   isExpanded ? 'rotate-180' : ''
                 }`}
               />
