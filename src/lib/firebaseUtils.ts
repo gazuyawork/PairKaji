@@ -297,3 +297,21 @@ export const fetchPairId = async (): Promise<string | null> => {
 
   return doc?.id ?? null;
 };
+
+export const savePointsToBothUsers = async (
+  userId: string,
+  partnerId: string | null,
+  data: any
+) => {
+  const ownRef = doc(db, 'points', userId);
+  const partnerRef = partnerId ? doc(db, 'points', partnerId) : null;
+
+  if (partnerRef) {
+    await Promise.all([
+      setDoc(ownRef, data, { merge: true }),
+      setDoc(partnerRef, data, { merge: true }),
+    ]);
+  } else {
+    await setDoc(ownRef, data, { merge: true });
+  }
+};

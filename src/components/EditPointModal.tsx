@@ -3,8 +3,20 @@
 import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
-import { doc, setDoc, getDocs, getDoc, collection, query, where } from 'firebase/firestore';
+import { doc, getDocs, getDoc, collection, query, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
+import { savePointsToBothUsers } from '@/lib/firebaseUtils';
+
+// const handleSave = async () => {
+//   if (!uid) return;
+
+//   await savePointsToBothUsers(uid, partnerUid, {
+//     rouletteEnabled,
+//     rouletteOptions,
+//     updatedAt: serverTimestamp(),
+//   });
+// };
+
 
 interface Props {
   isOpen: boolean;
@@ -98,12 +110,14 @@ export default function EditPointModal({
 
   const partnerPoint = Math.max(0, point - selfPoint);
 
+
+
   const handleSave = async () => {
     if (!point || point < 1) {
       setError('1以上の数値を入力してください');
       return;
     }
-    
+
     if (selfPoint > point) {
       setError('目標値以下で入力してください');
       return;
@@ -124,7 +138,6 @@ export default function EditPointModal({
       }
     }
 
-
     setError('');
 
     const uid = auth.currentUser?.uid;
@@ -137,6 +150,8 @@ export default function EditPointModal({
         where('status', '==', 'confirmed')
       ));
 
+      // ✅ パートナーがいれば取得する
+      let partnerUid: string | null = null;
       const userIds = [uid];
       pairsSnap.forEach(doc => {
         const data = doc.data();
@@ -147,15 +162,20 @@ export default function EditPointModal({
         }
       });
 
-      await setDoc(doc(db, 'points', uid), {
+      if (userIds.length === 2) {
+        partnerUid = userIds.find(id => id !== uid) ?? null;
+      }
+
+      // ✅ 共通関数で両方に保存
+      await savePointsToBothUsers(uid, partnerUid, {
         userId: uid,
-        userIds: userIds,
+        userIds,
         weeklyTargetPoint: point,
         selfPoint,
         partnerPoint,
         rouletteEnabled,
-        rouletteOptions, 
-      }, { merge: true });
+        rouletteOptions,
+      });
     } catch (error) {
       console.error('Firebaseへの保存に失敗:', error);
     }
@@ -163,6 +183,7 @@ export default function EditPointModal({
     onSave(point);
     onClose();
   };
+
 
   const handleAuto = () => {
     fetchTasksAndCalculate();

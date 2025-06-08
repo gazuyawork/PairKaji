@@ -144,14 +144,14 @@ background: `
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.6 }}
             transition={{ duration: MODAL_ANIMATION_DURATION, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed top-[49%] left-[6.5%]"
+            className="fixed top-[52%] left-[8%]"
             style={{ transform: "translate(-50%, -50%)" }}
           >
             <div
-              className="w-85 h-42 rounded-2xl flex flex-col items-center justify-center text-center px-4 py-4"
+              className="w-82 h-40 rounded-2xl flex flex-col items-center justify-center text-center px-4 py-4"
               style={{
                 background: `
-                  radial-gradient(circle at 50% 40%, #ffffff, #ebebeb)
+                  radial-gradient(circle at 50% 40%, #fff, #fff)
                 `,
                 boxShadow: `
                   inset 0 2px 4px rgba(255, 255, 255, 0.4),
