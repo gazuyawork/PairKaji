@@ -45,6 +45,11 @@ export default function FinishDayTask({ tasks }: Props) {
         setLogs(uniqueLogs.sort((a, b) => b.date.localeCompare(a.date)));
       };
 
+      if (!taskIds || taskIds.length === 0) {
+        console.warn('taskIds が空のため、taskCompletions クエリをスキップします');
+        return;
+      }
+
       const q1 = query(
         collection(db, 'taskCompletions'),
         where('taskId', 'in', taskIds),
@@ -56,6 +61,7 @@ export default function FinishDayTask({ tasks }: Props) {
         where('taskId', 'in', taskIds),
         where('userIds', 'array-contains', uid)
       );
+
 
       const unsubscribe1 = onSnapshot(q1, (snapshot1) => {
         snapshot1.docChanges().forEach(change => {

@@ -70,7 +70,6 @@ export const useProfileImages = () => {
   // ✅ partnerId を監視して、パートナー画像取得
   useEffect(() => {
     if (!partnerId) {
-      console.warn('⛔ partnerId が未設定のため監視をスキップ');
       return;
     }
 
@@ -93,5 +92,5 @@ export const useProfileImages = () => {
     return '/images/default.png';
   };
 
-  return { profileImage, partnerImage, getProfileImage };
+  return { profileImage, partnerImage, getProfileImage, partnerId };
 };

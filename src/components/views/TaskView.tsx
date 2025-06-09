@@ -25,7 +25,8 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { Timestamp } from 'firebase/firestore';
 import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { saveSingleTask } from '@/lib/taskUtils';
-import { toast } from 'sonner'; // 既に import されている場合はOK
+import { toast } from 'sonner';
+import { useProfileImages } from '@/hooks/useProfileImages';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -36,13 +37,21 @@ type Props = {
 export default function TaskView({ initialSearch = '' }: Props) {
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const initialTaskGroups: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
-
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
   const [periodFilter, setPeriodFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
+  const [partnerUserId, setPartnerUserId] = useState<string | null>(null);
+
+  const { profileImage, partnerImage } = useProfileImages();
+  const currentUserId = auth.currentUser?.uid;
+
+  const userList = [
+    { id: currentUserId ?? '', name: 'あなた', imageUrl: profileImage },
+    { id: partnerUserId ?? '', name: 'パートナー', imageUrl: partnerImage },
+  ];
 
   useEffect(() => {
     const fetchPairStatus = async () => {
@@ -55,17 +64,22 @@ export default function TaskView({ initialSearch = '' }: Props) {
         );
 
         let foundConfirmed = false;
+        let partnerId: string | null = null;
+
         pairsSnap.forEach(doc => {
           const data = doc.data();
           if (data.status === 'confirmed') {
             foundConfirmed = true;
+            partnerId = data.userIds?.find((id: string) => id !== uid) ?? null;
           }
         });
 
         setPairStatus(foundConfirmed ? 'confirmed' : 'none');
+        setPartnerUserId(partnerId);
       } catch (error) {
         console.error('ペアステータスの取得に失敗:', error);
         setPairStatus('none');
+        setPartnerUserId(null);
       }
     };
 
@@ -95,34 +109,38 @@ export default function TaskView({ initialSearch = '' }: Props) {
     }
   };
 
-const updateTask = async (oldPeriod: Period, updated: Task) => {
-  try {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+  const updateTask = async (oldPeriod: Period, updated: Task) => {
+    try {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
 
-    await saveSingleTask(updated, uid); // 保存処理
-
-    toast.success('編集内容を保存しました'); // 🎉 追加！
-
-    setEditTargetTask(null); // モーダルを閉じる
-  } catch (error) {
-    console.error('タスク更新に失敗しました:', error);
-    toast.error('タスクの保存に失敗しました'); // 🎉 エラー時も
-  }
-};
-
+      await saveSingleTask(updated, uid);
+      toast.success('編集内容を保存しました');
+      setEditTargetTask(null);
+    } catch (error) {
+      console.error('タスク更新に失敗しました:', error);
+      toast.error('タスクの保存に失敗しました');
+    }
+  };
 
   useEffect(() => {
     resetCompletedTasks().catch(console.error);
   }, []);
 
+
   useEffect(() => {
+    let unsubscribe: () => void;
+
     const fetchTasks = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
       const pairsSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+        query(
+          collection(db, 'pairs'),
+          where('userIds', 'array-contains', uid),
+          where('status', '==', 'confirmed')
+        )
       );
 
       const partnerUids = new Set<string>();
@@ -132,22 +150,29 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
         const data = doc.data();
         if (Array.isArray(data.userIds)) {
           data.userIds.forEach((id: string) => {
-            if (id !== uid) partnerUids.add(id);
+            partnerUids.add(id);
           });
         }
       });
 
-      const q = query(collection(db, 'tasks'), where('userId', 'in', Array.from(partnerUids)));
-      const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const ids = Array.from(partnerUids);
+
+      // 🔴 空配列でクエリを実行しない（'in' フィルターは空配列NG）
+      if (ids.length === 0) {
+        console.warn('userIds が空のため、Firestore クエリをスキップします');
+        return;
+      }
+
+      const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
+
+      unsubscribe = onSnapshot(q, async (snapshot) => {
         const rawTasks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
           mapFirestoreDocToTask(doc)
         );
 
         const updates: Promise<void>[] = [];
         for (const task of rawTasks) {
-
-          if (task.completedAt != null) { // ← nullとundefined両方を除外
-
+          if (task.completedAt != null) {
             let completedDate: Date | null = null;
 
             if (typeof task.completedAt === 'string') {
@@ -205,23 +230,31 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
 
         setTasksState(grouped);
       });
-
-      return () => unsubscribe();
     };
 
     fetchTasks().catch(console.error);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
+
+
+
+
 
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
 
   return (
-  <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
-    <Header title="Task" currentIndex={1} />
+    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
+      <Header title="Task" currentIndex={1} />
 
-    <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
-      <SearchBox value={searchTerm} onChange={setSearchTerm} />
+      <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
+        <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
         <FilterControls
           periodFilter={periodFilter}
@@ -229,7 +262,7 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
           onTogglePeriod={togglePeriod}
           onTogglePerson={togglePerson}
           searchTerm={searchTerm}
-          onClearSearch={() => setSearchTerm('')} 
+          onClearSearch={() => setSearchTerm('')}
           pairStatus={pairStatus}
         />
 
@@ -272,6 +305,7 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
                       menuOpenId={menuOpenId}
                       setMenuOpenId={setMenuOpenId}
                       highlighted={isHighlighted}
+                      userList={userList}
                     />
                   );
                 })}
@@ -288,6 +322,7 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
           task={editTargetTask}
           onClose={() => setEditTargetTask(null)}
           onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
+          users={userList}
         />
       )}
     </div>

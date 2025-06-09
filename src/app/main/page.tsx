@@ -81,21 +81,28 @@ function MainContent() {
         if (status === 'confirmed') {
           setDialogMessage('パートナーとタスクを共有するため、アプリを再起動します。');
           setConfirmAction(() => async () => {
-            const taskQuery = query(collection(db, 'tasks'), where('userId', 'in', [userAId, userBId]));
+            if (!userAId || !userBId) {
+              console.warn('userAIdまたはuserBIdが未定義です。Firestoreクエリをスキップします。');
+              return;
+            }
+
+            const userIds = [userAId, userBId];
+            const taskQuery = query(collection(db, 'tasks'), where('userId', 'in', userIds));
             const tasksSnap = await getDocs(taskQuery);
             const taskUpdates = tasksSnap.docs.map(task =>
-              updateDoc(doc(db, 'tasks', task.id), { userIds: [userAId, userBId] })
+              updateDoc(doc(db, 'tasks', task.id), { userIds })
             );
             await Promise.all(taskUpdates);
 
-            const pointQuery = query(collection(db, 'points'), where('userId', 'in', [userAId, userBId]));
+            const pointQuery = query(collection(db, 'points'), where('userId', 'in', userIds));
             const pointsSnap = await getDocs(pointQuery);
             const pointUpdates = pointsSnap.docs.map(point =>
-              updateDoc(doc(db, 'points', point.id), { userIds: [userAId, userBId] })
+              updateDoc(doc(db, 'points', point.id), { userIds })
             );
             await Promise.all(pointUpdates);
           });
         }
+
 
         if (status === 'removed') {
           setDialogMessage('パートナーとの共有が解除されました。共有情報を初期化します。');

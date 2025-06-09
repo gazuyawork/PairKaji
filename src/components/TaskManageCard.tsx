@@ -1,5 +1,3 @@
-// src/components/TaskManageCard.tsx
-
 'use client';
 
 import { useSwipeable } from 'react-swipeable';
@@ -7,16 +5,20 @@ import Image from 'next/image';
 import type { TaskManageTask } from '@/types/Task';
 import type { Period } from '@/types/Task';
 
+type UserInfo = {
+  id: string;
+  name: string;
+  imageUrl: string;
+};
 
 type Props = {
   task: TaskManageTask;
   onChange: (id: string, key: keyof TaskManageTask, value: string | number | string[] | boolean) => void;
   onRemove: (id: string) => void;
-  onToggleUser: (id: string, user: string) => void;
+  onToggleUser: (id: string, userId: string) => void;
   onToggleDay: (id: string, day: string) => void;
   onToggleDelete: (id: string) => void;
-  profileImage: string;
-  partnerImage: string;
+  users: UserInfo[];
 };
 
 const dayNames = ['月', '火', '水', '木', '金', '土', '日'];
@@ -25,11 +27,9 @@ export default function TaskManageCard({
   task,
   onChange,
   onRemove,
-  onToggleUser,
   onToggleDay,
   onToggleDelete,
-  profileImage,
-  partnerImage,
+  users,
 }: Props) {
   const handlers = useSwipeable({
     onSwipedLeft: () => onToggleDelete(task.id),
@@ -86,10 +86,10 @@ export default function TaskManageCard({
       <div className="flex items-center justify-between">
         <select
           value={task.period ?? ''}
-            onChange={(e) => {
-              const newValue = e.target.value as Period;
-              onChange(task.id, 'period', newValue);
-            }}
+          onChange={(e) => {
+            const newValue = e.target.value as Period;
+            onChange(task.id, 'period', newValue);
+          }}
           className="bg-transparent outline-none border-b border-gray-300"
         >
           {['毎日', '週次', '不定期'].map((f) => (
@@ -98,7 +98,6 @@ export default function TaskManageCard({
             </option>
           ))}
         </select>
-
 
         <div className="flex items-center w-20">
           <select
@@ -114,39 +113,31 @@ export default function TaskManageCard({
         </div>
 
         <div className="flex gap-2">
-          {[{ name: '太郎', image: profileImage }, { name: '花子', image: partnerImage }].map((user, _, array) => (
-            <button
-              key={user.name}
-              onClick={() => {
-                const isSelected = task.users.includes(user.name);
-                const other = array.find(u => u.name !== user.name);
-                const isOtherSelected = other ? task.users.includes(other.name) : false;
-
-                if (isSelected && !isOtherSelected) {
-                  onToggleUser(task.id, user.name);
-                  if (other) onToggleUser(task.id, other.name);
-                } else if (isSelected && isOtherSelected) {
-                  onToggleUser(task.id, user.name);
-                } else if (!isSelected) {
-                  onToggleUser(task.id, user.name);
-                }
-              }}
-              className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
-                task.users.includes(user.name)
-                  ? 'border-[#FFCB7D] opacity-100'
-                  : 'border-gray-300 opacity-30'
-              }`}
-            >
-              <Image
-                src={user.image || '/images/default.png'}
-                alt={`${user.name}のフィルター`}
-                width={32}
-                height={32}
-                className="object-cover w-full h-full"
-              />
-            </button>
-          ))}
+          {users.map((user) => {
+            const isSelected = task.users.includes(user.id);
+            return (
+              <button
+                key={user.id}
+                onClick={() => {
+                  const newUsers = isSelected ? [] : [user.id];
+                  onChange(task.id, 'users', newUsers);
+                }}
+                className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
+                  isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                }`}
+              >
+                <Image
+                  src={user.imageUrl || '/images/default.png'}
+                  alt={`${user.name}の画像`}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
+              </button>
+            );
+          })}
         </div>
+
       </div>
 
       {task.period === '週次' && (

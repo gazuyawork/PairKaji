@@ -5,14 +5,21 @@ import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 
+type UserInfo = {
+  id: string;
+  name: string;
+  imageUrl: string;
+};
+
 type Props = {
   isOpen: boolean;
   task: Task;
   onClose: () => void;
   onSave: (updated: Task) => void;
+  users: UserInfo[];
 };
 
-export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) {
+export default function EditTaskModal({ isOpen, task, onClose, onSave, users }: Props) {
   const [editedTask, setEditedTask] = useState<Task | null>(null);
 
   useEffect(() => {
@@ -33,14 +40,12 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
     setEditedTask(prev => prev ? { ...prev, [key]: value } : prev);
   };
 
-  const toggleUser = (user: string) => {
+  const toggleUser = (userId: string) => {
     const currentUser = editedTask.users[0] || null;
-    if (currentUser === user) {
-      // 同じ担当者をもう一度押したら解除（共通タスク状態に戻す）
+    if (currentUser === userId) {
       update('users', []);
     } else {
-      // 選んだ担当者だけをセット
-      update('users', [user]);
+      update('users', [userId]);
     }
   };
 
@@ -143,22 +148,23 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave }: Props) 
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">担当者：</label>
             <div className="flex gap-2">
-              {[{ name: '太郎', image: '/images/taro.png' }, { name: '花子', image: '/images/hanako.png' }].map(user => {
-                const isSelected = editedTask.users[0] === user.name;
+              {Array.isArray(users) && users.map(user => {
+                const isSelected = editedTask.users[0] === user.id;
                 return (
                   <button
-                    key={user.name}
+                    key={user.id}
                     type="button"
-                    onClick={() => toggleUser(user.name)}
+                    onClick={() => toggleUser(user.id)}
                     className={`w-12 h-12 rounded-full border overflow-hidden ${
                       isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
                     }`}
                   >
                     <Image 
-                      src={user.image || '/images/default.png'} 
+                      src={user.imageUrl || '/images/default.png'} 
                       alt={user.name} 
                       width={48} 
                       height={48} 
+                      className="object-cover w-full h-full"
                     />
                   </button>
                 );

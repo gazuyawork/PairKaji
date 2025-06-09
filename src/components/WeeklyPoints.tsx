@@ -49,9 +49,7 @@ export default function WeeklyPoints() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const pairId = sessionStorage.getItem('pairId');
-      const partnerUids = pairId ? await fetchPairUserIds(pairId) : [uid];
-
+      const partnerUids = await fetchPairUserIds(uid);
       setHasPartner(partnerUids.length > 1);
 
       const weekStartISO = weekStart.toISOString().split('T')[0];
@@ -82,10 +80,11 @@ export default function WeeklyPoints() {
     };
 
     fetchPoints();
+
     return () => {
       if (unsubscribe1) unsubscribe1();
     };
-  }, [weekStart, weekEnd]);
+  }, [weekStart, weekEnd]); // ✅ 修正ポイント：依存配列に追加
 
 
   useEffect(() => {
@@ -151,8 +150,7 @@ export default function WeeklyPoints() {
   const handleSave = async (newPoint: number) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const pairId = sessionStorage.getItem('pairId');
-    const partnerUids = pairId ? await fetchPairUserIds(pairId) : [uid];
+    const partnerUids = await fetchPairUserIds(uid);
 
     setMaxPoints(newPoint);
     await setDoc(

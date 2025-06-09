@@ -301,7 +301,7 @@ export const fetchPairId = async (): Promise<string | null> => {
 export const savePointsToBothUsers = async (
   userId: string,
   partnerId: string | null,
-  data: any
+  data: Record<string, unknown>
 ) => {
   const ownRef = doc(db, 'points', userId);
   const partnerRef = partnerId ? doc(db, 'points', partnerId) : null;

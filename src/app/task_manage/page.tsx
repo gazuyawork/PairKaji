@@ -28,6 +28,8 @@ export default function TaskManagePage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { profileImage, partnerImage } = useProfileImages();
   const [isSaving, setIsSaving] = useState(false);
+  const [sharedUserIds, setSharedUserIds] = useState<string[]>([]);
+
 
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
 
@@ -58,6 +60,24 @@ export default function TaskManagePage() {
 
     fetchPairStatus();
   }, []);
+
+useEffect(() => {
+  const fetchUserIds = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    let userIds = [uid];
+    if (pairStatus === 'confirmed') {
+      const fetched = await fetchPairUserIds(uid);
+      console.log('取得したpairUserIds:', fetched); // ✅ ここを確認
+      userIds = fetched.includes(uid) ? fetched : [...fetched, uid];
+    }
+    setSharedUserIds(userIds);
+  };
+
+  fetchUserIds();
+}, [pairStatus]);
+
 
   const addTask = async () => {
     const uid = auth.currentUser?.uid;
@@ -319,8 +339,16 @@ const confirmTasks = async () => {
                 onToggleUser={handleUserToggle}
                 onToggleDay={toggleDay}
                 onToggleDelete={toggleShowDelete}
-                profileImage={profileImage}
-                partnerImage={partnerImage}
+                users={sharedUserIds.map((id) => {
+                  const isSelf = id === auth.currentUser?.uid;
+                  return {
+                    id,
+                    name: isSelf ? 'あなた' : 'パートナー',
+                    imageUrl: isSelf ? profileImage : (partnerImage || '/default-partner.png'),
+                  };
+                })}
+
+
               />
             ))}
         </div>

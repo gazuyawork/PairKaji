@@ -1,5 +1,5 @@
 // Firebase関連のインポート
-import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import { dayNameToNumber } from '@/lib/constants';
@@ -12,18 +12,24 @@ import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
  * @param pairId FirestoreのpairsドキュメントID
  * @returns ペアに所属するuserIdsの配列（statusがconfirmedの時のみ）
  */
-export const fetchPairUserIds = async (pairId: string): Promise<string[]> => {
+export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
   try {
-    const pairDoc = await getDoc(doc(db, 'pairs', pairId));
-    if (!pairDoc.exists()) return []; // ドキュメントが存在しない場合は空配列を返す
+    const q = query(
+      collection(db, 'pairs'),
+      where('userIds', 'array-contains', uid),
+      where('status', '==', 'confirmed') // ✅ confirmed のみに限定
+    );
 
-    const data = pairDoc.data();
-    if (data?.status !== 'confirmed') return []; // 確認済みでない場合は空配列を返す
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return [];
 
-    return data.userIds ?? []; // userIdsがあれば返す
+    const doc = snapshot.docs[0]; // 最初の1件を使用
+    const data = doc.data();
+
+    return data.userIds ?? [];
   } catch (e) {
     console.error('ペア情報の取得に失敗:', e);
-    return []; // 例外発生時も空配列
+    return [];
   }
 };
 
