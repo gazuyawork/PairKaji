@@ -20,8 +20,11 @@ export type FirestoreTask = {
   completedBy?: string;
   visible?: boolean;
   groupId?: string | null;
-  todos?: string[];
-  userId?: string; // ← 追加！
+  userId?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  [key: string]: any; // 任意フィールド許容（必要であれば）
+  todos?: unknown[];
 };
 
 // アプリ共通で使うTask型（画面表示用ベース型）
@@ -46,6 +49,7 @@ export type Task = {
   completedAt?: string | Timestamp | null;
   completedBy?: string;
   userId: string;
+  todos?: unknown[];
 };
 
 

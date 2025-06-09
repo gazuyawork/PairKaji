@@ -1,11 +1,10 @@
 // Firebase関連のインポート
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import { dayNameToNumber } from '@/lib/constants';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
-
 
 /**
  * 指定されたpairIdのペアに属するuserIdsを取得する関数
@@ -150,3 +149,50 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
     throw error;
   }
 };
+
+
+/**
+ * ペア解除時に、共有されていたタスクを自分用・パートナー用に複製し直す関数
+ */
+export const splitSharedTasksOnPairRemoval = async (
+  userId: string,
+  partnerId: string
+) => {
+  const tasksRef = collection(db, 'tasks');
+  const sharedTasksQuery = query(
+    tasksRef,
+    where('userIds', 'array-contains', userId)
+  );
+
+  const snapshot = await getDocs(sharedTasksQuery);
+
+  const sharedTasks = snapshot.docs.filter((doc) => {
+    const data = doc.data() as FirestoreTask;
+    return Array.isArray(data.userIds) && data.userIds.includes(partnerId);
+  });
+
+  for (const docSnap of sharedTasks) {
+    const original = docSnap.data() as FirestoreTask;
+
+    // 自分用タスクの複製
+    const myCopy: FirestoreTask = {
+      ...original,
+      userIds: [userId],
+      users: [userId],
+      createdAt: serverTimestamp() as Timestamp,
+      updatedAt: serverTimestamp() as Timestamp,
+    };
+    await addDoc(tasksRef, myCopy);
+
+    // パートナー用タスクの複製
+    const partnerCopy: FirestoreTask = {
+      ...original,
+      userIds: [partnerId],
+      users: [partnerId],
+      createdAt: serverTimestamp() as Timestamp,
+      updatedAt: serverTimestamp() as Timestamp,
+    };
+    await addDoc(tasksRef, partnerCopy);
+  }
+};
+

@@ -12,7 +12,7 @@ import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
-import { getDocs, Query, QuerySnapshot } from 'firebase/firestore';
+import { getDocs, doc, getDoc, Query, QuerySnapshot } from 'firebase/firestore';
 import {
   getUserProfile,
   createUserProfile,
@@ -22,10 +22,11 @@ import {
   handleFirestoreError,
   generateInviteCode,
   saveUserNameToFirestore,
-  removePartnerFromUserTasks,
   approvePair,
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
+import { splitSharedTasksOnPairRemoval } from '@/lib/taskUtils';
+
 
 
 export default function ProfilePage() {
@@ -246,19 +247,27 @@ const unsubscribe = onSnapshot(
   };
 
   const handleRemovePair = async () => {
-    if (!pairDocId) return;
+    const user = auth.currentUser;
+    if (!user || !pairDocId) return;
+
+    const pairSnap = await getDoc(doc(db, 'pairs', pairDocId));
+    if (!pairSnap.exists()) return;
+
+    const pairData = pairSnap.data();
+    const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
+    if (!partnerId) return;
+
     const confirmed = confirm('ペアを解除しますか？この操作は取り消せません。');
     if (!confirmed) return;
 
     try {
+      // 🔸 ペアドキュメント削除
       await removePair(pairDocId);
 
-      // 🆕 ペア解除後にタスク共有解除処理
-      const user = auth.currentUser;
-      if (user) {
-        await removePartnerFromUserTasks(user.uid);
-      }
+      // 🔸 共有タスクの分離処理
+      await splitSharedTasksOnPairRemoval(user.uid, partnerId);
 
+      // 🔸 状態リセットと通知
       toast.success('ペアを解除しました');
       setIsPairConfirmed(false);
       setPartnerEmail('');
@@ -268,6 +277,7 @@ const unsubscribe = onSnapshot(
       handleFirestoreError(_err);
     }
   };
+
 
   const handleCancelInvite = async () => {
     if (!pairDocId) return;
