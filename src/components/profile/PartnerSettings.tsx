@@ -4,7 +4,6 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import type { PendingApproval } from '@/types/Pair';
 import { motion } from 'framer-motion';
-import { useProfileImages } from '@/hooks/useProfileImages'; // ✅ 修正
 
 type PartnerSettingsProps = {
   isLoading: boolean;
@@ -21,6 +20,7 @@ type PartnerSettingsProps = {
   onRemovePair: () => void;
   onChangePartnerEmail: (email: string) => void;
   partnerImage: string;
+  isRemoving: boolean;
 };
 
 export default function PartnerSettings({
@@ -36,8 +36,11 @@ export default function PartnerSettings({
   onSendInvite,
   onRemovePair,
   onChangePartnerEmail,
+  partnerImage,
+  isRemoving, // ✅ これを追加
 }: PartnerSettingsProps) {
-  const { partnerImage } = useProfileImages(); // ✅ 修正ポイント
+
+  // const { partnerImage } = useProfileImages(); // ✅ 修正ポイント
 
   return (
     <motion.div
@@ -103,27 +106,32 @@ export default function PartnerSettings({
             </>
           )}
 
-          {isPairConfirmed && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="relative w-16 h-16 rounded-full border border-gray-300 overflow-hidden">
-                  <Image
-                    src={partnerImage || '/images/default.png'} // ✅ fallback対応
-                    alt="パートナー画像"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="text-[#5E5E5E]">
-                  <p className="font-semibold">パートナー承認済み</p>
-                  <p>{partnerEmail}</p>
-                </div>
-                <button onClick={onRemovePair} className="text-red-500">
-                  <X size={24} />
-                </button>
-              </div>
-            </div>
-          )}
+{isPairConfirmed && (
+  <div className="space-y-4">
+    <div className="flex items-center gap-3">
+      <div className="relative w-16 h-16 rounded-full border border-gray-300 overflow-hidden">
+        <Image
+          src={partnerImage || '/images/default.png'}
+          alt="パートナー画像"
+          fill
+          className="object-cover"
+        />
+      </div>
+      <div className="text-[#5E5E5E]">
+        <p className="font-semibold">パートナー承認済み</p>
+        <p>{partnerEmail}</p>
+      </div>
+      <button
+        onClick={onRemovePair}
+        disabled={isRemoving} // ✅ ローディング中は押せない
+        className={`text-red-500 ${isRemoving ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        {isRemoving ? '処理中...' : <X size={24} />}
+      </button>
+    </div>
+  </div>
+)}
+
         </>
       )}
     </motion.div>

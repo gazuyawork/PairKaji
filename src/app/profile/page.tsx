@@ -49,6 +49,9 @@ export default function ProfilePage() {
   const [isPairConfirmed, setIsPairConfirmed] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pairDocId, setPairDocId] = useState<string | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  
 
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
@@ -246,37 +249,37 @@ const unsubscribe = onSnapshot(
     }
   };
 
-  const handleRemovePair = async () => {
-    const user = auth.currentUser;
-    if (!user || !pairDocId) return;
+const handleRemovePair = async () => {
+  const user = auth.currentUser;
+  if (!user || !pairDocId) return;
 
-    const pairSnap = await getDoc(doc(db, 'pairs', pairDocId));
-    if (!pairSnap.exists()) return;
+  const pairSnap = await getDoc(doc(db, 'pairs', pairDocId));
+  if (!pairSnap.exists()) return;
 
-    const pairData = pairSnap.data();
-    const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
-    if (!partnerId) return;
+  const pairData = pairSnap.data();
+  const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
+  if (!partnerId) return;
 
-    const confirmed = confirm('ペアを解除しますか？この操作は取り消せません。');
-    if (!confirmed) return;
+  const confirmed = confirm('ペアを解除しますか？この操作は取り消せません。');
+  if (!confirmed) return;
 
-    try {
-      // 🔸 ペアドキュメント削除
-      await removePair(pairDocId);
+  setIsRemoving(true); // 🟡 ローディング開始
+  try {
+    await removePair(pairDocId);
+    await splitSharedTasksOnPairRemoval(user.uid, partnerId);
 
-      // 🔸 共有タスクの分離処理
-      await splitSharedTasksOnPairRemoval(user.uid, partnerId);
+    toast.success('ペアを解除しました');
+    setIsPairConfirmed(false);
+    setPartnerEmail('');
+    setInviteCode('');
+    setPairDocId(null);
+  } catch (_err: unknown) {
+    handleFirestoreError(_err);
+  } finally {
+    setIsRemoving(false); // 🔵 ローディング終了
+  }
+};
 
-      // 🔸 状態リセットと通知
-      toast.success('ペアを解除しました');
-      setIsPairConfirmed(false);
-      setPartnerEmail('');
-      setInviteCode('');
-      setPairDocId(null);
-    } catch (_err: unknown) {
-      handleFirestoreError(_err);
-    }
-  };
 
 
   const handleCancelInvite = async () => {
@@ -348,6 +351,7 @@ const unsubscribe = onSnapshot(
               onSendInvite={handleSendInvite}
               onRemovePair={handleRemovePair}
               onChangePartnerEmail={setPartnerEmail}
+              isRemoving={isRemoving} 
             />
           </>
       )}
