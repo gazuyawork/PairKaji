@@ -2,18 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
-
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  onSnapshot,
+} from 'firebase/firestore';
 
 export const useProfileImages = () => {
   const [profileImage, setProfileImage] = useState<string>('');
   const [partnerImage, setPartnerImage] = useState<string>('');
+  const [partnerId, setPartnerId] = useState<string | null>(null);
 
+  // ✅ 自分のプロフィール画像取得・監視
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
-    // 自分の画像を取得
     const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), (docSnap) => {
       const data = docSnap.data();
       const imageUrl = data?.imageUrl || '';
@@ -21,52 +28,65 @@ export const useProfileImages = () => {
       localStorage.setItem('profileImage', imageUrl);
     });
 
-    // ペアの画像を取得
-    const fetchPartnerImage = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+    return () => {
+      unsubscribeProfile();
+    };
+  }, []);
 
+  // ✅ partnerId を Firestore から取得（confirmed のペアのみ）
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const fetchPartnerId = async () => {
       const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
-        console.warn('pairs ドキュメントが存在しません');
-        setPartnerImage('');
+        console.warn('❌ pairs ドキュメントが存在しません');
+        setPartnerId(null);
         localStorage.removeItem('partnerImage');
         return;
       }
 
-      const pairDoc = snapshot.docs[0];
-      const pairData = pairDoc.data();
-      const partnerId = pairData?.userIds?.find((id: string) => id !== uid);
-
-      if (!partnerId) {
-        console.warn('partnerId の取得に失敗');
-        setPartnerImage('');
+      const docRef = snapshot.docs.find((d) => d.data().status === 'confirmed');
+      if (!docRef) {
+        console.warn('⚠ confirmed 状態のペアが存在しません');
+        setPartnerId(null);
         localStorage.removeItem('partnerImage');
         return;
       }
 
-      const unsubscribePartner = onSnapshot(doc(db, 'users', partnerId), (partnerSnap) => {
-        const partnerData = partnerSnap.data();
-        console.log('partnerData:', partnerData);
-        const partnerImageUrl = partnerData?.imageUrl || '';
-        setPartnerImage(partnerImageUrl);
-        localStorage.setItem('partnerImage', partnerImageUrl);
-      });
+      const pairData = docRef.data();
+      const pid = pairData.userIds?.find((id: string) => id !== uid) ?? null;
 
-      return () => unsubscribePartner();
+      console.log('✅ partnerId:', pid);
+      setPartnerId(pid);
     };
 
-    const cleanup = fetchPartnerImage();
-
-    return () => {
-      unsubscribeProfile();
-      cleanup?.then((f) => f?.());
-    };
+    fetchPartnerId();
   }, []);
 
-  // ✅ getProfileImage 関数追加
+  // ✅ partnerId を監視して、パートナー画像取得
+  useEffect(() => {
+    if (!partnerId) {
+      console.warn('⛔ partnerId が未設定のため監視をスキップ');
+      return;
+    }
+
+    console.log('📡 onSnapshot 設定開始 for partnerId:', partnerId);
+    const unsubscribePartner = onSnapshot(doc(db, 'users', partnerId), (snap) => {
+      const data = snap.data();
+      console.log('👀 partner user doc:', data);
+      const imageUrl = data?.imageUrl || '';
+      setPartnerImage(imageUrl);
+      localStorage.setItem('partnerImage', imageUrl);
+    });
+
+    return () => unsubscribePartner();
+  }, [partnerId]);
+
+  // ✅ fallback付き getter
   const getProfileImage = (person: string): string => {
     if (person === '自分') return profileImage || '/images/default.png';
     if (person === 'パートナー') return partnerImage || '/images/default.png';

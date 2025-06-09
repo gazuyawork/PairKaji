@@ -91,9 +91,9 @@ export default function ProfilePage() {
           const data = snap.data();
           setName(data.name || user.email?.split('@')[0] || '');
 
-          if (data.profileImageUrl) {
-            setProfileImage(data.profileImageUrl);
-            localStorage.setItem('profileImage', data.profileImageUrl);
+          if (data.imageUrl) {
+            setProfileImage(data.imageUrl);
+            localStorage.setItem('profileImage', data.imageUrl);
           }
 
         } else {

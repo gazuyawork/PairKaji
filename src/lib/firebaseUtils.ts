@@ -8,7 +8,7 @@ import type { FirestoreTask } from '@/types/Task';
 import { addTaskCompletion } from './taskUtils';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/lib/firebase'; 
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase'; // storage を import 追加
 
 interface ShareTasksResponse {
@@ -316,41 +316,6 @@ export const savePointsToBothUsers = async (
   }
 };
 
-
-/**
- * プロフィール画像を Firebase Storage にアップロードし、そのURLを Firestore に保存する
- * @param uid - ユーザーID
- * @param file - 画像ファイル
- */
-export const uploadUserProfileImage = async (uid: string, file: File): Promise<string> => {
-  try {
-    const storage = getStorage(); // Firebase Storage インスタンス
-    const imageRef = ref(storage, `profileImages/${uid}`); // 拡張子は任意
-
-    // MIMEチェック（画像以外弾く）
-    if (!file.type.startsWith('image/')) {
-      throw new Error('画像ファイルのみアップロード可能です');
-    }
-
-    // Storage にアップロード
-    await uploadBytes(imageRef, file);
-
-    // ダウンロードURL取得
-    const downloadURL = await getDownloadURL(imageRef);
-
-    // Firestore に保存
-    await updateDoc(doc(db, 'users', uid), {
-      photoURL: downloadURL,
-      updatedAt: serverTimestamp(),
-    });
-
-    return downloadURL;
-  } catch (err) {
-    handleFirestoreError(err);
-    throw err;
-  }
-};
-
 /**
  * プロフィール画像をStorageにアップロードし、Firestoreに保存する
  * @param userId ユーザーID
@@ -370,7 +335,7 @@ export const uploadProfileImage = async (
 
   if (type === 'user') {
     await updateDoc(doc(db, 'users', userId), {
-      profileImageUrl: downloadURL,
+    imageUrl: downloadURL,
     });
   } else if (type === 'partner') {
     // ペア情報を更新（userIdを含むpairを取得し、更新）
@@ -389,13 +354,3 @@ export const uploadProfileImage = async (
 
   return downloadURL;
 };
-
-export async function getUserProfileImageUrl(uid: string): Promise<string | null> {
-  const snap = await getDoc(doc(db, 'userProfiles', uid));
-  return snap.exists() ? snap.data().profileImageUrl ?? null : null;
-}
-
-export async function getPartnerImageUrl(pairDocId: string): Promise<string | null> {
-  const snap = await getDoc(doc(db, 'pairs', pairDocId));
-  return snap.exists() ? snap.data().partnerImageUrl ?? null : null;
-}
