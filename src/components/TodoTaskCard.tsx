@@ -65,7 +65,7 @@ export default function TodoTaskCard({
     <div className="relative mb-2.5">
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <h2
-          className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline"
+          className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline "
           onClick={() =>
             router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)
           }
@@ -73,7 +73,7 @@ export default function TodoTaskCard({
           {task.name}
         </h2>
         <div className="flex items-center gap-2">
-          <div className="flex space-x-0">
+          <div className="flex space-x-0 h-10">
             {['undone', 'done'].map((type) => {
               const count = type === 'undone' ? undoneCount : doneCount;
               return (
@@ -107,7 +107,7 @@ export default function TodoTaskCard({
         </div>
       </div>
 
-      <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2">
+      <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2 min-h-20">
         <div
           ref={scrollRef}
           className={clsx(
@@ -116,7 +116,7 @@ export default function TodoTaskCard({
           )}
         >
           {filteredTodos.length === 0 && tab === 'done' && (
-            <div className="text-sm text-gray-400 italic">完了したタスクはありません</div>
+            <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
           )}
 
           {filteredTodos.map(todo => (
