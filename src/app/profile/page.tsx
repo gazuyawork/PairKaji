@@ -283,7 +283,10 @@ const handleRemovePair = async () => {
 
 
   const handleCancelInvite = async () => {
-    if (!pairDocId) return;
+    if (!pairDocId || typeof pairDocId !== 'string' || pairDocId.trim() === '') {
+      toast.error('ペア情報が取得できません');
+      return;
+    }
     const confirmed = confirm('この招待を取り消しますか？');
     if (!confirmed) return;
 

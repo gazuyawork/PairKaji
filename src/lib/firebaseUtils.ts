@@ -70,11 +70,23 @@ export const approvePair = async (pairId: string, inviterUid: string, userUid: s
 
 // 🔹 ペア解除
 export const removePair = async (pairId: string) => {
-  await updateDoc(doc(db, 'pairs', pairId), {
-    status: 'removed',
-    updatedAt: serverTimestamp(),
-  });
+  const ref = doc(db, 'pairs', pairId);
+  const snap = await getDoc(ref);
+
+  if (!snap.exists()) {
+    console.error('🔥 ペアドキュメントが存在しません:', pairId);
+    throw new Error('指定されたペアが存在しません');
+  }
+
+  try {
+    await updateDoc(ref, { status: 'removed', updatedAt: serverTimestamp() });
+  } catch (err) {
+    console.error('🔥 removePair失敗:', err);
+    throw err;
+  }
+
 };
+
 
 // 🔹 ペア削除（招待取消・拒否）
 export const deletePair = async (pairId: string) => {
