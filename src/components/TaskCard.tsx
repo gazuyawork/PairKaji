@@ -30,11 +30,12 @@ type Props = {
   setMenuOpenId: (id: string | null) => void;
   highlighted?: boolean;
   userList: UserInfo[];
+  isPairConfirmed: boolean;
 };
 
 export default function TaskCard({
   task, period, index, onToggleDone, onDelete, onEdit,
-  menuOpenId, setMenuOpenId, highlighted = false, userList,
+  menuOpenId, setMenuOpenId, highlighted = false, userList, isPairConfirmed,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -219,14 +220,17 @@ export default function TaskCard({
           <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
             {task.point} <span className="text-sm">pt</span>
           </p>
-          <Image
-            src={profileImage || '/images/default.png'}
-            alt={`${profileName}のアイコン`}
-            width={38}
-            height={38}
-            className="rounded-full border border-gray-300 object-cover aspect-square"
-          />
+          {isPairConfirmed && (
+            <Image
+              src={profileImage || '/images/default.png'}
+              alt={`${profileName}のアイコン`}
+              width={38}
+              height={38}
+              className="rounded-full border border-gray-300 object-cover aspect-square"
+            />
+          )}
         </div>
+
       </motion.div>
     </div>
   );

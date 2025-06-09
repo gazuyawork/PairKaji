@@ -19,6 +19,7 @@ type Props = {
   onToggleDay: (id: string, day: string) => void;
   onToggleDelete: (id: string) => void;
   users: UserInfo[];
+  isPairConfirmed: boolean;
 };
 
 const dayNames = ['月', '火', '水', '木', '金', '土', '日'];
@@ -30,6 +31,7 @@ export default function TaskManageCard({
   onToggleDay,
   onToggleDelete,
   users,
+  isPairConfirmed,
 }: Props) {
   const handlers = useSwipeable({
     onSwipedLeft: () => onToggleDelete(task.id),
@@ -112,31 +114,35 @@ export default function TaskManageCard({
           <span className="ml-1">pt</span>
         </div>
 
-        <div className="flex gap-2">
-          {users.map((user) => {
-            const isSelected = task.users.includes(user.id);
-            return (
-              <button
-                key={user.id}
-                onClick={() => {
-                  const newUsers = isSelected ? [] : [user.id];
-                  onChange(task.id, 'users', newUsers);
-                }}
-                className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
-                  isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
-                }`}
-              >
-                <Image
-                  src={user.imageUrl || '/images/default.png'}
-                  alt={`${user.name}の画像`}
-                  width={32}
-                  height={32}
-                  className="object-cover w-full h-full"
-                />
-              </button>
-            );
-          })}
-        </div>
+        {isPairConfirmed && (
+          <div className="flex gap-2">
+            {users.map((user) => {
+              const isSelected = task.users.includes(user.id);
+              return (
+                <button
+                  key={user.id}
+                  onClick={() => {
+                    const newUsers = isSelected ? [] : [user.id];
+                    onChange(task.id, 'users', newUsers);
+                  }}
+                  className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
+                    isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                  }`}
+                >
+                  <Image
+                    src={user.imageUrl || '/images/default.png'}
+                    alt={`${user.name}の画像`}
+                    width={32}
+                    height={32}
+                    className="object-cover w-full h-full"
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+
 
       </div>
 

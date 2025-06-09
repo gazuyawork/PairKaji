@@ -320,6 +320,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
                           setMenuOpenId={setMenuOpenId}
                           highlighted={isHighlighted}
                           userList={userList}
+                          isPairConfirmed={pairStatus === 'confirmed'}
                         />
                       );
                     })}
@@ -340,6 +341,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
           onClose={() => setEditTargetTask(null)}
           onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
           users={userList}
+          isPairConfirmed={pairStatus === 'confirmed'} // ✅ この行を追加
         />
       )}
     </div>

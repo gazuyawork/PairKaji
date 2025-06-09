@@ -127,20 +127,22 @@ export default function FinishDayTask({ tasks }: Props) {
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                   <div className="w-[60px] text-right text-gray-600 pr-4">{log.point}pt</div>
-                  <div className="w-[36px] h-[36px] flex-shrink-0">
-                    <Image
-                      src={
-                        log.userId === auth.currentUser?.uid
-                          ? profileImage
-                          : partnerImage
-                      }
-                      alt="icon"
-                      width={38}
-                      height={38}
-                      className="rounded-full border border-gray-300 object-cover w-full h-full"
-                      style={{ aspectRatio: '1 / 1' }}
-                    />
-                  </div>
+                  {partnerImage && (
+                    <div className="w-[36px] h-[36px] flex-shrink-0">
+                      <Image
+                        src={
+                          log.userId === auth.currentUser?.uid
+                            ? profileImage
+                            : partnerImage
+                        }
+                        alt="icon"
+                        width={38}
+                        height={38}
+                        className="rounded-full border border-gray-300 object-cover w-full h-full"
+                        style={{ aspectRatio: '1 / 1' }}
+                      />
+                    </div>
+                  )}
                 </div>
               </li>
             ))}

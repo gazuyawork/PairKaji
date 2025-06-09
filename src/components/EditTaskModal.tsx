@@ -17,9 +17,10 @@ type Props = {
   onClose: () => void;
   onSave: (updated: Task) => void;
   users: UserInfo[];
+  isPairConfirmed: boolean;
 };
 
-export default function EditTaskModal({ isOpen, task, onClose, onSave, users }: Props) {
+export default function EditTaskModal({ isOpen, task, onClose, onSave, users, isPairConfirmed }: Props) {
   const [editedTask, setEditedTask] = useState<Task | null>(null);
 
   useEffect(() => {
@@ -145,55 +146,57 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users }: 
             </select>
           </div>
 
-          <div className="flex items-center">
-            <label className="w-20 text-gray-600 shrink-0">担当者：</label>
-            <div className="flex gap-2">
-              {Array.isArray(users) && users.map(user => {
-                const isSelected = editedTask.users[0] === user.id;
-                return (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => toggleUser(user.id)}
-                    className={`w-12 h-12 rounded-full border overflow-hidden ${
-                      isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
-                    }`}
-                  >
-                    <Image 
-                      src={user.imageUrl || '/images/default.png'} 
-                      alt={user.name} 
-                      width={48} 
-                      height={48} 
-                      className="object-cover w-full h-full"
-                    />
-                  </button>
-                );
-              })}
+          {isPairConfirmed && (
+            <div className="flex items-center">
+              <label className="w-20 text-gray-600 shrink-0">担当者：</label>
+              <div className="flex gap-2">
+                {users.map(user => {
+                  const isSelected = editedTask.users[0] === user.id;
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => toggleUser(user.id)}
+                      className={`w-12 h-12 rounded-full border overflow-hidden ${
+                        isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                      }`}
+                    >
+                      <Image 
+                        src={user.imageUrl || '/images/default.png'} 
+                        alt={user.name} 
+                        width={48} 
+                        height={48} 
+                        className="object-cover w-full h-full"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap justify-end gap-3">
+            <button
+              onClick={() => {
+                const transformed = {
+                  ...editedTask,
+                  daysOfWeek: editedTask.daysOfWeek.map(d => dayNameToNumber[d] || d),
+                };
+                onSave(transformed);
+                onClose();
+              }}
+              className="w-full sm:w-auto px-6 py-3 text-sm bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
+            >
+              保存
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-full sm:w-auto px-6 py-3 text-sm bg-gray-200 rounded-lg hover:shadow-md"
+            >
+              キャンセル
+            </button>
           </div>
-        </div>
-
-        <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <button
-            onClick={() => {
-              const transformed = {
-                ...editedTask,
-                daysOfWeek: editedTask.daysOfWeek.map(d => dayNameToNumber[d] || d),
-              };
-              onSave(transformed);
-              onClose();
-            }}
-            className="w-full sm:w-auto px-6 py-3 text-sm bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
-          >
-            保存
-          </button>
-
-          <button
-            onClick={onClose}
-            className="w-full sm:w-auto px-6 py-3 text-sm bg-gray-200 rounded-lg hover:shadow-md"
-          >
-            キャンセル
-          </button>
         </div>
       </div>
     </div>

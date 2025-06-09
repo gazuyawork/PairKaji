@@ -309,54 +309,57 @@ const confirmTasks = async () => {
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] relative">
       <Header title="Edit" />
 
-<main className="main-content flex-1 px-4 py-6 space-y-4 overflow-y-auto pb-25">
-  {isLoading ? (
-    <div className="flex items-center justify-center text-gray-400 text-sm h-200">
-      <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-    </div>
-  ) : (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-    >
-      <SearchBox value={searchTerm} onChange={setSearchTerm} />
-      <FilterControls
-        periodFilter={filter}
-        personFilter={personFilter}
-        onTogglePeriod={toggleFilter}
-        onTogglePerson={togglePerson}
-        pairStatus={pairStatus}
-      />
-      <hr className="border-t border-gray-300 opacity-50 my-4" />
-      <div className="space-y-2.5">
-        {tasks
-          .filter(task => !filter || task.period === filter)
-          .filter(task => !personFilter || task.users.includes(personFilter))
-          .filter(task => (task.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
-          .map(task => (
-            <TaskManageCard
-              key={task.id}
-              task={task}
-              onChange={updateTask}
-              onRemove={removeTask}
-              onToggleUser={handleUserToggle}
-              onToggleDay={toggleDay}
-              onToggleDelete={toggleShowDelete}
-              users={sharedUserIds.map((id) => {
-                const isSelf = id === auth.currentUser?.uid;
-                return {
-                  id,
-                  name: isSelf ? 'あなた' : 'パートナー',
-                  imageUrl: isSelf ? profileImage : (partnerImage || '/default-partner.png'),
-                };
-              })}
-            />
-          ))}
-      </div>
-    </motion.div>
-  )}
-</main>
+      <main className="main-content flex-1 px-4 py-6 space-y-4 overflow-y-auto pb-25">
+        {isLoading ? (
+          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
+            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <SearchBox value={searchTerm} onChange={setSearchTerm} />
+            <div className="mt-4">
+              <FilterControls
+                periodFilter={filter}
+                personFilter={personFilter}
+                onTogglePeriod={toggleFilter}
+                onTogglePerson={togglePerson}
+                pairStatus={pairStatus}
+              />
+            </div>
+            <hr className="border-t border-gray-300 opacity-50 my-4" />
+            <div className="space-y-2.5">
+              {tasks
+                .filter(task => !filter || task.period === filter)
+                .filter(task => !personFilter || task.users.includes(personFilter))
+                .filter(task => (task.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+                .map(task => (
+                  <TaskManageCard
+                    key={task.id}
+                    task={task}
+                    onChange={updateTask}
+                    onRemove={removeTask}
+                    onToggleUser={handleUserToggle}
+                    onToggleDay={toggleDay}
+                    onToggleDelete={toggleShowDelete}
+                    users={sharedUserIds.map((id) => {
+                      const isSelf = id === auth.currentUser?.uid;
+                      return {
+                        id,
+                        name: isSelf ? 'あなた' : 'パートナー',
+                        imageUrl: isSelf ? profileImage : (partnerImage || '/default-partner.png'),
+                      };
+                    })}
+                    isPairConfirmed={pairStatus === 'confirmed'}
+                  />
+                ))}
+            </div>
+          </motion.div>
+        )}
+      </main>
 
 
 
