@@ -27,6 +27,7 @@ import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { saveSingleTask } from '@/lib/taskUtils';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
+import { motion } from 'framer-motion';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -44,9 +45,9 @@ export default function TaskView({ initialSearch = '' }: Props) {
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
   const [partnerUserId, setPartnerUserId] = useState<string | null>(null);
-
   const { profileImage, partnerImage } = useProfileImages();
   const currentUserId = auth.currentUser?.uid;
+  const [isLoading, setIsLoading] = useState(true);
 
   const userList = [
     { id: currentUserId ?? '', name: 'あなた', imageUrl: profileImage },
@@ -229,6 +230,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
         }
 
         setTasksState(grouped);
+        setIsLoading(false)
       });
     };
 
@@ -254,66 +256,79 @@ export default function TaskView({ initialSearch = '' }: Props) {
       <Header title="Task" currentIndex={1} />
 
       <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
-        <SearchBox value={searchTerm} onChange={setSearchTerm} />
+        {isLoading ? (
+          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
+            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
-        <FilterControls
-          periodFilter={periodFilter}
-          personFilter={personFilter}
-          onTogglePeriod={togglePeriod}
-          onTogglePerson={togglePerson}
-          searchTerm={searchTerm}
-          onClearSearch={() => setSearchTerm('')}
-          pairStatus={pairStatus}
-        />
+            <FilterControls
+              periodFilter={periodFilter}
+              personFilter={personFilter}
+              onTogglePeriod={togglePeriod}
+              onTogglePerson={togglePerson}
+              searchTerm={searchTerm}
+              onClearSearch={() => setSearchTerm('')}
+              pairStatus={pairStatus}
+            />
 
-        <hr className="border-t border-gray-300 opacity-50 my-4" />
+            <hr className="border-t border-gray-300 opacity-50 my-4" />
 
-        {periods.map(period => {
-          const rawTasks = tasksState[period] ?? [];
-          const list = rawTasks.filter(task =>
-            (!periodFilter || periodFilter === period) &&
-            (!personFilter || task.person === personFilter) &&
-            (!searchTerm || task.name.includes(searchTerm))
-          );
-          if (list.length === 0) return null;
+            {periods.map(period => {
+              const rawTasks = tasksState[period] ?? [];
+              const list = rawTasks.filter(task =>
+                (!periodFilter || periodFilter === period) &&
+                (!personFilter || task.person === personFilter) &&
+                (!searchTerm || task.name.includes(searchTerm))
+              );
+              if (list.length === 0) return null;
 
-          const remaining = list.filter(task => !task.done).length;
+              const remaining = list.filter(task => !task.done).length;
 
-          return (
-            <div key={period}>
-              <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mb-2">
-                {period}（残り {remaining} 件）
-              </h2>
-              <ul className="space-y-2">
-                {list.map((task, idx) => {
-                  const isHighlighted = task.visible === true;
-                  return (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      period={period}
-                      index={idx}
-                      onToggleDone={toggleDone}
-                      onDelete={deleteTask}
-                      onEdit={() => setEditTargetTask({
-                        ...task,
-                        period: task.period,
-                        daysOfWeek: task.daysOfWeek ?? [],
-                        dates: task.dates ?? [],
-                        isTodo: task.isTodo ?? false,
-                      })}
-                      menuOpenId={menuOpenId}
-                      setMenuOpenId={setMenuOpenId}
-                      highlighted={isHighlighted}
-                      userList={userList}
-                    />
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
+              return (
+                <div key={period}>
+                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mb-2">
+                    {period}（残り {remaining} 件）
+                  </h2>
+                  <ul className="space-y-2">
+                    {list.map((task, idx) => {
+                      const isHighlighted = task.visible === true;
+                      return (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          period={period}
+                          index={idx}
+                          onToggleDone={toggleDone}
+                          onDelete={deleteTask}
+                          onEdit={() => setEditTargetTask({
+                            ...task,
+                            period: task.period,
+                            daysOfWeek: task.daysOfWeek ?? [],
+                            dates: task.dates ?? [],
+                            isTodo: task.isTodo ?? false,
+                          })}
+                          menuOpenId={menuOpenId}
+                          setMenuOpenId={setMenuOpenId}
+                          highlighted={isHighlighted}
+                          userList={userList}
+                        />
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </motion.div>
+        )}
       </main>
+
 
       {editTargetTask && (
         <EditTaskModal

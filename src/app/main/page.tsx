@@ -23,14 +23,11 @@ import TaskView from '@/components/views/TaskView';
 import TodoView from '@/components/views/TodoView';
 import { ViewProvider } from '@/context/ViewContext'; 
 import { useView } from '@/context/ViewContext';
-import { useMemo } from 'react';
 
 function MainContent() {
   const searchParams = useSearchParams();
   const searchKeyword = searchParams.get("search") ?? "";
-
   const { index, setIndex } = useView();
-
   const [authReady, setAuthReady] = useState(false);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null);
@@ -215,28 +212,31 @@ function MainContent() {
   );
 }
 
-export default function MainPage() {
+
+
+function MainInitializer() {
   const searchParams = useSearchParams();
-  const [initialIndex, setInitialIndex] = useState<number | null>(null); // 🔴 初期は null
-
-  useEffect(() => {
-    const fromTaskManage = searchParams.get('fromTaskManage');
-    setInitialIndex(fromTaskManage === 'true' ? 1 : 0); // ✅ 明示的にセット
-  }, [searchParams]);
-
-  if (initialIndex === null) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center bg-white">
-        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const fromTaskManage = searchParams.get('fromTaskManage');
+  const initialIndex = fromTaskManage === 'true' ? 1 : 0;
 
   return (
     <ViewProvider initialIndex={initialIndex}>
-      <Suspense fallback={null}>
-        <MainContent />
-      </Suspense>
+      <MainContent />
     </ViewProvider>
   );
 }
+
+export default function MainPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-screen h-screen flex items-center justify-center bg-white">
+          <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <MainInitializer />
+    </Suspense>
+  );
+}
+

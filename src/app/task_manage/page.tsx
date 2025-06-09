@@ -18,8 +18,7 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { RotateCcw } from 'lucide-react'; 
-
-
+import { motion } from 'framer-motion';
 
 export default function TaskManagePage() {
   const [tasks, setTasks] = useState<TaskManageTask[]>([]);
@@ -29,8 +28,7 @@ export default function TaskManagePage() {
   const { profileImage, partnerImage } = useProfileImages();
   const [isSaving, setIsSaving] = useState(false);
   const [sharedUserIds, setSharedUserIds] = useState<string[]>([]);
-
-
+  const [isLoading, setIsLoading] = useState(true);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
 
   useEffect(() => {
@@ -270,20 +268,15 @@ const confirmTasks = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      // ✅ ペアユーザーIDを取得
       const partnerUids = await fetchPairUserIds(uid);
       if (!partnerUids.includes(uid)) {
         partnerUids.push(uid);
       }
 
-      // ✅ Firestoreからタスク取得（TaskViewと同じ条件に変更）
       const q = query(
         collection(db, 'tasks'),
-        where('userIds', 'array-contains', uid) // 自分が含まれるタスクすべて
+        where('userIds', 'array-contains', uid)
       );
-
-
-
 
       const snapshot = await getDocs(q);
       const loadedTasks = snapshot.docs.map(doc => ({
@@ -294,10 +287,15 @@ const confirmTasks = async () => {
       }));
 
       setTasks(loadedTasks);
+      setIsLoading(false); // ✅ 追加
     };
 
-    fetchTasks().catch(console.error);
+    fetchTasks().catch((err) => {
+      console.error(err);
+      setIsLoading(false); // エラーでも非表示
+    });
   }, []);
+
 
 
   const isConfirmDisabled = !tasks.some(task => task.isNew || task.isEdited);
@@ -311,47 +309,56 @@ const confirmTasks = async () => {
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] relative">
       <Header title="Edit" />
 
-      <main className="main-content flex-1 px-4 py-6 space-y-4 overflow-y-auto pb-25">
-        <SearchBox value={searchTerm} onChange={setSearchTerm} />
+<main className="main-content flex-1 px-4 py-6 space-y-4 overflow-y-auto pb-25">
+  {isLoading ? (
+    <div className="flex items-center justify-center text-gray-400 text-sm h-200">
+      <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ) : (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
+      <SearchBox value={searchTerm} onChange={setSearchTerm} />
+      <FilterControls
+        periodFilter={filter}
+        personFilter={personFilter}
+        onTogglePeriod={toggleFilter}
+        onTogglePerson={togglePerson}
+        pairStatus={pairStatus}
+      />
+      <hr className="border-t border-gray-300 opacity-50 my-4" />
+      <div className="space-y-2.5">
+        {tasks
+          .filter(task => !filter || task.period === filter)
+          .filter(task => !personFilter || task.users.includes(personFilter))
+          .filter(task => (task.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+          .map(task => (
+            <TaskManageCard
+              key={task.id}
+              task={task}
+              onChange={updateTask}
+              onRemove={removeTask}
+              onToggleUser={handleUserToggle}
+              onToggleDay={toggleDay}
+              onToggleDelete={toggleShowDelete}
+              users={sharedUserIds.map((id) => {
+                const isSelf = id === auth.currentUser?.uid;
+                return {
+                  id,
+                  name: isSelf ? 'あなた' : 'パートナー',
+                  imageUrl: isSelf ? profileImage : (partnerImage || '/default-partner.png'),
+                };
+              })}
+            />
+          ))}
+      </div>
+    </motion.div>
+  )}
+</main>
 
-        <FilterControls
-          periodFilter={filter}
-          personFilter={personFilter}
-          onTogglePeriod={toggleFilter}
-          onTogglePerson={togglePerson}
-          pairStatus={pairStatus}
-        />
 
-        <hr className="border-t border-gray-300 opacity-50 my-4" />
-
-        <div className="space-y-2.5">
-          {tasks
-            .filter(task => !filter || task.period === filter)
-            .filter(task => !personFilter || task.users.includes(personFilter))
-            .filter(task => (task.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
-            .map(task => (
-              <TaskManageCard
-                key={task.id}
-                task={task}
-                onChange={updateTask}
-                onRemove={removeTask}
-                onToggleUser={handleUserToggle}
-                onToggleDay={toggleDay}
-                onToggleDelete={toggleShowDelete}
-                users={sharedUserIds.map((id) => {
-                  const isSelf = id === auth.currentUser?.uid;
-                  return {
-                    id,
-                    name: isSelf ? 'あなた' : 'パートナー',
-                    imageUrl: isSelf ? profileImage : (partnerImage || '/default-partner.png'),
-                  };
-                })}
-
-
-              />
-            ))}
-        </div>
-      </main>
 
       {/* ✅ 固定表示のボタンコンテナ */}
       <div className="fixed bottom-10 left-0 right-0 flex justify-center items-center gap-8 z-50 px-4">
