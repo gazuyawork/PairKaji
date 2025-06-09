@@ -130,11 +130,9 @@ export default function FinishDayTask({ tasks }: Props) {
                   <div className="w-[36px] h-[36px] flex-shrink-0">
                     <Image
                       src={
-                        log.person === '太郎'
+                        log.userId === auth.currentUser?.uid
                           ? profileImage
-                          : log.person === '花子'
-                            ? partnerImage
-                            : '/images/default.png'
+                          : partnerImage
                       }
                       alt="icon"
                       width={38}
