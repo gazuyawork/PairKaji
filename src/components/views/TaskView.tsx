@@ -268,15 +268,17 @@ export default function TaskView({ initialSearch = '' }: Props) {
           >
             <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
-            <FilterControls
-              periodFilter={periodFilter}
-              personFilter={personFilter}
-              onTogglePeriod={togglePeriod}
-              onTogglePerson={togglePerson}
-              searchTerm={searchTerm}
-              onClearSearch={() => setSearchTerm('')}
-              pairStatus={pairStatus}
-            />
+            <div className="mt-4">
+              <FilterControls
+                periodFilter={periodFilter}
+                personFilter={personFilter}
+                onTogglePeriod={togglePeriod}
+                onTogglePerson={togglePerson}
+                searchTerm={searchTerm}
+                onClearSearch={() => setSearchTerm('')}
+                pairStatus={pairStatus}
+              />
+            </div>
 
             <hr className="border-t border-gray-300 opacity-50 my-4" />
 
@@ -293,7 +295,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
 
               return (
                 <div key={period}>
-                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mb-2">
+                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
                     {period}（残り {remaining} 件）
                   </h2>
                   <ul className="space-y-2">
