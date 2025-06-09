@@ -29,18 +29,22 @@ export default function Header({ title, saveStatus = 'idle', currentIndex }: Hea
     <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
       <div className="flex items-center gap-2">
         {/* 戻るボタン */}
-        {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
-          <button
-            onClick={() =>
-              pathname === '/task_manage' ? router.push('/main') : router.push('/main')
-            }
-            className="text-[#5E5E5E]"
-            aria-label="戻る"
-          >
-            <ArrowLeft size={24} />
-          </button>
-        )}
+{(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
+  <button
+    onClick={() => {
+      if (pathname === '/task_manage') {
+        router.push('/main?fromTaskManage=true'); // ← クエリ付きで遷移！
+        return;
+      }
+      router.push('/main');
+    }}
 
+    className="text-[#5E5E5E]"
+    aria-label="戻る"
+  >
+    <ArrowLeft size={24} />
+  </button>
+)}
         {/* ✅ TaskView 表示時だけタスク編集ボタン */}
         {pathname === '/main' && currentIndex === 1 && (
           <motion.button

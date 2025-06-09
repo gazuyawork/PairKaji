@@ -22,17 +22,14 @@ import HomeView from '@/components/views/HomeView';
 import TaskView from '@/components/views/TaskView';
 import TodoView from '@/components/views/TodoView';
 import { ViewProvider } from '@/context/ViewContext'; 
-import { useView } from '@/context/ViewContext'; // ← ファイル冒頭の import 群に追加
+import { useView } from '@/context/ViewContext';
+import { useMemo } from 'react';
 
 function MainContent() {
   const searchParams = useSearchParams();
-  // const viewParam = searchParams.get("view");
   const searchKeyword = searchParams.get("search") ?? "";
 
-
-
-  const { index, setIndex} = useView(); // ← この行を追加
-
+  const { index, setIndex } = useView();
 
   const [authReady, setAuthReady] = useState(false);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
@@ -103,7 +100,6 @@ function MainContent() {
           });
         }
 
-
         if (status === 'removed') {
           setDialogMessage('パートナーとの共有が解除されました。共有情報を初期化します。');
           setConfirmAction(() => async () => {
@@ -149,26 +145,25 @@ function MainContent() {
     trackMouse: true,
   });
 
-  // if (!authReady) return null;
   if (!authReady) {
     return (
       <div className="w-screen h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]" />
     );
   }
 
-
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex-1 overflow-hidden relative">
-          <motion.div
-            className="flex w-[300vw] h-full"
-            animate={{ x: `-${index * 100}vw` }}
-            transition={{
-              type: 'spring',
-              stiffness: 300,
-              damping: 30,
-            }}
-          >
+        <motion.div
+          className="flex w-[300vw] h-full"
+          initial={false}
+          animate={{ x: `-${index * 100}vw` }}
+          transition={{
+            type: 'spring',
+            stiffness: 300,
+            damping: 30,
+          }}
+        >
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <HomeView />
           </div>
@@ -194,26 +189,24 @@ function MainContent() {
                 <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-            <button
-              onClick={async () => {
-                setIsLoading(true);
-                try {
-                  await confirmAction?.(); // null セーフティ
-                  await new Promise((res) => setTimeout(res, 3000));
-                  setDialogMessage(null);
-                  setConfirmAction(null);
-                } catch (err) {
-                  console.error('confirmAction 失敗:', err);
-                  // 任意でトースト通知など
-                } finally {
-                  setIsLoading(false); // 成否に関わらず必ずローディング終了
-                }
-              }}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              OK
-            </button>
-
+              <button
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    await confirmAction?.();
+                    await new Promise((res) => setTimeout(res, 3000));
+                    setDialogMessage(null);
+                    setConfirmAction(null);
+                  } catch (err) {
+                    console.error('confirmAction 失敗:', err);
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                OK
+              </button>
             )}
           </div>
         </div>
@@ -222,11 +215,25 @@ function MainContent() {
   );
 }
 
+export default function MainPage() {
+  const searchParams = useSearchParams();
+  const [initialIndex, setInitialIndex] = useState<number | null>(null); // 🔴 初期は null
 
+  useEffect(() => {
+    const fromTaskManage = searchParams.get('fromTaskManage');
+    setInitialIndex(fromTaskManage === 'true' ? 1 : 0); // ✅ 明示的にセット
+  }, [searchParams]);
 
-export default function MainView() {
+  if (initialIndex === null) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-white">
+        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <ViewProvider>
+    <ViewProvider initialIndex={initialIndex}>
       <Suspense fallback={null}>
         <MainContent />
       </Suspense>

@@ -60,7 +60,6 @@ export const useProfileImages = () => {
       const pairData = docRef.data();
       const pid = pairData.userIds?.find((id: string) => id !== uid) ?? null;
 
-      console.log('✅ partnerId:', pid);
       setPartnerId(pid);
     };
 
@@ -73,10 +72,8 @@ export const useProfileImages = () => {
       return;
     }
 
-    console.log('📡 onSnapshot 設定開始 for partnerId:', partnerId);
     const unsubscribePartner = onSnapshot(doc(db, 'users', partnerId), (snap) => {
       const data = snap.data();
-      console.log('👀 partner user doc:', data);
       const imageUrl = data?.imageUrl || '';
       setPartnerImage(imageUrl);
       localStorage.setItem('partnerImage', imageUrl);

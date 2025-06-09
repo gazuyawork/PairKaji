@@ -69,7 +69,6 @@ useEffect(() => {
     let userIds = [uid];
     if (pairStatus === 'confirmed') {
       const fetched = await fetchPairUserIds(uid);
-      console.log('取得したpairUserIds:', fetched); // ✅ ここを確認
       userIds = fetched.includes(uid) ? fetched : [...fetched, uid];
     }
     setSharedUserIds(userIds);
