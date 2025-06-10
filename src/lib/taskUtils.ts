@@ -157,24 +157,20 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
  * - userId + name が一致する既存タスクがある場合は削除してから登録
  * - userId フィールドも正しく設定する
  */
-/**
- * 不正な値（null、undefined、空文字）を削除してからFirestoreに渡すためのユーティリティ関数
- */
 const cleanObject = <T extends object>(obj: T): Partial<T> => {
   const cleaned = Object.fromEntries(
     Object.entries(obj).filter(
       ([, v]) =>
         v !== undefined &&
-        v !== null &&
         !(typeof v === 'string' && v.trim() === '')
     )
   );
 
-  // 配列内の空文字も除去
+  // 配列内の空値も削除
   for (const key in cleaned) {
-    const value = cleaned[key];
-    if (Array.isArray(value)) {
-      cleaned[key] = value.filter(
+    const val = cleaned[key];
+    if (Array.isArray(val)) {
+      cleaned[key] = val.filter(
         (v) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')
       );
     }
@@ -182,6 +178,7 @@ const cleanObject = <T extends object>(obj: T): Partial<T> => {
 
   return cleaned as Partial<T>;
 };
+
 
 
 /**
