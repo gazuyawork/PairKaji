@@ -16,31 +16,31 @@ interface ShareTasksResponse {
   updatedCount: number;
 }
 
-// 🔹 ユーザープロフィール取得
+// ユーザープロフィール取得
 export const getUserProfile = async (uid: string) => {
   const ref = doc(db, 'users', uid);
   return await getDoc(ref);
 };
 
-// 🔹 ユーザープロフィール作成
+// ユーザープロフィール作成
 export const createUserProfile = async (uid: string, name: string) => {
   const ref = doc(db, 'users', uid);
   await setDoc(ref, { name, createdAt: serverTimestamp() });
 };
 
-// 🔹 ペア情報取得（userAId検索）
+// ペア情報取得（userAId検索）
 export const getUserPair = async (uid: string) => {
   const q = query(collection(db, 'pairs'), where('userAId', '==', uid));
   return await getDocs(q);
 };
 
-// 🔹 ペンディングペア取得（emailB検索）
+// ペンディングペア取得（emailB検索）
 export const getPendingPairByEmail = async (email: string) => {
   const q = query(collection(db, 'pairs'), where('emailB', '==', email));
   return await getDocs(q);
 };
 
-// 🔹 招待コード発行
+// 招待コード発行
 export const createPairInvite = async (uid: string, emailB: string, inviteCode: string) => {
   const docRef = await addDoc(collection(db, 'pairs'), {
     userAId: uid,
@@ -57,16 +57,7 @@ export const createPairInvite = async (uid: string, emailB: string, inviteCode: 
   return docRef;
 };
 
-
-// 🔹 ペア承認
-// export const approvePair = async (pairId: string, inviterUid: string, userUid: string) => {
-//   await updateDoc(doc(db, 'pairs', pairId), {
-//     userBId: userUid,
-//     status: 'confirmed',
-//     userIds: [inviterUid, userUid],
-//     updatedAt: serverTimestamp(),
-//   });
-// };
+// ペア承認
 export const approvePair = async (pairId: string, inviterUid: string, userUid: string) => {
   const ref = doc(db, 'pairs', pairId);
 
@@ -77,9 +68,6 @@ export const approvePair = async (pairId: string, inviterUid: string, userUid: s
     updatedAt: serverTimestamp(),
   }, { merge: true }); // ✅ merge で既存データを保持
 };
-
-
-
 
 /**
  * ペアを完全に削除する処理（Firestore 上からドキュメントを削除）
@@ -109,7 +97,7 @@ export const removePair = async (pairId: string) => {
 };
 
 
-// 🔹 ペア削除（招待取消・拒否）
+// ペア削除（招待取消・拒否）
 export const deletePair = async (pairId: string) => {
   await deleteDoc(doc(db, 'pairs', pairId));
 };
@@ -218,7 +206,7 @@ export const toggleTaskDoneStatus = async (
   try {
     const taskRef = doc(db, 'tasks', taskId);
 
-    // 🔸 ペア情報を取得して userIds を用意
+    // ペア情報を取得して userIds を用意
     let userIds = [userId];
     const pairId = sessionStorage.getItem('pairId');
 
@@ -231,7 +219,7 @@ export const toggleTaskDoneStatus = async (
     }
 
     if (done) {
-      // 🔸 完了にする場合
+      // 完了にする場合
       await updateDoc(taskRef, {
         done: true,
         completedAt: serverTimestamp(),
@@ -242,7 +230,7 @@ export const toggleTaskDoneStatus = async (
         await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
       }
     } else {
-      // 🔸 未処理に戻す場合
+      // 未処理に戻す場合
       await updateDoc(taskRef, {
         done: false,
         completedAt: null,

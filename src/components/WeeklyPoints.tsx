@@ -55,8 +55,19 @@ export default function WeeklyPoints() {
       const weekStartISO = weekStart.toISOString().split('T')[0];
       const weekEndISO = weekEnd.toISOString().split('T')[0];
 
+      if (partnerUids.length === 0) {
+        // console.warn('partnerUids が空のため、taskCompletions のクエリをスキップ');
+        setSelfPoints(0);
+        setPartnerPoints(0);
+        setIsLoadingPoints(false);
+        return;
+      }
+
       unsubscribe1 = onSnapshot(
-        query(collection(db, 'taskCompletions'), where('userId', 'in', partnerUids)),
+        query(
+          collection(db, 'taskCompletions'),
+          where('userId', 'in', partnerUids)
+        ),
         (snapshot) => {
           let bufferSelf = 0;
           let bufferPartner = 0;
@@ -77,6 +88,7 @@ export default function WeeklyPoints() {
           setIsLoadingPoints(false);
         }
       );
+
     };
 
     fetchPoints();
