@@ -161,15 +161,28 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
  * 不正な値（null、undefined、空文字）を削除してからFirestoreに渡すためのユーティリティ関数
  */
 const cleanObject = <T extends object>(obj: T): Partial<T> => {
-  return Object.fromEntries(
+  const cleaned = Object.fromEntries(
     Object.entries(obj).filter(
       ([, v]) =>
         v !== undefined &&
         v !== null &&
         !(typeof v === 'string' && v.trim() === '')
     )
-  ) as Partial<T>;
+  );
+
+  // 配列内の空文字も除去
+  for (const key in cleaned) {
+    const value = cleaned[key];
+    if (Array.isArray(value)) {
+      cleaned[key] = value.filter(
+        (v) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')
+      );
+    }
+  }
+
+  return cleaned as Partial<T>;
 };
+
 
 /**
  * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、
@@ -222,7 +235,7 @@ export const splitSharedTasksOnPairRemoval = async (
       userId,
       userIds: [userId],
       users: [userId],
-      point: typeof original.point === 'string' ? Number(original.point) : original.point,
+      point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     };
