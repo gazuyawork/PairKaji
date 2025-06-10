@@ -98,7 +98,7 @@ export default function PartnerSettings({
               <button
                 onClick={pairDocId ? onCancelInvite : onSendInvite}
                 className={`w-full py-2 rounded shadow text-sm ${
-                  pairDocId ? 'bg-gray-300 text-red-500 hover:underline' : 'bg-[#FFCB7D] text-white'
+                  pairDocId ? 'bg-gray-100 text-red-500 hover:underline' : 'bg-[#FFCB7D] text-white'
                 }`}
               >
                 {pairDocId ? '招待を取り消す' : '招待コードを発行'}

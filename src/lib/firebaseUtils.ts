@@ -59,17 +59,38 @@ export const createPairInvite = async (uid: string, emailB: string, inviteCode: 
 
 
 // 🔹 ペア承認
+// export const approvePair = async (pairId: string, inviterUid: string, userUid: string) => {
+//   await updateDoc(doc(db, 'pairs', pairId), {
+//     userBId: userUid,
+//     status: 'confirmed',
+//     userIds: [inviterUid, userUid],
+//     updatedAt: serverTimestamp(),
+//   });
+// };
 export const approvePair = async (pairId: string, inviterUid: string, userUid: string) => {
-  await updateDoc(doc(db, 'pairs', pairId), {
+  const ref = doc(db, 'pairs', pairId);
+
+  await setDoc(ref, {
     userBId: userUid,
     status: 'confirmed',
     userIds: [inviterUid, userUid],
     updatedAt: serverTimestamp(),
-  });
+  }, { merge: true }); // ✅ merge で既存データを保持
 };
 
-// 🔹 ペア解除
+
+
+
+/**
+ * ペアを完全に削除する処理（Firestore 上からドキュメントを削除）
+ * @param pairId Firestore の pairs/{pairId} ドキュメントID
+ */
 export const removePair = async (pairId: string) => {
+  if (!pairId || typeof pairId !== 'string') {
+    console.error('🔥 無効なpairIdです:', pairId);
+    throw new Error('無効なペアIDが渡されました');
+  }
+
   const ref = doc(db, 'pairs', pairId);
   const snap = await getDoc(ref);
 
@@ -79,12 +100,12 @@ export const removePair = async (pairId: string) => {
   }
 
   try {
-    await updateDoc(ref, { status: 'removed', updatedAt: serverTimestamp() });
+    await deleteDoc(ref);
+    console.log('✅ ペアドキュメントを削除しました:', pairId);
   } catch (err) {
-    console.error('🔥 removePair失敗:', err);
+    console.error('🔥 ペア削除失敗:', err);
     throw err;
   }
-
 };
 
 
