@@ -70,7 +70,7 @@ const createEmptyTask = (): Task => {
     userIds: [],
     done: false,
     skipped: false,
-    visible: true,
+    visible: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     todos: [],
