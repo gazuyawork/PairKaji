@@ -270,6 +270,8 @@ export const splitSharedTasksOnPairRemoval = async (
     cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;
     cleanedPartnerCopy.updatedAt = serverTimestamp() as Timestamp;
 
+    console.log('✅ パートナー用タスク登録準備:', original.name);
+
     await addDoc(tasksRef, cleanedPartnerCopy);
 
     console.log('✅ パートナー用タスク登録完了:', original.name);

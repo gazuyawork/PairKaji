@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Pencil } from 'lucide-react';
+import { CheckCircle, Circle, Calendar } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -26,8 +26,6 @@ type Props = {
   onToggleDone: (period: Period, index: number) => void;
   onDelete: (period: Period, id: string) => void;
   onEdit: () => void;
-  menuOpenId: string | null;
-  setMenuOpenId: (id: string | null) => void;
   highlighted?: boolean;
   userList: UserInfo[];
   isPairConfirmed: boolean;
@@ -35,13 +33,12 @@ type Props = {
 
 export default function TaskCard({
   task, period, index, onToggleDone, onDelete, onEdit,
-  menuOpenId, setMenuOpenId, highlighted = false, userList, isPairConfirmed,
+  highlighted = false, userList, isPairConfirmed,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const [isLongPress, setIsLongPress] = useState(false);
   const [animateTrigger, setAnimateTrigger] = useState(0);
 
   const assignedUserId = task.users?.[0];
@@ -52,11 +49,9 @@ export default function TaskCard({
   const swipeable = useSwipeable({
     onSwipedLeft: () => {
       setSwipeDirection('left');
-      setMenuOpenId(null);
     },
     onSwipedRight: () => {
       setSwipeDirection('right');
-      setMenuOpenId(null);
     },
     trackTouch: true,
   });
@@ -73,27 +68,23 @@ export default function TaskCard({
 
   const handleTouchStart = () => {
     const timer = setTimeout(() => {
-      setMenuOpenId(task.id);
-      setIsLongPress(true);
+      onEdit(); // ✅ 長押しで編集モーダルを開く
     }, 600);
     setLongPressTimer(timer);
   };
 
   const handleTouchEnd = () => {
     if (longPressTimer) clearTimeout(longPressTimer);
-    setTimeout(() => setIsLongPress(false), 300);
   };
 
   const handleClick = () => {
-    if (!isLongPress) {
-      if (task.done) {
-        const confirmed = window.confirm('このタスクを未処理に戻しますか？');
-        if (!confirmed) return;
-      } else {
-        setAnimateTrigger(prev => prev + 1);
-      }
-      onToggleDone(period, index);
+    if (task.done) {
+      const confirmed = window.confirm('このタスクを未処理に戻しますか？');
+      if (!confirmed) return;
+    } else {
+      setAnimateTrigger(prev => prev + 1);
     }
+    onToggleDone(period, index);
   };
 
   const handleDelete = () => {
@@ -113,22 +104,6 @@ export default function TaskCard({
 
   return (
     <div className="relative" ref={cardRef}>
-      {menuOpenId === task.id && (
-        <div className="absolute right-0 top-0 w-30 bg-white border border-gray-200 rounded-xl shadow-lg z-30 px-3 py-1 pb-3">
-          <button
-            className="w-full text-left px-3 py-3 flex items-center gap-2 hover:bg-gray-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-              setMenuOpenId(null);
-            }}
-          >
-            <Pencil className="w-4 h-4 text-gray-500" />
-            <span>編集</span>
-          </button>
-        </div>
-      )}
-
       {swipeDirection === 'left' && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
@@ -161,7 +136,7 @@ export default function TaskCard({
         onTouchEnd={handleTouchEnd}
         onContextMenu={(e) => {
           e.preventDefault();
-          setMenuOpenId(task.id);
+          onEdit(); // PCでは右クリックで編集
         }}
         className={clsx(
           'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
@@ -230,7 +205,6 @@ export default function TaskCard({
             />
           )}
         </div>
-
       </motion.div>
     </div>
   );

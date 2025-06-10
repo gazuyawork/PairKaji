@@ -28,6 +28,8 @@ import { saveSingleTask } from '@/lib/taskUtils';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
+import { serverTimestamp } from 'firebase/firestore';
+
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -41,7 +43,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
   const [periodFilter, setPeriodFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
   const [partnerUserId, setPartnerUserId] = useState<string | null>(null);
@@ -53,6 +54,29 @@ export default function TaskView({ initialSearch = '' }: Props) {
     { id: currentUserId ?? '', name: 'あなた', imageUrl: profileImage },
     { id: partnerUserId ?? '', name: 'パートナー', imageUrl: partnerImage },
   ];
+
+const createEmptyTask = (): Task => {
+  return {
+    id: '',
+    name: '',
+    title: '',
+    point: 5,
+    period: '毎日',
+    dates: [],
+    daysOfWeek: [],
+    isTodo: false,
+    userId: currentUserId ?? '',
+    users: [currentUserId ?? ''],
+    userIds: [],
+    done: false,
+    skipped: false,
+    visible: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    todos: [],
+  } as unknown as Task; // ✅ 型を一時的にTaskとして扱う
+};
+
 
   useEffect(() => {
     const fetchPairStatus = async () => {
@@ -128,7 +152,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
     resetCompletedTasks().catch(console.error);
   }, []);
 
-
   useEffect(() => {
     let unsubscribe: () => void;
 
@@ -158,7 +181,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
 
       const ids = Array.from(partnerUids);
 
-      // 🔴 空配列でクエリを実行しない（'in' フィルターは空配列NG）
       if (ids.length === 0) {
         console.warn('userIds が空のため、Firestore クエリをスキップします');
         return;
@@ -243,10 +265,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
     };
   }, []);
 
-
-
-
-
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
@@ -316,8 +334,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
                             dates: task.dates ?? [],
                             isTodo: task.isTodo ?? false,
                           })}
-                          menuOpenId={menuOpenId}
-                          setMenuOpenId={setMenuOpenId}
                           highlighted={isHighlighted}
                           userList={userList}
                           isPairConfirmed={pairStatus === 'confirmed'}
@@ -332,7 +348,7 @@ export default function TaskView({ initialSearch = '' }: Props) {
         )}
       </main>
 
-
+      {/* ✅ 新規登録用モーダル */}
       {editTargetTask && (
         <EditTaskModal
           key={editTargetTask.id}
@@ -341,9 +357,18 @@ export default function TaskView({ initialSearch = '' }: Props) {
           onClose={() => setEditTargetTask(null)}
           onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
           users={userList}
-          isPairConfirmed={pairStatus === 'confirmed'} // ✅ この行を追加
+          isPairConfirmed={pairStatus === 'confirmed'}
         />
       )}
+
+      {/* ✅ 右下固定の＋ボタン */}
+      <button
+        onClick={() => setEditTargetTask(createEmptyTask())}
+        className="fixed bottom-26 right-6 left-194 bg-[#FFCB7D] text-white text-3xl w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-40"
+        aria-label="新規タスク追加"
+      >
+        ＋
+      </button>
     </div>
   );
 }

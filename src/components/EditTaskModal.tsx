@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
@@ -22,6 +22,7 @@ type Props = {
 
 export default function EditTaskModal({ isOpen, task, onClose, onSave, users, isPairConfirmed }: Props) {
   const [editedTask, setEditedTask] = useState<Task | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null); // 🔸 入力欄用Ref
 
   useEffect(() => {
     if (task) {
@@ -34,6 +35,16 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
       });
     }
   }, [task]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 50); // 50ms 遅延してフォーカス
+
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !editedTask) return null;
 
@@ -58,12 +69,13 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center px-2">
+    <div className="fixed inset-0 bg-white/90 z-50 flex justify-center items-center px-2">
       <div className="bg-white w-full max-w-sm p-4 rounded-xl shadow-lg relative">
         <div className="space-y-6">
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">家事名：</label>
             <input
+              ref={nameInputRef} // 🔸 フォーカス対象
               type="text"
               value={editedTask.name}
               onChange={e => update('name', e.target.value)}
