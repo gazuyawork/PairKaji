@@ -157,26 +157,29 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
  * - userId + name が一致する既存タスクがある場合は削除してから登録
  * - userId フィールドも正しく設定する
  */
-const cleanObject = <T extends object>(obj: T): Partial<T> => {
-  const cleaned = Object.fromEntries(
-    Object.entries(obj).filter(
-      ([, v]) =>
-        v !== undefined &&
-        !(typeof v === 'string' && v.trim() === '')
-    )
-  );
-
-  // 配列内の空値も削除
-  for (const key in cleaned) {
-    const val = cleaned[key];
-    if (Array.isArray(val)) {
-      cleaned[key] = val.filter(
-        (v) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')
-      );
-    }
+export const cleanObject = <T>(obj: T): T => {
+  if (Array.isArray(obj)) {
+    return obj
+      .map(cleanObject)
+      .filter((v) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')) as T;
   }
 
-  return cleaned as Partial<T>;
+  if (typeof obj === 'object' && obj !== null) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (
+        value !== undefined &&
+        value !== null &&
+        !(typeof value === 'string' && value.trim() === '')
+      ) {
+        const cleanedValue = cleanObject(value); // 再帰的にクリーン
+        cleaned[key] = cleanedValue;
+      }
+    }
+    return cleaned as T;
+  }
+
+  return obj;
 };
 
 
