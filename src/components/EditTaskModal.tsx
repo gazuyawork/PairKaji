@@ -70,7 +70,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
 
   return (
     <div className="fixed inset-0 bg-white/90 z-50 flex justify-center items-center px-2">
-      <div className="bg-white w-full max-w-sm p-4 rounded-xl shadow-lg relative">
+      <div className="bg-white w-full max-w-sm p-4 rounded-xl shadow-lg relative border border-gray-300">
         <div className="space-y-6">
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">家事名：</label>
