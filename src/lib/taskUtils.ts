@@ -157,43 +157,35 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
  * - userId + name が一致する既存タスクがある場合は削除してから登録
  * - userId フィールドも正しく設定する
  */
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import type { FirestoreTask } from '@/types/Task';
-
 /**
- * Firestore 送信用に不正な値を除去するユーティリティ
+ * 不正な値（null、undefined、空文字）を削除してからFirestoreに渡すためのユーティリティ関数
  */
-const cleanObject = (obj: Record<string, any>) =>
-  Object.fromEntries(
+const cleanObject = <T extends object>(obj: T): Partial<T> => {
+  return Object.fromEntries(
     Object.entries(obj).filter(
-      ([_, v]) =>
+      ([, v]) =>
         v !== undefined &&
         v !== null &&
         !(typeof v === 'string' && v.trim() === '')
     )
-  );
+  ) as Partial<T>;
+};
 
+/**
+ * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、
+ * 各ユーザーごとに単独タスクとして再登録する。
+ */
 export const splitSharedTasksOnPairRemoval = async (
   userId: string,
   partnerId: string
-) => {
+): Promise<void> => {
   console.log('🔁 splitSharedTasksOnPairRemoval 実行開始');
   console.log('👤 userId:', userId);
   console.log('🤝 partnerId:', partnerId);
 
   const tasksRef = collection(db, 'tasks');
 
+  // 自分が含まれる共有タスクを取得
   const sharedTasksQuery = query(
     tasksRef,
     where('userIds', 'array-contains', userId)
@@ -211,7 +203,7 @@ export const splitSharedTasksOnPairRemoval = async (
     const original = docSnap.data() as FirestoreTask;
     console.log('📋 処理対象タスク:', original.name, 'ID:', docSnap.id);
 
-    // 自分用のタスク削除
+    // 🔹 自分用タスクの削除
     const myTaskQuery = query(
       tasksRef,
       where('name', '==', original.name),
@@ -224,10 +216,10 @@ export const splitSharedTasksOnPairRemoval = async (
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-    // 自分用タスクを作成
+    // 🔹 自分用タスクの登録
     const myCopy: FirestoreTask = {
       ...original,
-      userId: userId,
+      userId,
       userIds: [userId],
       users: [userId],
       createdAt: serverTimestamp() as Timestamp,
@@ -236,7 +228,7 @@ export const splitSharedTasksOnPairRemoval = async (
     await addDoc(tasksRef, cleanObject(myCopy));
     console.log('✅ 自分用タスク登録完了:', original.name);
 
-    // パートナー用タスク削除
+    // 🔹 パートナー用タスクの削除
     const partnerTaskQuery = query(
       tasksRef,
       where('name', '==', original.name),
@@ -249,7 +241,7 @@ export const splitSharedTasksOnPairRemoval = async (
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-    // パートナー用タスクを作成
+    // 🔹 パートナー用タスクの登録
     const partnerCopy: FirestoreTask = {
       ...original,
       userId: partnerId,
@@ -258,7 +250,6 @@ export const splitSharedTasksOnPairRemoval = async (
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     };
-
     console.log('🧪 partnerCopy:', JSON.stringify(partnerCopy));
     await addDoc(tasksRef, cleanObject(partnerCopy));
     console.log('✅ パートナー用タスク登録完了:', original.name);
