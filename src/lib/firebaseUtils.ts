@@ -42,28 +42,24 @@ export const getPendingPairByEmail = async (email: string) => {
 
 // 招待コード発行
 export const createPairInvite = async (
+  userId: string,
   emailB: string,
   inviteCode: string
 ) => {
-  const user = auth.currentUser;
-  if (!user || !emailB || !inviteCode) {
+  if (!userId || !emailB || !inviteCode) {
     throw new Error('ユーザーがログインしていないか、情報が不完全です');
   }
 
-  const payload = {
-    userAId: user.uid,
-    emailB: emailB.trim(),
+  const docRef = await addDoc(collection(db, 'pairs'), {
+    userAId: userId,
+    emailB,
     inviteCode,
     status: 'pending',
-    userIds: [user.uid],
     createdAt: serverTimestamp(),
-  };
+    userIds: [userId],
+  });
 
-  console.log('📨 Firestore に登録する招待データ', payload);
-
-  const docRef = await addDoc(collection(db, 'pairs'), payload);
   sessionStorage.setItem('pairId', docRef.id);
-
   return docRef;
 };
 

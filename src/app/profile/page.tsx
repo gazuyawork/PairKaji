@@ -225,7 +225,9 @@ const unsubscribe = onSnapshot(
         inviteCode: generatedCode,
       });
 
-      const docRef = await createPairInvite(partnerEmail.trim(), generatedCode);
+      const docRef = await createPairInvite(user.uid, partnerEmail.trim(), generatedCode);
+
+
       setPairDocId(docRef.id);
       toast.success('招待コードを発行しました');
     } catch (_err: unknown) {
