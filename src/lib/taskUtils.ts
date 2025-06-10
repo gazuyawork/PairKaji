@@ -230,9 +230,10 @@ export const splitSharedTasksOnPairRemoval = async (
       userId: partnerId,
       userIds: [partnerId],
       users: [partnerId],
-      createdAt: serverTimestamp() as Timestamp,
-      updatedAt: serverTimestamp() as Timestamp,
     };
+
+    partnerCopy.createdAt = serverTimestamp() as Timestamp;
+    partnerCopy.updatedAt = serverTimestamp() as Timestamp;
 
     console.log('🧪 partnerCopy:', JSON.stringify(partnerCopy));
     await addDoc(tasksRef, partnerCopy);
