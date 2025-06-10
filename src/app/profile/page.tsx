@@ -219,6 +219,12 @@ const unsubscribe = onSnapshot(
     setInviteCode(generatedCode);
 
     try {
+      console.log('📨 createPairInvite を呼び出します', {
+        userId: user.uid,
+        email: partnerEmail.trim(),
+        inviteCode: generatedCode,
+      });
+
       const docRef = await createPairInvite(user.uid, partnerEmail.trim(), generatedCode);
       setPairDocId(docRef.id);
       toast.success('招待コードを発行しました');
@@ -226,6 +232,7 @@ const unsubscribe = onSnapshot(
       handleFirestoreError(_err);
     }
   };
+
 
   const handleApprovePair = async () => {
     const user = auth.currentUser;
