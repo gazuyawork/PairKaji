@@ -222,6 +222,7 @@ export const splitSharedTasksOnPairRemoval = async (
       userId,
       userIds: [userId],
       users: [userId],
+      point: typeof original.point === 'string' ? Number(original.point) : original.point,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     };
@@ -247,6 +248,7 @@ export const splitSharedTasksOnPairRemoval = async (
       userId: partnerId,
       userIds: [partnerId],
       users: [partnerId],
+      point: typeof original.point === 'string' ? Number(original.point) : original.point,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     };
