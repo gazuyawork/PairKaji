@@ -206,7 +206,7 @@ export default function EditPointModal({
 
   return (
     <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex justify-center items-center">
-      <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative overflow-y-auto max-h-[95vh]">
+      <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative overflow-y-auto max-h-[95vh] border border-gray-300">
         <div className="space-y-6 mt-4 mx-3">
           <div className="text-center">
             <p className="text-lg font-bold text-[#5E5E5E] font-sans">目標ポイントを設定</p>
