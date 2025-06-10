@@ -229,17 +229,20 @@ export const splitSharedTasksOnPairRemoval = async (
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-    // 🔹 自分用タスクの登録
+    // 🔹 自分用タスクの登録（修正後）
     const myCopy: FirestoreTask = {
       ...original,
       userId,
       userIds: [userId],
       users: [userId],
       point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
-      createdAt: serverTimestamp() as Timestamp,
-      updatedAt: serverTimestamp() as Timestamp,
     };
-    await addDoc(tasksRef, cleanObject(myCopy));
+    const cleanedMyCopy = cleanObject(myCopy);
+    cleanedMyCopy.createdAt = serverTimestamp() as Timestamp;
+    cleanedMyCopy.updatedAt = serverTimestamp() as Timestamp;
+
+    await addDoc(tasksRef, cleanedMyCopy);
+
     console.log('✅ 自分用タスク登録完了:', original.name);
 
     // 🔹 パートナー用タスクの削除
@@ -262,11 +265,13 @@ export const splitSharedTasksOnPairRemoval = async (
       userIds: [partnerId],
       users: [partnerId],
       point: typeof original.point === 'string' ? Number(original.point) : original.point,
-      createdAt: serverTimestamp() as Timestamp,
-      updatedAt: serverTimestamp() as Timestamp,
     };
-    console.log('🧪 partnerCopy:', JSON.stringify(partnerCopy));
-    await addDoc(tasksRef, cleanObject(partnerCopy));
+    const cleanedPartnerCopy = cleanObject(partnerCopy);
+    cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;
+    cleanedPartnerCopy.updatedAt = serverTimestamp() as Timestamp;
+
+    await addDoc(tasksRef, cleanedPartnerCopy);
+
     console.log('✅ パートナー用タスク登録完了:', original.name);
   }
 
