@@ -56,7 +56,7 @@ export const buildFirestoreTaskData = (
     title: task.title ?? '',
     period: task.period ?? '毎日',
     point: task.point ?? 0,
-    users: task.users ?? [],
+    // users: task.users ?? [],
     daysOfWeek: convertedDaysOfWeek,
     dates: task.dates ?? [],
     isTodo: task.isTodo ?? false,
@@ -234,7 +234,7 @@ export const splitSharedTasksOnPairRemoval = async (
       ...original,
       userId,
       userIds: [userId],
-      users: [userId],
+      // users: [userId],
       point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
     };
     const cleanedMyCopy = cleanObject(myCopy);
@@ -263,7 +263,7 @@ export const splitSharedTasksOnPairRemoval = async (
       ...original,
       userId: partnerId,
       userIds: [partnerId],
-      users: [partnerId],
+      // users: [partnerId],
       point: typeof original.point === 'string' ? Number(original.point) : original.point,
     };
     const cleanedPartnerCopy = cleanObject(partnerCopy);
