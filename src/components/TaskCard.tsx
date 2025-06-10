@@ -139,7 +139,7 @@ export default function TaskCard({
           onEdit(); // PCでは右クリックで編集
         }}
         className={clsx(
-          'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
+          'w-full relative flex justify-between items-center px-4 py-4 rounded-2xl shadow-sm border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
           highlighted ? 'border-blue-400 bg-blue-50' : 'border-[#e5e5e5] bg-white'

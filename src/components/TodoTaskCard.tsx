@@ -63,7 +63,7 @@ export default function TodoTaskCard({
 
   return (
     <div className="relative mb-2.5">
-      <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
+      <div className="bg-blue-50 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <h2
           className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline "
           onClick={() =>
@@ -85,7 +85,7 @@ export default function TodoTaskCard({
                     'rounded-t-md w-24 flex items-center justify-center',
                     type === tab
                       ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
-                      : 'bg-gray-100 text-gray-400 z-0'
+                      : 'bg-blue-50 text-gray-400 z-0'
                   )}
                   type="button"
                 >

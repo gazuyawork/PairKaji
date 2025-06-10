@@ -313,7 +313,7 @@ const createEmptyTask = (): Task => {
 
               return (
                 <div key={period}>
-                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
+                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-1 ml-2">
                     {period}（残り {remaining} 件）
                   </h2>
                   <ul className="space-y-2">

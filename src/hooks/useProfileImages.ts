@@ -43,7 +43,7 @@ export const useProfileImages = () => {
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
-        console.warn('❌ pairs ドキュメントが存在しません');
+        // console.warn('❌ pairs ドキュメントが存在しません');
         setPartnerId(null);
         localStorage.removeItem('partnerImage');
         return;
