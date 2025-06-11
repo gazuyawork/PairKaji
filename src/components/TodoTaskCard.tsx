@@ -135,29 +135,29 @@ export default function TodoTaskCard({
 
 {filteredTodos.map(todo => (
   <div key={todo.id} className="flex items-center gap-2">
-    <motion.div
-      className="cursor-pointer"
-      onClick={() => {
-        setAnimatingTodoId(todo.id);
-        setTimeout(() => {
-          onToggleDone(todo.id);
-          setAnimatingTodoId(null);
-        }, 1000);
-      }}
-      initial={false}
-      animate={
-        animatingTodoId === todo.id
-          ? { rotate: 360, scale: 1.4 }
-          : { rotate: 0, scale: 1 }
-      }
-      transition={{ duration: 0.6, ease: 'easeInOut' }}
-    >
-      {todo.done ? (
-        <CheckCircle className="text-yellow-500" />
-      ) : (
-        <Circle className="text-gray-400" />
-      )}
-    </motion.div>
+<motion.div
+  className="cursor-pointer"
+  onClick={() => {
+    setAnimatingTodoId(todo.id);
+    setTimeout(() => {
+      onToggleDone(todo.id);
+      setAnimatingTodoId(null);
+    }, 600); // アニメーションと同じ時間
+  }}
+  initial={false}
+  animate={
+    animatingTodoId === todo.id
+      ? { rotate: 360, scale: 1.2 }
+      : { rotate: 0, scale: 1 }
+  }
+  transition={{ duration: 0.6, ease: 'easeInOut' }}
+>
+  {todo.done ? (
+    <CheckCircle className="text-yellow-500" />
+  ) : (
+    <Circle className="text-gray-400" />
+  )}
+</motion.div>
 
     <input
       type="text"
