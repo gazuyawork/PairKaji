@@ -135,20 +135,25 @@ export default function TodoTaskCard({
 
 {filteredTodos.map(todo => (
   <div key={todo.id} className="flex items-center gap-2">
+
 <motion.div
   className="cursor-pointer"
   onClick={() => {
-    setAnimatingTodoId(todo.id);
+    const willBeDone = !todo.done;
+    if (willBeDone) {
+      setAnimatingTodoId(todo.id); // ✅ 未処理→完了のときだけアニメ
+    }
+
     setTimeout(() => {
       onToggleDone(todo.id);
       setAnimatingTodoId(null);
-    }, 600); // アニメーションと同じ時間
+    }, willBeDone ? 600 : 0); // ✅ アニメがあるときのみ遅延
   }}
   initial={false}
   animate={
     animatingTodoId === todo.id
-      ? { rotate: 360, scale: 1.2 }
-      : { rotate: 0, scale: 1 }
+      ? { rotate: 360 }
+      : { rotate: 0 }
   }
   transition={{ duration: 0.6, ease: 'easeInOut' }}
 >
