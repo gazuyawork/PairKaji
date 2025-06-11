@@ -29,7 +29,6 @@ import { saveSingleTask } from '@/lib/taskUtils';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { useView } from '@/context/ViewContext';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -49,15 +48,6 @@ export default function TaskView({ initialSearch = '' }: Props) {
   const { profileImage, partnerImage } = useProfileImages();
   const currentUserId = auth.currentUser?.uid;
   const [isLoading, setIsLoading] = useState(true);
-  const { index } = useView();
-  
-
-  // ✅ 追加：＋ボタン表示制御
-  const [showAddButton, setShowAddButton] = useState(false);
-
-  useEffect(() => {
-    setShowAddButton(index === 1);
-  }, [index]);
 
   const userList = [
     { id: currentUserId ?? '', name: 'あなた', imageUrl: profileImage },
