@@ -135,31 +135,20 @@ export default function TodoTaskCard({
 
 {filteredTodos.map(todo => (
   <div key={todo.id} className="flex items-center gap-2">
-
-<motion.div
-  className="cursor-pointer"
-  onClick={() => {
-    setAnimatingTodoId(todo.id);
-    setTimeout(() => {
-      onToggleDone(todo.id);
-      setAnimatingTodoId(null);
-    }, 10); // 切り替え直後にアニメーションを発火
-  }}
-  initial={false}
-  animate={
-    animatingTodoId === todo.id
-      ? { rotate: 360, scale: 1.1 }
-      : { rotate: 0, scale: 1 }
-  }
-  transition={{ duration: 0.4, ease: 'easeInOut' }}
->
-  {/* 状態変更後のアイコンが回転表示されるように、反映後の todo.done を元にレンダリング */}
-  {todo.done ? (
-    <CheckCircle className="text-yellow-500" />
-  ) : (
-    <Circle className="text-gray-400" />
-  )}
-</motion.div>
+    <motion.div
+      key={`${todo.done}-${todo.id}`}
+      className="cursor-pointer"
+      onClick={() => onToggleDone(todo.id)}
+      initial={{ rotate: 0, scale: 1 }}
+      animate={{ rotate: todo.done ? 360 : -360, scale: 1.1 }}
+      transition={{ duration: 0.4, ease: 'easeInOut' }}
+    >
+      {todo.done ? (
+        <CheckCircle className="text-yellow-500" />
+      ) : (
+        <Circle className="text-gray-400" />
+      )}
+    </motion.div>
 
     <input
       type="text"
@@ -191,6 +180,7 @@ export default function TodoTaskCard({
     </button>
   </div>
 ))}
+
         </div>
 
         {tab === 'undone' && (
