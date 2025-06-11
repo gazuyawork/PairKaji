@@ -139,24 +139,21 @@ export default function TodoTaskCard({
 <motion.div
   className="cursor-pointer"
   onClick={() => {
-    const willBeDone = !todo.done;
-    if (willBeDone) {
-      setAnimatingTodoId(todo.id); // ✅ 未処理→完了のときだけアニメ
-    }
-
+    setAnimatingTodoId(todo.id);
     setTimeout(() => {
       onToggleDone(todo.id);
       setAnimatingTodoId(null);
-    }, willBeDone ? 600 : 0); // ✅ アニメがあるときのみ遅延
+    }, 10); // 切り替え直後にアニメーションを発火
   }}
   initial={false}
   animate={
     animatingTodoId === todo.id
-      ? { rotate: 360 }
-      : { rotate: 0 }
+      ? { rotate: 360, scale: 1.1 }
+      : { rotate: 0, scale: 1 }
   }
-  transition={{ duration: 0.6, ease: 'easeInOut' }}
+  transition={{ duration: 0.4, ease: 'easeInOut' }}
 >
+  {/* 状態変更後のアイコンが回転表示されるように、反映後の todo.done を元にレンダリング */}
   {todo.done ? (
     <CheckCircle className="text-yellow-500" />
   ) : (
