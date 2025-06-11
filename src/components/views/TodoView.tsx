@@ -298,7 +298,7 @@ export default function TodoView() {
                   todos: newTodos,
                   updatedAt: serverTimestamp(),
                 });
-                setFocusedTodoId(todoId);
+                // setFocusedTodoId(todoId);
               }}
 
 
