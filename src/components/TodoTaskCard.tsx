@@ -37,19 +37,19 @@ export default function TodoTaskCard({
   const router = useRouter();
   const todos = useMemo(() => task.todos ?? [], [task.todos]);
   const [isComposing, setIsComposing] = useState(false);
+  const [addedTodoId, setAddedTodoId] = useState<string | null>(null);
+  const newTodoRef = useRef<HTMLInputElement | null>(null);
 
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
-  const filteredTodos = useMemo(() =>
-    tab === 'done' ? todos.filter(todo => todo.done) : todos.filter(todo => !todo.done),
+  const filteredTodos = useMemo(
+    () => (tab === 'done' ? todos.filter(todo => todo.done) : todos.filter(todo => !todo.done)),
     [todos, tab]
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isScrollable, setIsScrollable] = useState(false);
   const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
-  const [addedTodoId, setAddedTodoId] = useState<string | null>(null);
-
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -62,6 +62,15 @@ export default function TodoTaskCard({
       return () => window.removeEventListener('resize', checkScroll);
     }
   }, [filteredTodos.length]);
+
+  useEffect(() => {
+    if (addedTodoId && newTodoRef.current) {
+      requestAnimationFrame(() => {
+        newTodoRef.current?.focus();
+        setAddedTodoId(null);
+      });
+    }
+  }, [addedTodoId]);
 
   return (
     <div className="relative mb-2.5">
@@ -160,19 +169,17 @@ export default function TodoTaskCard({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !isComposing && e.currentTarget.value.trim()) {
                     e.preventDefault();
-                    onAddTodo(crypto.randomUUID());
+                    const newId = crypto.randomUUID();
+                    setAddedTodoId(newId);
+                    onAddTodo(newId);
                   }
                 }}
                 ref={(el) => {
                   if (el) {
                     todoRefs.current[todo.id] = el;
                     if (focusedTodoId === todo.id) el.focus();
-
-                    if (addedTodoId === todo.id) {
-                      requestAnimationFrame(() => {
-                        el.focus();
-                        setAddedTodoId(null);
-                      });
+                    if (todo.id === addedTodoId) {
+                      newTodoRef.current = el;
                     }
                   }
                 }}
@@ -195,7 +202,7 @@ export default function TodoTaskCard({
             <button
               onClick={() => {
                 const newId = crypto.randomUUID();
-                setAddedTodoId(newId); // ✅ 新規IDを一時保持
+                setAddedTodoId(newId);
                 onAddTodo(newId);
               }}
               className="flex items-center gap-2 text-gray-600 hover:text-[#FFCB7D]"
