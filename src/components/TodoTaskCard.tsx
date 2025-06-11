@@ -48,6 +48,8 @@ export default function TodoTaskCard({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isScrollable, setIsScrollable] = useState(false);
   const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
+  const [addedTodoId, setAddedTodoId] = useState<string | null>(null);
+
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -111,7 +113,7 @@ export default function TodoTaskCard({
         <div
           ref={scrollRef}
           className={clsx(
-            'max-h-[30vh] space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100',
+            'max-h-[50vh] space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100',
             isScrollable ? 'overflow-y-scroll' : 'overflow-y-auto'
           )}
         >
@@ -162,8 +164,16 @@ export default function TodoTaskCard({
                   }
                 }}
                 ref={(el) => {
-                  if (el) todoRefs.current[todo.id] = el;
-                  if (focusedTodoId === todo.id) el?.focus();
+                  if (el) {
+                    todoRefs.current[todo.id] = el;
+                    if (focusedTodoId === todo.id) el.focus();
+
+                    // ✅ 追加されたTodoなら自動でフォーカス
+                    if (addedTodoId === todo.id) {
+                      el.focus();
+                      setAddedTodoId(null); // フォーカス後はリセット
+                    }
+                  }
                 }}
                 className={clsx(
                   'flex-1 border-b bg-transparent outline-none border-gray-200',
@@ -182,7 +192,11 @@ export default function TodoTaskCard({
         {tab === 'undone' && (
           <div className="relative flex items-center justify-between mt-4">
             <button
-              onClick={() => onAddTodo(crypto.randomUUID())}
+              onClick={() => {
+                const newId = crypto.randomUUID();
+                setAddedTodoId(newId); // ✅ 新規IDを一時保持
+                onAddTodo(newId);
+              }}
               className="flex items-center gap-2 text-gray-600 hover:text-[#FFCB7D]"
               type="button"
             >
