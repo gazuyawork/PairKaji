@@ -11,7 +11,7 @@ interface Props {
   task: TodoOnlyTask;
   tab: 'undone' | 'done';
   setTab: (tab: 'undone' | 'done') => void;
-  onAddTodo: (todoId: string) => void;
+  onAddTodo: (todoId: string, text: string) => void;
   onChangeTodo: (todoId: string, value: string) => void;
   onToggleDone: (todoId: string) => void;
   onBlurTodo: (todoId: string, text: string) => void;
@@ -35,10 +35,10 @@ export default function TodoTaskCard({
   focusedTodoId,
 }: Props) {
   const router = useRouter();
-  const todos = useMemo(() => task.todos ?? [], [task.todos]);
+  const todos = useMemo(() => task?.todos ?? [], [task?.todos]);
   const [isComposing, setIsComposing] = useState(false);
-  const [addedTodoId, setAddedTodoId] = useState<string | null>(null);
-  const newTodoRef = useRef<HTMLInputElement | null>(null);
+  const [newTodoText, setNewTodoText] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
@@ -63,20 +63,23 @@ export default function TodoTaskCard({
     }
   }, [filteredTodos.length]);
 
-  useEffect(() => {
-    if (addedTodoId && newTodoRef.current) {
-      requestAnimationFrame(() => {
-        newTodoRef.current?.focus();
-        setAddedTodoId(null);
-      });
-    }
-  }, [addedTodoId]);
+  const handleAdd = () => {
+    const trimmed = newTodoText.trim();
+    if (!trimmed) return;
+    console.log('[DEBUG] 新規TODO追加:', trimmed);
+    const newId = crypto.randomUUID();
+    onAddTodo(newId, trimmed);
+    setNewTodoText('');
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  };
 
   return (
     <div className="relative mb-2.5">
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <h2
-          className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline "
+          className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline"
           onClick={() =>
             router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)
           }
@@ -145,9 +148,7 @@ export default function TodoTaskCard({
                 animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
                 transition={{ duration: 0.6, ease: 'easeInOut' }}
               >
-                {animatingTodoId === todo.id ? (
-                  <CheckCircle className="text-yellow-500" />
-                ) : todo.done ? (
+                {todo.done ? (
                   <CheckCircle className="text-yellow-500" />
                 ) : (
                   <Circle className="text-gray-400" />
@@ -166,21 +167,10 @@ export default function TodoTaskCard({
                   setIsComposing(false);
                   onBlurTodo(todo.id, e.currentTarget.value);
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isComposing && e.currentTarget.value.trim()) {
-                    e.preventDefault();
-                    const newId = crypto.randomUUID();
-                    setAddedTodoId(newId);
-                    onAddTodo(newId);
-                  }
-                }}
                 ref={(el) => {
                   if (el) {
                     todoRefs.current[todo.id] = el;
                     if (focusedTodoId === todo.id) el.focus();
-                    if (todo.id === addedTodoId) {
-                      newTodoRef.current = el;
-                    }
                   }
                 }}
                 className={clsx(
@@ -198,18 +188,24 @@ export default function TodoTaskCard({
         </div>
 
         {tab === 'undone' && (
-          <div className="relative flex items-center justify-between mt-4">
-            <button
-              onClick={() => {
-                const newId = crypto.randomUUID();
-                setAddedTodoId(newId);
-                onAddTodo(newId);
+          <div className="flex items-center gap-2 mt-4">
+            <Plus className="text-[#FFCB7D]" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={newTodoText}
+              onChange={(e) => setNewTodoText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isComposing) {
+                  e.preventDefault();
+                  handleAdd();
+                }
               }}
-              className="flex items-center gap-2 text-gray-600 hover:text-[#FFCB7D]"
-              type="button"
-            >
-              <Plus size={24} /> TODOを追加
-            </button>
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+              className="flex-1 border-b bg-transparent outline-none border-gray-300 h-8 text-black"
+              placeholder="TODOを入力してEnter"
+            />
           </div>
         )}
       </div>
