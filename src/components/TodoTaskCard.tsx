@@ -133,54 +133,58 @@ export default function TodoTaskCard({
             <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
           )}
 
-{filteredTodos.map(todo => (
-  <div key={todo.id} className="flex items-center gap-2">
-    <motion.div
-      key={`${todo.done}-${todo.id}`}
-      className="cursor-pointer"
-      onClick={() => onToggleDone(todo.id)}
-      initial={{ rotate: 0, scale: 1 }}
-      animate={{ rotate: todo.done ? 360 : -360, scale: 1.1 }}
-      transition={{ duration: 0.4, ease: 'easeInOut' }}
-    >
-      {todo.done ? (
-        <CheckCircle className="text-yellow-500" />
-      ) : (
-        <Circle className="text-gray-400" />
-      )}
-    </motion.div>
+          {filteredTodos.map(todo => (
+            <div key={todo.id} className="flex items-center gap-2">
+              <motion.div
+                className="cursor-pointer"
+                onClick={() => {
+                  setAnimatingTodoId(todo.id);
+                  setTimeout(() => {
+                    onToggleDone(todo.id);
+                    setAnimatingTodoId(null);
+                  }, 1000);
+                }}
+                initial={false}
+                animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
+                transition={{ duration: 0.6, ease: 'easeInOut' }}
+              >
+                {todo.done ? (
+                  <CheckCircle className="text-yellow-500" />
+                ) : (
+                  <Circle className="text-gray-400" />
+                )}
+              </motion.div>
 
-    <input
-      type="text"
-      defaultValue={todo.text}
-      onChange={(e) => onChangeTodo(todo.id, e.target.value)}
-      onBlur={(e) => {
-        if (!isComposing) onBlurTodo(todo.id, e.target.value);
-      }}
-      onCompositionStart={() => setIsComposing(true)}
-      onCompositionEnd={(e) => {
-        setIsComposing(false);
-        onBlurTodo(todo.id, e.currentTarget.value);
-      }}
-      ref={(el) => {
-        if (el) {
-          todoRefs.current[todo.id] = el;
-          if (focusedTodoId === todo.id) el.focus();
-        }
-      }}
-      className={clsx(
-        'flex-1 border-b bg-transparent outline-none border-gray-200',
-        'h-8',
-        todo.done ? 'text-gray-400 line-through' : 'text-black'
-      )}
-      placeholder="TODOを入力"
-    />
-    <button onClick={() => onDeleteTodo(todo.id)} type="button">
-      <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
-    </button>
-  </div>
-))}
-
+              <input
+                type="text"
+                defaultValue={todo.text}
+                onChange={(e) => onChangeTodo(todo.id, e.target.value)}
+                onBlur={(e) => {
+                  if (!isComposing) onBlurTodo(todo.id, e.target.value);
+                }}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={(e) => {
+                  setIsComposing(false);
+                  onBlurTodo(todo.id, e.currentTarget.value);
+                }}
+                ref={(el) => {
+                  if (el) {
+                    todoRefs.current[todo.id] = el;
+                    if (focusedTodoId === todo.id) el.focus();
+                  }
+                }}
+                className={clsx(
+                  'flex-1 border-b bg-transparent outline-none border-gray-200',
+                  'h-8',
+                  todo.done ? 'text-gray-400 line-through' : 'text-black'
+                )}
+                placeholder="TODOを入力"
+              />
+              <button onClick={() => onDeleteTodo(todo.id)} type="button">
+                <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
+              </button>
+            </div>
+          ))}
         </div>
 
         {tab === 'undone' && (
@@ -207,5 +211,4 @@ export default function TodoTaskCard({
       </div>
     </div>
   );
-
 }
