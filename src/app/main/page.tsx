@@ -20,6 +20,8 @@ function MainContent() {
   const searchKeyword = searchParams.get("search") ?? "";
   const { index, setIndex } = useView();
   const [authReady, setAuthReady] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
@@ -81,7 +83,11 @@ function MainContent() {
             <HomeView />
           </div>
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
-            <TaskView initialSearch={searchKeyword} />
+            <TaskView
+              initialSearch={searchKeyword}
+              onModalOpenChange={setIsModalOpen}
+            />
+
           </div>
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <TodoView />
@@ -89,7 +95,7 @@ function MainContent() {
         </motion.div>
 
         {/* ✅ 右下固定の＋ボタン（indexが1のときのみ） */}
-        {index === 1 && (
+        {index === 1 && !isModalOpen && (
           <button
             onClick={() => {
               const event = new CustomEvent('open-new-task-modal');

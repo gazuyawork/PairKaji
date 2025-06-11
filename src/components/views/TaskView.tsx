@@ -34,9 +34,12 @@ const periods: Period[] = ['毎日', '週次', '不定期'];
 
 type Props = {
   initialSearch?: string;
+  onModalOpenChange?: (isOpen: boolean) => void; // ✅ 追加
 };
 
-export default function TaskView({ initialSearch = '' }: Props) {
+
+export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
+
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const initialTaskGroups: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
@@ -276,6 +279,11 @@ export default function TaskView({ initialSearch = '' }: Props) {
     return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
   }, []);
 
+  useEffect(() => {
+    if (onModalOpenChange) {
+      onModalOpenChange(editTargetTask !== null);
+    }
+  }, [editTargetTask, onModalOpenChange]);
 
 
   return (
