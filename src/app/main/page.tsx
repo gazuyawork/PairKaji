@@ -1,7 +1,7 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store'; // ← これが重要
+export const fetchCache = 'force-no-store';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -87,6 +87,20 @@ function MainContent() {
             <TodoView />
           </div>
         </motion.div>
+
+        {/* ✅ 右下固定の＋ボタン（indexが1のときのみ） */}
+        {index === 1 && (
+          <button
+            onClick={() => {
+              const event = new CustomEvent('open-new-task-modal');
+              window.dispatchEvent(event);
+            }}
+            className="fixed bottom-24 right-6 bg-[#FFCB7D] text-white text-3xl w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-[1000]"
+            aria-label="新規タスク追加"
+          >
+            ＋
+          </button>
+        )}
       </div>
 
       <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
@@ -121,4 +135,3 @@ export default function MainPage() {
     </Suspense>
   );
 }
-

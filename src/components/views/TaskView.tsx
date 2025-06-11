@@ -16,20 +16,20 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
 import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-import { Timestamp } from 'firebase/firestore';
 import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { saveSingleTask } from '@/lib/taskUtils';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { serverTimestamp } from 'firebase/firestore';
-
+import { useView } from '@/context/ViewContext';
 
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
@@ -49,34 +49,42 @@ export default function TaskView({ initialSearch = '' }: Props) {
   const { profileImage, partnerImage } = useProfileImages();
   const currentUserId = auth.currentUser?.uid;
   const [isLoading, setIsLoading] = useState(true);
+  const { index } = useView();
+  
+
+  // ✅ 追加：＋ボタン表示制御
+  const [showAddButton, setShowAddButton] = useState(false);
+
+  useEffect(() => {
+    setShowAddButton(index === 1);
+  }, [index]);
 
   const userList = [
     { id: currentUserId ?? '', name: 'あなた', imageUrl: profileImage },
     { id: partnerUserId ?? '', name: 'パートナー', imageUrl: partnerImage },
   ];
 
-const createEmptyTask = (): Task => {
-  return {
-    id: '',
-    name: '',
-    title: '',
-    point: 5,
-    period: '毎日',
-    dates: [],
-    daysOfWeek: [],
-    isTodo: false,
-    userId: currentUserId ?? '',
-    users: [currentUserId ?? ''],
-    userIds: [],
-    done: false,
-    skipped: false,
-    visible: false,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    todos: [],
-  } as unknown as Task; // ✅ 型を一時的にTaskとして扱う
-};
-
+  const createEmptyTask = (): Task => {
+    return {
+      id: '',
+      name: '',
+      title: '',
+      point: 5,
+      period: '毎日',
+      dates: [],
+      daysOfWeek: [],
+      isTodo: false,
+      userId: currentUserId ?? '',
+      users: [currentUserId ?? ''],
+      userIds: [],
+      done: false,
+      skipped: false,
+      visible: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      todos: [],
+    } as unknown as Task;
+  };
 
   useEffect(() => {
     const fetchPairStatus = async () => {
@@ -252,7 +260,7 @@ const createEmptyTask = (): Task => {
         }
 
         setTasksState(grouped);
-        setIsLoading(false)
+        setIsLoading(false);
       });
     };
 
@@ -268,6 +276,17 @@ const createEmptyTask = (): Task => {
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
+
+  useEffect(() => {
+    const handleOpenModal = () => {
+      setEditTargetTask(createEmptyTask());
+    };
+
+    window.addEventListener('open-new-task-modal', handleOpenModal);
+    return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
+  }, []);
+
+
 
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
@@ -313,7 +332,7 @@ const createEmptyTask = (): Task => {
 
               return (
                 <div key={period}>
-                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-1 ml-2">
+                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
                     {period}（残り {remaining} 件）
                   </h2>
                   <ul className="space-y-2">
@@ -348,7 +367,7 @@ const createEmptyTask = (): Task => {
         )}
       </main>
 
-      {/* ✅ 新規登録用モーダル */}
+      {/* ✅ モーダル */}
       {editTargetTask && (
         <EditTaskModal
           key={editTargetTask.id}
@@ -360,15 +379,6 @@ const createEmptyTask = (): Task => {
           isPairConfirmed={pairStatus === 'confirmed'}
         />
       )}
-
-      {/* ✅ 右下固定の＋ボタン */}
-      <button
-        onClick={() => setEditTargetTask(createEmptyTask())}
-        className="fixed bottom-26 right-6 left-194 bg-[#FFCB7D] text-white text-3xl w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-40"
-        aria-label="新規タスク追加"
-      >
-        ＋
-      </button>
     </div>
   );
 }
