@@ -168,10 +168,11 @@ export default function TodoTaskCard({
                     todoRefs.current[todo.id] = el;
                     if (focusedTodoId === todo.id) el.focus();
 
-                    // ✅ 追加されたTodoなら自動でフォーカス
                     if (addedTodoId === todo.id) {
-                      el.focus();
-                      setAddedTodoId(null); // フォーカス後はリセット
+                      requestAnimationFrame(() => {
+                        el.focus();
+                        setAddedTodoId(null);
+                      });
                     }
                   }
                 }}
