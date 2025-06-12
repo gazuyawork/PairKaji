@@ -163,7 +163,7 @@ export default function TodoTaskCard({
       </div>
 
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2 min-h-20">
-        <div ref={scrollRef} className="max-h-[28vh] overflow-y-scroll space-y-4 pr-4">
+        <div ref={scrollRef} className="max-h-[40vh] overflow-y-scroll space-y-4 pr-4">
           {filteredTodos.length === 0 && tab === 'done' && (
             <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
           )}
