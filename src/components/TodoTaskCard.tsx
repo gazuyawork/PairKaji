@@ -1,3 +1,5 @@
+// ファイル名: TodoTaskCard.tsx
+
 'use client';
 
 import { CheckCircle, Circle, Trash2, Plus, ChevronsDown } from 'lucide-react';
@@ -114,7 +116,7 @@ export default function TodoTaskCard({
   const [isAnimating, setIsAnimating] = useState(false);
 
   const handleToggleWithAnimation = (id: string) => {
-    if (isAnimating) return; // アニメーション中は無視
+    if (isAnimating) return;
 
     setIsAnimating(true);
     setAnimatingTodoIds(prev => new Set(prev).add(id));
@@ -125,10 +127,62 @@ export default function TodoTaskCard({
         newSet.delete(id);
         return newSet;
       });
-      setIsAnimating(false); // アニメーション完了後にロック解除
+      setIsAnimating(false);
     }, 1000);
   };
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDeleteAnimating, setIsDeleteAnimating] = useState(false);
+  const deleteTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDeleteClick = () => {
+    if (isDeleteAnimating) return;
+
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setIsDeleteAnimating(true);
+
+      setTimeout(() => {
+        setIsDeleteAnimating(false);
+      }, 400);
+
+      deleteTimeout.current = setTimeout(() => {
+        setConfirmDelete(false);
+      }, 2000);
+    } else {
+      if (deleteTimeout.current) clearTimeout(deleteTimeout.current);
+      setConfirmDelete(false);
+      onDeleteTask();
+    }
+  };
+
+  const [confirmTodoDeletes, setConfirmTodoDeletes] = useState<Record<string, boolean>>({});
+  const todoDeleteTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+
+  const handleTodoDeleteClick = (todoId: string) => {
+    if (confirmTodoDeletes[todoId]) {
+      if (todoDeleteTimeouts.current[todoId]) {
+        clearTimeout(todoDeleteTimeouts.current[todoId]);
+        delete todoDeleteTimeouts.current[todoId];
+      }
+      setConfirmTodoDeletes(prev => ({ ...prev, [todoId]: false }));
+      onDeleteTodo(todoId);
+    } else {
+      setConfirmTodoDeletes(prev => ({ ...prev, [todoId]: true }));
+      const timeout = setTimeout(() => {
+        setConfirmTodoDeletes(prev => ({ ...prev, [todoId]: false }));
+        delete todoDeleteTimeouts.current[todoId];
+      }, 2000);
+      todoDeleteTimeouts.current[todoId] = timeout;
+    }
+  };
+
+  const shakeVariants = {
+    shake: {
+      x: [0, -6, 6, -4, 4, -2, 2, 0],
+      transition: { duration: 0.4 },
+    },
+  };
 
   return (
     <div className="relative mb-2.5">
@@ -171,13 +225,19 @@ export default function TodoTaskCard({
               );
             })}
           </div>
-          <button
-            onClick={onDeleteTask}
-            className="text-gray-400 hover:text-red-500 text-2xl font-bold pr-1"
-            type="button"
-          >
-            ×
-          </button>
+<motion.button
+  onClick={handleDeleteClick}
+  animate={isDeleteAnimating ? 'shake' : undefined}
+  variants={shakeVariants}
+  className={clsx(
+    'text-2xl font-bold pr-1',
+    confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
+  )}
+  type="button"
+>
+  ×
+</motion.button>
+
         </div>
       </div>
 
@@ -246,9 +306,21 @@ export default function TodoTaskCard({
                   )}
                   placeholder="TODOを入力"
                 />
-                <button onClick={() => onDeleteTodo(todo.id)} type="button">
-                  <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
-                </button>
+<motion.button
+  type="button"
+  onClick={() => handleTodoDeleteClick(todo.id)}
+  animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
+  variants={shakeVariants}
+>
+  <Trash2
+    size={18}
+    className={clsx(
+      'hover:text-red-500',
+      confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
+    )}
+  />
+</motion.button>
+
               </div>
               {editingErrors[todo.id] && (
                 <div className="text-red-500 text-xs ml-8">{editingErrors[todo.id]}</div>
@@ -279,7 +351,6 @@ export default function TodoTaskCard({
               className="w-[75%] border-b bg-transparent outline-none border-gray-300 h-8 text-black"
               placeholder="TODOを入力してEnter"
             />
-
             {isScrollable && (
               <div className="absolute right-3 animate-pulse">
                 <div className="w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
@@ -289,7 +360,6 @@ export default function TodoTaskCard({
             )}
           </div>
         )}
-
         {inputError && (
           <div className="text-red-500 text-xs mt-1 ml-2">{inputError}</div>
         )}
