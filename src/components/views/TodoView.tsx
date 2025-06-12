@@ -50,6 +50,15 @@ export default function TodoView() {
   }, [tasks]);
 
   useEffect(() => {
+    if (inputError) {
+      const timer = setTimeout(() => {
+        setInputError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [inputError]);
+
+  useEffect(() => {
     const fetchTasks = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
