@@ -41,7 +41,7 @@ export default function TodoTaskCard({
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
+  const [animatingTodoIds, setAnimatingTodoIds] = useState<Set<string>>(new Set());
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
 
   const undoneCount = todos.filter(todo => !todo.done).length;
@@ -111,6 +111,25 @@ export default function TodoTaskCard({
     });
   };
 
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const handleToggleWithAnimation = (id: string) => {
+    if (isAnimating) return; // アニメーション中は無視
+
+    setIsAnimating(true);
+    setAnimatingTodoIds(prev => new Set(prev).add(id));
+    setTimeout(() => {
+      onToggleDone(id);
+      setAnimatingTodoIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+      setIsAnimating(false); // アニメーション完了後にロック解除
+    }, 1000);
+  };
+
+
   return (
     <div className="relative mb-2.5">
       {isScrollable && (
@@ -173,18 +192,12 @@ export default function TodoTaskCard({
               <div className="flex items-center gap-2">
                 <motion.div
                   className="cursor-pointer"
-                  onClick={() => {
-                    setAnimatingTodoId(todo.id);
-                    setTimeout(() => {
-                      onToggleDone(todo.id);
-                      setAnimatingTodoId(null);
-                    }, 1000);
-                  }}
+                  onClick={() => handleToggleWithAnimation(todo.id)}
                   initial={false}
-                  animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
-                  transition={{ duration: 0.6, ease: 'easeInOut' }}
+                  animate={animatingTodoIds.has(todo.id) ? { rotate: 360 } : { rotate: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
                 >
-                  {animatingTodoId === todo.id || todo.done ? (
+                  {animatingTodoIds.has(todo.id) || todo.done ? (
                     <CheckCircle className="text-yellow-500" />
                   ) : (
                     <Circle className="text-gray-400" />
