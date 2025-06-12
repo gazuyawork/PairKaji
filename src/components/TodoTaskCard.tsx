@@ -148,7 +148,9 @@ export default function TodoTaskCard({
                 animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
                 transition={{ duration: 0.6, ease: 'easeInOut' }}
               >
-                {todo.done ? (
+                {animatingTodoId === todo.id ? (
+                  <CheckCircle className="text-yellow-500" />
+                ) : todo.done ? (
                   <CheckCircle className="text-yellow-500" />
                 ) : (
                   <Circle className="text-gray-400" />
