@@ -225,18 +225,18 @@ export default function TodoTaskCard({
               );
             })}
           </div>
-<motion.button
-  onClick={handleDeleteClick}
-  animate={isDeleteAnimating ? 'shake' : undefined}
-  variants={shakeVariants}
-  className={clsx(
-    'text-2xl font-bold pr-1',
-    confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
-  )}
-  type="button"
->
-  ×
-</motion.button>
+            <motion.button
+              onClick={handleDeleteClick}
+              animate={isDeleteAnimating ? 'shake' : undefined}
+              variants={shakeVariants}
+              className={clsx(
+                'text-2xl font-bold pr-1',
+                confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
+              )}
+              type="button"
+            >
+              ×
+            </motion.button>
 
         </div>
       </div>
@@ -323,7 +323,7 @@ export default function TodoTaskCard({
 
               </div>
               {editingErrors[todo.id] && (
-                <div className="text-red-500 text-xs ml-8">{editingErrors[todo.id]}</div>
+                <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">{editingErrors[todo.id]}</div>
               )}
             </div>
           ))}
@@ -361,7 +361,7 @@ export default function TodoTaskCard({
           </div>
         )}
         {inputError && (
-          <div className="text-red-500 text-xs mt-1 ml-2">{inputError}</div>
+          <div className="bg-red-400 text-white text-xs mt-1 ml-2 px-2 py-1 rounded-md">{inputError}</div>
         )}
       </div>
     </div>

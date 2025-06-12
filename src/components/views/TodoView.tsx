@@ -244,7 +244,7 @@ export default function TodoView() {
               )}
             </div>
             {inputError && (
-              <p className="text-sm text-red-500 mt-1 px-1">{inputError}</p>
+              <p className="bg-red-400 text-white text-xs mt-1 px-2 py-1 rounded-md">{inputError}</p>
             )}
           </div>
           <button
