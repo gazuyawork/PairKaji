@@ -37,8 +37,8 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
   const filteredTasks = tasks.filter(task => task.visible);
 
   return (
-    <div className="relative py-0">
-      <div ref={scrollRef} className="overflow-x-auto whitespace-nowrap scroll-smooth px-4">
+    <div className="relative py-0 mb-3">
+      <div ref={scrollRef} className="overflow-x-auto whitespace-nowrap scroll-smooth px-2">
         <div className="flex gap-2 w-max">
           {filteredTasks.map((task) => (
             <button

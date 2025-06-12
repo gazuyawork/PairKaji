@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, Circle, Trash2, Plus } from 'lucide-react';
+import { CheckCircle, Circle, Trash2, Plus, ChevronsDown } from 'lucide-react';
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
@@ -48,25 +48,41 @@ export default function TodoTaskCard({
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollRatio, setScrollRatio] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
   const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) {
-      const checkScroll = () => {
-        setIsScrollable(el.scrollHeight > el.clientHeight);
-      };
-      checkScroll();
-      window.addEventListener('resize', checkScroll);
-      return () => window.removeEventListener('resize', checkScroll);
-    }
+    if (!el) return;
+
+    const handleScroll = () => {
+      const ratio = el.scrollTop / (el.scrollHeight - el.clientHeight);
+      setScrollRatio(Math.min(1, Math.max(0, ratio)));
+    };
+
+    const checkScrollable = () => {
+      if (el.scrollHeight > el.clientHeight) {
+        setIsScrollable(true);
+        handleScroll();
+      } else {
+        setIsScrollable(false);
+        setScrollRatio(0);
+      }
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    checkScrollable();
+    window.addEventListener('resize', checkScrollable);
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', checkScrollable);
+    };
   }, [filteredTodos.length]);
 
   const handleAdd = () => {
     const trimmed = newTodoText.trim();
     if (!trimmed) return;
-    console.log('[DEBUG] 新規TODO追加:', trimmed);
     const newId = crypto.randomUUID();
     onAddTodo(newId, trimmed);
     setNewTodoText('');
@@ -77,6 +93,14 @@ export default function TodoTaskCard({
 
   return (
     <div className="relative mb-2.5">
+      {/* ✅ 縦インジケータ（位置を上に調整） */}
+      {isScrollable && (
+        <div
+          className="absolute top-10 right-1 w-1 bg-orange-200 rounded-full transition-all duration-150"
+          style={{ height: `${scrollRatio * 90}%` }}
+        />
+      )}
+
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <h2
           className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline"
@@ -124,10 +148,7 @@ export default function TodoTaskCard({
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2 min-h-20">
         <div
           ref={scrollRef}
-          className={clsx(
-            'max-h-[50vh] space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100',
-            isScrollable ? 'overflow-y-scroll' : 'overflow-y-auto'
-          )}
+          className="max-h-[40vh] overflow-y-scroll space-y-4 pr-4"
         >
           {filteredTodos.length === 0 && tab === 'done' && (
             <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
@@ -190,7 +211,7 @@ export default function TodoTaskCard({
         </div>
 
         {tab === 'undone' && (
-          <div className="flex items-center gap-2 mt-4">
+          <div className="flex items-center gap-2 mt-4 relative">
             <Plus className="text-[#FFCB7D]" />
             <input
               ref={inputRef}
@@ -205,9 +226,19 @@ export default function TodoTaskCard({
               }}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
-              className="flex-1 border-b bg-transparent outline-none border-gray-300 h-8 text-black"
+              // className="flex-1 border-b bg-transparent outline-none border-gray-300 h-8 text-black"
+              className="w-[75%] border-b bg-transparent outline-none border-gray-300 h-8 text-black"
               placeholder="TODOを入力してEnter"
             />
+
+            {/* ✅ アイコンによるもっと見る */}
+            {isScrollable && (
+              <div className="absolute right-3 animate-pulse">
+                <div className="w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
+                  <ChevronsDown className="text-white" size={16} />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
