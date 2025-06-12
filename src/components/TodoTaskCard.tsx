@@ -42,6 +42,7 @@ export default function TodoTaskCard({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
+  const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
 
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
@@ -168,77 +169,77 @@ export default function TodoTaskCard({
           )}
 
           {filteredTodos.map(todo => (
-            <div key={todo.id} className="flex items-center gap-2">
-              <motion.div
-                className="cursor-pointer"
-                onClick={() => {
-                  setAnimatingTodoId(todo.id);
-                  setTimeout(() => {
-                    onToggleDone(todo.id);
-                    setAnimatingTodoId(null);
-                  }, 1000);
-                }}
-                initial={false}
-                animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
-                transition={{ duration: 0.6, ease: 'easeInOut' }}
-              >
-                {animatingTodoId === todo.id || todo.done ? (
-                  <CheckCircle className="text-yellow-500" />
-                ) : (
-                  <Circle className="text-gray-400" />
-                )}
-              </motion.div>
+            <div key={todo.id} className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <motion.div
+                  className="cursor-pointer"
+                  onClick={() => {
+                    setAnimatingTodoId(todo.id);
+                    setTimeout(() => {
+                      onToggleDone(todo.id);
+                      setAnimatingTodoId(null);
+                    }, 1000);
+                  }}
+                  initial={false}
+                  animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
+                  transition={{ duration: 0.6, ease: 'easeInOut' }}
+                >
+                  {animatingTodoId === todo.id || todo.done ? (
+                    <CheckCircle className="text-yellow-500" />
+                  ) : (
+                    <Circle className="text-gray-400" />
+                  )}
+                </motion.div>
 
-              <input
-                type="text"
-                defaultValue={todo.text}
-                onBlur={(e) => {
-                  const newText = e.target.value.trim();
-                  if (!newText) return;
+                <input
+                  type="text"
+                  defaultValue={todo.text}
+                  onBlur={(e) => {
+                    const newText = e.target.value.trim();
+                    if (!newText) return;
 
-                  const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
-                  if (isDuplicate) {
-                    setInputError('既に登録済みです');
-                    const inputEl = todoRefs.current[todo.id];
-                    if (inputEl) {
-                      inputEl.value = todo.text;
+                    const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
+                    if (isDuplicate) {
+                      setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
+                      const inputEl = todoRefs.current[todo.id];
+                      if (inputEl) inputEl.value = todo.text;
+                      return;
                     }
-                    return;
-                  }
 
-                const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
-                  if (matchDone) {
-                    setInputError('完了タスクに存在しています');
-                    const inputEl = todoRefs.current[todo.id];
-                    if (inputEl) {
-                      inputEl.value = todo.text;
+                    const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
+                    if (matchDone) {
+                      setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
+                      const inputEl = todoRefs.current[todo.id];
+                      if (inputEl) inputEl.value = todo.text;
+                      return;
                     }
-                    return;
-                }
 
-
-                  setInputError(null);
-                  onChangeTodo(todo.id, newText);
-                  onBlurTodo(todo.id, newText);
-                }}
-                onCompositionStart={() => setIsComposing(true)}
-                onCompositionEnd={() => setIsComposing(false)}
-                ref={(el) => {
-                  if (el) {
-                    todoRefs.current[todo.id] = el;
-                    if (focusedTodoId === todo.id) el.focus();
-                  }
-                }}
-                className={clsx(
-                  'flex-1 border-b bg-transparent outline-none border-gray-200',
-                  'h-8',
-                  todo.done ? 'text-gray-400 line-through' : 'text-black'
-                )}
-                placeholder="TODOを入力"
-              />
-              <button onClick={() => onDeleteTodo(todo.id)} type="button">
-                <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
-              </button>
+                    setEditingErrors(prev => ({ ...prev, [todo.id]: '' }));
+                    onChangeTodo(todo.id, newText);
+                    onBlurTodo(todo.id, newText);
+                  }}
+                  onCompositionStart={() => setIsComposing(true)}
+                  onCompositionEnd={() => setIsComposing(false)}
+                  ref={(el) => {
+                    if (el) {
+                      todoRefs.current[todo.id] = el;
+                      if (focusedTodoId === todo.id) el.focus();
+                    }
+                  }}
+                  className={clsx(
+                    'flex-1 border-b bg-transparent outline-none border-gray-200',
+                    'h-8',
+                    todo.done ? 'text-gray-400 line-through' : 'text-black'
+                  )}
+                  placeholder="TODOを入力"
+                />
+                <button onClick={() => onDeleteTodo(todo.id)} type="button">
+                  <Trash2 size={18} className="text-gray-400 hover:text-red-500" />
+                </button>
+              </div>
+              {editingErrors[todo.id] && (
+                <div className="text-red-500 text-xs ml-8">{editingErrors[todo.id]}</div>
+              )}
             </div>
           ))}
         </div>
