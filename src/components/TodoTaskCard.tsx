@@ -6,6 +6,7 @@ import { useRef, useState, useEffect, useMemo } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 
 interface Props {
   task: TodoOnlyTask;
@@ -39,6 +40,8 @@ export default function TodoTaskCard({
   const [isComposing, setIsComposing] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
 
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
@@ -50,7 +53,6 @@ export default function TodoTaskCard({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
-  const [animatingTodoId, setAnimatingTodoId] = useState<string | null>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -83,9 +85,26 @@ export default function TodoTaskCard({
   const handleAdd = () => {
     const trimmed = newTodoText.trim();
     if (!trimmed) return;
+
+    const isDuplicateUndone = todos.some(todo => todo.text === trimmed && !todo.done);
+    if (isDuplicateUndone) {
+      setInputError('既に登録済みです');
+      return;
+    }
+
+    const matchedDone = todos.find(todo => todo.text === trimmed && todo.done);
+    if (matchedDone) {
+      onToggleDone(matchedDone.id);
+      setNewTodoText('');
+      setInputError(null);
+      toast.success('完了済のタスクを復活しました');
+      return;
+    }
+
     const newId = crypto.randomUUID();
     onAddTodo(newId, trimmed);
     setNewTodoText('');
+    setInputError(null);
     requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
@@ -93,7 +112,6 @@ export default function TodoTaskCard({
 
   return (
     <div className="relative mb-2.5">
-      {/* ✅ 縦インジケータ（位置を上に調整） */}
       {isScrollable && (
         <div
           className="absolute top-10 right-1 w-1 bg-orange-200 rounded-full transition-all duration-150"
@@ -104,9 +122,7 @@ export default function TodoTaskCard({
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <h2
           className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline"
-          onClick={() =>
-            router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)
-          }
+          onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
         >
           {task.name}
         </h2>
@@ -146,10 +162,7 @@ export default function TodoTaskCard({
       </div>
 
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 px-4 pb-4 space-y-2 min-h-20">
-        <div
-          ref={scrollRef}
-          className="max-h-[40vh] overflow-y-scroll space-y-4 pr-4"
-        >
+        <div ref={scrollRef} className="max-h-[40vh] overflow-y-scroll space-y-4 pr-4">
           {filteredTodos.length === 0 && tab === 'done' && (
             <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
           )}
@@ -169,9 +182,7 @@ export default function TodoTaskCard({
                 animate={animatingTodoId === todo.id ? { rotate: 360 } : { rotate: 0 }}
                 transition={{ duration: 0.6, ease: 'easeInOut' }}
               >
-                {animatingTodoId === todo.id ? (
-                  <CheckCircle className="text-yellow-500" />
-                ) : todo.done ? (
+                {animatingTodoId === todo.id || todo.done ? (
                   <CheckCircle className="text-yellow-500" />
                 ) : (
                   <Circle className="text-gray-400" />
@@ -181,15 +192,37 @@ export default function TodoTaskCard({
               <input
                 type="text"
                 defaultValue={todo.text}
-                onChange={(e) => onChangeTodo(todo.id, e.target.value)}
                 onBlur={(e) => {
-                  if (!isComposing) onBlurTodo(todo.id, e.target.value);
+                  const newText = e.target.value.trim();
+                  if (!newText) return;
+
+                  const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
+                  if (isDuplicate) {
+                    setInputError('既に登録済みです');
+                    const inputEl = todoRefs.current[todo.id];
+                    if (inputEl) {
+                      inputEl.value = todo.text;
+                    }
+                    return;
+                  }
+
+                const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
+                  if (matchDone) {
+                    setInputError('完了タスクに存在しています');
+                    const inputEl = todoRefs.current[todo.id];
+                    if (inputEl) {
+                      inputEl.value = todo.text;
+                    }
+                    return;
+                }
+
+
+                  setInputError(null);
+                  onChangeTodo(todo.id, newText);
+                  onBlurTodo(todo.id, newText);
                 }}
                 onCompositionStart={() => setIsComposing(true)}
-                onCompositionEnd={(e) => {
-                  setIsComposing(false);
-                  onBlurTodo(todo.id, e.currentTarget.value);
-                }}
+                onCompositionEnd={() => setIsComposing(false)}
                 ref={(el) => {
                   if (el) {
                     todoRefs.current[todo.id] = el;
@@ -217,7 +250,10 @@ export default function TodoTaskCard({
               ref={inputRef}
               type="text"
               value={newTodoText}
-              onChange={(e) => setNewTodoText(e.target.value)}
+              onChange={(e) => {
+                setNewTodoText(e.target.value);
+                setInputError(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !isComposing) {
                   e.preventDefault();
@@ -226,12 +262,10 @@ export default function TodoTaskCard({
               }}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
-              // className="flex-1 border-b bg-transparent outline-none border-gray-300 h-8 text-black"
               className="w-[75%] border-b bg-transparent outline-none border-gray-300 h-8 text-black"
               placeholder="TODOを入力してEnter"
             />
 
-            {/* ✅ アイコンによるもっと見る */}
             {isScrollable && (
               <div className="absolute right-3 animate-pulse">
                 <div className="w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
@@ -240,6 +274,10 @@ export default function TodoTaskCard({
               </div>
             )}
           </div>
+        )}
+
+        {inputError && (
+          <div className="text-red-500 text-xs mt-1 ml-2">{inputError}</div>
         )}
       </div>
     </div>
