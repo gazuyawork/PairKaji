@@ -31,6 +31,7 @@ import { useView } from '@/context/ViewContext';
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName } = useView();
   const [filterText, setFilterText] = useState('');
+
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [taskInput, setTaskInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
@@ -43,20 +44,13 @@ export default function TodoView() {
 
   const taskNameOptions = useMemo(() => {
     const names = tasks
-      .filter(task => !task.visible)
+      .filter(task => !task.visible) // 非表示（visible: false）のものだけサジェスト表示
       .map(task => task.name)
       .filter(Boolean);
     return Array.from(new Set(names));
   }, [tasks]);
 
-  useEffect(() => {
-    if (inputError) {
-      const timer = setTimeout(() => {
-        setInputError(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [inputError]);
+
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -118,73 +112,80 @@ export default function TodoView() {
     }
   }, [tasks, selectedGroupId]);
 
-  const handleAddTask = useCallback(async () => {
-    const name = taskInput.trim();
-    if (!name) {
-      setInputError('タスク名を入力してください');
-      return;
-    }
 
-    const existing = tasks.find((t) => t.name.trim() === name);
-    if (existing) {
-      if (!existing.visible) {
-        await updateDoc(doc(db, 'tasks', existing.id), {
-          visible: true,
-          updatedAt: serverTimestamp(),
-        });
-        toast.success('非表示のタスクを再表示しました。');
-      } else {
-        setInputError('同じ名前のタスクは登録できません');
-      }
-      setTaskInput('');
-      return;
-    }
 
-    const userId = auth.currentUser?.uid;
-    if (!userId) {
-      alert("ユーザー情報が取得できません");
-      return;
-    }
+const handleAddTask = useCallback(async () => {
+  const name = taskInput.trim();
+  if (!name) {
+    setInputError('タスク名を入力してください');
+    return;
+  }
 
-    let userIds = [userId];
-    try {
-      const pairSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', userId), where('status', '==', 'confirmed'))
-      );
-      pairSnap.forEach(doc => {
-        const data = doc.data();
-        if (Array.isArray(data.userIds)) {
-          userIds = data.userIds;
-        }
+  const existing = tasks.find((t) => t.name.trim() === name);
+
+  if (existing) {
+    if (!existing.visible) {
+      await updateDoc(doc(db, 'tasks', existing.id), {
+        visible: true,
+        updatedAt: serverTimestamp(),
       });
-    } catch (e) {
-      console.error('ペア情報の取得に失敗:', e);
+      toast.success('非表示のタスクを再表示しました。');
+    } else {
+      setInputError('同じ名前のタスクは登録できません');
     }
 
-    const tasksRef = collection(db, 'tasks');
-    const newTaskRef = doc(tasksRef);
-    const newTaskData = {
-      name,
-      period: '毎日',
-      todos: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      isTodo: true,
-      point: 10,
-      userId,
-      userIds,
-      users: [],
-      daysOfWeek: [],
-      dates: [],
-      visible: true,
-    };
-
-    await setDoc(newTaskRef, newTaskData);
-    toast.success('新しくタスクが登録されました。');
     setTaskInput('');
-    setInputError(null);
-    setFocusedTodoId(null);
-  }, [taskInput, tasks]);
+    return;
+  }
+
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    alert("ユーザー情報が取得できません");
+    return;
+  }
+
+  // 🔹 userIdsの取得処理追加
+  let userIds = [userId];
+  try {
+    const pairSnap = await getDocs(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', userId), where('status', '==', 'confirmed'))
+    );
+    pairSnap.forEach(doc => {
+      const data = doc.data();
+      if (Array.isArray(data.userIds)) {
+        userIds = data.userIds;
+      }
+    });
+  } catch (e) {
+    console.error('ペア情報の取得に失敗:', e);
+  }
+
+  const tasksRef = collection(db, 'tasks');
+  const newTaskRef = doc(tasksRef);
+
+  const newTaskData = {
+    name,
+    period: '毎日',
+    todos: [],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    isTodo: true,
+    point: 10,
+    userId,
+    userIds, // 🔹 ここでペアのuserIdsをセット
+    users: [],
+    daysOfWeek: [],
+    dates: [],
+    visible: true,
+  };
+
+  await setDoc(newTaskRef, newTaskData);
+  toast.success('新しくタスクが登録されました。');
+
+  setTaskInput('');
+  setInputError(null);
+  setFocusedTodoId(null);
+}, [taskInput, tasks]);
 
   const handleTaskInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -197,7 +198,7 @@ export default function TodoView() {
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
       <Header title="Todo" />
       <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
-        <div className="flex gap-2 items-start mb-3">
+        <div className="flex gap-2 items-start">
           <div className="relative flex-1">
             <div className="relative">
               <input
@@ -231,6 +232,7 @@ export default function TodoView() {
               >
                 <ChevronDown size={16} />
               </button>
+
               {isOpen && taskNameOptions.length > 0 && (
                 <ul
                   className="absolute z-50 w-full bg-white border border-gray-300 rounded shadow mt-1 max-h-40 overflow-y-auto text-sm"
@@ -253,9 +255,11 @@ export default function TodoView() {
               )}
             </div>
             {inputError && (
-              <p className="bg-red-400 text-white text-xs mt-1 px-2 py-1 rounded-md">{inputError}</p>
+              <p className="text-sm text-red-500 mt-1 px-1">{inputError}</p>
             )}
+
           </div>
+
           <button
             onClick={handleAddTask}
             className="w-10 h-10 bg-[#FFCB7D] text-white rounded-full flex items-center justify-center shadow-md hover:opacity-90 mt-1"
@@ -264,14 +268,17 @@ export default function TodoView() {
             <Plus size={20} />
           </button>
         </div>
+
         <GroupSelector
           tasks={tasks}
           selectedGroupId={selectedGroupId}
           onSelectGroup={(groupId) => {
             setSelectedGroupId(groupId);
-            setFilterText('');
+            setFilterText(''); // ← ここでフィルタを解除
           }}
         />
+
+
         {(selectedGroupId != null || filterText.trim() !== '') && (
           <div className="flex justify-center">
             <button
@@ -285,32 +292,40 @@ export default function TodoView() {
             </button>
           </div>
         )}
+
+
         {(() => {
-          const filteredTasks = tasks.filter(task =>
-            task.visible &&
-            (!selectedGroupId || task.id === selectedGroupId) &&
-            (filterText.trim() === '' || task.name.includes(filterText))
-          );
+          const filteredTasks = tasks
+            .filter(task =>
+              task.visible &&
+              (!selectedGroupId || task.id === selectedGroupId) &&
+              (filterText.trim() === '' || task.name.includes(filterText))
+            );
+
           if (filteredTasks.length === 0) {
-            return <p className="text-center text-gray-500 mt-4">TODOはありません。</p>;
+            return (
+              <p className="text-center text-gray-500 mt-4">
+                TODOはありません。
+              </p>
+            );
           }
+
           return filteredTasks.map(task => (
             <TodoTaskCard
               key={task.id}
               task={task}
               tab={activeTabs[task.id] ?? 'undone'}
-              setTab={(tab) => setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))}
-
-              onAddTodo={async (todoId, text) => {
-                const newTodos = [...task.todos, { id: todoId, text, done: false }];
+              setTab={(tab) =>
+                setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
+              }
+              onAddTodo={async (todoId) => {
+                const newTodos = [...task.todos, { id: todoId, text: '', done: false }];
                 await updateDoc(doc(db, 'tasks', task.id), {
                   todos: newTodos,
                   updatedAt: serverTimestamp(),
                 });
-                // setFocusedTodoId(todoId);
+                setFocusedTodoId(todoId);
               }}
-
-
               onChangeTodo={async (todoId, value) => {
                 const updatedTodos = task.todos.map(todo =>
                   todo.id === todoId ? { ...todo, text: value } : todo
@@ -356,6 +371,7 @@ export default function TodoView() {
             />
           ));
         })()}
+
       </main>
     </div>
   );

@@ -2,7 +2,7 @@
 
 'use client';
 
-import { CheckCircle, Circle, Trash2, Plus, ChevronsDown } from 'lucide-react';
+import { CheckCircle, Circle, Trash2, Plus, ChevronsDown, Notebook } from 'lucide-react';
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
@@ -217,9 +217,15 @@ export default function TodoTaskCard({
                   )}
                   type="button"
                 >
-                  <span className="absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white bg-[#5E5E5E] rounded-full text-center">
+                  <span
+                    className={clsx(
+                      'absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white rounded-full text-center',
+                      type === 'undone' ? 'bg-red-400' : 'bg-blue-400'
+                    )}
+                  >
                     {count}
                   </span>
+
                   {type === 'undone' ? '未処理' : '完了'}
                 </button>
               );
@@ -306,6 +312,21 @@ export default function TodoTaskCard({
                   )}
                   placeholder="TODOを入力"
                 />
+
+<motion.button
+  type="button"
+  whileTap={{ scale: 0.9 }}
+  className="text-gray-400 hover:text-yellow-500 mr-1"
+  onClick={() => {
+    // 今後メモ表示処理を実装予定
+    toast('TODOメモ機能は今後追加予定です');
+  }}
+>
+  <Notebook size={18} />
+</motion.button>
+
+
+
 <motion.button
   type="button"
   onClick={() => handleTodoDeleteClick(todo.id)}
