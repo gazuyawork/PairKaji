@@ -43,7 +43,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PairInit />
           <PairListener />
           {children}
-          <Toaster />
+          {/* <Toaster /> */}
+          <Toaster position="top-center" richColors />
         </div>
       </body>
     </html>
