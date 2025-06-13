@@ -353,6 +353,7 @@ export default function TodoTaskCard({
         {tab === 'undone' && (
           <div className="flex items-center gap-2 mt-4 relative">
             <Plus className="text-[#FFCB7D]" />
+
             <input
               ref={inputRef}
               type="text"
@@ -367,11 +368,13 @@ export default function TodoTaskCard({
                   handleAdd();
                 }
               }}
+              onBlur={handleAdd}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
               className="w-[75%] border-b bg-transparent outline-none border-gray-300 h-8 text-black"
               placeholder="TODOを入力してEnter"
             />
+
             {isScrollable && (
               <div className="absolute right-3 animate-pulse">
                 <div className="w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
