@@ -382,3 +382,100 @@ export const uploadProfileImage = async (
 
   return downloadURL;
 };
+
+/**
+ * tasksコレクション内の特定todo（配列内オブジェクト）を更新する
+ */
+// 修正版: 第3引数をオブジェクトとして受け取るように修正
+export const updateTodoInTask = async (
+  taskId: string,
+  todoId: string,
+  updates: {
+    memo?: string;
+    price?: number | null;
+    quantity?: number | null;
+    unit?: string;
+  }
+) => {
+  try {
+    const { memo, price, quantity, unit } = updates;
+
+    console.log('🛠 updateTodoInTask called with:', { taskId, todoId, memo, price, quantity, unit });
+
+    const taskRef = doc(db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+
+    if (!taskSnap.exists()) {
+      console.error('❌ task document not found:', taskId);
+      throw new Error('タスクが存在しません');
+    }
+
+    const taskData = taskSnap.data();
+    console.log('📄 taskSnap.data():', taskData);
+
+    const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
+
+    type TodoItem = {
+      id: string;
+      text: string;
+      done: boolean;
+      memo?: string;
+      price?: number;
+      quantity?: number;
+      unit?: string;
+    };
+
+    const index = todos.findIndex((todo: TodoItem) => todo.id === todoId);
+
+    if (index === -1) {
+      console.error('❌ 該当するtodoが見つかりません:', todoId);
+      throw new Error('TODOが見つかりません');
+    }
+
+    const updatedTodos = [...todos];
+    updatedTodos[index] = {
+      ...updatedTodos[index],
+      memo,
+      price,
+      quantity,
+      unit,
+    };
+
+    await updateDoc(taskRef, {
+      todos: updatedTodos,
+    });
+
+    console.log('✅ updateTodoInTask 成功');
+  } catch (err) {
+    console.error('🔥 updateTodoInTask エラー:', err);
+    throw err;
+  }
+};
+
+
+/**
+ * 差額情報をsavingsコレクションに追加保存する
+ */
+export const addSavingsLog = async (
+  userId: string,
+  taskId: string,
+  todoId: string,
+  currentUnitPrice: number,
+  compareUnitPrice: number,
+  difference: number
+) => {
+  try {
+    await addDoc(collection(db, 'savings'), {
+      userId,
+      taskId,
+      todoId,
+      currentUnitPrice,
+      compareUnitPrice,
+      difference,
+      savedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('差額ログの保存に失敗しました:', error);
+    throw error;
+  }
+};

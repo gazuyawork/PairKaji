@@ -79,6 +79,19 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     } as unknown as Task;
   };
 
+
+
+  useEffect(() => {
+    const handleOpenModal = () => {
+      const newTask = createEmptyTask(); // 新規タスクを作成
+      setEditTargetTask(newTask);       // モーダル表示用にセット
+    };
+    window.addEventListener('open-new-task-modal', handleOpenModal);
+    return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
+  }, []);
+
+
+
   useEffect(() => {
     const fetchPairStatus = async () => {
       const uid = auth.currentUser?.uid;
@@ -269,17 +282,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
-
-  useEffect(() => {
-    const handleOpenModal = () => {
-      const newTask = createEmptyTask(); // 新規タスクを作成
-      setEditTargetTask(newTask);       // モーダル表示用にセット
-    };
-    window.addEventListener('open-new-task-modal', handleOpenModal);
-    return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
-  }, []);
-
-
 
   useEffect(() => {
     if (onModalOpenChange) {

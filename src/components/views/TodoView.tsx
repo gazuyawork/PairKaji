@@ -44,21 +44,25 @@ export default function TodoView() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const taskInputRef = useRef<HTMLInputElement | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
-
-  const [noteModalText, setNoteModalText] = useState('');
   const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
+  const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
+
 
   const { index } = useView();
 
-  const openNoteModal = (text: string) => {
-    setNoteModalText(text);
+  const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
+    setNoteModalTask(task);
+    setNoteModalTodo(todo);
     setNoteModalOpen(true);
   };
 
   const closeNoteModal = () => {
     setNoteModalOpen(false);
-    setNoteModalText('');
+    setNoteModalTask(null);
+    setNoteModalTodo(null);
   };
+
 
 
   const taskNameOptions = useMemo(() => {
@@ -217,13 +221,16 @@ const handleAddTask = useCallback(async () => {
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
       <Header title="Todo" />
       {/* ✅ indexが2（TodoView）である場合のみ表示 */}
-      {index === 2 && (
+      {index === 2 && noteModalTask && noteModalTodo && (
         <TodoNoteModal
           isOpen={noteModalOpen}
           onClose={closeNoteModal}
-          todoText={noteModalText}
+          todoText={noteModalTodo.text}
+          todoId={noteModalTodo.id}
+          taskId={noteModalTask.id}
         />
       )}
+
       <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
         <div className="flex gap-2 items-start">
           <div className="relative flex-1">
@@ -346,7 +353,13 @@ const handleAddTask = useCallback(async () => {
                 setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
               }
 
-              onOpenNote={(text) => openNoteModal(text)}
+              onOpenNote={(text) => {
+                const todo = task.todos.find(t => t.text === text);
+                if (todo) {
+                  openNoteModal(task, todo);
+                }
+              }}
+
 
               onAddTodo={async (todoId, text) => {
                 const newTodos = [...task.todos, { id: todoId, text, done: false }];

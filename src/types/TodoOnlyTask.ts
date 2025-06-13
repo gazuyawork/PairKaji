@@ -3,6 +3,10 @@ export type TodoItem = {
   id: string;
   text: string;
   done: boolean;
+  memo?: string;
+  price?: number | null;
+  quantity?: number | null;
+  unit?: string;
 };
 
 export type TodoOnlyTask = {
