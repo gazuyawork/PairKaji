@@ -20,8 +20,6 @@ function MainContent() {
   const searchKeyword = searchParams.get("search") ?? "";
   const { index, setIndex } = useView();
   const [authReady, setAuthReady] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
@@ -85,9 +83,7 @@ function MainContent() {
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <TaskView
               initialSearch={searchKeyword}
-              onModalOpenChange={setIsModalOpen}
             />
-
           </div>
           <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
             <TodoView />
@@ -95,11 +91,11 @@ function MainContent() {
         </motion.div>
 
         {/* ✅ 右下固定の＋ボタン（indexが1のときのみ） */}
-        {index === 1 && !isModalOpen && (
+        {index === 1 && (
           <button
-            onClick={() => {
-              const event = new CustomEvent('open-new-task-modal');
-              window.dispatchEvent(event);
+            
+              onClick={() => {
+              window.dispatchEvent(new Event('open-new-task-modal'));
             }}
             className="fixed bottom-24 right-6 bg-[#FFCB7D] text-white text-3xl w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-[1000]"
             aria-label="新規タスク追加"

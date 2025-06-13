@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
+import { createPortal } from 'react-dom';
 
 type UserInfo = {
   id: string;
@@ -20,15 +21,27 @@ type Props = {
   isPairConfirmed: boolean;
 };
 
-export default function EditTaskModal({ isOpen, task, onClose, onSave, users, isPairConfirmed }: Props) {
+export default function EditTaskModal({
+  isOpen,
+  task,
+  onClose,
+  onSave,
+  users,
+  isPairConfirmed,
+}: Props) {
   const [editedTask, setEditedTask] = useState<Task | null>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null); // 🔸 入力欄用Ref
+  const [mounted, setMounted] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (task) {
       setEditedTask({
         ...task,
-        daysOfWeek: task.daysOfWeek?.map(num => dayNumberToName[num] || num) ?? [],
+        daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
         dates: task.dates ?? [],
         users: task.users ?? [],
         period: task.period ?? task.period,
@@ -40,16 +53,15 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
     if (isOpen) {
       const timer = setTimeout(() => {
         nameInputRef.current?.focus();
-      }, 50); // 50ms 遅延してフォーカス
-
+      }, 50);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
-  if (!isOpen || !editedTask) return null;
+  if (!mounted || !isOpen || !editedTask) return null;
 
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
-    setEditedTask(prev => prev ? { ...prev, [key]: value } : prev);
+    setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   const toggleUser = (userId: string) => {
@@ -63,22 +75,22 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
 
   const toggleDay = (day: string) => {
     const newDays = editedTask.daysOfWeek.includes(day)
-      ? editedTask.daysOfWeek.filter(d => d !== day)
+      ? editedTask.daysOfWeek.filter((d) => d !== day)
       : [...editedTask.daysOfWeek, day];
     update('daysOfWeek', newDays);
   };
 
-  return (
-    <div className="fixed inset-0 bg-white/90 z-[9999] flex justify-center items-center px-2">
+  return createPortal(
+    <div className="fixed inset-0 bg-white/80 z-[9999] flex justify-center items-center px-2">
       <div className="bg-white w-full max-w-sm p-4 pt-8 rounded-xl shadow-lg relative border border-gray-300">
         <div className="space-y-6">
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">家事名：</label>
             <input
-              ref={nameInputRef} // 🔸 フォーカス対象
+              ref={nameInputRef}
               type="text"
               value={editedTask.name}
-              onChange={e => update('name', e.target.value)}
+              onChange={(e) => update('name', e.target.value)}
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
             />
           </div>
@@ -89,7 +101,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
               value={editedTask.period}
               onChange={(e) => {
                 const newPeriod = e.target.value as Period;
-                setEditedTask(prev => {
+                setEditedTask((prev) => {
                   if (!prev) return prev;
                   const updated = { ...prev, period: newPeriod };
                   if (newPeriod === '毎日') {
@@ -105,8 +117,10 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
               }}
               className="w-full border-b border-gray-300 outline-none pl-2"
             >
-              {['毎日', '週次', '不定期'].map(p => (
-                <option key={p} value={p}>{p}</option>
+              {['毎日', '週次', '不定期'].map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
           </div>
@@ -115,7 +129,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
             <div className="flex items-center flex-wrap gap-y-2">
               <label className="w-20 text-gray-600 shrink-0">曜日：</label>
               <div className="flex gap-2 flex-wrap">
-                {['月', '火', '水', '木', '金', '土', '日'].map(day => (
+                {['月', '火', '水', '木', '金', '土', '日'].map((day) => (
                   <button
                     key={day}
                     type="button"
@@ -149,11 +163,13 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
             <label className="w-20 text-gray-600 shrink-0">ポイント：</label>
             <select
               value={editedTask.point}
-              onChange={e => update('point', Number(e.target.value))}
+              onChange={(e) => update('point', Number(e.target.value))}
               className="w-full border-b border-gray-300 outline-none pl-2"
             >
-              {Array.from({ length: 10 }, (_, i) => i + 1).map(val => (
-                <option key={val} value={val}>{val} pt</option>
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => (
+                <option key={val} value={val}>
+                  {val} pt
+                </option>
               ))}
             </select>
           </div>
@@ -162,7 +178,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
             <div className="flex items-center">
               <label className="w-20 text-gray-600 shrink-0">担当者：</label>
               <div className="flex gap-2">
-                {users.map(user => {
+                {users.map((user) => {
                   const isSelected = editedTask.users[0] === user.id;
                   return (
                     <button
@@ -170,14 +186,16 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
                       type="button"
                       onClick={() => toggleUser(user.id)}
                       className={`w-12 h-12 rounded-full border overflow-hidden ${
-                        isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                        isSelected
+                          ? 'border-[#FFCB7D] opacity-100'
+                          : 'border-gray-300 opacity-30'
                       }`}
                     >
-                      <Image 
-                        src={user.imageUrl || '/images/default.png'} 
-                        alt={user.name} 
-                        width={48} 
-                        height={48} 
+                      <Image
+                        src={user.imageUrl || '/images/default.png'}
+                        alt={user.name}
+                        width={48}
+                        height={48}
                         className="object-cover w-full h-full"
                       />
                     </button>
@@ -192,7 +210,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
               onClick={() => {
                 const transformed = {
                   ...editedTask,
-                  daysOfWeek: editedTask.daysOfWeek.map(d => dayNameToNumber[d] || d),
+                  daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
                 };
                 onSave(transformed);
                 onClose();
@@ -211,6 +229,7 @@ export default function EditTaskModal({ isOpen, task, onClose, onSave, users, is
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

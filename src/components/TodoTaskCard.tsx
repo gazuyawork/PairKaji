@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
+
 interface Props {
   task: TodoOnlyTask;
   tab: 'undone' | 'done';
@@ -22,6 +23,7 @@ interface Props {
   onDeleteTask: () => void;
   todoRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
   focusedTodoId: string | null;
+  onOpenNote: (text: string) => void;
 }
 
 export default function TodoTaskCard({
@@ -36,6 +38,7 @@ export default function TodoTaskCard({
   onDeleteTask,
   todoRefs,
   focusedTodoId,
+  onOpenNote,
 }: Props) {
   const router = useRouter();
   const todos = useMemo(() => task?.todos ?? [], [task?.todos]);
@@ -317,10 +320,11 @@ export default function TodoTaskCard({
   type="button"
   whileTap={{ scale: 0.9 }}
   className="text-gray-400 hover:text-yellow-500 mr-1"
-  onClick={() => {
-    // 今後メモ表示処理を実装予定
-    toast('TODOメモ機能は今後追加予定です');
-  }}
+  // onClick={() => {
+  //   // 今後メモ表示処理を実装予定
+  //   toast('TODOメモ機能は今後追加予定です');
+  // }}
+  onClick={() => onOpenNote(todo.text)}
 >
   <Notebook size={18} />
 </motion.button>

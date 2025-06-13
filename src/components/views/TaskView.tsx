@@ -272,12 +272,14 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   useEffect(() => {
     const handleOpenModal = () => {
-      setEditTargetTask(createEmptyTask());
+      const newTask = createEmptyTask(); // 新規タスクを作成
+      setEditTargetTask(newTask);       // モーダル表示用にセット
     };
-
     window.addEventListener('open-new-task-modal', handleOpenModal);
     return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
   }, []);
+
+
 
   useEffect(() => {
     if (onModalOpenChange) {
@@ -289,6 +291,18 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
       <Header title="Task" currentIndex={1} />
+      {/* ✅ モーダル */}
+      {editTargetTask && (
+        <EditTaskModal
+          key={editTargetTask.id}
+          isOpen={!!editTargetTask}
+          task={editTargetTask}
+          onClose={() => setEditTargetTask(null)}
+          onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
+          users={userList}
+          isPairConfirmed={pairStatus === 'confirmed'}
+        />
+      )}
 
       <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
         {isLoading ? (
@@ -364,19 +378,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </motion.div>
         )}
       </main>
-
-      {/* ✅ モーダル */}
-      {editTargetTask && (
-        <EditTaskModal
-          key={editTargetTask.id}
-          isOpen={!!editTargetTask}
-          task={editTargetTask}
-          onClose={() => setEditTargetTask(null)}
-          onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
-          users={userList}
-          isPairConfirmed={pairStatus === 'confirmed'}
-        />
-      )}
     </div>
   );
 }

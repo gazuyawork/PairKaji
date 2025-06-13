@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import GroupSelector from '@/components/GroupSelector';
 import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
+import TodoNoteModal from '@/components/TodoNoteModal';
 
 
 export default function TodoView() {
@@ -43,6 +44,22 @@ export default function TodoView() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const taskInputRef = useRef<HTMLInputElement | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const [noteModalText, setNoteModalText] = useState('');
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+
+  const { index } = useView();
+
+  const openNoteModal = (text: string) => {
+    setNoteModalText(text);
+    setNoteModalOpen(true);
+  };
+
+  const closeNoteModal = () => {
+    setNoteModalOpen(false);
+    setNoteModalText('');
+  };
+
 
   const taskNameOptions = useMemo(() => {
     const names = tasks
@@ -199,6 +216,14 @@ const handleAddTask = useCallback(async () => {
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
       <Header title="Todo" />
+      {/* ✅ indexが2（TodoView）である場合のみ表示 */}
+      {index === 2 && (
+        <TodoNoteModal
+          isOpen={noteModalOpen}
+          onClose={closeNoteModal}
+          todoText={noteModalText}
+        />
+      )}
       <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
         <div className="flex gap-2 items-start">
           <div className="relative flex-1">
@@ -321,13 +346,15 @@ const handleAddTask = useCallback(async () => {
                 setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
               }
 
-onAddTodo={async (todoId, text) => {
-  const newTodos = [...task.todos, { id: todoId, text, done: false }];
-  await updateDoc(doc(db, 'tasks', task.id), {
-    todos: newTodos,
-    updatedAt: serverTimestamp(),
-  });
-}}
+              onOpenNote={(text) => openNoteModal(text)}
+
+              onAddTodo={async (todoId, text) => {
+                const newTodos = [...task.todos, { id: todoId, text, done: false }];
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  todos: newTodos,
+                  updatedAt: serverTimestamp(),
+                });
+              }}
 
 
               onChangeTodo={(todoId, value) => {
