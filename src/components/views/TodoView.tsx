@@ -320,14 +320,15 @@ const handleAddTask = useCallback(async () => {
               setTab={(tab) =>
                 setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
               }
-              onAddTodo={async (todoId) => {
-                const newTodos = [...task.todos, { id: todoId, text: '', done: false }];
-                await updateDoc(doc(db, 'tasks', task.id), {
-                  todos: newTodos,
-                  updatedAt: serverTimestamp(),
-                });
-                // setFocusedTodoId(todoId);
-              }}
+
+onAddTodo={async (todoId, text) => {
+  const newTodos = [...task.todos, { id: todoId, text, done: false }];
+  await updateDoc(doc(db, 'tasks', task.id), {
+    todos: newTodos,
+    updatedAt: serverTimestamp(),
+  });
+}}
+
 
               onChangeTodo={(todoId, value) => {
                 const updated = tasks.map(t =>
