@@ -27,6 +27,8 @@ import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import GroupSelector from '@/components/GroupSelector';
 import { useView } from '@/context/ViewContext';
+import { saveTaskToFirestore } from '@/lib/firebaseUtils';
+
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName } = useView();
@@ -324,17 +326,23 @@ const handleAddTask = useCallback(async () => {
                   todos: newTodos,
                   updatedAt: serverTimestamp(),
                 });
-                setFocusedTodoId(todoId);
+                // setFocusedTodoId(todoId);
               }}
-              onChangeTodo={async (todoId, value) => {
-                const updatedTodos = task.todos.map(todo =>
-                  todo.id === todoId ? { ...todo, text: value } : todo
+
+              onChangeTodo={(todoId, value) => {
+                const updated = tasks.map(t =>
+                  t.id === task.id
+                    ? {
+                        ...t,
+                        todos: t.todos.map(todo =>
+                          todo.id === todoId ? { ...todo, text: value } : todo
+                        ),
+                      }
+                    : t
                 );
-                await updateDoc(doc(db, 'tasks', task.id), {
-                  todos: updatedTodos,
-                  updatedAt: serverTimestamp(),
-                });
+                setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
               }}
+
               onToggleDone={async (todoId) => {
                 const updatedTodos = task.todos.map(todo =>
                   todo.id === todoId ? { ...todo, done: !todo.done } : todo
@@ -344,14 +352,22 @@ const handleAddTask = useCallback(async () => {
                   updatedAt: serverTimestamp(),
                 });
               }}
+
               onBlurTodo={async (todoId, text) => {
-                if (text.trim() !== '') return;
-                const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
-                await updateDoc(doc(db, 'tasks', task.id), {
-                  todos: updatedTodos,
-                  updatedAt: serverTimestamp(),
+                const updatedTask = tasks.find(t => t.id === task.id);
+                if (!updatedTask) return;
+
+                const newTodos = updatedTask.todos.map(todo =>
+                  todo.id === todoId ? { ...todo, text } : todo
+                );
+
+                await saveTaskToFirestore(task.id, {
+                  ...updatedTask,
+                  todos: newTodos,
                 });
               }}
+
+
               onDeleteTodo={async (todoId) => {
                 const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
                 await updateDoc(doc(db, 'tasks', task.id), {
