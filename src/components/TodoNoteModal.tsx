@@ -179,13 +179,28 @@ export default function TodoNoteModal({
 
           <div className="flex items-center justify-between mb-4">
             
-          <button
+          {/* <button
             onClick={() => setShowDetails(!showDetails)}
             className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
           >
             <Info size={16} />
             {showDetails ? '詳細を閉じる' : '詳細を追加'}
+          </button> */}
+
+          <button
+            onClick={() => {
+              const next = !showDetails;
+              setShowDetails(next);
+              if (!next) {
+                setCompareMode(false); // 詳細を閉じたときに差額確認モードも解除
+              }
+            }}
+            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
+          >
+            <Info size={16} />
+            {showDetails ? '詳細を閉じる' : '詳細を追加'}
           </button>
+
 
 
             {showDetails && !isNaN(parseFloat(price)) && parseFloat(price) > 0 && (
