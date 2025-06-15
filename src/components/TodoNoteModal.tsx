@@ -114,29 +114,42 @@ export default function TodoNoteModal({
   useEffect(() => {
     if (totalDifference !== null) {
       const duration = 1000;
-      const start = performance.now();
+      const delay = 1000; // ← 遅延（ミリ秒）
+
       const from = 0;
       const to = Math.abs(Math.round(totalDifference));
 
-      const animate = (now: number) => {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / duration, 1);
-        const currentValue = Math.floor(from + (to - from) * progress);
-        setAnimatedDifference(currentValue);
+      const startAnimation = () => {
+        const start = performance.now();
 
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          setDiffAnimationComplete(true);
-        }
+        const animate = (now: number) => {
+          const elapsed = now - start;
+          const progress = Math.min(elapsed / duration, 1);
+          const currentValue = Math.floor(from + (to - from) * progress);
+          setAnimatedDifference(currentValue);
+
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            setDiffAnimationComplete(true);
+          }
+        };
+
+        requestAnimationFrame(animate);
       };
 
-      requestAnimationFrame(animate);
+      // タイムラグ付きで開始
+      const delayTimeout = setTimeout(() => {
+        startAnimation();
+      }, delay);
+
+      return () => clearTimeout(delayTimeout);
     } else {
       setAnimatedDifference(null);
       setDiffAnimationComplete(false);
     }
   }, [totalDifference]);
+
 
   const saveButtonLabel: string = comparePrice && parseFloat(comparePrice) > 0
     ? 'この価格で更新する'
@@ -178,14 +191,6 @@ export default function TodoNoteModal({
           />
 
           <div className="flex items-center justify-between mb-4">
-            
-          {/* <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
-          >
-            <Info size={16} />
-            {showDetails ? '詳細を閉じる' : '詳細を追加'}
-          </button> */}
 
           <button
             onClick={() => {
@@ -201,16 +206,16 @@ export default function TodoNoteModal({
             {showDetails ? '詳細を閉じる' : '詳細を追加'}
           </button>
 
-
-
             {showDetails && !isNaN(parseFloat(price)) && parseFloat(price) > 0 && (
               <button
                 onClick={() => setCompareMode(!compareMode)}
                 className="flex items-center gap-2 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
               >
-                <CheckCircle size={16} /> 差額確認
+                <CheckCircle size={16} />
+                {compareMode ? '差額確認をやめる' : '差額確認'}
               </button>
             )}
+
           </div>
 
           {compareMode ? (
@@ -332,14 +337,16 @@ export default function TodoNoteModal({
             <button
               onClick={async () => {
                 const user = auth.currentUser;
+                const appliedPrice = numericComparePrice > 0 ? numericComparePrice : numericPrice;
                 if (!user) return;
                 try {
                   await updateTodoInTask(taskId, todoId, {
                     memo,
-                    price: numericPrice || null,
-                    quantity: numericQuantity > 0 ? numericQuantity : 1,
+                    price: appliedPrice || null,
+                    quantity: numericComparePrice > 0 ? numericCompareQuantity : numericQuantity > 0 ? numericQuantity : 1,
                     unit: numericQuantity > 0 ? unit : '個',
                   });
+
 
                   if (totalDifference !== null) {
                     await addDoc(collection(db, 'savings'), {
