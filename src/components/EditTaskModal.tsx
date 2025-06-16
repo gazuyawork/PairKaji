@@ -254,20 +254,16 @@ export default function EditTaskModal({
                   ...editedTask,
                   daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
                 };
-                setIsSaving(true); // 保存開始
-
-                // Firestore への保存処理の try 成功後:
+                setIsSaving(true);
+                onSave(transformed);
                 setTimeout(() => {
-                  setIsSaving(false); // スピナーを非表示
-                  setSaveComplete(true); // ✅ 完了アイコン表示開始
-
-                  // ここで表示時間を十分に確保（例：2秒）
+                  setIsSaving(false);
+                  setSaveComplete(true);
                   setTimeout(() => {
-                    setSaveComplete(false); // 完了アイコン非表示
-                    onClose(); // モーダル閉じる
-                  }, 2000); // ← ✅ 2秒に調整
-                }, 500); // ← 最低500msスピナー保証
-
+                    setSaveComplete(false);
+                    onClose();
+                  }, 2000); // アニメーション表示後に閉じる
+                }, 500);
 
               }}
               className="w-full sm:w-auto px-6 py-3 text-sm bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
