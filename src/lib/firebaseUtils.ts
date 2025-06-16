@@ -242,14 +242,14 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
       const pairDoc = await getDoc(doc(db, 'pairs', pairId));
       const pairData = pairDoc.data();
       if (pairData?.userIds) {
-        userIds = pairData.userIds; // 🔥 必ず最新のペア情報をセット
+        userIds = pairData.userIds; // 必ず最新のペア情報をセット
       }
     }
 
     const commonData = {
       ...taskData,
       private: taskData.private ?? false,
-      userIds, // ✅ 最新の「自分＋ペア」のUIDを含める
+      userIds, // 最新の「自分＋ペア」のUIDを含める
     };
 
     if (taskId) {
