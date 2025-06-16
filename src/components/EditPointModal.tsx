@@ -2,12 +2,12 @@
 
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
-import { Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 import { useEditPointData } from '@/hooks/useEditPointData';
 import { handleSavePoints } from '@/utils/handleSavePoints';
 import RouletteInputSection from '@/components/points/RouletteInputSection';
+import PointInputRow from '@/components/points/PointInputRow';
 
 
 interface Props {
@@ -112,24 +112,11 @@ export default function EditPointModal({
             <p className="text-sm text-gray-500 font-sans mt-1">無理のない程度で目標を設定しましょう</p>
           </div>
 
-          <div className="flex items-center pt-4 gap-4">
-            <label className="w-14 text-gray-600 font-bold">目標 pt</label>
-            <input
-              type="number"
-              min={1}
-              max={1000}
-              value={point}
-              onChange={e => handlePointChange(Number(e.target.value))}
-              className="w-26 text-4xl border-b border-gray-300 outline-none px-2 py-1 text-[#5E5E5E] text-center"
-            />
-            <button
-              onClick={handleAuto}
-              className="flex w-20 items-center gap-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100"
-            >
-              <Sparkles size={16} className="text-yellow-500" />
-              自動
-            </button>
-          </div>
+          <PointInputRow
+            point={point}
+            onChange={handlePointChange}
+            onAuto={handleAuto}
+          />
 
           <div className="flex mt-4">
             <p className="text-gray-600 font-bold pt-2 pl-2 pr-6">内訳</p>
