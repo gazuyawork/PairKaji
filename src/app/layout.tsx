@@ -1,7 +1,7 @@
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import { Toaster } from 'sonner';
-import PairListener from '@/components/PairListener';
+// import PairListener from '@/components/PairListener';
 import PairInit from '@/components/PairInit';
 import PreventBounce from '@/components/PreventBounce';
 import SetViewportHeight from '@/components/SetViewportHeight';
@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SetViewportHeight />
         <div className="flex flex-col h-full overscroll-none">
           <PairInit />
-          <PairListener />
+          {/* <PairListener /> */}
           {children}
           {/* <Toaster /> */}
           <Toaster position="top-center" richColors />
