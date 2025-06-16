@@ -44,22 +44,20 @@ export default function EditTaskModal({
     setMounted(true);
   }, []);
 
-useEffect(() => {
-  if (task && isOpen) {
-    console.log('🧪 task.private =', task.private);
-    setEditedTask({
-      ...task,
-      daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
-      dates: task.dates ?? [],
-      users: task.users ?? [],
-      period: task.period ?? task.period,
-    });
+  useEffect(() => {
+    if (task && isOpen) {
+      console.log('🧪 task.private =', task.private);
+      setEditedTask({
+        ...task,
+        daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
+        dates: task.dates ?? [],
+        users: task.users ?? [],
+        period: task.period ?? task.period,
+      });
 
-    setIsPrivate(task.private ?? !isPairConfirmed); // ✅ ← ここも毎回リセット
-  }
-}, [task, isOpen, isPairConfirmed]);
-
-
+      setIsPrivate(task.private ?? !isPairConfirmed);
+    }
+  }, [task, isOpen, isPairConfirmed]);
 
   useEffect(() => {
     if (isOpen) {

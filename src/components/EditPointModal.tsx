@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
-import { doc, getDocs, collection, query, where, onSnapshot  } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { savePointsToBothUsers } from '@/lib/firebaseUtils';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
+import { useEditPointData } from '@/hooks/useEditPointData';
+import { handleSavePoints } from '@/utils/handleSavePoints';
 
 interface Props {
   isOpen: boolean;
@@ -30,82 +29,16 @@ export default function EditPointModal({
   rouletteEnabled,
   setRouletteEnabled,
 }: Props) {
-  const [point, setPoint] = useState<number>(0);
-  const [selfPoint, setSelfPoint] = useState<number>(0);
   const [error, setError] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
-
-  useEffect(() => {
-    if (initialPoint && initialPoint > 0) {
-      setPoint(initialPoint);
-      setSelfPoint(Math.ceil(initialPoint / 2));
-    } else {
-      fetchTasksAndCalculate();
-    }
-
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-
-    const unsubscribe = onSnapshot(doc(db, 'points', uid), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-
-        // 🔄 目標ポイント情報をリアルタイム反映
-        if (typeof data.weeklyTargetPoint === 'number') {
-          setPoint(data.weeklyTargetPoint);
-        }
-
-        if (typeof data.selfPoint === 'number') {
-          setSelfPoint(data.selfPoint);
-        }
-
-        // ※ partnerPoint は setState 不要（計算から導出するため）
-        // どうしても表示したい場合は setPartnerPoint を追加してもよい
-
-        if (typeof data.rouletteEnabled === 'boolean') {
-          setRouletteEnabled(data.rouletteEnabled);
-        }
-
-        if (Array.isArray(data.rouletteOptions)) {
-          setRouletteOptions(data.rouletteOptions);
-        }
-      }
-    });
-
-
-    return () => unsubscribe(); // クリーンアップ
-  }, [initialPoint, setRouletteEnabled, setRouletteOptions]);
-
-
-
-  const fetchTasksAndCalculate = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    try {
-      const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
-      const snapshot = await getDocs(q);
-      let total = 0;
-      snapshot.docs.forEach(docSnap => {
-        const data = docSnap.data();
-        const point = data.point ?? 0;
-        const freq = data.period;
-        const days = data.daysOfWeek ?? [];
-
-        if (freq === '毎日') {
-          total += point * 7;
-        } else if (freq === '週次') {
-          total += point * days.length;
-        }
-      });
-      const half = Math.floor(total / 2);
-      const extra = total % 2;
-      setPoint(total);
-      setSelfPoint(half + extra);
-    } catch (err) {
-      console.error('ポイント自動算出失敗:', err);
-    }
-  };
+  const {
+    point,
+    selfPoint,
+    setPoint,
+    setSelfPoint,
+    calculatePoints
+  } = useEditPointData(initialPoint, setRouletteEnabled, setRouletteOptions);
 
   const userPoints = useMemo(() => [
     { name: 'たろう', image: '/images/taro.png' },
@@ -115,104 +48,48 @@ export default function EditPointModal({
   const partnerPoint = Math.max(0, point - selfPoint);
 
 
+  const invalidRouletteConditions = (): boolean => {
+    if (!rouletteEnabled) return false;
 
-
-
-
-
-
-
-
-const handleSave = async () => {
-  if (!point || point < 1) {
-    setError('1以上の数値を入力してください');
-    return;
-  }
-
-  if (selfPoint > point) {
-    setError('目標値以下で入力してください');
-    return;
-  }
-
-  if (rouletteEnabled) {
     const hasAtLeastOne = rouletteOptions.some(opt => opt.trim() !== '');
     const hasEmpty = rouletteOptions.some(opt => opt.trim() === '');
 
-    if (!hasAtLeastOne) {
-      setError('1件以上のご褒美を入力してください');
+    return !hasAtLeastOne || hasEmpty;
+  };
+
+  const handleSave = async () => {
+    if (point < 1) {
+      setError('1以上の数値を入力してください');
       return;
     }
 
-    if (hasEmpty) {
-      setError('ご褒美に空欄があります。');
+    if (selfPoint > point) {
+      setError('目標値以下で入力してください');
       return;
     }
-  }
 
-  setError('');
-  setIsSaving(true); // ✅ アニメーション開始
-
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
-
-  try {
-    const pairsSnap = await getDocs(query(
-      collection(db, 'pairs'),
-      where('userIds', 'array-contains', uid),
-      where('status', '==', 'confirmed')
-    ));
-
-    let partnerUid: string | null = null;
-    const userIds = [uid];
-    pairsSnap.forEach(doc => {
-      const data = doc.data();
-      if (Array.isArray(data.userIds)) {
-        data.userIds.forEach((id: string) => {
-          if (!userIds.includes(id)) userIds.push(id);
-        });
-      }
-    });
-
-    if (userIds.length === 2) {
-      partnerUid = userIds.find(id => id !== uid) ?? null;
+    if (invalidRouletteConditions()) {
+      setError('ご褒美入力に不備があります');
+      return;
     }
 
-    await savePointsToBothUsers(uid, partnerUid, {
-      userId: uid,
-      userIds,
-      weeklyTargetPoint: point,
+    setError('');
+    setIsSaving(true);
+
+    await handleSavePoints(
+      point,
       selfPoint,
-      partnerPoint,
       rouletteEnabled,
       rouletteOptions,
-    });
-
-    setSaveComplete(true); // ✅ チェックマーク表示へ
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaveComplete(false);
-      onSave(point); // ✅ 外部通知
-      onClose();     // ✅ モーダル閉じ
-    }, 1500); // ✅ アニメーション後に閉じる
-  } catch (error) {
-    console.error('Firebaseへの保存に失敗:', error);
-    setIsSaving(false); // ❗️忘れずに止める
-  }
-};
- 
-
-
-
-
-
-
-
-
-
-
+      onSave,
+      onClose,
+      setIsSaving,
+      setSaveComplete
+    );
+  };
 
   const handleAuto = () => {
-    fetchTasksAndCalculate();
+    calculatePoints();
   };
 
   const handlePointChange = (value: number) => {
@@ -221,12 +98,6 @@ const handleSave = async () => {
     const extra = value % 2;
     setSelfPoint(half + extra);
   };
-
-  // const handleRouletteOptionChange = (index: number, value: string) => {
-  //   const newOptions = [...rouletteOptions];
-  //   newOptions[index] = value;
-  //   setRouletteOptions(newOptions);
-  // };
 
   if (!isOpen) return null;
 
