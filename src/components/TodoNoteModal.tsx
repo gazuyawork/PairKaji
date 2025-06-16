@@ -7,6 +7,7 @@ import { CheckCircle, Info } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 interface TodoNoteModalProps {
   isOpen: boolean;
@@ -114,7 +115,7 @@ export default function TodoNoteModal({
   useEffect(() => {
     if (totalDifference !== null) {
       const duration = 1000;
-      const delay = 1000; // ← 遅延（ミリ秒）
+      const delay = 500; // ← 遅延（ミリ秒）
 
       const from = 0;
       const to = Math.abs(Math.round(totalDifference));
@@ -200,7 +201,7 @@ export default function TodoNoteModal({
                 setCompareMode(false); // 詳細を閉じたときに差額確認モードも解除
               }
             }}
-            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
           >
             <Info size={16} />
             {showDetails ? '詳細を閉じる' : '詳細を追加'}
@@ -209,7 +210,7 @@ export default function TodoNoteModal({
             {showDetails && !isNaN(parseFloat(price)) && parseFloat(price) > 0 && (
               <button
                 onClick={() => setCompareMode(!compareMode)}
-                className="flex items-center gap-2 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
               >
                 <CheckCircle size={16} />
                 {compareMode ? '差額確認をやめる' : '差額確認'}
@@ -223,10 +224,10 @@ export default function TodoNoteModal({
 
               <table className="w-full text-sm mb-2 table-fixed">
                 <colgroup>
-                  <col className="w-[25%]" />  {/* 数値（前回価格） */}
-                  <col className="w-[10%]" />  {/* 単位（円） */}
-                  <col className="w-[25%]" />  {/* 数値（比較価格） */}
-                  <col className="w-[10%]" />  {/* 単位（円） */}
+                  <col className="w-[25%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[25%]" />
+                  <col className="w-[10%]" />
                 </colgroup>
                 <thead>
                   <tr>
@@ -347,7 +348,6 @@ export default function TodoNoteModal({
                     unit: numericQuantity > 0 ? unit : '個',
                   });
 
-
                   if (totalDifference !== null) {
                     await addDoc(collection(db, 'savings'), {
                       userId: user.uid,
@@ -359,6 +359,8 @@ export default function TodoNoteModal({
                     });
                   }
 
+                  // ✅ トーストを表示
+                  toast.success('登録が完了しました');
                   onClose();
                 } catch (error) {
                   console.error('保存に失敗しました:', error);
