@@ -107,7 +107,7 @@ export default function TaskCard({
       {swipeDirection === 'left' && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="bg-red-400 text-white text-sm px-1 py-1 rounded-full shadow w-12 h-12 transition transform active:scale-95"
+            className="bg-red-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8 transition transform active:scale-95"
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
@@ -121,7 +121,7 @@ export default function TaskCard({
       {swipeDirection === 'right' && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="bg-blue-400 text-white text-sm px-1 py-1 rounded-full shadow w-12 h-12 transition transform active:scale-95"
+            className="bg-blue-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8 transition transform active:scale-95"
             onClick={handleTodoClick}
           >
             TODO
@@ -139,7 +139,7 @@ export default function TaskCard({
           onEdit(); // PCでは右クリックで編集
         }}
         className={clsx(
-          'w-full relative flex justify-between items-center px-4 py-4 rounded-2xl shadow-sm border overflow-hidden border-2',
+          'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
           highlighted ? 'border-blue-400 bg-blue-50' : 'border-[#e5e5e5] bg-white'
