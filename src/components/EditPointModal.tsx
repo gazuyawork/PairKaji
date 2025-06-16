@@ -6,6 +6,8 @@ import { Sparkles } from 'lucide-react';
 import { doc, getDocs, collection, query, where, onSnapshot  } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { savePointsToBothUsers } from '@/lib/firebaseUtils';
+import { motion } from 'framer-motion';
+import { CheckCircle } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -31,6 +33,8 @@ export default function EditPointModal({
   const [point, setPoint] = useState<number>(0);
   const [selfPoint, setSelfPoint] = useState<number>(0);
   const [error, setError] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveComplete, setSaveComplete] = useState(false);
 
   useEffect(() => {
     if (initialPoint && initialPoint > 0) {
@@ -112,77 +116,99 @@ export default function EditPointModal({
 
 
 
-  const handleSave = async () => {
-    if (!point || point < 1) {
-      setError('1以上の数値を入力してください');
+
+
+
+
+
+
+
+const handleSave = async () => {
+  if (!point || point < 1) {
+    setError('1以上の数値を入力してください');
+    return;
+  }
+
+  if (selfPoint > point) {
+    setError('目標値以下で入力してください');
+    return;
+  }
+
+  if (rouletteEnabled) {
+    const hasAtLeastOne = rouletteOptions.some(opt => opt.trim() !== '');
+    const hasEmpty = rouletteOptions.some(opt => opt.trim() === '');
+
+    if (!hasAtLeastOne) {
+      setError('1件以上のご褒美を入力してください');
       return;
     }
 
-    if (selfPoint > point) {
-      setError('目標値以下で入力してください');
+    if (hasEmpty) {
+      setError('ご褒美に空欄があります。');
       return;
     }
+  }
 
-    if (rouletteEnabled) {
-      const hasAtLeastOne = rouletteOptions.some(opt => opt.trim() !== '');
-      const hasEmpty = rouletteOptions.some(opt => opt.trim() === '');
+  setError('');
+  setIsSaving(true); // ✅ アニメーション開始
 
-      if (!hasAtLeastOne) {
-        setError('1件以上のご褒美を入力してください');
-        return;
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+
+  try {
+    const pairsSnap = await getDocs(query(
+      collection(db, 'pairs'),
+      where('userIds', 'array-contains', uid),
+      where('status', '==', 'confirmed')
+    ));
+
+    let partnerUid: string | null = null;
+    const userIds = [uid];
+    pairsSnap.forEach(doc => {
+      const data = doc.data();
+      if (Array.isArray(data.userIds)) {
+        data.userIds.forEach((id: string) => {
+          if (!userIds.includes(id)) userIds.push(id);
+        });
       }
+    });
 
-      if (hasEmpty) {
-        setError('ご褒美に空欄があります。');
-        return;
-      }
+    if (userIds.length === 2) {
+      partnerUid = userIds.find(id => id !== uid) ?? null;
     }
 
-    setError('');
+    await savePointsToBothUsers(uid, partnerUid, {
+      userId: uid,
+      userIds,
+      weeklyTargetPoint: point,
+      selfPoint,
+      partnerPoint,
+      rouletteEnabled,
+      rouletteOptions,
+    });
 
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    setSaveComplete(true); // ✅ チェックマーク表示へ
+    setTimeout(() => {
+      setIsSaving(false);
+      setSaveComplete(false);
+      onSave(point); // ✅ 外部通知
+      onClose();     // ✅ モーダル閉じ
+    }, 1500); // ✅ アニメーション後に閉じる
+  } catch (error) {
+    console.error('Firebaseへの保存に失敗:', error);
+    setIsSaving(false); // ❗️忘れずに止める
+  }
+};
 
-    try {
-      const pairsSnap = await getDocs(query(
-        collection(db, 'pairs'),
-        where('userIds', 'array-contains', uid),
-        where('status', '==', 'confirmed')
-      ));
 
-      // ✅ パートナーがいれば取得する
-      let partnerUid: string | null = null;
-      const userIds = [uid];
-      pairsSnap.forEach(doc => {
-        const data = doc.data();
-        if (Array.isArray(data.userIds)) {
-          data.userIds.forEach((id: string) => {
-            if (!userIds.includes(id)) userIds.push(id);
-          });
-        }
-      });
 
-      if (userIds.length === 2) {
-        partnerUid = userIds.find(id => id !== uid) ?? null;
-      }
 
-      // ✅ 共通関数で両方に保存
-      await savePointsToBothUsers(uid, partnerUid, {
-        userId: uid,
-        userIds,
-        weeklyTargetPoint: point,
-        selfPoint,
-        partnerPoint,
-        rouletteEnabled,
-        rouletteOptions,
-      });
-    } catch (error) {
-      console.error('Firebaseへの保存に失敗:', error);
-    }
 
-    onSave(point);
-    onClose();
-  };
+
+
+
+
+
 
 
   const handleAuto = () => {
@@ -353,6 +379,31 @@ export default function EditPointModal({
           </button>
         </div>
       </div>
+
+      {isSaving && (
+        <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
+          <motion.div
+            key={saveComplete ? 'check' : 'spinner'}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {saveComplete ? (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: [0.8, 1.2, 1] }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+              >
+                <CheckCircle className="text-green-500 w-20 h-20" />
+              </motion.div>
+            ) : (
+              <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+            )}
+          </motion.div>
+        </div>
+      )}
+
     </div>
   );
 }
