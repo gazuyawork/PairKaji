@@ -403,16 +403,15 @@ export const updateTodoInTask = async (
     console.log('🛠 updateTodoInTask called with:', { taskId, todoId, memo, price, quantity, unit });
 
     const taskRef = doc(db, 'tasks', taskId);
-    const taskSnap = await getDoc(taskRef);
 
-    if (!taskSnap.exists()) {
+    // ✅ ここで最新の task データを再取得
+    const latestSnap = await getDoc(taskRef);
+    if (!latestSnap.exists()) {
       console.error('❌ task document not found:', taskId);
       throw new Error('タスクが存在しません');
     }
 
-    const taskData = taskSnap.data();
-    console.log('📄 taskSnap.data():', taskData);
-
+    const taskData = latestSnap.data();
     const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
 
     type TodoItem = {
@@ -433,12 +432,14 @@ export const updateTodoInTask = async (
     }
 
     const updatedTodos = [...todos];
+
+    // ✅ undefined の項目は上書きしないよう安全にマージ
     updatedTodos[index] = {
       ...updatedTodos[index],
-      memo,
-      price,
-      quantity,
-      unit,
+      ...(memo !== undefined && { memo }),
+      ...(price !== undefined && { price }),
+      ...(quantity !== undefined && { quantity }),
+      ...(unit !== undefined && { unit }),
     };
 
     await updateDoc(taskRef, {
@@ -451,7 +452,6 @@ export const updateTodoInTask = async (
     throw err;
   }
 };
-
 
 /**
  * 差額情報をsavingsコレクションに追加保存する
