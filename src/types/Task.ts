@@ -50,6 +50,7 @@ export type Task = {
   completedBy?: string;
   userId: string;
   todos?: unknown[];
+  private: boolean;
 };
 
 

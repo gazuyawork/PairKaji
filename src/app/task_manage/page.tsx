@@ -114,6 +114,7 @@ useEffect(() => {
         userId: uid,
         isNew: true,
         isEdited: false,
+        private: false,
         showDelete: false,
       },
     ]);

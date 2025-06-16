@@ -133,7 +133,11 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
     // 🔹 ペアの userIds を取得
     let userIds = [uid];
     const pairsSnap = await getDocs(
-      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+      query(
+        collection(db, 'pairs'),
+        where('userIds', 'array-contains', uid),
+        where('status', '==', 'confirmed')
+      )
     );
     pairsSnap.forEach(doc => {
       const data = doc.data();
@@ -142,7 +146,19 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
       }
     });
 
-    const taskData = buildFirestoreTaskData(task, userIds, uid);
+    // ✅ Firestore に保存するデータを構築
+    const taskData = {
+      name: task.name,
+      point: task.point,
+      dates: task.dates,
+      daysOfWeek: task.daysOfWeek,
+      users: task.users,
+      period: task.period,
+      private: task.private ?? false, // ✅ ← 追加
+      userIds,
+      userId: uid,
+    };
+
     await saveTaskToFirestore(task.id, taskData);
   } catch (error) {
     console.error('タスク保存失敗:', error);

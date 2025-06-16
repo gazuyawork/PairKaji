@@ -71,10 +71,13 @@ export const approvePair = async (pairId: string, inviterUid: string, userUid: s
   await setDoc(ref, {
     userBId: userUid,
     status: 'confirmed',
-    userIds: [inviterUid, userUid],
+    // userIds: [inviterUid, userUid],
     updatedAt: serverTimestamp(),
   }, { merge: true }); // ✅ merge で既存データを保持
 };
+
+
+
 
 /**
  * ペアを完全に削除する処理（Firestore 上からドキュメントを削除）
@@ -144,12 +147,28 @@ export const fetchTasksForUser = async (uid: string): Promise<{ id: string; data
     snap1.docs.forEach(docSnap => docsMap.set(docSnap.id, docSnap.data() as FirestoreTask));
     snap2.docs.forEach(docSnap => docsMap.set(docSnap.id, docSnap.data() as FirestoreTask));
 
-    return Array.from(docsMap.entries()).map(([id, data]) => ({ id, data }));
+    return Array.from(docsMap.entries()).map(([id, data]) => ({
+      id,
+      data: {
+        ...data,
+        private: data.private ?? false, // ← 補完追加
+      }
+    }));
   } catch (_err: unknown) {
     handleFirestoreError(_err);
     return [];
   }
 };
+
+
+
+
+
+
+
+
+
+
 
 export const saveTaskToFirestore = async (taskId: string | null, taskData: FirestoreTask): Promise<void> => {
   try {
@@ -170,6 +189,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
 
     const commonData = {
       ...taskData,
+      private: taskData.private ?? false,
       userIds, // ✅ 最新の「自分＋ペア」のUIDを含める
     };
 
@@ -192,6 +212,10 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
     handleFirestoreError(_err);
   }
 };
+
+
+
+
 
 
 export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
@@ -290,7 +314,10 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
   const batchUpdates = snapshot.docs.map(async (docRef) => {
     const task = docRef.data();
     const newUserIds = (task.userIds || []).filter((id: string) => id !== partnerUid);
-    await updateDoc(doc(db, 'tasks', docRef.id), { userIds: newUserIds });
+    await updateDoc(doc(db, 'tasks', docRef.id), {
+      userIds: newUserIds,
+      private: task.private ?? false, // ← 念のため保持
+    });
   });
 
   await Promise.all(batchUpdates);

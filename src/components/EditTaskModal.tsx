@@ -8,7 +8,6 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 
-
 type UserInfo = {
   id: string;
   name: string;
@@ -38,22 +37,29 @@ export default function EditTaskModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
 
+  // ✅ private切り替え状態の追加
+  const [isPrivate, setIsPrivate] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (task) {
-      setEditedTask({
-        ...task,
-        daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
-        dates: task.dates ?? [],
-        users: task.users ?? [],
-        period: task.period ?? task.period,
-      });
-    }
-  }, [task]);
+useEffect(() => {
+  if (task && isOpen) {
+    console.log('🧪 task.private =', task.private);
+    setEditedTask({
+      ...task,
+      daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
+      dates: task.dates ?? [],
+      users: task.users ?? [],
+      period: task.period ?? task.period,
+    });
+
+    setIsPrivate(task.private ?? !isPairConfirmed); // ✅ ← ここも毎回リセット
+  }
+}, [task, isOpen, isPairConfirmed]);
+
+
 
   useEffect(() => {
     if (isOpen) {
@@ -95,35 +101,29 @@ export default function EditTaskModal({
         className="bg-white w-full max-w-sm p-4 pt-8 rounded-xl shadow-lg relative border border-gray-300"
       >
 
-      {(isSaving || saveComplete) && (
-        <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
-          <motion.div
-            key={saveComplete ? 'check' : 'spinner'}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {saveComplete ? (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: [0.8, 1.5, 1.2] }}
-                transition={{ duration: 1.2, ease: 'easeOut' }}
-              >
-                <CheckCircle className="text-green-500 w-12 h-12" />
-              </motion.div>
-            ) : (
-              <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-            )}
-          </motion.div>
-        </div>
-      )}
-
-
-
-
-
-
+        {(isSaving || saveComplete) && (
+          <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
+            <motion.div
+              key={saveComplete ? 'check' : 'spinner'}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {saveComplete ? (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [0.8, 1.5, 1.2] }}
+                  transition={{ duration: 1.2, ease: 'easeOut' }}
+                >
+                  <CheckCircle className="text-green-500 w-12 h-12" />
+                </motion.div>
+              ) : (
+                <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+              )}
+            </motion.div>
+          </div>
+        )}
 
         <div className="space-y-6">
           <div className="flex items-center">
@@ -217,34 +217,56 @@ export default function EditTaskModal({
           </div>
 
           {isPairConfirmed && (
-            <div className="flex items-center">
-              <label className="w-20 text-gray-600 shrink-0">担当者：</label>
-              <div className="flex gap-2">
-                {users.map((user) => {
-                  const isSelected = editedTask.users[0] === user.id;
-                  return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => toggleUser(user.id)}
-                      className={`w-12 h-12 rounded-full border overflow-hidden ${
-                        isSelected
-                          ? 'border-[#FFCB7D] opacity-100'
-                          : 'border-gray-300 opacity-30'
-                      }`}
-                    >
-                      <Image
-                        src={user.imageUrl || '/images/default.png'}
-                        alt={user.name}
-                        width={48}
-                        height={48}
-                        className="object-cover w-full h-full"
-                      />
-                    </button>
-                  );
-                })}
+            <>
+              <div className="flex items-center">
+                <label className="w-20 text-gray-600 shrink-0">担当者：</label>
+                <div className="flex gap-2">
+                  {users.map((user) => {
+                    const isSelected = editedTask.users[0] === user.id;
+                    return (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => toggleUser(user.id)}
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${
+                          isSelected
+                            ? 'border-[#FFCB7D] opacity-100'
+                            : 'border-gray-300 opacity-30'
+                        }`}
+                      >
+                        <Image
+                          src={user.imageUrl || '/images/default.png'}
+                          alt={user.name}
+                          width={48}
+                          height={48}
+                          className="object-cover w-full h-full"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+
+              <div className="flex items-center gap-3 mt-2">
+                <span className="text-sm text-gray-600">プライベートモード：</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isPrivate}
+                  onClick={() => setIsPrivate(!isPrivate)}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                    isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                      isPrivate ? 'translate-x-6' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+
+            </>
           )}
 
           <div className="mt-6 flex flex-wrap justify-end gap-3">
@@ -253,6 +275,7 @@ export default function EditTaskModal({
                 const transformed = {
                   ...editedTask,
                   daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
+                  private: isPrivate,
                 };
                 setIsSaving(true);
                 onSave(transformed);
@@ -261,11 +284,12 @@ export default function EditTaskModal({
                   setSaveComplete(true);
                   setTimeout(() => {
                     setSaveComplete(false);
-                    onClose();
-                  }, 2000); // アニメーション表示後に閉じる
+                    setIsPrivate(false); // ✅ ここでリセット
+                    onClose();           // ✅ この順番で
+                  }, 2000);
                 }, 500);
-
               }}
+
               className="w-full sm:w-auto px-6 py-3 text-sm bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
             >
               保存

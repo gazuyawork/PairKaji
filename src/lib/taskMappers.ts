@@ -19,7 +19,6 @@ export const mapFirestoreDocToTask = (doc: QueryDocumentSnapshot<FirestoreTask>)
     completedAt: data.completedAt ?? null, // ← ここも修正済みでOK
     completedBy: data.completedBy ?? '',
     person: user,
-    // image: useProfileImages(user),
     daysOfWeek: (data.daysOfWeek ?? []).map((code: string) => dayNumberToName[code] ?? ''),
     dates: data.dates ?? [],
     isTodo: data.isTodo ?? false,
@@ -27,5 +26,6 @@ export const mapFirestoreDocToTask = (doc: QueryDocumentSnapshot<FirestoreTask>)
     scheduledDate: data.dates?.[0] ?? '',
     visible: data.visible ?? false,
     userId: data.userId ?? '',
+    private: data.private ?? false,
   };
 };
