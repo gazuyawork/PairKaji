@@ -71,7 +71,7 @@ export const approvePair = async (pairId: string, inviterUid: string, userUid: s
   await setDoc(ref, {
     userBId: userUid,
     status: 'confirmed',
-    // userIds: [inviterUid, userUid],
+    userIds: [inviterUid, userUid],
     updatedAt: serverTimestamp(),
   }, { merge: true }); // ✅ merge で既存データを保持
 };
