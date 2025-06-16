@@ -24,6 +24,6 @@
     "typeRoots": ["./src/types", "./node_modules/@types"],
     "baseUrl": "."
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/hooks/useProfileImages.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/hooks/useProfileImages.ts", "src/components/PairListener.tsx"],
   "exclude": ["node_modules"]
 }
