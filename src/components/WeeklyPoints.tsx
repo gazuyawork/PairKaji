@@ -17,7 +17,6 @@ import { motion } from 'framer-motion';
 import RouletteWheel from '@/components/RouletteWheel';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
-import { onAuthStateChanged } from 'firebase/auth';
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,24 +48,21 @@ export default function WeeklyPoints() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
 
-      const partnerUids = await fetchPairUserIds(uid);
-      setHasPartner(partnerUids.length > 1);
-
+      const today = new Date();
+      const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
       const weekStartISO = weekStart.toISOString().split('T')[0];
       const weekEndISO = weekEnd.toISOString().split('T')[0];
 
-      if (partnerUids.length === 0) {
-        // console.warn('partnerUids が空のため、taskCompletions のクエリをスキップ');
-        setSelfPoints(0);
-        setPartnerPoints(0);
-        setIsLoadingPoints(false);
-        return;
-      }
+      const partnerUids = await fetchPairUserIds(uid);
+      setHasPartner(partnerUids.length > 1);
+
+      const userIdsToQuery = partnerUids.length > 0 ? partnerUids : [uid];
 
       unsubscribe1 = onSnapshot(
         query(
           collection(db, 'taskCompletions'),
-          where('userId', 'in', partnerUids)
+          where('userId', 'in', userIdsToQuery)
         ),
         (snapshot) => {
           let bufferSelf = 0;
@@ -88,45 +84,15 @@ export default function WeeklyPoints() {
           setIsLoadingPoints(false);
         }
       );
-
     };
 
     fetchPoints();
 
+    // ✅ クリーンアップ時に参照できるようにする
     return () => {
       if (unsubscribe1) unsubscribe1();
     };
-  }, [weekStart, weekEnd]); // ✅ 修正ポイント：依存配列に追加
-
-
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) return;
-
-      const uid = user.uid;
-
-      const unsubscribePoints = onSnapshot(doc(db, 'points', uid), (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (typeof data.weeklyTargetPoint === 'number') {
-            setMaxPoints(data.weeklyTargetPoint);
-          }
-          if (typeof data.rouletteEnabled === 'boolean') {
-            setRouletteEnabled(data.rouletteEnabled);
-          }
-          if (Array.isArray(data.rouletteOptions)) {
-            setRouletteOptions(data.rouletteOptions);
-          }
-        }
-      });
-
-      // 🔁 Firestore リスナー解除
-      return () => unsubscribePoints();
-    });
-
-    // 🔁 auth リスナー解除
-    return () => unsubscribeAuth();
-  }, []);
+  }, []); // ← weekStart/End は fetchPoints 内に閉じたので依存不要
 
 
 

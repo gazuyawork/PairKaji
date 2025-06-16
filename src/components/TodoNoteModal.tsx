@@ -7,7 +7,6 @@ import { CheckCircle, Info } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
-import { toast } from 'sonner';
 
 interface TodoNoteModalProps {
   isOpen: boolean;
@@ -69,6 +68,10 @@ export default function TodoNoteModal({
     return isNaN(num) ? '0' : num.toLocaleString();
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveComplete, setSaveComplete] = useState(false);
+
+
 
   useEffect(() => {
     const fetchTodoData = async () => {
@@ -111,6 +114,12 @@ export default function TodoNoteModal({
       memoRef.current.style.height = memoRef.current.scrollHeight + 'px';
     }
   }, [memo]);
+
+    useEffect(() => {
+    if (isSaving) {
+      console.log('✅ overlay render');
+    }
+  }, [isSaving]);
 
   useEffect(() => {
     if (totalDifference !== null) {
@@ -159,6 +168,9 @@ export default function TodoNoteModal({
   // if (!mounted || !isOpen || initialLoad) return null;
   if (!mounted || initialLoad) return null;
 
+
+
+
   return createPortal(
     <AnimatePresence>
       {isOpen && (
@@ -169,7 +181,7 @@ export default function TodoNoteModal({
         exit={{ opacity: 0 }}
       >
         <motion.div
-          className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full mx-4"
+          className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full mx-4 relative"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
@@ -338,8 +350,11 @@ export default function TodoNoteModal({
             <button
               onClick={async () => {
                 const user = auth.currentUser;
-                const appliedPrice = numericComparePrice > 0 ? numericComparePrice : numericPrice;
                 if (!user) return;
+
+                setIsSaving(true);
+
+                const appliedPrice = numericComparePrice > 0 ? numericComparePrice : numericPrice;
                 try {
                   await updateTodoInTask(taskId, todoId, {
                     memo,
@@ -359,11 +374,15 @@ export default function TodoNoteModal({
                     });
                   }
 
-                  // ✅ トーストを表示
-                  toast.success('登録が完了しました');
-                  onClose();
+                  setSaveComplete(true);
+                  setTimeout(() => {
+                    setIsSaving(false);
+                    setSaveComplete(false);
+                    onClose();
+                  }, 1500);
                 } catch (error) {
                   console.error('保存に失敗しました:', error);
+                  setIsSaving(false);
                 }
               }}
               className="w-full sm:w-auto px-6 py-3 text-sm bg-[#FFCB7D] text-white rounded-xl font-bold hover:opacity-90"
@@ -377,6 +396,34 @@ export default function TodoNoteModal({
               閉じる
             </button>
           </div>
+
+          {isSaving && (
+            <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
+              <motion.div
+                key={saveComplete ? 'check' : 'spinner'}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                {saveComplete ? (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: [0.8, 1.2, 1] }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                  >
+                    <CheckCircle className="text-green-500 w-20 h-20" />
+                  </motion.div>
+                ) : (
+                  <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+                )}
+              </motion.div>
+            </div>
+          )}
+
+
+
+
         </motion.div>
       </motion.div>
     )}

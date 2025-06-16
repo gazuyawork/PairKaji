@@ -154,7 +154,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       if (!uid) return;
 
       await saveSingleTask(updated, uid);
-      toast.success('編集内容を保存しました');
       setEditTargetTask(null);
     } catch (error) {
       console.error('タスク更新に失敗しました:', error);
