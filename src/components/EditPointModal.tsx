@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 import { useEditPointData } from '@/hooks/useEditPointData';
 import { handleSavePoints } from '@/utils/handleSavePoints';
+import RouletteInputSection from '@/components/points/RouletteInputSection';
+
 
 interface Props {
   isOpen: boolean;
@@ -183,53 +185,11 @@ export default function EditPointModal({
 
           {/* ✅ ご褒美入力欄 */}
           {rouletteEnabled && (
-            <div className="space-y-2 mt-4">
-              <p className="text-gray-600 font-bold">ご褒美の内容（1件以上）</p>
-
-              {rouletteOptions.map((value, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={value}
-                    onChange={(e) => {
-                      const newOptions = [...rouletteOptions];
-                      newOptions[index] = e.target.value;
-                      setRouletteOptions(newOptions);
-                    }}
-                    placeholder={`ご褒美 ${index + 1}`}
-                    className="flex-1 border-b border-gray-300 py-1 px-2 outline-none"
-                  />
-                  {rouletteOptions.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newOptions = rouletteOptions.filter((_, i) => i !== index);
-                        setRouletteOptions(newOptions);
-                      }}
-                      className="text-sm text-red-500 hover:underline"
-                    >
-                      ✖
-                    </button>
-                  )}
-                </div>
-              ))}
-
-              {/* ✅ ご褒美が5件未満なら追加ボタンを表示 */}
-              {rouletteOptions.length < 5 ? (
-                <button
-                  type="button"
-                  onClick={() => setRouletteOptions([...rouletteOptions, ''])}
-                  className="text-blue-500 text-sm mt-1 hover:underline"
-                >
-                  ＋ ご褒美を追加
-                </button>
-              ) : (
-                <p className="text-sm text-gray-400">※ご褒美は最大5件までです</p>
-              )}
-            </div>
+            <RouletteInputSection
+              rouletteOptions={rouletteOptions}
+              setRouletteOptions={setRouletteOptions}
+            />
           )}
-
-
 
           {error && <p className="text-red-500 text-center text-sm pt-2">{error}</p>}
         </div>
