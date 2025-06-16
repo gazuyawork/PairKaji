@@ -6,15 +6,15 @@ import {
 } from 'firebase/firestore';
 import type { FirestoreTask } from '@/types/Task';
 import { addTaskCompletion } from './taskUtils';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '@/lib/firebase'; 
+// import { getFunctions, httpsCallable } from 'firebase/functions';
+// import { app } from '@/lib/firebase'; 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase'; // storage を import 追加
 
-interface ShareTasksResponse {
-  success: boolean;
-  updatedCount: number;
-}
+// interface ShareTasksResponse {
+//   success: boolean;
+//   updatedCount: number;
+// }
 
 // ユーザープロフィール取得
 export const getUserProfile = async (uid: string) => {
@@ -159,14 +159,6 @@ export const fetchTasksForUser = async (uid: string): Promise<{ id: string; data
     return [];
   }
 };
-
-
-
-
-
-
-
-
 
 
 
@@ -323,24 +315,24 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
   await Promise.all(batchUpdates);
 };
 
-export const callShareTasksWithPartner = async (
-  userId: string,
-  partnerId: string
-): Promise<ShareTasksResponse> => {
-  const functions = getFunctions(app);
-  const shareTasksFn = httpsCallable<{ userId: string; partnerId: string }, ShareTasksResponse>(
-    functions,
-    'shareTasksWithPartner'
-  );
+// export const callShareTasksWithPartner = async (
+//   userId: string,
+//   partnerId: string
+// ): Promise<ShareTasksResponse> => {
+//   const functions = getFunctions(app);
+//   const shareTasksFn = httpsCallable<{ userId: string; partnerId: string }, ShareTasksResponse>(
+//     functions,
+//     'shareTasksWithPartner'
+//   );
 
-  try {
-    const result = await shareTasksFn({ userId, partnerId });
-    return result.data;
-  } catch (error) {
-    console.error('Error calling shareTasksWithPartner:', error);
-    throw error;
-  }
-};
+//   try {
+//     const result = await shareTasksFn({ userId, partnerId });
+//     return result.data;
+//   } catch (error) {
+//     console.error('Error calling shareTasksWithPartner:', error);
+//     throw error;
+//   }
+// };
 
 export const fetchPairId = async (): Promise<string | null> => {
   const uid = auth.currentUser?.uid;
@@ -370,6 +362,13 @@ export const savePointsToBothUsers = async (
     await setDoc(ownRef, data, { merge: true });
   }
 };
+
+
+
+
+
+
+
 
 /**
  * プロフィール画像をStorageにアップロードし、Firestoreに保存する

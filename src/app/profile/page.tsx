@@ -25,7 +25,7 @@ import {
   approvePair,
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
-// import { splitSharedTasksOnPairRemoval } from '@/lib/taskUtils';
+import { splitSharedTasksOnPairRemoval } from '@/lib/taskUtils';
 
 
 
@@ -236,6 +236,7 @@ const unsubscribe = onSnapshot(
   };
 
 
+  // パートナー承認時の処理
   const handleApprovePair = async () => {
     const user = auth.currentUser;
     if (!user || !pendingApproval) return;
@@ -258,6 +259,7 @@ const unsubscribe = onSnapshot(
     }
   };
 
+// パートナー解除時の処理
 const handleRemovePair = async () => {
   const user = auth.currentUser;
   if (!user || !pairDocId) return;
@@ -275,7 +277,7 @@ const handleRemovePair = async () => {
   setIsRemoving(true); // 🟡 ローディング開始
   try {
     await removePair(pairDocId);
-    // await splitSharedTasksOnPairRemoval(user.uid, partnerId);
+    await splitSharedTasksOnPairRemoval(user.uid, partnerId);
 
     toast.success('ペアを解除しました');
     setIsPairConfirmed(false);
