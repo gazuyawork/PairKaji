@@ -1,8 +1,9 @@
+// src/components/TaskCard.tsx
 'use client';
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Pencil, Flag, Lock } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -29,6 +30,7 @@ type Props = {
   highlighted?: boolean;
   userList: UserInfo[];
   isPairConfirmed: boolean;
+  onLongPress?: (x: number, y: number) => void;
 };
 
 export default function TaskCard({
@@ -38,7 +40,6 @@ export default function TaskCard({
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
-  // const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [animateTrigger, setAnimateTrigger] = useState(0);
 
   const assignedUserId = task.users?.[0];
@@ -48,13 +49,15 @@ export default function TaskCard({
 
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [showActions, setShowActions] = useState(false);
+  
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartPos.current = { x: touch.clientX, y: touch.clientY };
 
     const timer = setTimeout(() => {
-      onEdit(); // ✅ 長押しで編集モーダルを開く
+      setShowActions(true);
     }, 600);
     setLongPressTimer(timer);
   };
@@ -63,9 +66,7 @@ export default function TaskCard({
     const touch = e.touches[0];
     const dx = Math.abs(touch.clientX - touchStartPos.current.x);
     const dy = Math.abs(touch.clientY - touchStartPos.current.y);
-    const moveThreshold = 10; // 指が動いたら長押しとみなさない
-
-    if (dx > moveThreshold || dy > moveThreshold) {
+    if (dx > 10 || dy > 10) {
       if (longPressTimer) clearTimeout(longPressTimer);
       setLongPressTimer(null);
     }
@@ -76,14 +77,9 @@ export default function TaskCard({
     setLongPressTimer(null);
   };
 
-
   const swipeable = useSwipeable({
-    onSwipedLeft: () => {
-      setSwipeDirection('left');
-    },
-    onSwipedRight: () => {
-      setSwipeDirection('right');
-    },
+    onSwipedLeft: () => setSwipeDirection('left'),
+    onSwipedRight: () => setSwipeDirection('right'),
     trackTouch: true,
   });
 
@@ -91,6 +87,7 @@ export default function TaskCard({
     const handleClickOutside = (e: MouseEvent) => {
       if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
         setSwipeDirection(null);
+        setShowActions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -98,6 +95,7 @@ export default function TaskCard({
   }, []);
 
   const handleClick = () => {
+    if (showActions) return; // アクション表示中は処理しない
     if (task.done) {
       const confirmed = window.confirm('このタスクを未処理に戻しますか？');
       if (!confirmed) return;
@@ -127,7 +125,7 @@ export default function TaskCard({
       {swipeDirection === 'left' && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="bg-red-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8 transition transform active:scale-95"
+            className="bg-red-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8"
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
@@ -141,13 +139,57 @@ export default function TaskCard({
       {swipeDirection === 'right' && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="bg-blue-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8 transition transform active:scale-95"
+            className="bg-blue-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8"
             onClick={handleTodoClick}
           >
             TODO
           </button>
         </div>
       )}
+
+      {/* ✅ 長押しメニュー表示 */}
+{showActions && (
+  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
+    <div className="flex items-center gap-6">
+      {/* 編集ボタン（青系） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowActions(false);
+          onEdit();
+        }}
+        className="w-12 h-12 rounded-full bg-gradient-to-b from-blue-50 to-blue-50 shadow-mb shadow-blue-200 ring-1 ring-blue-300 ring-offset-1 shadow-inner flex items-center justify-center text-blue-600 active:translate-y-0.5 transition-all duration-150"
+      >
+        <Pencil className="w-5 h-5" />
+      </button>
+
+      {/* フラグボタン（赤系） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          alert('フラグ機能は未実装');
+        }}
+        className="w-12 h-12 rounded-full bg-gradient-to-b from-red-50 to-red-50 shadow-mb shadow-red-200 ring-1 ring-red-300 ring-offset-1 shadow-inner flex items-center justify-center text-red-500 active:translate-y-0.5 transition-all duration-150"
+      >
+        <Flag className="w-5 h-5" />
+      </button>
+
+      {/* 鍵ボタン（緑系） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          alert('鍵機能は未実装');
+        }}
+        className="w-12 h-12 rounded-full bg-gradient-to-b from-green-50 to-green-50 shadow-mb shadow-green-200 ring-1 ring-green-300 ring-offset-1 shadow-inner flex items-center justify-center text-green-600 active:translate-y-0.5 transition-all duration-150"
+      >
+        <Lock className="w-5 h-5" />
+      </button>
+    </div>
+  </div>
+)}
+
+
+
 
       <motion.div
         {...swipeable}
@@ -157,7 +199,7 @@ export default function TaskCard({
         onTouchEnd={handleTouchEnd}
         onContextMenu={(e) => {
           e.preventDefault();
-          onEdit(); // PCでは右クリックで編集
+          setShowActions(true);
         }}
         className={clsx(
           'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
@@ -180,12 +222,7 @@ export default function TaskCard({
             )}
           </motion.div>
 
-          <div
-            className={clsx(
-              'min-w-0',
-              (task.scheduledDate || (task.daysOfWeek && task.daysOfWeek.length > 0)) ? 'w-1/2' : 'w-2/3'
-            )}
-          >
+          <div className={clsx('min-w-0', (task.scheduledDate || (task.daysOfWeek?.length ?? 0) > 0) ? 'w-1/2' : 'w-2/3')}>
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
           </div>
 
@@ -199,7 +236,7 @@ export default function TaskCard({
           {task.daysOfWeek && (
             <div className="flex flex-wrap gap-1 ml-2 max-w-[calc(5*3*0.25rem+0.25rem*2)]">
               {[...task.daysOfWeek]
-                .sort((a, b) => ['0', '1', '2', '3', '4', '5', '6'].indexOf(a) - ['0', '1', '2', '3', '4', '5', '6'].indexOf(b))
+                .sort((a, b) => ['0','1','2','3','4','5','6'].indexOf(a) - ['0','1','2','3','4','5','6'].indexOf(b))
                 .map((d, i) => (
                   <div
                     key={i}

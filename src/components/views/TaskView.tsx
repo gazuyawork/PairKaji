@@ -34,7 +34,8 @@ const periods: Period[] = ['毎日', '週次', '不定期'];
 
 type Props = {
   initialSearch?: string;
-  onModalOpenChange?: (isOpen: boolean) => void; // ✅ 追加
+  onModalOpenChange?: (isOpen: boolean) => void;
+  onLongPress?: (x: number, y: number) => void;
 };
 
 
@@ -51,6 +52,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const { profileImage, partnerImage } = useProfileImages();
   const currentUserId = auth.currentUser?.uid;
   const [isLoading, setIsLoading] = useState(true);
+  const [longPressPosition, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
+
 
   const userList = [
     { id: currentUserId ?? '', name: 'あなた', imageUrl: profileImage },
@@ -369,10 +372,56 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           highlighted={isHighlighted}
                           userList={userList}
                           isPairConfirmed={pairStatus === 'confirmed'}
+                          onLongPress={(x, y) => setLongPressPosition({ x, y })}
                         />
                       );
                     })}
                   </ul>
+
+
+{longPressPosition && (
+  <div className="fixed inset-0 z-[9999] pointer-events-none">
+    {/* ✅ 背景レイヤー：クリックでメニューを閉じる */}
+    <div
+      className="absolute inset-0 bg-transparent"
+      style={{ pointerEvents: 'auto' }}
+      onClick={() => setLongPressPosition(null)}
+    />
+
+    {/* ✅ メニュー本体 */}
+    <div
+      className="absolute"
+      style={{
+        top: longPressPosition.y,
+        left: longPressPosition.x,
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'auto',
+      }}
+    >
+      <div className="flex flex-col gap-2 items-center">
+        <button className="w-12 h-12 bg-orange-300 rounded-full shadow-lg text-white">編集</button>
+        <button className="w-12 h-12 bg-red-400 rounded-full shadow-lg text-white">削除</button>
+        <button className="w-12 h-12 bg-gray-400 rounded-full shadow-lg text-white">詳細</button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
+
+
+
+{longPressPosition && (
+  <div
+    className="absolute inset-0 z-40"
+    onClick={() => setLongPressPosition(null)}
+  />
+)}
+
+
+
+
                 </div>
               );
             })}
