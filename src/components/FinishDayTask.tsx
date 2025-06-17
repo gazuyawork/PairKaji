@@ -121,7 +121,7 @@ export default function FinishDayTask({ tasks }: Props) {
         ) : (
           <ul className="space-y-2 text-left">
             {logs.map((log) => (
-              <li key={log.__docId} className="flex items-center gap-4 border-b pb-1 text-[#5E5E5E]">
+              <li key={log.__docId} className="flex items-center gap-4 border-b px-4 pb-2 text-[#5E5E5E]">
                 <div className="w-[100px] truncate text-ellipsis overflow-hidden whitespace-nowrap">
                   {log.taskName ?? '（タスク名なし）'}
                 </div>

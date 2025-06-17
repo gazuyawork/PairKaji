@@ -51,11 +51,11 @@ export default function PairInviteCard({ mode }: Props) {
         </button>
       )}
       <div className="flex items-center gap-3 justify-center">
-        <div className="text-orange-500">
-          <UserPlus className="w-10 h-10" />
-        </div>
-        <div className="text-left">
-          <p className="font-semibold text-lg text-gray-700 text-center mb-2">{title}</p>
+        <div className="text-center">
+          <div className="flex pl-4 gap-3">
+            <div className="text-orange-500"><UserPlus className="w-6 h-6" /></div>
+            <p className="font-semibold text-lg text-gray-700 text-center mb-2">{title}</p>
+          </div>
           <p className="text-sm text-gray-500">{subtitle}</p>
         </div>
       </div>
