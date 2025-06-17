@@ -180,7 +180,7 @@ export default function TaskCard({
           e.stopPropagation();
           alert('鍵機能は未実装');
         }}
-        className="w-12 h-12 rounded-full bg-gradient-to-b from-green-50 to-green-50 shadow-mb shadow-green-200 ring-1 ring-green-300 ring-offset-1 shadow-inner flex items-center justify-center text-green-600 active:translate-y-0.5 transition-all duration-150"
+        className="w-12 h-12 rounded-full bg-gradient-to-b from-yellow-50 to-yellow-100 shadow-mb shadow-yellow-200 ring-1 ring-yellow-300 ring-offset-1 shadow-inner flex items-center justify-center text-yellow-600 active:translate-y-0.5 transition-all duration-150"
       >
         <Lock className="w-5 h-5" />
       </button>
