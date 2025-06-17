@@ -31,18 +31,31 @@ export default function EditTaskModal({
   isPairConfirmed,
 }: Props) {
   const [editedTask, setEditedTask] = useState<Task | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  const saveRequestIdRef = useRef<number>(0); // 一意の保存処理ID
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null); // 閉じるsetTimeout制御
+
+  const [shouldClose, setShouldClose] = useState(false);
+
+  useEffect(() => {
+    if (shouldClose) {
+      onClose();
+      setShouldClose(false); // 再表示時の影響を防ぐ
+    }
+  }, [shouldClose]);
+
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (task && isOpen) {
+    if (isOpen) {
       setEditedTask({
         ...task,
         daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
@@ -50,10 +63,18 @@ export default function EditTaskModal({
         users: task.users ?? [],
         period: task.period ?? task.period,
       });
-
       setIsPrivate(task.private ?? !isPairConfirmed);
+
+      // ✅ 状態・タイマー初期化
+      setIsSaving(false);
+      setSaveComplete(false);
+      saveRequestIdRef.current += 1;
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
     }
-  }, [task, isOpen, isPairConfirmed]);
+  }, [isOpen, task, isPairConfirmed]);
 
   useEffect(() => {
     if (isOpen) {
@@ -64,14 +85,12 @@ export default function EditTaskModal({
     }
   }, [isOpen]);
 
-  if (!mounted || !isOpen || !editedTask) return null;
-
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
     setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   const toggleUser = (userId: string) => {
-    const currentUser = editedTask.users[0] || null;
+    const currentUser = editedTask?.users?.[0] || null;
     if (currentUser === userId) {
       update('users', []);
     } else {
@@ -80,6 +99,7 @@ export default function EditTaskModal({
   };
 
   const toggleDay = (day: string) => {
+    if (!editedTask) return;
     const newDays = editedTask.daysOfWeek.includes(day)
       ? editedTask.daysOfWeek.filter((d) => d !== day)
       : [...editedTask.daysOfWeek, day];
@@ -87,27 +107,36 @@ export default function EditTaskModal({
   };
 
   const handleSave = () => {
+    if (!editedTask) return;
+
     const transformed = {
       ...editedTask,
       daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
       private: isPrivate,
     };
 
+    const requestId = Date.now();
+    saveRequestIdRef.current = requestId;
+
     setIsSaving(true);
     onSave(transformed);
 
-    // ✅ スピナーを 0.5秒表示した後、完了マークを 1.5秒表示
     setTimeout(() => {
       setIsSaving(false);
       setSaveComplete(true);
 
-      setTimeout(() => {
-        setSaveComplete(false);
-        setIsPrivate(false); // 必要であればリセット
-        onClose();
-      }, 1500); // ✅ チェックマーク表示：1.5秒
-    }, 500);    // ✅ スピナー表示：0.5秒
+      closeTimerRef.current = setTimeout(() => {
+        if (saveRequestIdRef.current === requestId) {
+          // setSaveComplete(false);
+          // onClose();
+          setSaveComplete(false);
+          setShouldClose(true); // ← onClose を state 経由で実行
+        }
+      }, 1500);
+    }, 300);
   };
+
+  if (!mounted || !isOpen || !editedTask) return null;
 
   return createPortal(
     <BaseModal
@@ -116,6 +145,7 @@ export default function EditTaskModal({
       saveComplete={saveComplete}
       onClose={onClose}
       onSaveClick={handleSave}
+      disableCloseAnimation={true}
     >
       <div className="space-y-6">
         <div className="flex items-center">
