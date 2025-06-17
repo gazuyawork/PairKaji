@@ -115,9 +115,9 @@ export default function FinishDayTask({ tasks }: Props) {
         <h2 className="text-lg font-bold text-[#5E5E5E]">本日の完了タスク</h2>
       </div>
 
-      <div className="overflow-y-auto p-4">
+      <div className="overflow-y-auto pt-4">
         {logs.length === 0 ? (
-          <p className="text-gray-400 mb-10">本日の履歴はありません</p>
+          <p className="text-gray-400 mb-10 text-center pt-6">本日の履歴はありません</p>
         ) : (
           <ul className="space-y-2 text-left">
             {logs.map((log) => (
