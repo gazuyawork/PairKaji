@@ -36,10 +36,8 @@ export default function EditTaskModal({
   const [isPrivate, setIsPrivate] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
-
-  const saveRequestIdRef = useRef<number>(0); // 一意の保存処理ID
-  const closeTimerRef = useRef<NodeJS.Timeout | null>(null); // 閉じるsetTimeout制御
-
+  const saveRequestIdRef = useRef<number>(0);
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldClose, setShouldClose] = useState(false);
 
   useEffect(() => {
@@ -49,53 +47,51 @@ export default function EditTaskModal({
     }
   }, [shouldClose]);
 
-
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      setEditedTask({
-        ...task,
-        daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
-        dates: task.dates ?? [],
-        users: task.users ?? [],
-        period: task.period ?? task.period,
-      });
-      setIsPrivate(task.private ?? !isPairConfirmed);
+    if (!isOpen) return;
 
-      // ✅ 状態・タイマー初期化
-      setIsSaving(false);
-      setSaveComplete(false);
-      saveRequestIdRef.current += 1;
-      if (closeTimerRef.current) {
-        clearTimeout(closeTimerRef.current);
-        closeTimerRef.current = null;
-      }
+    // editedTask初期化
+    setEditedTask({
+      ...task,
+      daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
+      dates: task.dates ?? [],
+      users: task.users ?? [],
+      period: task.period ?? task.period,
+    });
+
+    // プライベートフラグ設定
+    setIsPrivate(task.private ?? !isPairConfirmed);
+
+    // 保存状態の初期化
+    setIsSaving(false);
+    setSaveComplete(false);
+
+    // タイマー・リクエスト初期化
+    saveRequestIdRef.current += 1;
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
     }
+
+    // フォーカス
+    const timer = setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 50);
+
+    return () => clearTimeout(timer);
   }, [isOpen, task, isPairConfirmed]);
-
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => {
-        nameInputRef.current?.focus();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
 
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
     setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   const toggleUser = (userId: string) => {
-    const currentUser = editedTask?.users?.[0] || null;
-    if (currentUser === userId) {
-      update('users', []);
-    } else {
-      update('users', [userId]);
-    }
+    if (!editedTask) return;
+    update('users', editedTask.users[0] === userId ? [] : [userId]);
   };
 
   const toggleDay = (day: string) => {
@@ -115,23 +111,23 @@ export default function EditTaskModal({
       private: isPrivate,
     };
 
-    const requestId = Date.now();
-    saveRequestIdRef.current = requestId;
-
     setIsSaving(true);
     onSave(transformed);
+
+    // 以前のタイマーをクリア（再表示時に誤発火しないように）
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
 
     setTimeout(() => {
       setIsSaving(false);
       setSaveComplete(true);
 
+      // 保存完了表示 → 自動クローズ
       closeTimerRef.current = setTimeout(() => {
-        if (saveRequestIdRef.current === requestId) {
-          // setSaveComplete(false);
-          // onClose();
-          setSaveComplete(false);
-          setShouldClose(true); // ← onClose を state 経由で実行
-        }
+        setSaveComplete(false);
+        setShouldClose(true);
       }, 1500);
     }, 300);
   };
@@ -148,6 +144,8 @@ export default function EditTaskModal({
       disableCloseAnimation={true}
     >
       <div className="space-y-6">
+
+        {/* 🏷 家事名入力 */}
         <div className="flex items-center">
           <label className="w-20 text-gray-600 shrink-0">家事名：</label>
           <input
@@ -159,6 +157,7 @@ export default function EditTaskModal({
           />
         </div>
 
+        {/* 🗓 頻度選択 */}
         <div className="flex items-center">
           <label className="w-20 text-gray-600 shrink-0">頻度：</label>
           <select
@@ -189,6 +188,7 @@ export default function EditTaskModal({
           </select>
         </div>
 
+        {/* 📅 曜日選択（週次のみ） */}
         {editedTask.period === '週次' && (
           <div className="flex items-center flex-wrap gap-y-2">
             <label className="w-20 text-gray-600 shrink-0">曜日：</label>
@@ -211,6 +211,7 @@ export default function EditTaskModal({
           </div>
         )}
 
+        {/* 📆 日付選択（不定期のみ） */}
         {editedTask.period === '不定期' && (
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">日付：</label>
@@ -223,6 +224,7 @@ export default function EditTaskModal({
           </div>
         )}
 
+        {/* ⭐ ポイント選択 */}
         <div className="flex items-center">
           <label className="w-20 text-gray-600 shrink-0">ポイント：</label>
           <select
@@ -240,6 +242,7 @@ export default function EditTaskModal({
 
         {isPairConfirmed && (
           <>
+            {/* 👤 担当者選択 */}
             <div className="flex items-center">
               <label className="w-20 text-gray-600 shrink-0">担当者：</label>
               <div className="flex gap-2">
@@ -269,6 +272,7 @@ export default function EditTaskModal({
               </div>
             </div>
 
+            {/* 🔒 プライベートモード */}
             <div className="flex items-center gap-3 mt-2">
               <span className="text-sm text-gray-600">プライベートモード：</span>
               <button
