@@ -38,13 +38,44 @@ export default function TaskCard({
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  // const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [animateTrigger, setAnimateTrigger] = useState(0);
 
   const assignedUserId = task.users?.[0];
   const assignedUser = userList.find(u => u.id === assignedUserId);
   const profileImage = assignedUser?.imageUrl ?? '/images/default.png';
   const profileName = assignedUser?.name ?? '未設定';
+
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+
+    const timer = setTimeout(() => {
+      onEdit(); // ✅ 長押しで編集モーダルを開く
+    }, 600);
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPos.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPos.current.y);
+    const moveThreshold = 10; // 指が動いたら長押しとみなさない
+
+    if (dx > moveThreshold || dy > moveThreshold) {
+      if (longPressTimer) clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer) clearTimeout(longPressTimer);
+    setLongPressTimer(null);
+  };
+
 
   const swipeable = useSwipeable({
     onSwipedLeft: () => {
@@ -65,17 +96,6 @@ export default function TaskCard({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleTouchStart = () => {
-    const timer = setTimeout(() => {
-      onEdit(); // ✅ 長押しで編集モーダルを開く
-    }, 600);
-    setLongPressTimer(timer);
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimer) clearTimeout(longPressTimer);
-  };
 
   const handleClick = () => {
     if (task.done) {
@@ -133,6 +153,7 @@ export default function TaskCard({
         {...swipeable}
         onClick={handleClick}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onContextMenu={(e) => {
           e.preventDefault();

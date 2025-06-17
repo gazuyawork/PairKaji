@@ -162,9 +162,6 @@ export default function WeeklyPoints() {
           }
         }}
       >
-
-
-
         <p className="text-lg font-bold text-[#5E5E5E] mb-4">
           今週の合計ポイント {weekLabel}
         </p>

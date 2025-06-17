@@ -316,15 +316,26 @@ export default function TodoTaskCard({
                   placeholder="TODOを入力"
                 />
 
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.85, rotate: -10 }} // より押した感を演出
-                  transition={{ type: 'spring', stiffness: 300, damping: 15 }} // アニメーションに弾性を追加
-                  className="text-gray-400 hover:text-yellow-500 mr-1 active:scale-90 active:text-yellow-600" // Tailwindのactiveも併用
-                  onClick={() => onOpenNote(todo.text)}
-                >
-                  <Notebook size={18} />
-                </motion.button>
+<motion.button
+  type="button"
+  whileTap={{ scale: 0.85, rotate: -10 }}
+  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+  className={clsx(
+    'mr-1 active:scale-90',
+    (
+      (typeof todo.memo === 'string' && todo.memo.trim() !== '') ||
+      (typeof todo.price === 'number' && todo.price !== 0) ||
+      (typeof todo.quantity === 'number' && todo.quantity !== 0)
+    )
+      ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
+      : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
+  )}
+  onClick={() => onOpenNote(todo.text)}
+>
+  <Notebook size={18} />
+</motion.button>
+
+
 
 
 
