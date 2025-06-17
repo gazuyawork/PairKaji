@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 
+
 const periods: Period[] = ['毎日', '週次', '不定期'];
 
 type Props = {
@@ -53,6 +54,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const currentUserId = auth.currentUser?.uid;
   const [isLoading, setIsLoading] = useState(true);
   const [longPressPosition, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showSearchBox, setShowSearchBox] = useState(false);
+  
+
 
 
   const userList = [
@@ -314,26 +318,62 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            <SearchBox value={searchTerm} onChange={setSearchTerm} />
 
-            <div className="mt-4">
-              <FilterControls
-                periodFilter={periodFilter}
-                personFilter={personFilter}
-                onTogglePeriod={togglePeriod}
-                onTogglePerson={togglePerson}
-                searchTerm={searchTerm}
-                onClearSearch={() => setSearchTerm('')}
-                pairStatus={pairStatus}
-              />
-            </div>
+<motion.div
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ duration: 0.4 }}
+>
+{/* 🔍 SearchBox（上部にトグル表示） */}
+{showSearchBox && (
+  <div className="mb-4">
+    <SearchBox value={searchTerm} onChange={setSearchTerm} />
+  </div>
+)}
 
-            <hr className="border-t border-gray-300 opacity-50 my-4" />
+{/* 🔍虫眼鏡 + FilterControls 横並び */}
+<div className="flex items-center gap-2 mb-2">
+  {/* 🔍虫眼鏡ボタン */}
+  <button
+    className="w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center shadow-sm"
+    onClick={() => setShowSearchBox(prev => !prev)}
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-5 h-5 text-gray-600"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      />
+    </svg>
+  </button>
+
+  {/* FilterControls 本体 */}
+  <div className="flex-1">
+    <FilterControls
+      periodFilter={periodFilter}
+      personFilter={personFilter}
+      onTogglePeriod={togglePeriod}
+      onTogglePerson={togglePerson}
+      searchTerm={searchTerm}
+      onClearSearch={() => setSearchTerm('')}
+      pairStatus={pairStatus}
+    />
+  </div>
+</div>
+
+
+  <hr className="border-t border-gray-300 opacity-50 my-4" />
+
+
+
+
 
             {periods.map(period => {
               const rawTasks = tasksState[period] ?? [];
