@@ -12,12 +12,68 @@ import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
+import PairInviteCard from '@/components/PairInviteCard';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false); // 完了タスクの展開状態
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [hasPairInvite, setHasPairInvite] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [hasSentInvite, setHasSentInvite] = useState(false);
+  const [hasPairConfirmed, setHasPairConfirmed] = useState(false);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    // 🔸 自分が userAId として招待を送信しているか
+    const sentQuery = query(
+      collection(db, 'pairs'),
+      where('userAId', '==', uid),
+      where('status', '==', 'pending')
+    );
+
+    const unsubscribeSent = onSnapshot(sentQuery, (snapshot) => {
+      setHasSentInvite(!snapshot.empty);
+    });
+
+    // 🔸 自分が含まれる confirmed ペアがあるか
+    const confirmedQuery = query(
+      collection(db, 'pairs'),
+      where('userIds', 'array-contains', uid),
+      where('status', '==', 'confirmed')
+    );
+
+    const unsubscribeConfirmed = onSnapshot(confirmedQuery, (snapshot) => {
+      setHasPairConfirmed(!snapshot.empty);
+    });
+
+    return () => {
+      unsubscribeSent();
+      unsubscribeConfirmed();
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user?.email) return;
+
+    const q = query(
+      collection(db, 'pairs'),
+      where('emailB', '==', user.email),
+      where('status', '==', 'pending')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setHasPairInvite(!snapshot.empty);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -56,6 +112,16 @@ export default function HomeView() {
           transition={{ duration: 0.2 }}
           className="space-y-4"
         >
+
+          {!isLoading && hasPairInvite && (
+            <PairInviteCard mode="invite-received" />
+          )}
+
+          {!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed && (
+            <PairInviteCard mode="no-partner" />
+          )}
+
+          
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
             className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${

@@ -40,7 +40,8 @@ export default function TaskCalendar({ tasks }: Props) {
   };
 
   return (
-    <div className="bg-white p-4 rounded-xl text-center mb-3 shadow-md border border-[#e5e5e5]">
+    <div className="bg-white p-4 rounded-xl text-center mb-3 shadow-md border border-[#e5e5e5]
+    ">
       <h2 className="text-lg font-bold text-[#5E5E5E] mb-4">今後7日間のタスク</h2>
       <div
         className="overflow-x-auto horizontal-scroll"
