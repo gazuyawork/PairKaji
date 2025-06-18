@@ -8,6 +8,7 @@ import type { Period } from '@/types/Task';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
+import { auth } from '@/lib/firebase';
 
 interface Props {
   personFilter: string | null;
@@ -28,26 +29,35 @@ export default function FilterControls({
   personFilter,
   onTogglePeriod,
   onTogglePerson,
-  // searchTerm,
+  searchTerm,
+  onClearSearch,
   extraButton,
   pairStatus,
   todayFilter, // ✅ 追加
   onToggleTodayFilter, // ✅ 追加
 }: Props) {
   // const periods = ['毎日', '週次', 'その他'] as const;
-  const { profileImage, partnerImage } = useProfileImages();
-  const users = [
-    { name: '太郎', image: profileImage },
-    { name: '花子', image: partnerImage },
-  ];
+const currentUserId = auth.currentUser?.uid;
+const { profileImage, partnerImage, partnerId } = useProfileImages();
+const users = [
+  { id: currentUserId ?? '', name: '自分', image: profileImage },
+  ...(pairStatus === 'confirmed' && partnerId
+    ? [{ id: partnerId, name: 'パートナー', image: partnerImage }]
+    : []),
+];
+
+
+  const showClear = !!(periodFilter || personFilter || searchTerm || todayFilter);
 
   const [periodClickKey, setPeriodClickKey] = useState(0);
   const [personClickKey, setPersonClickKey] = useState(0);
 
   const todayDate = new Date().getDate();
 
+
+
   return (
-    <div className="w-full flex flex-col items-center gap-2 ml-2">
+    <div className="w-full flex flex-col items-center gap-2 ml-[-16px]">
       <div className="flex justify-center items-center gap-1 flex-wrap">
 
       {/* 📅 本日フィルターボタン */}
@@ -109,15 +119,16 @@ export default function FilterControls({
           {pairStatus === 'confirmed' &&
             users.map(user => (
               <motion.button
-                key={user.name + personClickKey}
+                key={user.id + personClickKey}
                 onClick={() => {
                   setPersonClickKey(prev => prev + 1);
-                  onTogglePerson(user.name);
+                  onTogglePerson(user.id); // ← idでフィルタリング
                 }}
+
                 whileTap={{ scale: 1.2 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 10 }}
                 className={`w-10 h-10 rounded-full overflow-hidden border ${
-                  personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
+                  personFilter === user.id ? 'border-[#FFCB7D]' : 'border-gray-300'
                 }`}
               >
                 <Image
@@ -129,6 +140,30 @@ export default function FilterControls({
                 />
               </motion.button>
             ))}
+
+            {/* 検索ボックスと ✖ ボタン（右寄せ配置） */}
+            {showClear && (
+              <div className="ml-2">
+                <motion.button
+                  onClick={() => {
+                    onTogglePeriod(null);
+                    onTogglePerson(null);
+                    onClearSearch?.();
+                    // ✅ todayFilter は解除しない
+                  }}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                  className={`
+                    w-9 h-9 bg-white rounded-full border-2 border-red-500
+                    text-red-500 font-bold flex items-center justify-center
+                    hover:bg-red-50 text-2xl pb-1.5
+                  `}
+                  title="フィルター解除"
+                >
+                  ×
+                </motion.button>
+              </div>
+            )}
           {extraButton}
       </div>
     </div>

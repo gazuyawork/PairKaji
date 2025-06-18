@@ -364,21 +364,16 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </div>
         )}
 
-
-
-
-
-
 {/* 🔍虫眼鏡 + FilterControls 横並び */}
 <div className="flex items-center gap-2 mb-2">
   {/* 🔍虫眼鏡ボタン + 縦線 */}
-  <div className="flex-shrink-0 flex items-center pr-2 border-r border-gray-300">
+  <div className="flex items-center pr-2 border-r border-gray-300">
     <motion.button
       onClick={() => setShowSearchBox(prev => !prev)}
       whileTap={{ scale: 1.2 }}
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
       className={`
-        w-9 h-9 rounded-full flex items-center justify-center border
+        w-9 h-9 rounded-full flex items-center justify-center border mr-
         ${showSearchBox
           ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
           : 'bg-white text-gray-600 border-gray-300'}
@@ -402,45 +397,20 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     </motion.button>
   </div>
 
-  {/* 🎛️ フィルター横スクロール */}
-  <div className="flex-1 overflow-x-auto">
-    <div className="flex w-max items-center gap-1">
-      <FilterControls
-        periodFilter={periodFilter}
-        personFilter={personFilter}
-        onTogglePeriod={togglePeriod}
-        onTogglePerson={togglePerson}
-        searchTerm={searchTerm}
-        onClearSearch={() => setSearchTerm('')}
-        pairStatus={pairStatus}
-        todayFilter={todayFilter}
-        onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-      />
-    </div>
+  {/* FilterControls 本体 */}
+  <div className="flex-1">
+    <FilterControls
+      periodFilter={periodFilter}
+      personFilter={personFilter}
+      onTogglePeriod={togglePeriod}
+      onTogglePerson={togglePerson}
+      searchTerm={searchTerm}
+      onClearSearch={() => setSearchTerm('')}
+      pairStatus={pairStatus}
+      todayFilter={todayFilter}
+      onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+    />
   </div>
-
-  {/* ❌ ×ボタン（スクロール対象外） */}
-  {(periodFilter || personFilter || searchTerm || todayFilter) && (
-    <div className="flex-shrink-0">
-      <motion.button
-        onClick={() => {
-          togglePeriod(null);
-          togglePerson(null);
-          setSearchTerm('');
-        }}
-        whileTap={{ scale: 1.2 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-        className={`
-          w-9 h-9 bg-white rounded-full border-2 border-red-500
-          text-red-500 font-bold flex items-center justify-center
-          hover:bg-red-50 text-2xl pb-1.5
-        `}
-        title="フィルター解除"
-      >
-        ×
-      </motion.button>
-    </div>
-  )}
 </div>
 
 
@@ -448,12 +418,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
           {periods.map(period => {
             const rawTasks = tasksState[period] ?? [];
-            const list = rawTasks.filter(task =>
-              (!periodFilter || periodFilter === period) &&
-              (!personFilter || task.person === personFilter) &&
-              (!searchTerm || task.name.includes(searchTerm)) &&
-              (!todayFilter || isTodayTask(task))
-            );
+const list = rawTasks.filter(task =>
+  (!periodFilter || periodFilter === period) &&
+  (!personFilter || task.users.includes(personFilter)) && // ✅ 修正済み
+  (!searchTerm || task.name.includes(searchTerm)) &&
+  (!todayFilter || isTodayTask(task))
+);
+
 
             if (list.length === 0) return null;
 
@@ -492,7 +463,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 </ul>
 
                 {longPressPosition && (
-                  <div className="fixed inset-0 z-[9999] pointer-events-none">
+                  <div className="flex overflow-x-auto overflow-y-hidden gap-1 items-center">
+
                     {/* ✅ 背景レイヤー：クリックでメニューを閉じる */}
                     <div
                       className="absolute inset-0 bg-transparent"
