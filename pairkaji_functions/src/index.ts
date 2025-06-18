@@ -54,10 +54,13 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
           users: {
             [targetUserId]: task.users?.[targetUserId] || null,
           },
-          private: true,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
+          // ✅ 最後に必ず true で上書きする
+          private: true,
         };
+
 
         batch.set(newTaskRef, newTask);
         opCount++;
