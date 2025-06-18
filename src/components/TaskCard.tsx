@@ -148,52 +148,49 @@ export default function TaskCard({
       )}
 
       {/* ✅ 長押しメニュー表示 */}
-{showActions && (
-  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
-    <div className="flex items-center gap-6">
-      {/* 編集ボタン（青系） */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowActions(false);
-          onEdit();
-        }}
-        className="w-12 h-12 rounded-full bg-gradient-to-b from-blue-50 to-blue-50 shadow-mb shadow-blue-200 ring-1 ring-blue-300 ring-offset-1 shadow-inner flex items-center justify-center text-blue-600 active:translate-y-0.5 transition-all duration-150"
-      >
-        <Pencil className="w-5 h-5" />
-      </button>
+      {showActions && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
+          <div className="flex items-center gap-6">
+            {/* 編集ボタン（青系） */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowActions(false);
+                onEdit();
+              }}
+              className="w-12 h-12 rounded-full bg-gradient-to-b from-blue-50 to-blue-50 shadow-mb shadow-blue-200 ring-1 ring-blue-300 ring-offset-1 shadow-inner flex items-center justify-center text-blue-600 active:translate-y-0.5 transition-all duration-150"
+            >
+              <Pencil className="w-5 h-5" />
+            </button>
 
-      {/* フラグボタン（赤系） */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          alert('フラグ機能は未実装');
-        }}
-        className="w-12 h-12 rounded-full bg-gradient-to-b from-red-50 to-red-50 shadow-mb shadow-red-200 ring-1 ring-red-300 ring-offset-1 shadow-inner flex items-center justify-center text-red-500 active:translate-y-0.5 transition-all duration-150"
-      >
-        <Flag className="w-5 h-5" />
-      </button>
+            {/* フラグボタン（赤系） */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                alert('フラグ機能は未実装');
+              }}
+              className="w-12 h-12 rounded-full bg-gradient-to-b from-red-50 to-red-50 shadow-mb shadow-red-200 ring-1 ring-red-300 ring-offset-1 shadow-inner flex items-center justify-center text-red-500 active:translate-y-0.5 transition-all duration-150"
+            >
+              <Flag className="w-5 h-5" />
+            </button>
 
-      {/* 鍵ボタン（緑系） */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          alert('鍵機能は未実装');
-        }}
-        className="w-12 h-12 rounded-full bg-gradient-to-b from-yellow-50 to-yellow-100 shadow-mb shadow-yellow-200 ring-1 ring-yellow-300 ring-offset-1 shadow-inner flex items-center justify-center text-yellow-600 active:translate-y-0.5 transition-all duration-150"
-      >
-        <Lock className="w-5 h-5" />
-      </button>
-    </div>
-  </div>
-)}
-
-
-
+            {/* 鍵ボタン（緑系） */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                alert('鍵機能は未実装');
+              }}
+              className="w-12 h-12 rounded-full bg-gradient-to-b from-yellow-50 to-yellow-100 shadow-mb shadow-yellow-200 ring-1 ring-yellow-300 ring-offset-1 shadow-inner flex items-center justify-center text-yellow-600 active:translate-y-0.5 transition-all duration-150"
+            >
+              <Lock className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <motion.div
         {...swipeable}
-        onClick={handleClick}
+        // onClick={handleClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -209,18 +206,27 @@ export default function TaskCard({
         )}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <motion.div
-            key={animateTrigger}
-            initial={{ rotate: 0, scale: 1 }}
-            animate={{ rotate: 360, scale: [1, 1.3, 1] }}
-            transition={{ duration: 0.6, ease: 'easeInOut' }}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClick();
+            }}
+            className="focus:outline-none"
           >
-            {task.done ? (
-              <CheckCircle className="text-yellow-500" />
-            ) : (
-              <Circle className="text-gray-400" />
-            )}
-          </motion.div>
+            <motion.div
+              key={animateTrigger}
+              initial={{ rotate: 0, scale: 1 }}
+              animate={{ rotate: 360, scale: [1, 1.3, 1] }}
+              transition={{ duration: 0.6, ease: 'easeInOut' }}
+            >
+              {task.done ? (
+                <CheckCircle className="text-yellow-500" />
+              ) : (
+                <Circle className="text-gray-400" />
+              )}
+            </motion.div>
+          </button>
+
 
           <div className={clsx('min-w-0', (task.scheduledDate || (task.daysOfWeek?.length ?? 0) > 0) ? 'w-1/2' : 'w-2/3')}>
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
@@ -265,5 +271,9 @@ export default function TaskCard({
         </div>
       </motion.div>
     </div>
+
+
+
+
   );
 }

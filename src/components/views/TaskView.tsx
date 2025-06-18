@@ -319,148 +319,134 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </div>
         ) : (
 
-<motion.div
-  initial={{ opacity: 0 }}
-  animate={{ opacity: 1 }}
-  transition={{ duration: 0.4 }}
->
-{/* 🔍 SearchBox（上部にトグル表示） */}
-{showSearchBox && (
-  <div className="mb-4">
-    <SearchBox value={searchTerm} onChange={setSearchTerm} />
-  </div>
-)}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+        {/* 🔍 SearchBox（上部にトグル表示） */}
+        {showSearchBox && (
+          <div className="mb-4">
+            <SearchBox value={searchTerm} onChange={setSearchTerm} />
+          </div>
+        )}
 
-{/* 🔍虫眼鏡 + FilterControls 横並び */}
-<div className="flex items-center gap-2 mb-2">
-  {/* 🔍虫眼鏡ボタン */}
-  <button
-    className="w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center shadow-sm"
-    onClick={() => setShowSearchBox(prev => !prev)}
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-5 h-5 text-gray-600"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-      />
-    </svg>
-  </button>
+        {/* 🔍虫眼鏡 + FilterControls 横並び */}
+        <div className="flex items-center gap-2 mb-2">
+          {/* 🔍虫眼鏡ボタン */}
+          <button
+            className="w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center shadow-sm"
+            onClick={() => setShowSearchBox(prev => !prev)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5 text-gray-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </button>
 
-  {/* FilterControls 本体 */}
-  <div className="flex-1">
-    <FilterControls
-      periodFilter={periodFilter}
-      personFilter={personFilter}
-      onTogglePeriod={togglePeriod}
-      onTogglePerson={togglePerson}
-      searchTerm={searchTerm}
-      onClearSearch={() => setSearchTerm('')}
-      pairStatus={pairStatus}
-    />
-  </div>
-</div>
+          {/* FilterControls 本体 */}
+          <div className="flex-1">
+            <FilterControls
+              periodFilter={periodFilter}
+              personFilter={personFilter}
+              onTogglePeriod={togglePeriod}
+              onTogglePerson={togglePerson}
+              searchTerm={searchTerm}
+              onClearSearch={() => setSearchTerm('')}
+              pairStatus={pairStatus}
+            />
+          </div>
+        </div>
 
+        <hr className="border-t border-gray-300 opacity-50 my-4" />
 
-  <hr className="border-t border-gray-300 opacity-50 my-4" />
+          {periods.map(period => {
+            const rawTasks = tasksState[period] ?? [];
+            const list = rawTasks.filter(task =>
+              (!periodFilter || periodFilter === period) &&
+              (!personFilter || task.person === personFilter) &&
+              (!searchTerm || task.name.includes(searchTerm))
+            );
+            if (list.length === 0) return null;
 
+            const remaining = list.filter(task => !task.done).length;
 
+            return (
+              <div key={period}>
+                <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
+                  {period}（残り {remaining} 件）
+                </h2>
+                <ul className="space-y-2">
+                  {list.map((task, idx) => {
+                    const isHighlighted = task.visible === true;
+                    return (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        period={period}
+                        index={idx}
+                        onToggleDone={toggleDone}
+                        onDelete={deleteTask}
+                        onEdit={() => setEditTargetTask({
+                          ...task,
+                          period: task.period,
+                          daysOfWeek: task.daysOfWeek ?? [],
+                          dates: task.dates ?? [],
+                          isTodo: task.isTodo ?? false,
+                        })}
+                        highlighted={isHighlighted}
+                        userList={userList}
+                        isPairConfirmed={pairStatus === 'confirmed'}
+                        onLongPress={(x, y) => setLongPressPosition({ x, y })}
+                      />
+                    );
+                  })}
+                </ul>
 
+                {longPressPosition && (
+                  <div className="fixed inset-0 z-[9999] pointer-events-none">
+                    {/* ✅ 背景レイヤー：クリックでメニューを閉じる */}
+                    <div
+                      className="absolute inset-0 bg-transparent"
+                      style={{ pointerEvents: 'auto' }}
+                      onClick={() => setLongPressPosition(null)}
+                    />
 
+                    {/* ✅ メニュー本体 */}
+                    <div
+                      className="absolute"
+                      style={{
+                        top: longPressPosition.y,
+                        left: longPressPosition.x,
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'auto',
+                      }}
+                    >
+                      <div className="flex flex-col gap-2 items-center">
+                        <button className="w-12 h-12 bg-orange-300 rounded-full shadow-lg text-white">編集</button>
+                        <button className="w-12 h-12 bg-red-400 rounded-full shadow-lg text-white">削除</button>
+                        <button className="w-12 h-12 bg-gray-400 rounded-full shadow-lg text-white">詳細</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-            {periods.map(period => {
-              const rawTasks = tasksState[period] ?? [];
-              const list = rawTasks.filter(task =>
-                (!periodFilter || periodFilter === period) &&
-                (!personFilter || task.person === personFilter) &&
-                (!searchTerm || task.name.includes(searchTerm))
-              );
-              if (list.length === 0) return null;
-
-              const remaining = list.filter(task => !task.done).length;
-
-              return (
-                <div key={period}>
-                  <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
-                    {period}（残り {remaining} 件）
-                  </h2>
-                  <ul className="space-y-2">
-                    {list.map((task, idx) => {
-                      const isHighlighted = task.visible === true;
-                      return (
-                        <TaskCard
-                          key={task.id}
-                          task={task}
-                          period={period}
-                          index={idx}
-                          onToggleDone={toggleDone}
-                          onDelete={deleteTask}
-                          onEdit={() => setEditTargetTask({
-                            ...task,
-                            period: task.period,
-                            daysOfWeek: task.daysOfWeek ?? [],
-                            dates: task.dates ?? [],
-                            isTodo: task.isTodo ?? false,
-                          })}
-                          highlighted={isHighlighted}
-                          userList={userList}
-                          isPairConfirmed={pairStatus === 'confirmed'}
-                          onLongPress={(x, y) => setLongPressPosition({ x, y })}
-                        />
-                      );
-                    })}
-                  </ul>
-
-
-{longPressPosition && (
-  <div className="fixed inset-0 z-[9999] pointer-events-none">
-    {/* ✅ 背景レイヤー：クリックでメニューを閉じる */}
-    <div
-      className="absolute inset-0 bg-transparent"
-      style={{ pointerEvents: 'auto' }}
-      onClick={() => setLongPressPosition(null)}
-    />
-
-    {/* ✅ メニュー本体 */}
-    <div
-      className="absolute"
-      style={{
-        top: longPressPosition.y,
-        left: longPressPosition.x,
-        transform: 'translate(-50%, -50%)',
-        pointerEvents: 'auto',
-      }}
-    >
-      <div className="flex flex-col gap-2 items-center">
-        <button className="w-12 h-12 bg-orange-300 rounded-full shadow-lg text-white">編集</button>
-        <button className="w-12 h-12 bg-red-400 rounded-full shadow-lg text-white">削除</button>
-        <button className="w-12 h-12 bg-gray-400 rounded-full shadow-lg text-white">詳細</button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-
-
-
-
-{longPressPosition && (
-  <div
-    className="absolute inset-0 z-40"
-    onClick={() => setLongPressPosition(null)}
-  />
-)}
-
-
-
+                {longPressPosition && (
+                  <div
+                    className="absolute inset-0 z-40"
+                    onClick={() => setLongPressPosition(null)}
+                  />
+                )}
 
                 </div>
               );
