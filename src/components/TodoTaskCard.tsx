@@ -220,14 +220,18 @@ export default function TodoTaskCard({
                   )}
                   type="button"
                 >
-                  <span
-                    className={clsx(
-                      'absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white rounded-full text-center',
-                      type === 'undone' ? 'bg-red-400' : 'bg-blue-400'
-                    )}
-                  >
-                    {count}
-                  </span>
+                <span
+                  className={clsx(
+                    'absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white rounded-full text-center',
+                    count === 0
+                      ? 'bg-gray-300'
+                      : type === 'undone'
+                        ? 'bg-red-400'
+                        : 'bg-blue-400'
+                  )}
+                >
+                  {count}
+                </span>
 
                   {type === 'undone' ? '未処理' : '完了'}
                 </button>
@@ -316,44 +320,39 @@ export default function TodoTaskCard({
                   placeholder="TODOを入力"
                 />
 
-<motion.button
-  type="button"
-  whileTap={{ scale: 0.85, rotate: -10 }}
-  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-  className={clsx(
-    'mr-1 active:scale-90',
-    (
-      (typeof todo.memo === 'string' && todo.memo.trim() !== '') ||
-      (typeof todo.price === 'number' && todo.price !== 0) ||
-      (typeof todo.quantity === 'number' && todo.quantity !== 0)
-    )
-      ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
-      : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
-  )}
-  onClick={() => onOpenNote(todo.text)}
->
-  <Notebook size={18} />
-</motion.button>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.85, rotate: -10 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                  className={clsx(
+                    'mr-1 active:scale-90',
+                    (
+                      (typeof todo.memo === 'string' && todo.memo.trim() !== '') ||
+                      (typeof todo.price === 'number' && todo.price !== 0) ||
+                      (typeof todo.quantity === 'number' && todo.quantity !== 0)
+                    )
+                      ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
+                      : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
+                  )}
+                  onClick={() => onOpenNote(todo.text)}
+                >
+                  <Notebook size={18} />
+                </motion.button>
 
-
-
-
-
-
-<motion.button
-  type="button"
-  onClick={() => handleTodoDeleteClick(todo.id)}
-  animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
-  variants={shakeVariants}
->
-  <Trash2
-    size={18}
-    className={clsx(
-      'hover:text-red-500',
-      confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
-    )}
-  />
-</motion.button>
+                <motion.button
+                  type="button"
+                  onClick={() => handleTodoDeleteClick(todo.id)}
+                  animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
+                  variants={shakeVariants}
+                >
+                  <Trash2
+                    size={18}
+                    className={clsx(
+                      'hover:text-red-500',
+                      confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
+                    )}
+                  />
+                </motion.button>
 
               </div>
               {editingErrors[todo.id] && (
