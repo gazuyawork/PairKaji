@@ -373,7 +373,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       whileTap={{ scale: 1.2 }}
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
       className={`
-        w-9 h-9 rounded-full flex items-center justify-center border mr-1
+        w-9 h-9 rounded-full flex items-center justify-center border mr-
         ${showSearchBox
           ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
           : 'bg-white text-gray-600 border-gray-300'}

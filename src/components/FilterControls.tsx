@@ -50,8 +50,8 @@ export default function FilterControls({
   const todayDate = new Date().getDate();
 
   return (
-    <div className="w-full flex flex-col items-center gap-2">
-      <div className="flex justify-center items-center gap-2 flex-wrap">
+    <div className="w-full flex flex-col items-center gap-2 ml-[-16px]">
+      <div className="flex justify-center items-center gap-1 flex-wrap">
 
       {/* 📅 本日フィルターボタン */}
       <motion.button
@@ -135,7 +135,7 @@ export default function FilterControls({
 
             {/* 検索ボックスと ✖ ボタン（右寄せ配置） */}
             {showClear && (
-              <div className="ml-3">
+              <div className="ml-2">
                 <motion.button
                   onClick={() => {
                     onTogglePeriod(null);
