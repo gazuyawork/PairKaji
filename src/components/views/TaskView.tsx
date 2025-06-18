@@ -398,7 +398,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   </div>
 
   {/* FilterControls 本体 */}
-  <div className="flex-1">
+  <div className="flex-1 overflow-y-auto">
     <FilterControls
       periodFilter={periodFilter}
       personFilter={personFilter}
@@ -418,12 +418,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
           {periods.map(period => {
             const rawTasks = tasksState[period] ?? [];
-const list = rawTasks.filter(task =>
-  (!periodFilter || periodFilter === period) &&
-  (!personFilter || task.users.includes(personFilter)) && // ✅ 修正済み
-  (!searchTerm || task.name.includes(searchTerm)) &&
-  (!todayFilter || isTodayTask(task))
-);
+            const list = rawTasks.filter(task =>
+              (!periodFilter || periodFilter === period) &&
+              (!personFilter || task.users.includes(personFilter)) && // ✅ 修正済み
+              (!searchTerm || task.name.includes(searchTerm)) &&
+              (!todayFilter || isTodayTask(task))
+            );
 
 
             if (list.length === 0) return null;
@@ -463,8 +463,7 @@ const list = rawTasks.filter(task =>
                 </ul>
 
                 {longPressPosition && (
-                  <div className="flex overflow-x-auto overflow-y-hidden gap-1 items-center">
-
+                  <div className="fixed inset-0 z-[9999] pointer-events-none">
                     {/* ✅ 背景レイヤー：クリックでメニューを閉じる */}
                     <div
                       className="absolute inset-0 bg-transparent"

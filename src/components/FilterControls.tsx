@@ -58,7 +58,7 @@ const users = [
 
   return (
     <div className="w-full flex flex-col items-center gap-2 ml-[-16px]">
-      <div className="flex justify-center items-center gap-1 flex-wrap">
+      <div className="flex gap-1 overflow-x-auto whitespace-nowrap no-scrollbar pr-2 min-w-0" style={{ WebkitOverflowScrolling: 'touch' }}>
 
       {/* 📅 本日フィルターボタン */}
       <motion.button
