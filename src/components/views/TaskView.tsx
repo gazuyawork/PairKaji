@@ -431,7 +431,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               }}
               whileTap={{ scale: 1.2 }}
               transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-              className="w-9 h-9 bg-white rounded-full border-2 border-red-500 text-red-500 font-bold flex items-center justify-center hover:bg-red-50 text-2xl pb-1.5"
+              className="w-9 h-9 bg-white rounded-full border-2 border-red-500 text-red-500 font-bold flex items-center justify-center hover:bg-red-50 text-2xl pb-0.5"
               title="フィルター解除"
             >
               ×

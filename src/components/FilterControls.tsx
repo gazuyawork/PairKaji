@@ -78,9 +78,9 @@ const users = [
         {/* 日付の文字色を todayFilter に応じて変化 */}
         <span
           className={`
-            absolute text-[12px] font-bold top-[57.14%] left-1/2 -translate-x-1/2 -translate-y-1/2
+            absolute text-[12px] font-bold top-[62.14%] left-1/2 -translate-x-1/2 -translate-y-1/2
             pointer-events-none
-            ${todayFilter ? 'text-white' : 'text-black'}
+            ${todayFilter ? 'text-white' : 'text-gray-600'}
           `}
         >
           {todayDate}

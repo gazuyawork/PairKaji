@@ -124,10 +124,15 @@ export default function TodoView() {
 
   useEffect(() => {
     if (selectedTaskName) {
-      setFilterText(selectedTaskName);
+      const matched = tasks.find(task => task.name === selectedTaskName);
+      if (matched) {
+        setSelectedGroupId(matched.id); // ✅ 選択状態にする
+      }
+      setFilterText(selectedTaskName); // ✅ 絞り込みはそのまま
       setSelectedTaskName('');
     }
-  }, [selectedTaskName, setSelectedTaskName]);
+  }, [selectedTaskName, setSelectedTaskName, tasks]);
+
 
   useEffect(() => {
     if (selectedGroupId && !tasks.some(task => task.id === selectedGroupId)) {
