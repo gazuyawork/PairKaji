@@ -16,6 +16,9 @@ import PreventBounce from '@/components/PreventBounce';
 // モバイルで正確なvh計算をするための処理
 import SetViewportHeight from '@/components/SetViewportHeight';
 
+// 🔽 タスク分割状態の監視コンポーネントを追加
+import TaskSplitMonitor from '@/components/shared/TaskSplitMonitor';
+
 // Zen Maru Gothic フォントの設定（CSS変数 --font-zen を指定）
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
@@ -75,6 +78,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex flex-col h-full overscroll-none">
           {/* ペア情報の初期化処理（ログイン後の状態確認など） */}
           <PairInit />
+
+          {/* 🔽 タスク分割監視を追加（ローディング＋完了モーダル） */}
+          <TaskSplitMonitor />
 
           {/* 各ページの中身 */}
           {children}

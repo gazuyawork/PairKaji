@@ -1,0 +1,29 @@
+[debug] [2025-06-18T13:51:18.138Z] ----------------------------------------------------------------------
+[debug] [2025-06-18T13:51:18.139Z] Command:       /Users/matsumotokazuya/.nvm/versions/node/v20.19.1/bin/node /Users/matsumotokazuya/.nvm/versions/node/v20.19.1/bin/firebase deploy --only functions
+[debug] [2025-06-18T13:51:18.140Z] CLI Version:   14.2.1
+[debug] [2025-06-18T13:51:18.140Z] Platform:      darwin
+[debug] [2025-06-18T13:51:18.140Z] Node Version:  v20.19.1
+[debug] [2025-06-18T13:51:18.140Z] Time:          Wed Jun 18 2025 22:51:18 GMT+0900 (日本標準時)
+[debug] [2025-06-18T13:51:18.140Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-06-18T13:51:18.215Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-18T13:51:18.215Z] > authorizing via signed-in user (gazuyawork@gmail.com)
+[debug] [2025-06-18T13:51:18.215Z] [iam] checking project pairkaji-alpha for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-06-18T13:51:18.216Z] Checked if tokens are valid: true, expires at: 1750256235816
+[debug] [2025-06-18T13:51:18.216Z] Checked if tokens are valid: true, expires at: 1750256235816
+[debug] [2025-06-18T13:51:18.216Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions [none]
+[debug] [2025-06-18T13:51:18.216Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions x-goog-quota-user=projects/pairkaji-alpha
+[debug] [2025-06-18T13:51:18.216Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-06-18T13:51:19.045Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions 200
+[debug] [2025-06-18T13:51:19.045Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-06-18T13:51:19.045Z] Checked if tokens are valid: true, expires at: 1750256235816
+[debug] [2025-06-18T13:51:19.045Z] Checked if tokens are valid: true, expires at: 1750256235816
+[debug] [2025-06-18T13:51:19.046Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-06-18T13:51:19.046Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-06-18T13:51:20.142Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-06-18T13:51:20.142Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'pairkaji-alpha'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
