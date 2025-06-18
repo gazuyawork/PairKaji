@@ -58,8 +58,11 @@ const users = [
 
   return (
     <div className="w-full flex flex-col items-center gap-2">
-      <div className="flex gap-1 overflow-x-auto whitespace-nowrap no-scrollbar pr-2 min-w-0" style={{ WebkitOverflowScrolling: 'touch' }}>
-
+      {/* <div className="flex gap-1 overflow-x-auto whitespace-nowrap no-scrollbar pr-2 min-w-0" style={{ WebkitOverflowScrolling: 'touch' }}> */}
+      <div
+        className="flex gap-1 overflow-x-auto whitespace-nowrap no-scrollbar pr-2 pl-4"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
       {/* 📅 本日フィルターボタン */}
       <motion.button
         onClick={onToggleTodayFilter}

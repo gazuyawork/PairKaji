@@ -371,76 +371,73 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </div>
         )}
 
-{/* 🔍虫眼鏡 + FilterControls 横並び */}
-<div className="flex items-center gap-2 mb-2">
-  {/* 🔍虫眼鏡ボタン + 縦線 */}
-  <div className="flex items-center pr-2 border-r border-gray-300">
-    <motion.button
-      onClick={() => setShowSearchBox(prev => !prev)}
-      whileTap={{ scale: 1.2 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 12 }}
-      className={`
-        w-9 h-9 rounded-full flex items-center justify-center border mr-
-        ${showSearchBox
-          ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
-          : 'bg-white text-gray-600 border-gray-300'}
-      `}
-      title="検索"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-5 h-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-        />
-      </svg>
-    </motion.button>
-  </div>
+        {/* 🔍虫眼鏡 + FilterControls 横並び */}
+        <div className="flex items-center gap-2 mb-2">
+          {/* 🔍虫眼鏡ボタン + 縦線 */}
+          <div className="flex items-center pr-2 border-r border-gray-300">
+            <motion.button
+              onClick={() => setShowSearchBox(prev => !prev)}
+              whileTap={{ scale: 1.2 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+              className={`
+                w-9 h-9 rounded-full flex items-center justify-center border mr-
+                ${showSearchBox
+                  ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
+                  : 'bg-white text-gray-600 border-gray-300'}
+              `}
+              title="検索"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </motion.button>
+          </div>
 
-  {/* FilterControls 本体 */}
-  <div className="flex overflow-x-auto no-scrollbar space-x-2">
-    <FilterControls
-      periodFilter={periodFilter}
-      personFilter={personFilter}
-      onTogglePeriod={togglePeriod}
-      onTogglePerson={togglePerson}
-      searchTerm={searchTerm}
-      onClearSearch={() => setSearchTerm('')}
-      pairStatus={pairStatus}
-      todayFilter={todayFilter}
-      onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-    />
-  </div>
+          {/* FilterControls 本体 */}
+          <div className="flex overflow-x-auto no-scrollbar space-x-2">
+            <FilterControls
+              periodFilter={periodFilter}
+              personFilter={personFilter}
+              onTogglePeriod={togglePeriod}
+              onTogglePerson={togglePerson}
+              searchTerm={searchTerm}
+              onClearSearch={() => setSearchTerm('')}
+              pairStatus={pairStatus}
+              todayFilter={todayFilter}
+              onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+            />
+          </div>
 
-  
-  {/* ✅ フィルター解除ボタン：FilterControls外に移動 */}
-  {(periodFilter || personFilter || searchTerm || todayFilter) && (
-    <motion.button
-      onClick={() => {
-        setPeriodFilter(null);
-        setPersonFilter(null);
-        handleClearSearch?.();
-        // todayFilter の解除は任意で：必要であれば下記を有効化
-        // handleToggleTodayFilter(false);
-      }}
-      whileTap={{ scale: 1.2 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-      className="w-9 h-9 bg-white rounded-full border-2 border-red-500 text-red-500 font-bold flex items-center justify-center hover:bg-red-50 text-2xl pb-1.5"
-      title="フィルター解除"
-    >
-      ×
-    </motion.button>
-  )}
-
-  
-</div>
+          
+          {/* ✅ フィルター解除ボタン：FilterControls外に移動 */}
+          {(periodFilter || personFilter || searchTerm || todayFilter) && (
+            <motion.button
+              onClick={() => {
+                setPeriodFilter(null);
+                setPersonFilter(null);
+                handleClearSearch?.();
+                setTodayFilter(false);
+              }}
+              whileTap={{ scale: 1.2 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+              className="w-9 h-9 bg-white rounded-full border-2 border-red-500 text-red-500 font-bold flex items-center justify-center hover:bg-red-50 text-2xl pb-1.5"
+              title="フィルター解除"
+            >
+              ×
+            </motion.button>
+          )}
+        </div>
 
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
