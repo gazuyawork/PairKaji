@@ -313,7 +313,7 @@ const handleAddTask = useCallback(async () => {
         />
 
 
-        {(selectedGroupId != null || filterText.trim() !== '') && (
+        {/* {(selectedGroupId != null || filterText.trim() !== '') && (
           <div className="flex justify-center">
             <button
               onClick={() => {
@@ -325,7 +325,7 @@ const handleAddTask = useCallback(async () => {
               フィルター解除
             </button>
           </div>
-        )}
+        )} */}
 
 
         {(() => {

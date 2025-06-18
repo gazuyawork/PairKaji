@@ -31,7 +31,7 @@ import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 
 
-const periods: Period[] = ['毎日', '週次', '不定期'];
+const periods: Period[] = ['毎日', '週次', 'その他'];
 
 type Props = {
   initialSearch?: string;
@@ -43,7 +43,7 @@ type Props = {
 export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
-  const initialTaskGroups: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
+  const initialTaskGroups: Record<Period, Task[]> = { 毎日: [], 週次: [], その他: [] };
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(initialTaskGroups);
   const [periodFilter, setPeriodFilter] = useState<Period | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
@@ -84,7 +84,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       return task.daysOfWeek.includes(todayDayKanji);
     }
 
-    if (task.period === '不定期') {
+    if (task.period === 'その他') {
       if (!Array.isArray(task.dates)) return false;
       return task.dates.includes(todayStr);
     }
@@ -293,11 +293,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         const grouped: Record<Period, Task[]> = {
           毎日: [],
           週次: [],
-          不定期: [],
+          その他: [],
         };
 
         for (const task of rawTasks) {
-          if (task.period === '毎日' || task.period === '週次' || task.period === '不定期') {
+          if (task.period === '毎日' || task.period === '週次' || task.period === 'その他') {
             grouped[task.period].push(task);
           } else {
             console.warn('無効な period 値:', task.period, task);
@@ -364,44 +364,55 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </div>
         )}
 
-        {/* 🔍虫眼鏡 + FilterControls 横並び */}
-        <div className="flex items-center gap-2 mb-2">
-          {/* 🔍虫眼鏡ボタン */}
-          <button
-            className="w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center shadow-sm"
-            onClick={() => setShowSearchBox(prev => !prev)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 text-gray-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </button>
+{/* 🔍虫眼鏡 + FilterControls 横並び */}
+<div className="flex items-center gap-2 mb-2">
+  {/* 🔍虫眼鏡ボタン + 縦線 */}
+  <div className="flex items-center pr-2 border-r border-gray-300">
+    <motion.button
+      onClick={() => setShowSearchBox(prev => !prev)}
+      whileTap={{ scale: 1.2 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+      className={`
+        w-9 h-9 rounded-full flex items-center justify-center border mr-1
+        ${showSearchBox
+          ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
+          : 'bg-white text-gray-600 border-gray-300'}
+      `}
+      title="検索"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        />
+      </svg>
+    </motion.button>
+  </div>
 
-          {/* FilterControls 本体 */}
-          <div className="flex-1">
-            <FilterControls
-              periodFilter={periodFilter}
-              personFilter={personFilter}
-              onTogglePeriod={togglePeriod}
-              onTogglePerson={togglePerson}
-              searchTerm={searchTerm}
-              onClearSearch={() => setSearchTerm('')}
-              pairStatus={pairStatus}
-              todayFilter={todayFilter}
-              onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-            />
-          </div>
-        </div>
+  {/* FilterControls 本体 */}
+  <div className="flex-1">
+    <FilterControls
+      periodFilter={periodFilter}
+      personFilter={personFilter}
+      onTogglePeriod={togglePeriod}
+      onTogglePerson={togglePerson}
+      searchTerm={searchTerm}
+      onClearSearch={() => setSearchTerm('')}
+      pairStatus={pairStatus}
+      todayFilter={todayFilter}
+      onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+    />
+  </div>
+</div>
+
 
         <hr className="border-t border-gray-300 opacity-50 my-4" />
 

@@ -94,7 +94,7 @@ export default function TaskManageCard({
           }}
           className="bg-transparent outline-none border-b border-gray-300"
         >
-          {['毎日', '週次', '不定期'].map((f) => (
+          {['毎日', '週次', 'その他'].map((f) => (
             <option key={f} value={f}>
               {f}
             </option>
@@ -164,7 +164,7 @@ export default function TaskManageCard({
         </div>
       )}
 
-      {task.period === '不定期' && (
+      {task.period === 'その他' && (
         <div className="pt-1">
           <label className="text-sm text-gray-600">日付選択：</label>
           <input

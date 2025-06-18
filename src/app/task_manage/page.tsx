@@ -31,6 +31,12 @@ export default function TaskManagePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
 
+  const [todayFilter, setTodayFilter] = useState(false);
+  const handleToggleTodayFilter = () => {
+    setTodayFilter((prev) => !prev);
+  };
+
+
   useEffect(() => {
     const fetchPairStatus = async () => {
       const uid = auth.currentUser?.uid;
@@ -329,6 +335,8 @@ const confirmTasks = async () => {
                 onTogglePeriod={toggleFilter}
                 onTogglePerson={togglePerson}
                 pairStatus={pairStatus}
+                todayFilter={todayFilter} // ✅ 追加
+                onToggleTodayFilter={handleToggleTodayFilter}
               />
             </div>
             <hr className="border-t border-gray-300 opacity-50 my-4" />

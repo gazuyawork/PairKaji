@@ -8,7 +8,7 @@ import { dayNumberToName } from '@/lib/constants'; // 🔹 追加
 type CalendarTask = {
   id: string;
   name: string;
-  period: '毎日' | '週次' | '不定期';
+  period: '毎日' | '週次' | 'その他';
   dates?: string[];
   daysOfWeek?: string[];
 };

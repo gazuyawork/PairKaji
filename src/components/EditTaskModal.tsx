@@ -172,7 +172,7 @@ export default function EditTaskModal({
                   updated.dates = [];
                 } else if (newPeriod === '週次') {
                   updated.dates = [];
-                } else if (newPeriod === '不定期') {
+                } else if (newPeriod === 'その他') {
                   updated.daysOfWeek = [];
                 }
                 return updated;
@@ -180,7 +180,7 @@ export default function EditTaskModal({
             }}
             className="w-full border-b border-gray-300 outline-none pl-2"
           >
-            {['毎日', '週次', '不定期'].map((p) => (
+            {['毎日', '週次', 'その他'].map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>
@@ -211,8 +211,8 @@ export default function EditTaskModal({
           </div>
         )}
 
-        {/* 📆 日付選択（不定期のみ） */}
-        {editedTask.period === '不定期' && (
+        {/* 📆 日付選択（その他のみ） */}
+        {editedTask.period === 'その他' && (
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">日付：</label>
             <input

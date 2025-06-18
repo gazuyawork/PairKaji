@@ -35,7 +35,7 @@ export default function FilterControls({
   todayFilter, // ✅ 追加
   onToggleTodayFilter, // ✅ 追加
 }: Props) {
-  const periods = ['毎日', '週次', '不定期'] as const;
+  // const periods = ['毎日', '週次', 'その他'] as const;
   const { profileImage, partnerImage } = useProfileImages();
   const users = [
     { name: '太郎', image: profileImage },
@@ -77,69 +77,87 @@ export default function FilterControls({
         >
           {todayDate}
         </span>
-      </motion.button>
 
-        {/* 🗓️ 期間フィルター */}
-        {periods.map(period => (
-          <motion.button
-            key={period + periodClickKey}
-            onClick={() => {
-              setPeriodClickKey(prev => prev + 1);
-              onTogglePeriod(period);
-            }}
-            whileTap={{ scale: 1.2 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 10 }}
-            className={`px-4 py-2 rounded-full font-sans border ${
-              periodFilter === period ? 'bg-[#FFCB7D] text-white' : 'bg-white text-[#5E5E5E]'
-            }`}
-          >
-            {period}
-          </motion.button>
-        ))}
+        </motion.button>
 
-        {/* 👥 担当者フィルター */}
-        {pairStatus === 'confirmed' &&
-          users.map(user => (
-            <motion.button
-              key={user.name + personClickKey}
-              onClick={() => {
-                setPersonClickKey(prev => prev + 1);
-                onTogglePerson(user.name);
-              }}
-              whileTap={{ scale: 1.2 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 10 }}
-              className={`w-10 h-10 rounded-full overflow-hidden border ${
-                personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
-              }`}
-            >
-              <Image
-                src={user.image || '/images/default.png'}
-                alt={`${user.name}のフィルター`}
-                width={40}
-                height={40}
-                className="object-cover"
-              />
-            </motion.button>
-          ))}
+          {/* 🗓️ 期間フィルター */}
+          {(['毎日', '週次', 'その他'] as Period[]).map(period => {
+            const displayMap: Record<Period, string> = {
+              '毎日': '毎',
+              '週次': '週',
+              'その他': '他',
+            };
 
-        {extraButton}
+            return (
+              <motion.button
+                key={period + periodClickKey}
+                onClick={() => {
+                  setPeriodClickKey(prev => prev + 1);
+                  onTogglePeriod(period);
+                }}
+                whileTap={{ scale: 1.2 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+                className={`
+                  w-10 h-10 rounded-full flex items-center justify-center font-sans border font-bold
+                  ${periodFilter === period ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]' : 'bg-white text-[#5E5E5E] border-gray-300'}
+                `}
+              >
+                {displayMap[period]}
+              </motion.button>
+            );
+          })}
+
+
+          {/* 👥 担当者フィルター */}
+          {pairStatus === 'confirmed' &&
+            users.map(user => (
+              <motion.button
+                key={user.name + personClickKey}
+                onClick={() => {
+                  setPersonClickKey(prev => prev + 1);
+                  onTogglePerson(user.name);
+                }}
+                whileTap={{ scale: 1.2 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+                className={`w-10 h-10 rounded-full overflow-hidden border ${
+                  personFilter === user.name ? 'border-[#FFCB7D]' : 'border-gray-300'
+                }`}
+              >
+                <Image
+                  src={user.image || '/images/default.png'}
+                  alt={`${user.name}のフィルター`}
+                  width={40}
+                  height={40}
+                  className="object-cover"
+                />
+              </motion.button>
+            ))}
+
+            {/* 検索ボックスと ✖ ボタン（右寄せ配置） */}
+            {showClear && (
+              <div className="ml-3">
+                <motion.button
+                  onClick={() => {
+                    onTogglePeriod(null);
+                    onTogglePerson(null);
+                    onClearSearch?.();
+                    // ✅ todayFilter は解除しない
+                  }}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                  className={`
+                    w-9 h-9 bg-white rounded-full border-2 border-red-500
+                    text-red-500 font-bold flex items-center justify-center
+                    hover:bg-red-50 text-2xl pb-1.5
+                  `}
+                  title="フィルター解除"
+                >
+                  ×
+                </motion.button>
+              </div>
+            )}
+          {extraButton}
       </div>
-
-      {showClear && (
-        <div className="flex justify-center">
-          <button
-            onClick={() => {
-              onTogglePeriod(null);
-              onTogglePerson(null);
-              onClearSearch?.();
-              onToggleTodayFilter(); // ✅ フィルター解除時にtodayFilterもOFFへ
-            }}
-            className="text-xs px-3 py-1 mt-1 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition"
-          >
-            フィルター解除
-          </button>
-        </div>
-      )}
     </div>
   );
 }
