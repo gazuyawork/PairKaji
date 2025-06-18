@@ -55,9 +55,42 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [isLoading, setIsLoading] = useState(true);
   const [longPressPosition, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
-  
+  const [todayFilter, setTodayFilter] = useState(false);
 
+  const isTodayTask = (task: Task): boolean => {
+    const today = new Date();
 
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    const dayNumberToKanji: Record<number, string> = {
+      0: '日',
+      1: '月',
+      2: '火',
+      3: '水',
+      4: '木',
+      5: '金',
+      6: '土',
+    };
+
+    const todayDayKanji = dayNumberToKanji[today.getDay()];
+
+    if (task.period === '毎日') return true;
+
+    if (task.period === '週次') {
+      if (!Array.isArray(task.daysOfWeek)) return false;
+      return task.daysOfWeek.includes(todayDayKanji);
+    }
+
+    if (task.period === '不定期') {
+      if (!Array.isArray(task.dates)) return false;
+      return task.dates.includes(todayStr);
+    }
+
+    return false;
+  };
 
   const userList = [
     { id: currentUserId ?? '', name: 'あなた', imageUrl: profileImage },
@@ -364,6 +397,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               searchTerm={searchTerm}
               onClearSearch={() => setSearchTerm('')}
               pairStatus={pairStatus}
+              todayFilter={todayFilter}
+              onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
             />
           </div>
         </div>
@@ -375,8 +410,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             const list = rawTasks.filter(task =>
               (!periodFilter || periodFilter === period) &&
               (!personFilter || task.person === personFilter) &&
-              (!searchTerm || task.name.includes(searchTerm))
+              (!searchTerm || task.name.includes(searchTerm)) &&
+              (!todayFilter || isTodayTask(task))
             );
+
             if (list.length === 0) return null;
 
             const remaining = list.filter(task => !task.done).length;

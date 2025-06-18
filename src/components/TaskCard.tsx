@@ -272,8 +272,5 @@ export default function TaskCard({
       </motion.div>
     </div>
 
-
-
-
   );
 }
