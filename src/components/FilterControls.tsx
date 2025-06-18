@@ -19,9 +19,8 @@ interface Props {
   onClearSearch?: () => void;
   extraButton?: ReactNode;
   pairStatus: 'confirmed' | 'none';
-
-  todayFilter: boolean; // ✅ 追加
-  onToggleTodayFilter: () => void; // ✅ 追加
+  todayFilter: boolean;
+  onToggleTodayFilter: () => void;
 }
 
 export default function FilterControls({
@@ -29,14 +28,13 @@ export default function FilterControls({
   personFilter,
   onTogglePeriod,
   onTogglePerson,
-  searchTerm,
-  onClearSearch,
+  // searchTerm,
+  // onClearSearch,
   extraButton,
   pairStatus,
   todayFilter, // ✅ 追加
   onToggleTodayFilter, // ✅ 追加
 }: Props) {
-  // const periods = ['毎日', '週次', 'その他'] as const;
 const currentUserId = auth.currentUser?.uid;
 const { profileImage, partnerImage, partnerId } = useProfileImages();
 const users = [
@@ -47,7 +45,7 @@ const users = [
 ];
 
 
-  const showClear = !!(periodFilter || personFilter || searchTerm || todayFilter);
+  // const showClear = !!(periodFilter || personFilter || searchTerm || todayFilter);
 
   const [periodClickKey, setPeriodClickKey] = useState(0);
   const [personClickKey, setPersonClickKey] = useState(0);

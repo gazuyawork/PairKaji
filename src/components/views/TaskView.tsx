@@ -421,7 +421,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
           
           {/* ✅ フィルター解除ボタン：FilterControls外に移動 */}
-          {(periodFilter || personFilter || searchTerm || todayFilter) && (
+          {showClear && (
             <motion.button
               onClick={() => {
                 setPeriodFilter(null);
