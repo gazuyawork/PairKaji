@@ -1,5 +1,4 @@
 // src/lib/taskMappers.ts
-// import { useProfileImages } from '@/hooks/useProfileImages'; // ✅ 修正
 import type { Task, FirestoreTask } from '@/types/Task';
 import { dayNumberToName } from '@/lib/constants'; 
 import { QueryDocumentSnapshot } from 'firebase/firestore';
@@ -16,7 +15,7 @@ export const mapFirestoreDocToTask = (doc: QueryDocumentSnapshot<FirestoreTask>)
     point: data.point ?? 0,
     done: data.done ?? false,
     skipped: data.skipped ?? false,
-    completedAt: data.completedAt ?? null, // ← ここも修正済みでOK
+    completedAt: data.completedAt ?? null,
     completedBy: data.completedBy ?? '',
     person: user,
     daysOfWeek: (data.daysOfWeek ?? []).map((code: string) => dayNumberToName[code] ?? ''),
@@ -27,5 +26,8 @@ export const mapFirestoreDocToTask = (doc: QueryDocumentSnapshot<FirestoreTask>)
     visible: data.visible ?? false,
     userId: data.userId ?? '',
     private: data.private ?? false,
+
+    // ✅ これを追加してください！
+    userIds: data.userIds ?? [],
   };
 };

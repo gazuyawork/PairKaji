@@ -51,7 +51,18 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
   const [partnerUserId, setPartnerUserId] = useState<string | null>(null);
   const { profileImage, partnerImage } = useProfileImages();
-  const currentUserId = auth.currentUser?.uid;
+  // const currentUserId = auth.currentUser?.uid;
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+useEffect(() => {
+  const uid = auth.currentUser?.uid;
+  console.log('✅ currentUserId from auth:', uid);
+  if (uid) {
+    setCurrentUserId(uid);
+  }
+}, []);
+
+
   const [isLoading, setIsLoading] = useState(true);
   const [longPressPosition, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
@@ -246,12 +257,17 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         return;
       }
 
-      const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
+      // const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
+      const q = query(collection(db, 'tasks'), where('userIds', 'array-contains-any', ids));
+
 
       unsubscribe = onSnapshot(q, async (snapshot) => {
         const rawTasks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
           mapFirestoreDocToTask(doc)
         );
+
+        console.log('✅ rawTasks:', rawTasks);
+
 
         const updates: Promise<void>[] = [];
         for (const task of rawTasks) {
@@ -336,10 +352,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [editTargetTask, onModalOpenChange]);
 
 
-  return (
+    return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
       <Header title="Task" currentIndex={1} />
-      {/* ✅ モーダル */}
       {editTargetTask && (
         <EditTaskModal
           key={editTargetTask.id}
@@ -358,171 +373,166 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            {showSearchBox && (
+              <div className="mb-4">
+                <SearchBox value={searchTerm} onChange={setSearchTerm} />
+              </div>
+            )}
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
-        >
-        {/* 🔍 SearchBox（上部にトグル表示） */}
-        {showSearchBox && (
-          <div className="mb-4">
-            <SearchBox value={searchTerm} onChange={setSearchTerm} />
-          </div>
-        )}
-
-        {/* 🔍虫眼鏡 + FilterControls 横並び */}
-        <div className="flex items-center gap-2 mb-2">
-          {/* 🔍虫眼鏡ボタン + 縦線 */}
-          <div className="flex items-center pr-2 border-r border-gray-300">
-            <motion.button
-              onClick={() => setShowSearchBox(prev => !prev)}
-              whileTap={{ scale: 1.2 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 12 }}
-              className={`
-                w-9 h-9 rounded-full flex items-center justify-center border mr-
-                ${showSearchBox
-                  ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
-                  : 'bg-white text-gray-600 border-gray-300'}
-              `}
-              title="検索"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </motion.button>
-          </div>
-
-          {/* FilterControls 本体 */}
-          <div className="flex overflow-x-auto no-scrollbar space-x-2">
-            <FilterControls
-              periodFilter={periodFilter}
-              personFilter={personFilter}
-              onTogglePeriod={togglePeriod}
-              onTogglePerson={togglePerson}
-              searchTerm={searchTerm}
-              onClearSearch={() => setSearchTerm('')}
-              pairStatus={pairStatus}
-              todayFilter={todayFilter}
-              onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-            />
-          </div>
-
-          
-          {/* ✅ フィルター解除ボタン：FilterControls外に移動 */}
-          {showClear && (
-            <motion.button
-              onClick={() => {
-                setPeriodFilter(null);
-                setPersonFilter(null);
-                handleClearSearch?.();
-                setTodayFilter(false);
-              }}
-              whileTap={{ scale: 1.2 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-              className="w-9 h-9 bg-white rounded-full border-2 border-red-500 text-red-500 font-bold flex items-center justify-center hover:bg-red-50 text-2xl pb-0.5"
-              title="フィルター解除"
-            >
-              ×
-            </motion.button>
-          )}
-        </div>
-
-
-        <hr className="border-t border-gray-300 opacity-50 my-4" />
-
-          {periods.map(period => {
-            const rawTasks = tasksState[period] ?? [];
-            const list = rawTasks.filter(task =>
-              (!periodFilter || periodFilter === period) &&
-              (!personFilter || task.users.includes(personFilter)) && // ✅ 修正済み
-              (!searchTerm || task.name.includes(searchTerm)) &&
-              (!todayFilter || isTodayTask(task))
-            );
-
-
-            if (list.length === 0) return null;
-
-            const remaining = list.filter(task => !task.done).length;
-
-            return (
-              <div key={period}>
-                <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
-                  {period}（残り {remaining} 件）
-                </h2>
-                <ul className="space-y-2">
-                  {list.map((task, idx) => {
-                    const isHighlighted = task.visible === true;
-                    return (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        period={period}
-                        index={idx}
-                        onToggleDone={toggleDone}
-                        onDelete={deleteTask}
-                        onEdit={() => setEditTargetTask({
-                          ...task,
-                          period: task.period,
-                          daysOfWeek: task.daysOfWeek ?? [],
-                          dates: task.dates ?? [],
-                          isTodo: task.isTodo ?? false,
-                        })}
-                        highlighted={isHighlighted}
-                        userList={userList}
-                        isPairConfirmed={pairStatus === 'confirmed'}
-                        onLongPress={(x, y) => setLongPressPosition({ x, y })}
-                      />
-                    );
-                  })}
-                </ul>
-
-                {longPressPosition && (
-                  <div className="fixed inset-0 z-[9999] pointer-events-none">
-                    {/* ✅ 背景レイヤー：クリックでメニューを閉じる */}
-                    <div
-                      className="absolute inset-0 bg-transparent"
-                      style={{ pointerEvents: 'auto' }}
-                      onClick={() => setLongPressPosition(null)}
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center pr-2 border-r border-gray-300">
+                <motion.button
+                  onClick={() => setShowSearchBox(prev => !prev)}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+                  className={`
+                    w-9 h-9 rounded-full flex items-center justify-center border
+                    ${showSearchBox
+                      ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]'
+                      : 'bg-white text-gray-600 border-gray-300'}
+                  `}
+                  title="検索"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
+                  </svg>
+                </motion.button>
+              </div>
 
-                    {/* ✅ メニュー本体 */}
-                    <div
-                      className="absolute"
-                      style={{
-                        top: longPressPosition.y,
-                        left: longPressPosition.x,
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'auto',
-                      }}
-                    >
-                      <div className="flex flex-col gap-2 items-center">
-                        <button className="w-12 h-12 bg-orange-300 rounded-full shadow-lg text-white">編集</button>
-                        <button className="w-12 h-12 bg-red-400 rounded-full shadow-lg text-white">削除</button>
-                        <button className="w-12 h-12 bg-gray-400 rounded-full shadow-lg text-white">詳細</button>
+              <div className="flex overflow-x-auto no-scrollbar space-x-2">
+                <FilterControls
+                  periodFilter={periodFilter}
+                  personFilter={personFilter}
+                  onTogglePeriod={togglePeriod}
+                  onTogglePerson={togglePerson}
+                  searchTerm={searchTerm}
+                  onClearSearch={() => setSearchTerm('')}
+                  pairStatus={pairStatus}
+                  todayFilter={todayFilter}
+                  onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+                />
+              </div>
+
+              {showClear && (
+                <motion.button
+                  onClick={() => {
+                    setPeriodFilter(null);
+                    setPersonFilter(null);
+                    handleClearSearch?.();
+                    setTodayFilter(false);
+                  }}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                  className="w-9 h-9 bg-white rounded-full border-2 border-red-500 text-red-500 font-bold flex items-center justify-center hover:bg-red-50 text-2xl pb-0.5"
+                  title="フィルター解除"
+                >
+                  ×
+                </motion.button>
+              )}
+            </div>
+
+            <hr className="border-t border-gray-300 opacity-50 my-4" />
+
+            {periods.map(period => {
+              const rawTasks = tasksState[period] ?? [];
+              const list = rawTasks.filter(task =>
+                currentUserId && task.userIds?.includes(currentUserId) &&
+                (!periodFilter || periodFilter === period) &&
+                (!personFilter || task.users.includes(personFilter)) &&
+                (!searchTerm || task.name.includes(searchTerm)) &&
+                (!todayFilter || isTodayTask(task))
+              );
+              const remaining = list.filter(task => !task.done).length;
+
+              let content: React.ReactElement | null = null;
+
+
+              if (!currentUserId) {
+                content = <div className="p-4 text-gray-400">ユーザー情報を取得中...</div>;
+              } else if (list.length === 0) {
+                content = <div className="p-4 text-gray-400">{period}：表示するタスクはありません。</div>;
+              } else {
+                content = (
+                  <>
+                    <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
+                      {period}（残り {remaining} 件）
+                    </h2>
+                    <ul className="space-y-2">
+                      {list.map((task, idx) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          period={period}
+                          index={idx}
+                          onToggleDone={toggleDone}
+                          onDelete={deleteTask}
+                          onEdit={() => setEditTargetTask({
+                            ...task,
+                            period: task.period,
+                            daysOfWeek: task.daysOfWeek ?? [],
+                            dates: task.dates ?? [],
+                            isTodo: task.isTodo ?? false,
+                          })}
+                          highlighted={task.visible === true}
+                          userList={userList}
+                          isPairConfirmed={pairStatus === 'confirmed'}
+                          onLongPress={(x, y) => setLongPressPosition({ x, y })}
+                        />
+                      ))}
+                    </ul>
+                  </>
+                );
+              }
+
+              return (
+                <div key={period}>
+                  {content}
+                  {longPressPosition && (
+                    <>
+                      <div className="fixed inset-0 z-[9999] pointer-events-none">
+                        <div
+                          className="absolute inset-0 bg-transparent"
+                          style={{ pointerEvents: 'auto' }}
+                          onClick={() => setLongPressPosition(null)}
+                        />
+                        <div
+                          className="absolute"
+                          style={{
+                            top: longPressPosition.y,
+                            left: longPressPosition.x,
+                            transform: 'translate(-50%, -50%)',
+                            pointerEvents: 'auto',
+                          }}
+                        >
+                          <div className="flex flex-col gap-2 items-center">
+                            <button className="w-12 h-12 bg-orange-300 rounded-full shadow-lg text-white">編集</button>
+                            <button className="w-12 h-12 bg-red-400 rounded-full shadow-lg text-white">削除</button>
+                            <button className="w-12 h-12 bg-gray-400 rounded-full shadow-lg text-white">詳細</button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {longPressPosition && (
-                  <div
-                    className="absolute inset-0 z-40"
-                    onClick={() => setLongPressPosition(null)}
-                  />
-                )}
-
+                      <div
+                        className="absolute inset-0 z-40"
+                        onClick={() => setLongPressPosition(null)}
+                      />
+                    </>
+                  )}
                 </div>
               );
             })}
