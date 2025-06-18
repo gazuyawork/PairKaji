@@ -56,6 +56,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [longPressPosition, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(false);
+  const showClear = !!(periodFilter || personFilter || searchTerm || todayFilter);
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+  };
+
+
 
   const isTodayTask = (task: Task): boolean => {
     const today = new Date();
@@ -398,7 +405,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   </div>
 
   {/* FilterControls 本体 */}
-  <div className="flex-1 overflow-y-auto">
+  <div className="flex overflow-x-auto no-scrollbar space-x-2">
     <FilterControls
       periodFilter={periodFilter}
       personFilter={personFilter}
@@ -411,6 +418,28 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
     />
   </div>
+
+  
+  {/* ✅ フィルター解除ボタン：FilterControls外に移動 */}
+  {(periodFilter || personFilter || searchTerm || todayFilter) && (
+    <motion.button
+      onClick={() => {
+        setPeriodFilter(null);
+        setPersonFilter(null);
+        handleClearSearch?.();
+        // todayFilter の解除は任意で：必要であれば下記を有効化
+        // handleToggleTodayFilter(false);
+      }}
+      whileTap={{ scale: 1.2 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+      className="w-9 h-9 bg-white rounded-full border-2 border-red-500 text-red-500 font-bold flex items-center justify-center hover:bg-red-50 text-2xl pb-1.5"
+      title="フィルター解除"
+    >
+      ×
+    </motion.button>
+  )}
+
+  
 </div>
 
 

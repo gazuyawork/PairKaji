@@ -57,7 +57,7 @@ const users = [
 
 
   return (
-    <div className="w-full flex flex-col items-center gap-2 ml-[-16px]">
+    <div className="w-full flex flex-col items-center gap-2">
       <div className="flex gap-1 overflow-x-auto whitespace-nowrap no-scrollbar pr-2 min-w-0" style={{ WebkitOverflowScrolling: 'touch' }}>
 
       {/* 📅 本日フィルターボタン */}
@@ -140,30 +140,6 @@ const users = [
                 />
               </motion.button>
             ))}
-
-            {/* 検索ボックスと ✖ ボタン（右寄せ配置） */}
-            {showClear && (
-              <div className="ml-2">
-                <motion.button
-                  onClick={() => {
-                    onTogglePeriod(null);
-                    onTogglePerson(null);
-                    onClearSearch?.();
-                    // ✅ todayFilter は解除しない
-                  }}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                  className={`
-                    w-9 h-9 bg-white rounded-full border-2 border-red-500
-                    text-red-500 font-bold flex items-center justify-center
-                    hover:bg-red-50 text-2xl pb-1.5
-                  `}
-                  title="フィルター解除"
-                >
-                  ×
-                </motion.button>
-              </div>
-            )}
           {extraButton}
       </div>
     </div>
