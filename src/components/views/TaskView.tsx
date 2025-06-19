@@ -466,7 +466,7 @@ useEffect(() => {
               if (!currentUserId) {
                 content = <div className="p-4 text-gray-400">ユーザー情報を取得中...</div>;
               } else if (list.length === 0) {
-                content = <div className="p-4 text-gray-400">{period}：表示するタスクはありません。</div>;
+                // content = <div className="p-4 text-gray-400">{period}：表示するタスクはありません。</div>;
               } else {
                 content = (
                   <>
