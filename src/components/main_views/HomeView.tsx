@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
-import WeeklyPoints from '@/components/WeeklyPoints';
-import FinishDayTask from '@/components/FinishDayTask';
-import TaskCalendar from '@/components/TaskCalendar';
+import WeeklyPoints from '@/components/home_view/WeeklyPoints';
+import FinishDayTask from '@/components/home_view/FinishDayTask';
+import TaskCalendar from '@/components/home_view/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';

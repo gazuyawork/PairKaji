@@ -14,7 +14,7 @@ import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from './EditPointModal';
 import { fetchPairUserIds } from '@/lib/taskUtils';
 import { motion } from 'framer-motion';
-import RouletteWheel from '@/components/RouletteWheel';
+import RouletteWheel from '@/components/home_view/RouletteWheel';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 

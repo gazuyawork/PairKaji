@@ -5,12 +5,12 @@
 import Header from '@/components/Header';
 import { Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import SearchBox from '@/components/SearchBox';
-import FilterControls from '@/components/FilterControls';
+import SearchBox from '@/components/filter/SearchBox';
+import FilterControls from '@/components/filter/FilterControls';
 import type { Period } from '@/types/Task';
 import { toast } from 'sonner'; 
 import { deleteTaskFromFirestore } from '@/lib/firebaseUtils';
-import TaskManageCard from '@/components/TaskManageCard'; 
+import TaskManageCard from '@/components/task_view/TaskManageCard'; 
 import type { TaskManageTask } from '@/types/Task';
 import { fetchPairUserIds, saveAllTasks } from '@/lib/taskUtils';
 import { useProfileImages } from '@/hooks/useProfileImages';

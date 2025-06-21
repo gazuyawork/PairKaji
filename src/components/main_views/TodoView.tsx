@@ -21,14 +21,14 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import Header from '@/components/Header';
-import TodoTaskCard from '@/components/TodoTaskCard';
+import TodoTaskCard from '@/components/todo_view/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import GroupSelector from '@/components/GroupSelector';
+import GroupSelector from '@/components/filter/GroupSelector';
 import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
-import TodoNoteModal from '@/components/TodoNoteModal';
+import TodoNoteModal from '@/components/todo_view/TodoNoteModal';
 
 
 export default function TodoView() {

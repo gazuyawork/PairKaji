@@ -2,11 +2,11 @@
 
 import Header from '@/components/Header';
 import { useState, useEffect } from 'react';
-import TaskCard from '@/components/TaskCard';
+import TaskCard from '@/components/task_view/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
 import type { Task, Period } from '@/types/Task';
-import SearchBox from '@/components/SearchBox';
-import FilterControls from '@/components/FilterControls';
+import SearchBox from '@/components/filter/SearchBox';
+import FilterControls from '@/components/filter/FilterControls';
 import {
   collection,
   onSnapshot,

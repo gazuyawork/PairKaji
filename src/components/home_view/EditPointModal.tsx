@@ -6,7 +6,7 @@ import { useEditPointData } from '@/hooks/useEditPointData';
 import { handleSavePoints } from '@/utils/handleSavePoints';
 import RouletteInputSection from '@/components/points/RouletteInputSection';
 import PointInputRow from '@/components/points/PointInputRow';
-import BaseModal from './modals/BaseModal';
+import BaseModal from '../modals/BaseModal';
 
 interface Props {
   isOpen: boolean;

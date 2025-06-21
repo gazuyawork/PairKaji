@@ -10,9 +10,9 @@ import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { auth } from '@/lib/firebase';
 import FooterNav from '@/components/FooterNav';
-import HomeView from '@/components/views/HomeView';
-import TaskView from '@/components/views/TaskView';
-import TodoView from '@/components/views/TodoView';
+import HomeView from '@/components/main_views/HomeView';
+import TaskView from '@/components/main_views/TaskView';
+import TodoView from '@/components/main_views/TodoView';
 import { ViewProvider } from '@/context/ViewContext'; 
 import { useView } from '@/context/ViewContext';
 
