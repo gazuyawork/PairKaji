@@ -10,8 +10,26 @@ import Image from 'next/image';
 import clsx from 'clsx';
 import { useView } from '@/context/ViewContext';
 
-const dayNumberToName: Record<string, string> = {
-  '1': '月', '2': '火', '3': '水', '4': '木', '5': '金', '6': '土', '0': '日',
+const dayBorderClassMap: Record<string, string> = {
+  '0': 'border-orange-200',
+  '1': 'border-gray-300',
+  '2': 'border-red-200',
+  '3': 'border-blue-200',
+  '4': 'border-green-200',
+  '5': 'border-yellow-200',
+  '6': 'border-amber-200',
+};
+
+const dayBaseClass = 'bg-gray-600'; // 常に背景はダークグレー系で統一
+
+const dayKanjiToNumber: Record<string, string> = {
+  '日': '0',
+  '月': '1',
+  '火': '2',
+  '水': '3',
+  '木': '4',
+  '金': '5',
+  '土': '6',
 };
 
 type UserInfo = {
@@ -239,20 +257,31 @@ export default function TaskCard({
             </span>
           )}
 
-          {task.daysOfWeek && (
-            <div className="flex flex-wrap gap-1 ml-2 max-w-[calc(5*3*0.25rem+0.25rem*2)]">
-              {[...task.daysOfWeek]
-                .sort((a, b) => ['0','1','2','3','4','5','6'].indexOf(a) - ['0','1','2','3','4','5','6'].indexOf(b))
-                .map((d, i) => (
-                  <div
-                    key={i}
-                    className="w-5 h-5 aspect-square rounded-full bg-[#5E5E5E] text-white text-xs flex items-center justify-center flex-shrink-0"
-                  >
-                    {dayNumberToName[d] ?? d}
-                  </div>
-                ))}
-            </div>
+{task.daysOfWeek && (
+  <div className="flex flex-wrap gap- ml-2 max-w-[calc(5*3*0.25rem+0.25rem*2)]">
+    {[...task.daysOfWeek]
+      .sort(
+        (a, b) =>
+          ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
+          ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
+      )
+      .map((d, i) => (
+        <div
+          key={i}
+          className={clsx(
+            'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
+            dayBaseClass,
+            dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
           )}
+        >
+          {d}
+        </div>
+      ))}
+  </div>
+)}
+
+
+
         </div>
 
         <div className="flex items-center gap-3">
