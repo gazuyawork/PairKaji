@@ -24,7 +24,7 @@ type Props = {
   task: Task;
   period: Period;
   index: number;
-  onToggleDone: (period: Period, index: number) => void;
+  onToggleDone: (period: Period, taskId: string) => void;
   onDelete: (period: Period, id: string) => void;
   onEdit: () => void;
   highlighted?: boolean;
@@ -34,7 +34,7 @@ type Props = {
 };
 
 export default function TaskCard({
-  task, period, index, onToggleDone, onDelete, onEdit,
+  task, period, onToggleDone, onDelete, onEdit,
   highlighted = false, userList, isPairConfirmed,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
@@ -102,7 +102,7 @@ export default function TaskCard({
     } else {
       setAnimateTrigger(prev => prev + 1);
     }
-    onToggleDone(period, index);
+    onToggleDone(period, task.id);
   };
 
   const handleDelete = () => {

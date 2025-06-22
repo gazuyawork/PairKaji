@@ -186,8 +186,9 @@ useEffect(() => {
   const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
   const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
 
-  const toggleDone = async (period: Period, index: number) => {
-    const task = tasksState[period][index];
+  const toggleDone = async (period: Period, taskId: string) => {
+    const task = tasksState[period].find(t => t.id === taskId);
+    if (!task) return;
     await toggleTaskDoneStatus(
       task.id,
       task.userId,
