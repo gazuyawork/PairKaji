@@ -146,7 +146,7 @@ useEffect(() => {
     };
     window.addEventListener('open-new-task-modal', handleOpenModal);
     return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
-  }, []);
+  }, [createEmptyTask]);
 
 
 

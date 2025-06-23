@@ -79,6 +79,7 @@ export const buildFirestoreTaskData = (
 export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds: string[]) => {
   for (const task of tasks) {
     const taskData = buildFirestoreTaskData(task, userIds, uid); // FirestoreTaskデータを生成
+
     try {
       await saveTaskToFirestore(task.isNew ? null : task.id, taskData); // 新規ならnullを渡して追加、既存ならIDを渡して更新
     } catch (e) {
@@ -181,14 +182,14 @@ export const cleanObject = <T>(obj: T): T => {
   }
 
   if (typeof obj === 'object' && obj !== null) {
-    const cleaned: Record<string, any> = {};
-    for (const [key, value] of Object.entries(obj)) {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       if (
         value !== undefined &&
         value !== null &&
         !(typeof value === 'string' && value.trim() === '')
       ) {
-        const cleanedValue = cleanObject(value); // 再帰的にクリーン
+        const cleanedValue = cleanObject(value);
         cleaned[key] = cleanedValue;
       }
     }
@@ -197,7 +198,6 @@ export const cleanObject = <T>(obj: T): T => {
 
   return obj;
 };
-
 
 
 /**

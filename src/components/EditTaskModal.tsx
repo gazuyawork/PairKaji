@@ -45,7 +45,7 @@ export default function EditTaskModal({
       onClose();
       setShouldClose(false); // 再表示時の影響を防ぐ
     }
-  }, [shouldClose]);
+  }, [shouldClose, onClose]);
 
   useEffect(() => {
     setMounted(true);

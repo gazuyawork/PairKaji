@@ -23,7 +23,7 @@ export type FirestoreTask = {
   userId?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  [key: string]: any; // 任意フィールド許容（必要であれば）
+  [key: string]: unknown; // 任意フィールド許容（必要であれば）
   todos?: unknown[];
 };
 
