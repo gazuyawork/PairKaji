@@ -251,36 +251,34 @@ export default function TaskCard({
           </div>
 
           {task.scheduledDate && (
-            <span className="text-xs text-gray-400 whitespace-nowrap">
-              <Calendar size={12} className="inline mr-1" />
+            <span className="text-xs text-white whitespace-nowrap bg-gray-600 px-1.5 py-1 rounded-md">
+              <Calendar size={13} className="inline mr-0.5 pb-0.5" />
               {task.scheduledDate.replace(/-/g, '/').slice(5)}
             </span>
           )}
 
-{task.daysOfWeek && (
-  <div className="flex flex-wrap gap- ml-2 max-w-[calc(5*3*0.25rem+0.25rem*2)]">
-    {[...task.daysOfWeek]
-      .sort(
-        (a, b) =>
-          ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
-          ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
-      )
-      .map((d, i) => (
-        <div
-          key={i}
-          className={clsx(
-            'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
-            dayBaseClass,
-            dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+          {task.daysOfWeek && (
+            <div className="flex flex-wrap gap- ml-2 max-w-[calc(5*3*0.25rem+0.25rem*2)]">
+              {[...task.daysOfWeek]
+                .sort(
+                  (a, b) =>
+                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
+                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
+                )
+                .map((d, i) => (
+                  <div
+                    key={i}
+                    className={clsx(
+                      'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
+                      dayBaseClass,
+                      dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+                    )}
+                  >
+                    {d}
+                  </div>
+                ))}
+            </div>
           )}
-        >
-          {d}
-        </div>
-      ))}
-  </div>
-)}
-
-
 
         </div>
 
