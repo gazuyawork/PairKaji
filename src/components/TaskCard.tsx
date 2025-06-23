@@ -220,9 +220,31 @@ export default function TaskCard({
           'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
-          highlighted ? 'border-blue-400 bg-blue-50' : 'border-[#e5e5e5] bg-white'
+          // highlighted ? 'border-blue-400 bg-blue-50' : 'border-[#e5e5e5] bg-white'
+          'border-[#e5e5e5] bg-white'
         )}
       >
+
+      {/* 🔷 TODOバッジ（左上） */}
+      {task.visible && (
+        <div
+          className="absolute top-0 left-0 w-[34px] h-[34px] bg-blue-500 text-white text-[12px] font-bold flex items-center justify-center z-10"
+          style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
+        >
+          <span className="translate-y-[-6px] translate-x-[-6px]">T</span>
+        </div>
+      )}
+
+      {/* 🔶 Privateバッジ（右上） */}
+      {task.private && (
+        <div
+          className="absolute top-0 right-0 w-[34px] h-[34px] bg-orange-400 text-white text-[12px] font-bold flex items-center justify-center z-10"
+          style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
+        >
+          <span className="translate-y-[-6px] translate-x-[6px]">P</span>
+        </div>
+      )}
+
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             onClick={(e) => {
