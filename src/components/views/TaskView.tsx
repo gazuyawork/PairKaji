@@ -490,7 +490,6 @@ useEffect(() => {
                             dates: task.dates ?? [],
                             isTodo: task.isTodo ?? false,
                           })}
-                          highlighted={task.visible === true}
                           userList={userList}
                           isPairConfirmed={pairStatus === 'confirmed'}
                           onLongPress={(x, y) => setLongPressPosition({ x, y })}

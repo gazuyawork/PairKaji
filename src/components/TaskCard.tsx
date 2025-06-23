@@ -45,7 +45,6 @@ type Props = {
   onToggleDone: (period: Period, taskId: string) => void;
   onDelete: (period: Period, id: string) => void;
   onEdit: () => void;
-  highlighted?: boolean;
   userList: UserInfo[];
   isPairConfirmed: boolean;
   onLongPress?: (x: number, y: number) => void;
@@ -53,7 +52,7 @@ type Props = {
 
 export default function TaskCard({
   task, period, onToggleDone, onDelete, onEdit,
-  highlighted = false, userList, isPairConfirmed,
+  userList, isPairConfirmed,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
