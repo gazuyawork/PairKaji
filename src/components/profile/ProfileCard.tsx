@@ -4,7 +4,9 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { auth } from '@/lib/firebase';
-import { uploadProfileImage } from '@/lib/firebaseUtils'; 
+import { uploadProfileImage } from '@/lib/firebaseUtils';
+import { Check, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 
 type ProfileCardProps = {
   profileImage: string | null;
@@ -16,7 +18,8 @@ type ProfileCardProps = {
   onEditEmail: () => void;
   onEditPassword: () => void;
   email: string;
-  isLoading: boolean; // ←追加
+  isLoading: boolean;
+  nameUpdateStatus: 'idle' | 'loading' | 'success';
 };
 
 export default function ProfileCard({
@@ -29,8 +32,23 @@ export default function ProfileCard({
   onEditEmail,
   onEditPassword,
   email,
-  isLoading, // ←追加
+  isLoading,
+  nameUpdateStatus,
 }: ProfileCardProps) {
+  // ボタン表示の切り替え
+  const renderEditButtonContent = () => {
+    switch (nameUpdateStatus) {
+      case 'loading':
+        return <Loader2 className="w-4 h-4 animate-spin" />;
+      case 'success':
+        return <Check className="w-4 h-4 text-white" />;
+      default:
+        return <span>変更</span>;
+    }
+  };
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
   return (
     <motion.div
       className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6"
@@ -48,18 +66,29 @@ export default function ProfileCard({
             <div className="w-24 h-24 bg-gray-200 animate-pulse rounded-full" />
           ) : (
             <>
-              <Image
-                src={profileImage || '/images/default.png'}
-                alt="プロフィール画像"
-                width={100}
-                height={100}
-                className="h-24 aspect-square rounded-full object-cover border border-gray-300"
-              />
+{isUploadingImage ? (
+  <div
+    style={{ width: 100, height: 100 }}
+    className="bg-white rounded-full border border-gray-300 flex items-center justify-center"
+  >
+    <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+  </div>
+) : (
+  <Image
+    src={profileImage || '/images/default.png'}
+    alt="プロフィール画像"
+    width={100}
+    height={100}
+    className="aspect-square rounded-full object-cover border border-gray-300"
+  />
+)}
+
 
               <input
                 type="file"
                 accept="image/*"
                 className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -80,19 +109,22 @@ export default function ProfileCard({
                     return;
                   }
 
+                  setIsUploadingImage(true); // ⬅️ アップロード開始
+
                   uploadProfileImage(user.uid, file, 'user')
                     .then((downloadUrl) => {
                       setProfileImage(downloadUrl);
-                      toast.success('プロフィール画像を更新しました');
                     })
                     .catch((err) => {
                       console.error('画像アップロード失敗', err);
                       toast.error('プロフィール画像の更新に失敗しました');
+                    })
+                    .finally(() => {
+                      setIsUploadingImage(false); // ⬅️ アップロード完了
                     });
                 }}
+
               />
-
-
             </>
           )}
         </div>
@@ -111,9 +143,10 @@ export default function ProfileCard({
               />
               <button
                 onClick={onEditName}
-                className="w-12 h-8 rounded-sm text-sm bg-[#FFCB7D] text-white shadow"
+                disabled={nameUpdateStatus === 'loading'}
+                className="w-12 h-8 rounded-sm text-sm bg-[#FFCB7D] text-white shadow flex items-center justify-center"
               >
-                変更
+                {renderEditButtonContent()}
               </button>
             </div>
           )}

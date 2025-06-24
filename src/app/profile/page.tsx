@@ -50,8 +50,7 @@ export default function ProfilePage() {
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pairDocId, setPairDocId] = useState<string | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
-
-  
+  const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
@@ -60,11 +59,19 @@ export default function ProfilePage() {
       return;
     }
 
+    setNameUpdateStatus('loading'); // ローディング状態に
+
     try {
       await saveUserNameToFirestore(user.uid, name);
-      toast.success('氏名を更新しました');
+      setNameUpdateStatus('success');
+
+      // ✅ 数秒後にアイドル状態に戻す
+      setTimeout(() => {
+        setNameUpdateStatus('idle');
+      }, 1500);
     } catch {
       toast.error('氏名の更新に失敗しました');
+      setNameUpdateStatus('idle');
     }
   };
 
@@ -348,6 +355,7 @@ const handleRemovePair = async () => {
               onEditPassword={onEditPasswordHandler}
               email={email}
               isLoading={isLoading}
+              nameUpdateStatus={nameUpdateStatus} 
             />
 
             <PartnerSettings

@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
-import FinishDayTask from '@/components/FinishDayTask';
+// import FinishDayTask from '@/components/FinishDayTask';
 import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -128,14 +128,14 @@ export default function HomeView() {
               isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
             }`}
           >
-            {isLoading ? (
+            {/* {isLoading ? (
               <div className="p-6">
                 <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse" />
                 <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
               </div>
             ) : (
               <FinishDayTask tasks={tasks} />
-            )}
+            )} */}
 
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
