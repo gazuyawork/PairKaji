@@ -166,18 +166,19 @@ export default function WeeklyPoints() {
           今週の合計ポイント {weekLabel}
         </p>
 
-        <div className="mt-4 h-6 w-full bg-gray-200 rounded-full overflow-hidden flex">
-          <div
-            className="h-full bg-[#FFA552]"
-            style={{ width: `${selfPercent}%`, transition: 'width 0.8s ease-out' }}
-          />
-          {hasPartner && (
-            <div
-              className="h-full bg-[#FFD97A]"
-              style={{ width: `${partnerPercent}%`, transition: 'width 0.8s ease-out' }}
-            />
-          )}
-        </div>
+<div className="mt-4 h-6 w-full rounded-full overflow-hidden flex border border-gray-300 shadow-inner bg-gradient-to-b from-gray-100 to-gray-200">
+  <div
+    className="h-full bg-gradient-to-r from-[#FFC288] to-[#FFA552] rounded-l-full shadow-[inset_0_0_2px_rgba(255,255,255,0.5),0_2px_4px_rgba(0,0,0,0.1)]"
+    style={{ width: `${selfPercent}%`, transition: 'width 0.8s ease-out' }}
+  />
+  {hasPartner && (
+    <div
+      className="h-full bg-gradient-to-r from-[#FFF0AA] to-[#FFD97A] rounded-r-xs shadow-[inset_0_0_2px_rgba(255,255,255,0.5),0_2px_4px_rgba(0,0,0,0.1)]"
+      style={{ width: `${partnerPercent}%`, transition: 'width 0.8s ease-out' }}
+    />
+  )}
+</div>
+
 
         <p className="text-2xl font-bold text-[#5E5E5E] mt-2 font-sans">
           {Math.round(animatedSelfPoints + animatedPartnerPoints)} / {maxPoints} pt

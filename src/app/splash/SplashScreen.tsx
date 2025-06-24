@@ -87,7 +87,7 @@ export default function SplashScreen() {
         )}
       >
         <motion.h1
-          className="font-pacifico text-[50px] text-[#5E5E5E] mb-3"
+          className="font-pacifico text-[50px] text-[#5E5E5E] mb-5"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}

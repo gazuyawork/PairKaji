@@ -67,10 +67,12 @@ export default function TaskCalendar({ tasks }: Props) {
             const bgColor = hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]';
 
             return (
-              <div
-                key={idx}
-                className={`w-[100px] flex-shrink-0 border rounded-lg p-2 min-h-[60px] ${bgColor}`}
-              >
+<div
+  key={idx}
+  className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor}`}
+>
+
+
                 <div className="font-semibold text-gray-600">
                   {format(day, 'E')}
                 </div>
@@ -88,19 +90,22 @@ export default function TaskCalendar({ tasks }: Props) {
                       isSameDay(parseISO(dateStr), day)
                     );
 
-                    const badgeStyle = isWeeklyTask
-                      ? 'bg-gray-500 text-white'
-                      : isDateTask
-                      ? 'bg-orange-400 text-white'
-                      : 'bg-gray-200 text-gray-700';
+
 
                     return (
-                      <div
-                        key={i}
-                        className={`mt-1 text-[10px] rounded px-1 py-1 truncate ${badgeStyle}`}
-                      >
-                        {task.name}
-                      </div>
+<div
+  key={i}
+  className={`mt-1 text-[10px] rounded px-1.5 py-[3px] truncate font-semibold border border-white/30 
+    ${isWeeklyTask
+      ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
+      : isDateTask
+      ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
+      : 'bg-gradient-to-b from-gray-100 to-gray-300 text-gray-700'}
+  `}
+>
+  {task.name}
+</div>
+
                     );
                   })
                 ) : (

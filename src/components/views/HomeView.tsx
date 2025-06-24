@@ -86,7 +86,7 @@ export default function HomeView() {
 
       setTimeout(() => {
         setIsLoading(false);
-      }, 150); // ローディング猶予
+      }, 50); // ローディング猶予
     });
 
     return () => unsubscribe();
@@ -109,7 +109,7 @@ export default function HomeView() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: isLoading ? 0 : 1 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.4 }}
           className="space-y-4"
         >
 

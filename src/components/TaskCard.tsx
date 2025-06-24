@@ -226,22 +226,24 @@ export default function TaskCard({
 
       {/* 🔷 TODOバッジ（左上） */}
       {task.visible && (
-        <div
-          className="absolute top-0 left-0 w-[34px] h-[34px] bg-blue-500 text-white text-[12px] font-bold flex items-center justify-center z-10"
-          style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
-        >
-          <span className="translate-y-[-6px] translate-x-[-6px]">T</span>
-        </div>
+<div
+  className="absolute top-0 left-0 w-[34px] h-[34px] bg-gradient-to-br from-blue-400 to-blue-600 text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+  style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
+>
+  <span className="translate-y-[-6px] translate-x-[-6px]">T</span>
+</div>
+
       )}
 
       {/* 🔶 Privateバッジ（右上） */}
       {task.private && (
-        <div
-          className="absolute top-0 right-0 w-[34px] h-[34px] bg-orange-400 text-white text-[12px] font-bold flex items-center justify-center z-10"
-          style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
-        >
-          <span className="translate-y-[-6px] translate-x-[6px]">P</span>
-        </div>
+<div
+  className="absolute top-0 right-0 w-[34px] h-[34px] bg-gradient-to-bl from-orange-300 to-orange-500 text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+  style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
+>
+  <span className="translate-y-[-6px] translate-x-[6px]">P</span>
+</div>
+
       )}
 
         <div className="flex items-center gap-3 min-w-0 flex-1">
