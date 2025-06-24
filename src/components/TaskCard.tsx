@@ -178,9 +178,10 @@ export default function TaskCard({
 
 
       {/* ✅ 長押しメニュー表示 */}
-{showActions && (
-  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
-    <div className="flex items-center gap-6">
+      {showActions && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
+          <div className="flex items-center gap-6">
+            {/* 編集ボタン（爽やかな青） */}
       {/* 編集ボタン（爽やかな青） */}
       <button
         onClick={(e) => {
@@ -189,11 +190,11 @@ export default function TaskCard({
           onEdit();
         }}
         className="w-12 h-12 rounded-full 
-                   bg-gradient-to-b from-green-300 to-green-700 
-                   shadow-md ring-1 ring-green-300 ring-offset-1 
-                   shadow-inner flex items-center justify-center 
-                   text-white active:translate-y-0.5 
-                   transition-all duration-150"
+                  bg-gradient-to-b from-green-300 to-green-600 
+                  shadow ring-1 ring-green-300 ring-offset-1 
+                  flex items-center justify-center 
+                  text-white active:translate-y-0.5 
+                  transition-all duration-150"
       >
         <Pencil className="w-5 h-5" />
       </button>
@@ -205,11 +206,11 @@ export default function TaskCard({
           alert('フラグ機能は未実装');
         }}
         className="w-12 h-12 rounded-full 
-                   bg-gradient-to-b from-red-300 to-red-500 
-                   shadow-md ring-1 ring-red-300 ring-offset-1 
-                   shadow-inner flex items-center justify-center 
-                   text-white active:translate-y-0.5 
-                   transition-all duration-150"
+                  bg-gradient-to-b from-red-300 to-red-500 
+                  shadow ring-1 ring-red-300 ring-offset-1 
+                  flex items-center justify-center 
+                  text-white active:translate-y-0.5 
+                  transition-all duration-150"
       >
         <Flag className="w-5 h-5" />
       </button>
@@ -221,19 +222,17 @@ export default function TaskCard({
           alert('鍵機能は未実装');
         }}
         className="w-12 h-12 rounded-full 
-                   bg-gradient-to-b from-yellow-300 to-yellow-500 
-                   shadow-md ring-1 ring-yellow-300 ring-offset-1 
-                   shadow-inner flex items-center justify-center 
-                   text-white active:translate-y-0.5 
-                   transition-all duration-150"
+                  bg-gradient-to-b from-yellow-300 to-yellow-500 
+                  shadow ring-1 ring-yellow-300 ring-offset-1 
+                  flex items-center justify-center 
+                  text-white active:translate-y-0.5 
+                  transition-all duration-150"
       >
         <Lock className="w-5 h-5" />
       </button>
     </div>
   </div>
 )}
-
-
 
       <motion.div
         {...swipeable}
