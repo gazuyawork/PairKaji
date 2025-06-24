@@ -142,13 +142,16 @@ export default function TaskCard({
       {swipeDirection === 'left' && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="bg-red-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8"
+            className="w-14 h-8 text-xs font-bold text-white rounded-md 
+                      bg-gradient-to-b from-red-300 to-red-500 
+                      shadow-md ring-1 ring-white/30 
+                      active:translate-y-[1px] transition-transform"
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
             }}
           >
-            削除
+            削 除
           </button>
         </div>
       )}
@@ -156,13 +159,17 @@ export default function TaskCard({
       {swipeDirection === 'right' && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="bg-blue-400 text-white text-xs px-1 py-1 rounded-full shadow w-14 h-8"
+            className="w-14 h-8 text-xs font-bold text-white rounded-md 
+                      bg-gradient-to-b from-blue-300 to-blue-500 
+                      shadow-md ring-1 ring-white/30 
+                      active:translate-y-[1px] transition-transform"
             onClick={handleTodoClick}
           >
             TODO
           </button>
         </div>
       )}
+
 
       {/* ✅ 長押しメニュー表示 */}
       {showActions && (
