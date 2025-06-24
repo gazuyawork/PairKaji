@@ -1,5 +1,8 @@
-// FooterNav.tsx
-import { Home, LayoutList, ListTodo } from 'lucide-react';
+// src/components/FooterNav.tsx
+'use client';
+
+import Image from 'next/image';
+import { Home, ListTodo } from 'lucide-react';
 
 type Props = {
   currentIndex: number;
@@ -9,8 +12,8 @@ type Props = {
 export default function FooterNav({ currentIndex, setIndex }: Props) {
   const navItems = [
     { name: 'ホーム', icon: Home },
-    { name: '掃除', icon: ListTodo },
-    { name: 'プロフィール', icon: LayoutList },
+    { name: '掃除', icon: null }, // アイコン画像を使うためnullにする
+    { name: 'プロフィール', icon: ListTodo },
   ];
 
   return (
@@ -18,7 +21,6 @@ export default function FooterNav({ currentIndex, setIndex }: Props) {
       <ul className="relative flex justify-around items-end mx-10">
         {navItems.map((item, index) => {
           const isActive = currentIndex === index;
-          const Icon = item.icon;
           const isCenter = index === 1;
 
           return (
@@ -30,12 +32,22 @@ export default function FooterNav({ currentIndex, setIndex }: Props) {
               {isCenter ? (
                 <div className="relative -mt-10 z-10">
                   <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
-                    <Icon size={30} className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'} />
+                    <Image
+                      src={isActive ? '/icons/task_on.png' : '/icons/task_off.png'}
+                      alt="Task Icon"
+                      width={60}
+                      height={60}
+                    />
                   </div>
                 </div>
               ) : (
                 <div className="w-10 h-10 flex items-center justify-center pb-4">
-                  <Icon size={26} className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'} />
+                  {item.icon && (
+                    <item.icon
+                      size={26}
+                      className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'}
+                    />
+                  )}
                 </div>
               )}
             </li>
