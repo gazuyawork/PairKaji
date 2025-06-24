@@ -355,7 +355,7 @@ useEffect(() => {
 
     return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
-      <Header title="Task" currentIndex={1} />
+      <Header title="Task" />
       {editTargetTask && (
         <EditTaskModal
           key={editTargetTask.id}

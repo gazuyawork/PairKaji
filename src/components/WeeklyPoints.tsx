@@ -184,13 +184,13 @@ export default function WeeklyPoints() {
         </p>
 
         {hasPartner && (
-          <div className="flex justify-center gap-4 mt-4 text-sm text-[#5E5E5E]">
+          <div className="flex justify-center gap-4 mt-4 text-xs text-[#5E5E5E]">
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded-full bg-[#FFA552]" />
+              <div className="w-3 h-3 rounded-full bg-[#FFA552]" />
               <span>あなた</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded-full bg-[#FFD97A]" />
+              <div className="w-3 h-3 rounded-full bg-[#FFD97A]" />
               <span>パートナー</span>
             </div>
           </div>

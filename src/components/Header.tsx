@@ -6,21 +6,18 @@ import {
   Loader2,
   CheckCircle,
   ArrowLeft,
-  Pencil,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 
 type HeaderProps = {
   title: string;
   saveStatus?: 'idle' | 'saving' | 'saved';
-  currentIndex?: number;
 };
 
-export default function Header({ title, saveStatus = 'idle', currentIndex }: HeaderProps) {
+export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
   const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -29,24 +26,24 @@ export default function Header({ title, saveStatus = 'idle', currentIndex }: Hea
     <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
       <div className="flex items-center gap-2">
         {/* 戻るボタン */}
-{(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
-  <button
-    onClick={() => {
-      if (pathname === '/task_manage') {
-        router.push('/main?fromTaskManage=true'); // ← クエリ付きで遷移！
-        return;
-      }
-      router.push('/main');
-    }}
+        {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
+          <button
+            onClick={() => {
+              if (pathname === '/task_manage') {
+                router.push('/main?fromTaskManage=true'); // ← クエリ付きで遷移！
+                return;
+              }
+              router.push('/main');
+            }}
 
-    className="text-[#5E5E5E]"
-    aria-label="戻る"
-  >
-    <ArrowLeft size={24} />
-  </button>
-)}
+            className="text-[#5E5E5E]"
+            aria-label="戻る"
+          >
+            <ArrowLeft size={24} />
+          </button>
+        )}
         {/* ✅ TaskView 表示時だけタスク編集ボタン */}
-        {pathname === '/main' && currentIndex === 1 && (
+        {/* {pathname === '/main' && currentIndex === 1 && (
           <motion.button
             onClick={() => router.push('/task_manage')}
             whileTap={{ scale: 0.85, rotate: -5 }}
@@ -54,7 +51,7 @@ export default function Header({ title, saveStatus = 'idle', currentIndex }: Hea
           >
             <Pencil className="w-5 h-5 text-gray-600" />
           </motion.button>
-        )}
+        )} */}
       </div>
 
       {/* タイトル */}
