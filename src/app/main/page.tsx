@@ -102,18 +102,30 @@ function MainContent() {
         </motion.div>
 
         {/* タスク画面（index===1）にだけ表示される＋ボタン */}
-        {index === 1 && (
-          <button
-            onClick={() => {
-              // カスタムイベントでモーダル表示を発火
-              window.dispatchEvent(new Event('open-new-task-modal'));
-            }}
-            className="fixed bottom-24 right-6 bg-[#FFCB7D] text-white text-3xl w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-[1000]"
-            aria-label="新規タスク追加"
-          >
-            ＋
-          </button>
-        )}
+{index === 1 && (
+  <button
+    onClick={() => {
+      // カスタムイベントでモーダル表示を発火
+      window.dispatchEvent(new Event('open-new-task-modal'));
+    }}
+    className="fixed bottom-24 right-6 
+               w-14 h-14 
+               rounded-full 
+               text-white text-3xl font-bold 
+               bg-gradient-to-b from-[#FFC25A] to-[#FFA726] 
+               shadow-lg shadow-[#e18c3b]/60 
+               ring-2 ring-white 
+               ring-offset-0 
+               hover:scale-105 active:translate-y-[1px] 
+               transition-transform 
+               flex items-center justify-center 
+               z-[1000]"
+    aria-label="新規タスク追加"
+  >
+    ＋
+  </button>
+)}
+
       </div>
 
       {/* フッターナビ + スワイプ領域 */}

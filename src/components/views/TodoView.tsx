@@ -301,11 +301,21 @@ const handleAddTask = useCallback(async () => {
 
           <button
             onClick={handleAddTask}
-            className="w-10 h-10 bg-[#FFCB7D] text-white rounded-full flex items-center justify-center shadow-md hover:opacity-90 mt-1"
             type="button"
+            className="w-10 h-10 
+                      rounded-full 
+                      text-white 
+                      bg-gradient-to-b from-[#FFC25A] to-[#FFA726] 
+                      shadow-md shadow-[#e18c3b]/60 
+                      ring-2 ring-white 
+                      ring-offset-0 
+                      hover:scale-105 active:translate-y-[1px] 
+                      transition-transform 
+                      flex items-center justify-center mt-0"
           >
             <Plus size={20} />
           </button>
+
         </div>
 
         <GroupSelector

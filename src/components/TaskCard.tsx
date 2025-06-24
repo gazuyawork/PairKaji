@@ -3,7 +3,7 @@
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Pencil, Flag, Lock } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Pencil, Flag, Lock, Trash2 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -140,77 +140,100 @@ export default function TaskCard({
   return (
     <div className="relative" ref={cardRef}>
       {swipeDirection === 'left' && (
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-14 h-8 text-xs font-bold text-white rounded-md 
-                      bg-gradient-to-b from-red-300 to-red-500 
-                      shadow-md ring-1 ring-white/30 
-                      active:translate-y-[1px] transition-transform"
+            className="w-8 h-8 flex items-center justify-center 
+                      rounded-md 
+                      bg-gradient-to-b from-red-300 to-red-600 
+                      shadow-md ring-1 ring-white/30
+                      ring-2 ring-white
+                      active:translate-y-[1px] 
+                      transition-transform"
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
             }}
           >
-            削 除
+            <Trash2 className="w-5 h-5 text-white [text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]" />
           </button>
         </div>
       )}
 
-      {swipeDirection === 'right' && (
+
+      {swipeDirection === 'right' && task.visible && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
             className="w-14 h-8 text-xs font-bold text-white rounded-md 
                       bg-gradient-to-b from-blue-300 to-blue-500 
-                      shadow-md ring-1 ring-white/30 
+                      shadow-md ring-1 ring-white/30
+                      ring-2 ring-white 
                       active:translate-y-[1px] transition-transform"
             onClick={handleTodoClick}
           >
-            TODO
+            <span className="[text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]">TODO</span>
           </button>
         </div>
       )}
 
 
+
       {/* ✅ 長押しメニュー表示 */}
-      {showActions && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
-          <div className="flex items-center gap-6">
-            {/* 編集ボタン（青系） */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowActions(false);
-                onEdit();
-              }}
-              className="w-12 h-12 rounded-full bg-gradient-to-b from-blue-50 to-blue-50 shadow-mb shadow-blue-200 ring-1 ring-blue-300 ring-offset-1 shadow-inner flex items-center justify-center text-blue-600 active:translate-y-0.5 transition-all duration-150"
-            >
-              <Pencil className="w-5 h-5" />
-            </button>
+{showActions && (
+  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
+    <div className="flex items-center gap-6">
+      {/* 編集ボタン（爽やかな青） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowActions(false);
+          onEdit();
+        }}
+        className="w-12 h-12 rounded-full 
+                   bg-gradient-to-b from-green-300 to-green-700 
+                   shadow-md ring-1 ring-green-300 ring-offset-1 
+                   shadow-inner flex items-center justify-center 
+                   text-white active:translate-y-0.5 
+                   transition-all duration-150"
+      >
+        <Pencil className="w-5 h-5" />
+      </button>
 
-            {/* フラグボタン（赤系） */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                alert('フラグ機能は未実装');
-              }}
-              className="w-12 h-12 rounded-full bg-gradient-to-b from-red-50 to-red-50 shadow-mb shadow-red-200 ring-1 ring-red-300 ring-offset-1 shadow-inner flex items-center justify-center text-red-500 active:translate-y-0.5 transition-all duration-150"
-            >
-              <Flag className="w-5 h-5" />
-            </button>
+      {/* フラグボタン（爽やかな赤） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          alert('フラグ機能は未実装');
+        }}
+        className="w-12 h-12 rounded-full 
+                   bg-gradient-to-b from-red-300 to-red-500 
+                   shadow-md ring-1 ring-red-300 ring-offset-1 
+                   shadow-inner flex items-center justify-center 
+                   text-white active:translate-y-0.5 
+                   transition-all duration-150"
+      >
+        <Flag className="w-5 h-5" />
+      </button>
 
-            {/* 鍵ボタン（緑系） */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                alert('鍵機能は未実装');
-              }}
-              className="w-12 h-12 rounded-full bg-gradient-to-b from-yellow-50 to-yellow-100 shadow-mb shadow-yellow-200 ring-1 ring-yellow-300 ring-offset-1 shadow-inner flex items-center justify-center text-yellow-600 active:translate-y-0.5 transition-all duration-150"
-            >
-              <Lock className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* 鍵ボタン（爽やかな黄緑） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          alert('鍵機能は未実装');
+        }}
+        className="w-12 h-12 rounded-full 
+                   bg-gradient-to-b from-yellow-300 to-yellow-500 
+                   shadow-md ring-1 ring-yellow-300 ring-offset-1 
+                   shadow-inner flex items-center justify-center 
+                   text-white active:translate-y-0.5 
+                   transition-all duration-150"
+      >
+        <Lock className="w-5 h-5" />
+      </button>
+    </div>
+  </div>
+)}
+
+
 
       <motion.div
         {...swipeable}
@@ -233,24 +256,23 @@ export default function TaskCard({
 
       {/* 🔷 TODOバッジ（左上） */}
       {task.visible && (
-<div
-  className="absolute top-0 left-0 w-[34px] h-[34px] bg-gradient-to-br from-blue-400 to-blue-600 text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
-  style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
->
-  <span className="translate-y-[-6px] translate-x-[-6px]">T</span>
-</div>
+        <div
+          className="absolute top-0 left-0 w-[34px] h-[34px] bg-gradient-to-br from-blue-400 to-blue-600 text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+          style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
+        >
+          <span className="translate-y-[-6px] translate-x-[-6px]">T</span>
+        </div>
 
-      )}
+              )}
 
       {/* 🔶 Privateバッジ（右上） */}
       {task.private && (
-<div
-  className="absolute top-0 right-0 w-[34px] h-[34px] bg-gradient-to-bl from-orange-300 to-orange-500 text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
-  style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
->
-  <span className="translate-y-[-6px] translate-x-[6px]">P</span>
-</div>
-
+        <div
+          className="absolute top-0 right-0 w-[34px] h-[34px] bg-gradient-to-bl from-orange-300 to-orange-500 text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+          style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
+        >
+          <span className="translate-y-[-6px] translate-x-[6px]">P</span>
+        </div>
       )}
 
         <div className="flex items-center gap-3 min-w-0 flex-1">
