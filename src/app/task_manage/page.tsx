@@ -35,6 +35,8 @@ export default function TaskManagePage() {
   const handleToggleTodayFilter = () => {
     setTodayFilter((prev) => !prev);
   };
+  const [privateFilter, setPrivateFilter] = useState(false);
+
 
 
   useEffect(() => {
@@ -337,6 +339,8 @@ const confirmTasks = async () => {
                 pairStatus={pairStatus}
                 todayFilter={todayFilter} // ✅ 追加
                 onToggleTodayFilter={handleToggleTodayFilter}
+                privateFilter={privateFilter}
+                onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
               />
             </div>
             <hr className="border-t border-gray-300 opacity-50 my-4" />

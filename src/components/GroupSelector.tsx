@@ -3,8 +3,8 @@
 
 import { useRef, useEffect, useState } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 
 type Props = {
   tasks: TodoOnlyTask[];
@@ -66,17 +66,16 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
           onClick={() => onSelectGroup(null)}
           whileTap={{ scale: 1.2 }}
           transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-          className={`ml-2 w-9 h-9 rounded-full border-2 flex items-center justify-center text-white text-2xl transition-all duration-300
+          className={`ml-2 w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all duration-300
             ${selectedGroupId !== null
-              ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner'
-              : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}
-          `}
-
+              ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner text-white'
+              : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}`}
           title="フィルター解除"
         >
-          ×
+          <X className="w-5 h-5" /> {/* ← アイコン化 */}
         </motion.button>
       )}
+
 
       {/* ← 矢印 */}
       {showLeftArrow && (
