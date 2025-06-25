@@ -61,11 +61,11 @@ export default function RouletteWheel({
   };
 
   return (
-    <div className="relative w-40 h-40">
+    <div className="relative w-80 h-80">
       <motion.div
         animate={{ scale: showShrinked ? SHRINK_SCALE : 1 }}
         transition={{ duration: SHRINK_DURATION, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-40 h-40 rounded-full shadow-lg overflow-hidden"
+        className="relative w-80 h-80 rounded-full shadow-lg overflow-hidden"
         style={{ transformOrigin: "center center" }}
       >
         <motion.div
@@ -76,20 +76,18 @@ export default function RouletteWheel({
           }}
           className="w-full h-full rounded-full relative"
           style={{
-background: `
-  radial-gradient(circle at 30% 30%, #ffffff55, transparent),
-  conic-gradient(
-    ${options
-      .map((_, i) => pastelColors[i % pastelColors.length] + ' ' + (i * 100 / options.length) + '% ' + ((i + 1) * 100 / options.length) + '%')
-      .join(',')}
-  )
-`,
-
+            background: `
+              radial-gradient(circle at 30% 30%, #ffffff55, transparent),
+              conic-gradient(
+                ${options
+                  .map((_, i) => pastelColors[i % pastelColors.length] + ' ' + (i * 100 / options.length) + '% ' + ((i + 1) * 100 / options.length) + '%')
+                  .join(',')}
+              )
+            `,
             boxShadow:
               "inset 0 0 15px rgba(0, 0, 0, 0.2), 0 4px 10px rgba(0, 0, 0, 0.3)",
           }}
         >
-
 
         {fixedLabels.slice(0, options.length).map((char, i) => {
           const segmentAngle = 360 / options.length;
@@ -144,11 +142,10 @@ background: `
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.6 }}
             transition={{ duration: MODAL_ANIMATION_DURATION, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed top-[52%] left-[8%]"
-            style={{ transform: "translate(-50%, -50%)" }}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50"
           >
             <div
-              className="w-82 h-40 rounded-2xl flex flex-col items-center justify-center text-center px-4 py-4"
+              className="w-90 h-50 rounded-2xl flex flex-col items-center justify-center text-center px-4 py-4"
               style={{
                 background: `
                   radial-gradient(circle at 50% 40%, #fff, #fff)
