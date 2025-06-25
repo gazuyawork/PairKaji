@@ -9,6 +9,7 @@ import {
   onSnapshot,
   doc,
   setDoc,
+  getDoc
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from './EditPointModal';
@@ -24,7 +25,7 @@ export default function WeeklyPoints() {
   const [partnerPoints, setPartnerPoints] = useState(0);
   const [animatedSelfPoints, setAnimatedSelfPoints] = useState(0);
   const [animatedPartnerPoints, setAnimatedPartnerPoints] = useState(0);
-  const [maxPoints, setMaxPoints] = useState(100);
+  const [maxPoints, setMaxPoints] = useState(500);
   const [hasPartner, setHasPartner] = useState(false);
   const [showRoulette, setShowRoulette] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -151,6 +152,24 @@ export default function WeeklyPoints() {
       setIsSpinning(false);
     }, 1000);
   };
+
+  useEffect(() => {
+    const fetchInitialTargetPoint = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const ref = doc(db, 'points', uid);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.weeklyTargetPoint) {
+          setMaxPoints(data.weeklyTargetPoint);
+        }
+      }
+    };
+
+    fetchInitialTargetPoint();
+  }, []);
 
   return (
     <>
