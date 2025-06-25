@@ -66,10 +66,10 @@ const users = [
         onClick={onToggleTodayFilter}
         whileTap={{ scale: 1.2 }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }} // ← dampingを大きくしてバウンドを抑制
-        className={`
-          w-10 h-10 rounded-full border relative overflow-hidden p-0
-          flex items-center justify-center
-          ${todayFilter ? 'bg-[#FFCB7D] border-[#FFCB7D]' : 'bg-white border-gray-300'}
+        className={`w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+          ${todayFilter
+            ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner'
+            : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D]'}
         `}
       >
         {/* アイコンの色も選択中は白に */}
@@ -105,9 +105,10 @@ const users = [
                 }}
                 whileTap={{ scale: 1.2 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 10 }}
-                className={`
-                  w-10 h-10 rounded-full flex items-center justify-center font-sans border font-bold
-                  ${periodFilter === period ? 'bg-[#FFCB7D] text-white border-[#FFCB7D]' : 'bg-white text-[#5E5E5E] border-gray-300'}
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-sans border font-bold transition-all duration-300
+                  ${periodFilter === period
+                    ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
+                    : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'}
                 `}
               >
                 {displayMap[period]}
