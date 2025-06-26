@@ -422,7 +422,7 @@ useEffect(() => {
                 {/* 🔹 P: Private フィルターボタン */}
                 <button
                   onClick={() => setPrivateFilter(prev => !prev)}
-                  className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center transition-all duration-300 text-xl
+                  className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
                     ${privateFilter
                       ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white  shadow-inner'
                       : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
