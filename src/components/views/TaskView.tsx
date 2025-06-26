@@ -420,10 +420,8 @@ useEffect(() => {
 
               <div className="flex items-center pr-2 border-r border-gray-300">
                 {/* 🔹 P: Private フィルターボタン */}
-                <motion.button
+                <button
                   onClick={() => setPrivateFilter(prev => !prev)}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center transition-all duration-300 text-xl
                     ${privateFilter
                       ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white  shadow-inner'
@@ -431,7 +429,7 @@ useEffect(() => {
                   title="プライベートタスク"
                 >
                   P
-                </motion.button>
+                </button>
               </div>
 
               <div className="flex overflow-x-auto no-scrollbar space-x-2">
