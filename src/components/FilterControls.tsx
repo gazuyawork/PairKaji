@@ -21,8 +21,8 @@ interface Props {
   pairStatus: 'confirmed' | 'none';
   todayFilter: boolean;
   onToggleTodayFilter: () => void;
-  privateFilter: boolean; // 🔹 追加
-  onTogglePrivateFilter: () => void; // 🔹 追加
+  privateFilter: boolean;
+  onTogglePrivateFilter: () => void;
 }
 
 export default function FilterControls({
@@ -30,14 +30,10 @@ export default function FilterControls({
   personFilter,
   onTogglePeriod,
   onTogglePerson,
-  // searchTerm,
-  // onClearSearch,
   extraButton,
   pairStatus,
-  todayFilter, // ✅ 追加
-  onToggleTodayFilter, // ✅ 追加
-  privateFilter, // 🔹 追加
-  onTogglePrivateFilter, // 🔹 追加
+  todayFilter,
+  onToggleTodayFilter,
 }: Props) {
 const currentUserId = auth.currentUser?.uid;
 const { profileImage, partnerImage, partnerId } = useProfileImages();
@@ -48,9 +44,6 @@ const users = [
     : []),
 ];
 
-
-  // const showClear = !!(periodFilter || personFilter || searchTerm || todayFilter);
-
   const [periodClickKey, setPeriodClickKey] = useState(0);
   const [personClickKey, setPersonClickKey] = useState(0);
 
@@ -59,31 +52,11 @@ const users = [
 
 
   return (
-    <div className="w-full flex flex-col items-center gap-2">
-      {/* <div className="flex gap-1 overflow-x-auto whitespace-nowrap no-scrollbar pr-2 min-w-0" style={{ WebkitOverflowScrolling: 'touch' }}> */}
+    <div className="w-full flex flex-col items-start">     
       <div
-        className="flex gap-1 overflow-x-auto whitespace-nowrap no-scrollbar pr-2 pl-13"
+        className="flex gap-1 pr-2 pl-0"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-
-
-          {/* 🔹 P: Private フィルターボタン */}
-          <motion.button
-            onClick={onTogglePrivateFilter}
-            whileTap={{ scale: 1.2 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className={`w-10 h-10 rounded-full border font-bold flex items-center justify-center transition-all duration-300
-              ${privateFilter
-                ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] text-white border-[#f43f5e] shadow-inner'
-                : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
-            title="プライベートタスク"
-          >
-            P
-          </motion.button>
-
-
-          {/* 👥 担当者フィルター前の縦線 */}
-          <div className="w-px h-6 bg-gray-300 self-center mx-1" />
 
       {/* 📅 本日フィルターボタン */}
       <motion.button

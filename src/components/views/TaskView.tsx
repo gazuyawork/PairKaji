@@ -40,7 +40,6 @@ type Props = {
   onLongPress?: (x: number, y: number) => void;
 };
 
-
 export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -390,17 +389,17 @@ useEffect(() => {
 
             <div className="flex items-center gap-2 mb-2">
               <div className="flex items-center pr-2 border-r border-gray-300">
-            <motion.button
-              onClick={() => setShowSearchBox(prev => !prev)}
-              whileTap={{ scale: 1.2 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 12 }}
-              className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
-                ${showSearchBox
-                  ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                  : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}
-              `}
-              title="検索"
-            >
+                <motion.button
+                  onClick={() => setShowSearchBox(prev => !prev)}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
+                    ${showSearchBox
+                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
+                      : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}
+                  `}
+                  title="検索"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="w-5 h-5"
@@ -418,45 +417,60 @@ useEffect(() => {
                 </motion.button>
               </div>
 
+
+              <div className="flex items-center pr-2 border-r border-gray-300">
+                {/* 🔹 P: Private フィルターボタン */}
+                <motion.button
+                  onClick={() => setPrivateFilter(prev => !prev)}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center transition-all duration-300 text-xl
+                    ${privateFilter
+                      ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white  shadow-inner'
+                      : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
+                  title="プライベートタスク"
+                >
+                  P
+                </motion.button>
+              </div>
+
               <div className="flex overflow-x-auto no-scrollbar space-x-2">
-<FilterControls
-  periodFilter={periodFilter}
-  personFilter={personFilter}
-  onTogglePeriod={togglePeriod}
-  onTogglePerson={togglePerson}
-  searchTerm={searchTerm}
-  onClearSearch={() => setSearchTerm('')}
-  pairStatus={pairStatus}
-  todayFilter={todayFilter}
-  onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-  privateFilter={privateFilter}
-  onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
-/>
+                <FilterControls
+                  periodFilter={periodFilter}
+                  personFilter={personFilter}
+                  onTogglePeriod={togglePeriod}
+                  onTogglePerson={togglePerson}
+                  searchTerm={searchTerm}
+                  onClearSearch={() => setSearchTerm('')}
+                  pairStatus={pairStatus}
+                  todayFilter={todayFilter}
+                  onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+                  privateFilter={privateFilter}
+                  onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
+                />
               </div>
 
               {showClear && (
-<motion.button
-  onClick={() => {
-    setPeriodFilter(null);
-    setPersonFilter(null);
-    handleClearSearch?.();
-    setTodayFilter(false);
-    setPrivateFilter(false);
-  }}
-  whileTap={{ scale: 1.2 }}
-  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-  className={`w-12 h-9 rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
-    ${
-      periodFilter || personFilter || todayFilter || privateFilter
-        ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner'
-        : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:text-white'
-    }`}
-  title="フィルター解除"
->
-  <X className="w-5 h-5" />
-</motion.button>
-
-
+                <motion.button
+                  onClick={() => {
+                    setPeriodFilter(null);
+                    setPersonFilter(null);
+                    handleClearSearch?.();
+                    setTodayFilter(false);
+                    setPrivateFilter(false);
+                  }}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                  className={`w-12 h-9 rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
+                    ${
+                      periodFilter || personFilter || todayFilter || privateFilter
+                        ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner'
+                        : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:text-white'
+                    }`}
+                  title="フィルター解除"
+                >
+                  <X className="w-5 h-5" />
+                </motion.button>
               )}
             </div>
 

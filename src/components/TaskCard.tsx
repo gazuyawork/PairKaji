@@ -267,7 +267,7 @@ export default function TaskCard({
       {/* 🔶 Privateバッジ（右上） */}
       {task.private && (
         <div
-          className="absolute top-0 right-0 w-[34px] h-[34px] bg-gradient-to-bl from-orange-300 to-orange-500 text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+          className="absolute top-0 right-0 w-[34px] h-[34px] bg-gradient-to-bl bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
           style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
         >
           <span className="translate-y-[-6px] translate-x-[6px]">P</span>
