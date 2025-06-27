@@ -418,35 +418,39 @@ useEffect(() => {
               </div>
 
 
-              <div className="flex items-center pr-2 border-r border-gray-300">
-                {/* 🔹 P: Private フィルターボタン */}
-                <button
-                  onClick={() => setPrivateFilter(prev => !prev)}
-                  className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
-                    ${privateFilter
-                      ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white  shadow-inner'
-                      : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
-                  title="プライベートタスク"
-                >
-                  P
-                </button>
-              </div>
+  {/* ✅ パートナー設定時のみ表示 */}
+  {pairStatus === 'confirmed' && (
+      <div className="flex items-center pr-2 border-r border-gray-300">
+        {/* 🔹 P: Private フィルターボタン */}
+        <button
+          onClick={() => setPrivateFilter(prev => !prev)}
+          className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
+            ${privateFilter
+              ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white  shadow-inner'
+              : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
+          title="プライベートタスク"
+        >
+          P
+        </button>
+      </div>
+    )}
 
-              <div className="flex overflow-x-auto no-scrollbar space-x-2">
-                <FilterControls
-                  periodFilter={periodFilter}
-                  personFilter={personFilter}
-                  onTogglePeriod={togglePeriod}
-                  onTogglePerson={togglePerson}
-                  searchTerm={searchTerm}
-                  onClearSearch={() => setSearchTerm('')}
-                  pairStatus={pairStatus}
-                  todayFilter={todayFilter}
-                  onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-                  privateFilter={privateFilter}
-                  onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
-                />
-              </div>
+      <div className="flex overflow-x-auto no-scrollbar space-x-2">
+        <FilterControls
+          periodFilter={periodFilter}
+          personFilter={personFilter}
+          onTogglePeriod={togglePeriod}
+          onTogglePerson={togglePerson}
+          searchTerm={searchTerm}
+          onClearSearch={() => setSearchTerm('')}
+          pairStatus={pairStatus}
+          todayFilter={todayFilter}
+          onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+          privateFilter={privateFilter}
+          onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
+        />
+      </div>
+  
 
               {showClear && (
                 <motion.button
