@@ -311,7 +311,7 @@ export default function TaskCard({
           )}
 
           {task.daysOfWeek && (
-            <div className="flex flex-wrap justify-end w-[75px]">
+            <div className="flex flex-wrap justify-end w-[105px]">
               {[...task.daysOfWeek]
                 .sort(
                   (a, b) =>
