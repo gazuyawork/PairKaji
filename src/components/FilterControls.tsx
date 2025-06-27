@@ -117,39 +117,40 @@ const users = [
             );
           })}
 
-          {/* 👥 担当者フィルター前の縦線 */}
-          <div className="w-px h-6 bg-gray-300 self-center mx-1" />
-
           {/* 👥 担当者フィルター */}
           {pairStatus === 'confirmed' &&
             users.map(user => {
               const isSelected = personFilter === user.id;
               return (
-                <motion.button
-                  key={user.id + personClickKey}
-                  onClick={() => {
-                    setPersonClickKey(prev => prev + 1);
-                    onTogglePerson(user.id);
-                  }}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 10 }}
-                  className={`w-10 h-10 rounded-full overflow-hidden border ${
-                    isSelected ? 'border-[#FFCB7D]' : 'border-gray-300'
-                  }`}
-                >
-                  <Image
-                    src={user.image || '/images/default.png'}
-                    alt={`${user.name}のフィルター`}
-                    width={40}
-                    height={40}
-                    className={`object-cover transition-opacity duration-300 ${
-                      isSelected ? 'opacity-100' : 'opacity-30'
+                <>
+                  <div className="w-px h-6 bg-gray-300 self-center mx-1" />
+                  <motion.button
+                    key={user.id + personClickKey}
+                    onClick={() => {
+                      setPersonClickKey(prev => prev + 1);
+                      onTogglePerson(user.id);
+                    }}
+                    whileTap={{ scale: 1.2 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+                    className={`w-10 h-10 rounded-full overflow-hidden border ${
+                      isSelected ? 'border-[#FFCB7D]' : 'border-gray-300'
                     }`}
-                  />
-                </motion.button>
+                  >
+                    <Image
+                      src={user.image || '/images/default.png'}
+                      alt={`${user.name}のフィルター`}
+                      width={40}
+                      height={40}
+                      className={`object-cover transition-opacity duration-300 ${
+                        isSelected ? 'opacity-100' : 'opacity-30'
+                      }`}
+                    />
+                  </motion.button>
+                </>
               );
             })}
           {extraButton}
+
       </div>
     </div>
   );
