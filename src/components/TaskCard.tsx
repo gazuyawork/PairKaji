@@ -297,19 +297,21 @@ export default function TaskCard({
           </button>
 
 
-          <div className={clsx('min-w-0', (task.scheduledDate || (task.daysOfWeek?.length ?? 0) > 0) ? 'w-1/2' : 'w-2/3')}>
+          <div className={clsx('min-w-0', (task.scheduledDate || (task.daysOfWeek?.length ?? 0) > 0) ? 'w-[100%]' : 'w-[100%]')}>
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
           </div>
 
           {task.scheduledDate && (
+            <div className="w-[5px]">
             <span className="text-xs text-white whitespace-nowrap bg-gray-600 px-1.5 py-1 rounded-md">
               <Calendar size={13} className="inline mr-0.5 pb-0.5" />
               {task.scheduledDate.replace(/-/g, '/').slice(5)}
             </span>
+            </div>
           )}
 
           {task.daysOfWeek && (
-            <div className="flex flex-wrap gap- ml-2 max-w-[calc(5*3*0.25rem+0.25rem*2)]">
+            <div className="flex flex-wrap justify-end w-[75px]">
               {[...task.daysOfWeek]
                 .sort(
                   (a, b) =>
