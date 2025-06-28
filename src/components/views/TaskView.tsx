@@ -56,13 +56,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [privateFilter, setPrivateFilter] = useState(false);
 
 
-useEffect(() => {
-  const uid = auth.currentUser?.uid;
-  console.log('✅ currentUserId from auth:', uid);
-  if (uid) {
-    setCurrentUserId(uid);
-  }
-}, []);
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    console.log('✅ currentUserId from auth:', uid);
+    if (uid) {
+      setCurrentUserId(uid);
+    }
+  }, []);
 
 
   const [isLoading, setIsLoading] = useState(true);
@@ -355,7 +355,7 @@ useEffect(() => {
   }, [editTargetTask, onModalOpenChange]);
 
 
-    return (
+  return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
       <Header title="Task" />
       {editTargetTask && (
@@ -376,6 +376,11 @@ useEffect(() => {
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
+
+
+
+
+
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -394,10 +399,10 @@ useEffect(() => {
                   whileTap={{ scale: 1.2 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 12 }}
                   className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
-                    ${showSearchBox
+          ${showSearchBox
                       ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
                       : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}
-                  `}
+        `}
                   title="検索"
                 >
                   <svg
@@ -417,40 +422,36 @@ useEffect(() => {
                 </motion.button>
               </div>
 
-
-  {/* ✅ パートナー設定時のみ表示 */}
-  {pairStatus === 'confirmed' && (
-      <div className="flex items-center pr-2 border-r border-gray-300">
-        {/* 🔹 P: Private フィルターボタン */}
-        <button
-          onClick={() => setPrivateFilter(prev => !prev)}
-          className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
+              {pairStatus === 'confirmed' && (
+                <div className="flex items-center pr-2 border-r border-gray-300">
+                  <button
+                    onClick={() => setPrivateFilter(prev => !prev)}
+                    className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
             ${privateFilter
-              ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white  shadow-inner'
-              : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
-          title="プライベートタスク"
-        >
-          P
-        </button>
-      </div>
-    )}
+                        ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
+                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
+                    title="プライベートタスク"
+                  >
+                    P
+                  </button>
+                </div>
+              )}
 
-      <div className="flex overflow-x-auto no-scrollbar space-x-2">
-        <FilterControls
-          periodFilter={periodFilter}
-          personFilter={personFilter}
-          onTogglePeriod={togglePeriod}
-          onTogglePerson={togglePerson}
-          searchTerm={searchTerm}
-          onClearSearch={() => setSearchTerm('')}
-          pairStatus={pairStatus}
-          todayFilter={todayFilter}
-          onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-          privateFilter={privateFilter}
-          onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
-        />
-      </div>
-  
+              <div className="flex overflow-x-auto no-scrollbar space-x-2">
+                <FilterControls
+                  periodFilter={periodFilter}
+                  personFilter={personFilter}
+                  onTogglePeriod={togglePeriod}
+                  onTogglePerson={togglePerson}
+                  searchTerm={searchTerm}
+                  onClearSearch={() => setSearchTerm('')}
+                  pairStatus={pairStatus}
+                  todayFilter={todayFilter}
+                  onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+                  privateFilter={privateFilter}
+                  onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
+                />
+              </div>
 
               {showClear && (
                 <motion.button
@@ -464,10 +465,9 @@ useEffect(() => {
                   whileTap={{ scale: 1.2 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 15 }}
                   className={`w-12 h-9 rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
-                    ${
-                      periodFilter || personFilter || todayFilter || privateFilter
-                        ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner'
-                        : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:text-white'
+          ${periodFilter || personFilter || todayFilter || privateFilter
+                      ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner'
+                      : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:text-white'
                     }`}
                   title="フィルター解除"
                 >
@@ -478,93 +478,81 @@ useEffect(() => {
 
             <hr className="border-t border-gray-300 opacity-50 my-4" />
 
-            {periods.map(period => {
-              const rawTasks = tasksState[period] ?? [];
-              const list = rawTasks.filter(task =>
-                currentUserId && task.userIds?.includes(currentUserId) &&
-                (!periodFilter || periodFilter === period) &&
-                (!personFilter || task.users.includes(personFilter)) &&
-                (!searchTerm || task.name.includes(searchTerm)) &&
-                (!todayFilter || isTodayTask(task)) &&
-                (!privateFilter || task.private === true)
-              );
-              const remaining = list.filter(task => !task.done).length;
+            {(() => {
+              const allFilteredTasks = periods
+                .flatMap(period => tasksState[period] ?? [])
+                .filter(task =>
+                  currentUserId && task.userIds?.includes(currentUserId) &&
+                  (!periodFilter || periodFilter === task.period) &&
+                  (!personFilter || task.users.includes(personFilter)) &&
+                  (!searchTerm || task.name.includes(searchTerm)) &&
+                  (!todayFilter || isTodayTask(task)) &&
+                  (!privateFilter || task.private === true)
+                );
 
-              let content: React.ReactElement | null = null;
-
-
-              if (!currentUserId) {
-                content = <div className="p-4 text-gray-400">ユーザー情報を取得中...</div>;
-              } else if (list.length === 0) {
-                // content = <div className="p-4 text-gray-400">{period}：表示するタスクはありません。</div>;
-              } else {
-                content = (
-                  <>
-                    <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
-                      {period}（残り {remaining} 件）
-                    </h2>
-                    <ul className="space-y-2">
-                      {list.map((task, idx) => (
-                        <TaskCard
-                          key={task.id}
-                          task={task}
-                          period={period}
-                          index={idx}
-                          onToggleDone={toggleDone}
-                          onDelete={deleteTask}
-                          onEdit={() => setEditTargetTask({
-                            ...task,
-                            period: task.period,
-                            daysOfWeek: task.daysOfWeek ?? [],
-                            dates: task.dates ?? [],
-                            isTodo: task.isTodo ?? false,
-                          })}
-                          userList={userList}
-                          isPairConfirmed={pairStatus === 'confirmed'}
-                          onLongPress={(x, y) => setLongPressPosition({ x, y })}
-                        />
-                      ))}
-                    </ul>
-                  </>
+              if (allFilteredTasks.length === 0) {
+                return (
+                  <p className="text-center text-gray-500 mt-6">
+                    表示するタスクはありません。
+                  </p>
                 );
               }
 
-              return (
-                <div key={period}>
-                  {content}
-                  {longPressPosition && (
+              return periods.map(period => {
+                const rawTasks = tasksState[period] ?? [];
+                const list = rawTasks.filter(task =>
+                  currentUserId && task.userIds?.includes(currentUserId) &&
+                  (!periodFilter || periodFilter === period) &&
+                  (!personFilter || task.users.includes(personFilter)) &&
+                  (!searchTerm || task.name.includes(searchTerm)) &&
+                  (!todayFilter || isTodayTask(task)) &&
+                  (!privateFilter || task.private === true)
+                );
+                const remaining = list.filter(task => !task.done).length;
+
+                let content: React.ReactElement | null = null;
+
+                if (!currentUserId) {
+                  content = <div className="p-4 text-gray-400">ユーザー情報を取得中...</div>;
+                } else if (list.length === 0) {
+                  content = null;
+                } else {
+                  content = (
                     <>
-                      <div className="fixed inset-0 z-[9999] pointer-events-none">
-                        <div
-                          className="absolute inset-0 bg-transparent"
-                          style={{ pointerEvents: 'auto' }}
-                          onClick={() => setLongPressPosition(null)}
-                        />
-                        <div
-                          className="absolute"
-                          style={{
-                            top: longPressPosition.y,
-                            left: longPressPosition.x,
-                            transform: 'translate(-50%, -50%)',
-                            pointerEvents: 'auto',
-                          }}
-                        >
-                          <div className="flex flex-col gap-2 items-center">
-                            <button className="w-12 h-12 bg-orange-300 rounded-full shadow-lg text-white">編集</button>
-                            <button className="w-12 h-12 bg-red-400 rounded-full shadow-lg text-white">削除</button>
-                            <button className="w-12 h-12 bg-gray-400 rounded-full shadow-lg text-white">詳細</button>
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        className="absolute inset-0 z-40"
-                        onClick={() => setLongPressPosition(null)}
-                      />
+                      <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
+                        {period}（残り {remaining} 件）
+                      </h2>
+                      <ul className="space-y-2">
+                        {list.map((task, idx) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            period={period}
+                            index={idx}
+                            onToggleDone={toggleDone}
+                            onDelete={deleteTask}
+                            onEdit={() =>
+                              setEditTargetTask({
+                                ...task,
+                                period: task.period,
+                                daysOfWeek: task.daysOfWeek ?? [],
+                                dates: task.dates ?? [],
+                                isTodo: task.isTodo ?? false,
+                              })
+                            }
+                            userList={userList}
+                            isPairConfirmed={pairStatus === 'confirmed'}
+                            onLongPress={(x, y) => setLongPressPosition({ x, y })}
+                          />
+                        ))}
+                      </ul>
                     </>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                }
+
+                return <div key={period}>{content}</div>;
+              });
+            })()}
           </motion.div>
         )}
       </main>

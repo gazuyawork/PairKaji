@@ -143,9 +143,8 @@ export default function EditPointModal({
                     user.name === 'たろう' && setSelfPoint(Number(e.target.value))
                   }
                   disabled={user.name === 'はなこ'}
-                  className={`w-16 text-xl border-b border-gray-300 outline-none text-center text-gray-700 ${
-                    user.name === 'はなこ' ? 'bg-gray-100' : ''
-                  }`}
+                  className={`w-16 text-xl border-b border-gray-300 outline-none text-center text-gray-700 ${user.name === 'はなこ' ? 'bg-gray-100' : ''
+                    }`}
                 />
                 <span className="text-gray-600">pt</span>
               </div>
@@ -164,14 +163,12 @@ export default function EditPointModal({
                 onChange={() => setRouletteEnabled(!rouletteEnabled)}
               />
               <div
-                className={`w-11 h-6 bg-gray-300 rounded-full shadow-inner transition-colors duration-300 ${
-                  rouletteEnabled ? 'bg-yellow-400' : ''
-                }`}
+                className={`w-11 h-6 bg-gray-300 rounded-full shadow-inner transition-colors duration-300 ${rouletteEnabled ? 'bg-yellow-400' : ''
+                  }`}
               ></div>
               <div
-                className={`dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${
-                  rouletteEnabled ? 'translate-x-5' : ''
-                }`}
+                className={`dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${rouletteEnabled ? 'translate-x-5' : ''
+                  }`}
               ></div>
             </div>
           </label>

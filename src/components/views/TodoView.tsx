@@ -30,7 +30,6 @@ import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import TodoNoteModal from '@/components/TodoNoteModal';
 
-
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName } = useView();
   const [filterText, setFilterText] = useState('');
@@ -47,24 +46,17 @@ export default function TodoView() {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
-
-
   const { index } = useView();
-
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
     setNoteModalTodo(todo);
     setNoteModalOpen(true);
   };
-
   const closeNoteModal = () => {
     setNoteModalOpen(false);
     setNoteModalTask(null);
     setNoteModalTodo(null);
   };
-
-
-
   const taskNameOptions = useMemo(() => {
     const names = tasks
       .filter(task => !task.visible) // 非表示（visible: false）のものだけサジェスト表示
@@ -72,8 +64,6 @@ export default function TodoView() {
       .filter(Boolean);
     return Array.from(new Set(names));
   }, [tasks]);
-
-
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -142,78 +132,78 @@ export default function TodoView() {
 
 
 
-const handleAddTask = useCallback(async () => {
-  const name = taskInput.trim();
-  if (!name) {
-    setInputError('タスク名を入力してください');
-    return;
-  }
-
-  const existing = tasks.find((t) => t.name.trim() === name);
-
-  if (existing) {
-    if (!existing.visible) {
-      await updateDoc(doc(db, 'tasks', existing.id), {
-        visible: true,
-        updatedAt: serverTimestamp(),
-      });
-      toast.success('非表示のタスクを再表示しました。');
-    } else {
-      setInputError('同じ名前のタスクは登録できません');
+  const handleAddTask = useCallback(async () => {
+    const name = taskInput.trim();
+    if (!name) {
+      setInputError('タスク名を入力してください');
+      return;
     }
 
-    setTaskInput('');
-    return;
-  }
+    const existing = tasks.find((t) => t.name.trim() === name);
 
-  const userId = auth.currentUser?.uid;
-  if (!userId) {
-    alert("ユーザー情報が取得できません");
-    return;
-  }
-
-  // 🔹 userIdsの取得処理追加
-  let userIds = [userId];
-  try {
-    const pairSnap = await getDocs(
-      query(collection(db, 'pairs'), where('userIds', 'array-contains', userId), where('status', '==', 'confirmed'))
-    );
-    pairSnap.forEach(doc => {
-      const data = doc.data();
-      if (Array.isArray(data.userIds)) {
-        userIds = data.userIds;
+    if (existing) {
+      if (!existing.visible) {
+        await updateDoc(doc(db, 'tasks', existing.id), {
+          visible: true,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success('非表示のタスクを再表示しました。');
+      } else {
+        setInputError('同じ名前のタスクは登録できません');
       }
-    });
-  } catch (e) {
-    console.error('ペア情報の取得に失敗:', e);
-  }
 
-  const tasksRef = collection(db, 'tasks');
-  const newTaskRef = doc(tasksRef);
+      setTaskInput('');
+      return;
+    }
 
-  const newTaskData = {
-    name,
-    period: '毎日',
-    todos: [],
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    isTodo: true,
-    point: 10,
-    userId,
-    userIds, // 🔹 ここでペアのuserIdsをセット
-    users: [],
-    daysOfWeek: [],
-    dates: [],
-    visible: true,
-  };
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      alert("ユーザー情報が取得できません");
+      return;
+    }
 
-  await setDoc(newTaskRef, newTaskData);
-  toast.success('新しくタスクが登録されました。');
+    // 🔹 userIdsの取得処理追加
+    let userIds = [userId];
+    try {
+      const pairSnap = await getDocs(
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', userId), where('status', '==', 'confirmed'))
+      );
+      pairSnap.forEach(doc => {
+        const data = doc.data();
+        if (Array.isArray(data.userIds)) {
+          userIds = data.userIds;
+        }
+      });
+    } catch (e) {
+      console.error('ペア情報の取得に失敗:', e);
+    }
 
-  setTaskInput('');
-  setInputError(null);
-  setFocusedTodoId(null);
-}, [taskInput, tasks]);
+    const tasksRef = collection(db, 'tasks');
+    const newTaskRef = doc(tasksRef);
+
+    const newTaskData = {
+      name,
+      period: '毎日',
+      todos: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      isTodo: true,
+      point: 10,
+      userId,
+      userIds, // 🔹 ここでペアのuserIdsをセット
+      users: [],
+      daysOfWeek: [],
+      dates: [],
+      visible: true,
+    };
+
+    await setDoc(newTaskRef, newTaskData);
+    toast.success('新しくタスクが登録されました。');
+
+    setTaskInput('');
+    setInputError(null);
+    setFocusedTodoId(null);
+  }, [taskInput, tasks]);
 
   const handleTaskInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -373,11 +363,11 @@ const handleAddTask = useCallback(async () => {
                 const updated = tasks.map(t =>
                   t.id === task.id
                     ? {
-                        ...t,
-                        todos: t.todos.map(todo =>
-                          todo.id === todoId ? { ...todo, text: value } : todo
-                        ),
-                      }
+                      ...t,
+                      todos: t.todos.map(todo =>
+                        todo.id === todoId ? { ...todo, text: value } : todo
+                      ),
+                    }
                     : t
                 );
                 setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映

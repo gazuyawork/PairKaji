@@ -54,9 +54,8 @@ export default function TaskManageCard({
     >
       {(task.isNew || task.isEdited) && (
         <div
-          className={`absolute -top-2 -left-2 w-4 h-4 rounded-full ${
-            task.isNew ? 'bg-red-400' : 'bg-blue-400'
-          }`}
+          className={`absolute -top-2 -left-2 w-4 h-4 rounded-full ${task.isNew ? 'bg-red-400' : 'bg-blue-400'
+            }`}
         />
       )}
 
@@ -125,9 +124,8 @@ export default function TaskManageCard({
                     const newUsers = isSelected ? [] : [user.id];
                     onChange(task.id, 'users', newUsers);
                   }}
-                  className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${
-                    isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
-                  }`}
+                  className={`w-8.5 h-8.5 rounded-full border overflow-hidden ${isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                    }`}
                 >
                   <Image
                     src={user.imageUrl || '/images/default.png'}
@@ -152,11 +150,10 @@ export default function TaskManageCard({
             <button
               key={day}
               onClick={() => onToggleDay(task.id, day)}
-              className={`w-6 h-6 rounded-full text-xs font-bold ${
-                task.daysOfWeek.includes(day)
+              className={`w-6 h-6 rounded-full text-xs font-bold ${task.daysOfWeek.includes(day)
                   ? 'bg-[#5E5E5E] text-white'
                   : 'bg-gray-200 text-gray-600'
-              }`}
+                }`}
             >
               {day}
             </button>

@@ -47,10 +47,9 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
               key={task.id ?? `fallback-${idx}`}
               onClick={() => onSelectGroup(task.id)}
               className={`px-3 py-2 rounded-full text-sm border transition-all duration-300 whitespace-nowrap font-semibold
-                ${
-                  selectedGroupId === task.id
-                    ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                    : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
+                ${selectedGroupId === task.id
+                  ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
+                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
                 }`}
 
             >
@@ -87,9 +86,8 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
       )}
       {showRightArrow && (
         <div
-          className={`absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-300 ${
-            selectedGroupId !== null ? 'right-14' : 'right-2'
-          }`}
+          className={`absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-300 ${selectedGroupId !== null ? 'right-14' : 'right-2'
+            }`}
         >
           <div className="w-8 h-8 bg-[#5E5E5E] rounded-full flex items-center justify-center shadow-md animate-blink">
             <ChevronRight className="text-white w-4 h-4" />

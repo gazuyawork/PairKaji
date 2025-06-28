@@ -198,11 +198,10 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-6 h-6 rounded-full text-xs font-bold ${
-                    editedTask.daysOfWeek.includes(day)
+                  className={`w-6 h-6 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
                       ? 'bg-[#5E5E5E] text-white'
                       : 'bg-gray-200 text-gray-600'
-                  }`}
+                    }`}
                 >
                   {day}
                 </button>
@@ -253,11 +252,10 @@ export default function EditTaskModal({
                       key={user.id}
                       type="button"
                       onClick={() => toggleUser(user.id)}
-                      className={`w-12 h-12 rounded-full border overflow-hidden ${
-                        isSelected
+                      className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected
                           ? 'border-[#FFCB7D] opacity-100'
                           : 'border-gray-300 opacity-30'
-                      }`}
+                        }`}
                     >
                       <Image
                         src={user.imageUrl || '/images/default.png'}
@@ -280,14 +278,12 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isPrivate}
                 onClick={() => setIsPrivate(!isPrivate)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
-                }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isPrivate ? 'translate-x-6' : ''
-                  }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : ''
+                    }`}
                 />
               </button>
             </div>

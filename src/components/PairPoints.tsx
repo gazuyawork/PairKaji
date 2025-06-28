@@ -14,8 +14,6 @@ import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import type { Pair } from '@/types/Pair';
 
-
-
 interface UserPoints {
   [userId: string]: {
     name: string;

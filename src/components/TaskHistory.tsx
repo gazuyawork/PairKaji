@@ -53,7 +53,6 @@ export default function TaskHistory() {
     fetchLogs();
   }, [weekStart, weekEnd]);
 
-
   const getProfileImage = (person?: string) => {
     if (person === '太郎') return localStorage.getItem('profileImage') || '/images/taro.png';
     if (person === '花子') return localStorage.getItem('partnerImage') || '/images/hanako.png';
@@ -112,26 +111,25 @@ export default function TaskHistory() {
 
       <div className="mb-6">
         <select
-            value={weekOffset}
-            onChange={(e) => setWeekOffset(Number(e.target.value))}
-            className="ml-1 text-sm border-b border-gray-400 bg-transparent outline-none appearance-none"
-            >
-            {generateWeekOptions().map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-        </select>
-    </div>
-
-
-        {weekOffset < 0 && (
-        <div
-            className="text-sm bg-gray-500 text-white hover:bg-gray-600 px-4 py-2 rounded-full cursor-pointer inline-block mb-10 shadow"
-            onClick={() => setWeekOffset(0)}
+          value={weekOffset}
+          onChange={(e) => setWeekOffset(Number(e.target.value))}
+          className="ml-1 text-sm border-b border-gray-400 bg-transparent outline-none appearance-none"
         >
-            今週に戻る
-        </div>
-        )}
+          {generateWeekOptions().map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
 
+
+      {weekOffset < 0 && (
+        <div
+          className="text-sm bg-gray-500 text-white hover:bg-gray-600 px-4 py-2 rounded-full cursor-pointer inline-block mb-10 shadow"
+          onClick={() => setWeekOffset(0)}
+        >
+          今週に戻る
+        </div>
+      )}
 
       {logs.length === 0 ? (
         <p className="text-gray-400 mb-10">この週の履歴はありません</p>
@@ -153,16 +151,16 @@ export default function TaskHistory() {
                     </div>
                     <div className="ml-auto flex items-center gap-2">
                       <div className="w-[60px] text-right text-gray-600 pr-4-4">{log.point}pt</div>
-                        <div className="w-[36px] h-[36px] flex-shrink-0">
+                      <div className="w-[36px] h-[36px] flex-shrink-0">
                         <Image
-                            src={getProfileImage(log.person)}
-                            alt="icon"
-                            width={38}
-                            height={38}
-                            className="rounded-full border border-gray-300 object-cover w-full h-full"
-                            style={{ aspectRatio: '1 / 1' }}
+                          src={getProfileImage(log.person)}
+                          alt="icon"
+                          width={38}
+                          height={38}
+                          className="rounded-full border border-gray-300 object-cover w-full h-full"
+                          style={{ aspectRatio: '1 / 1' }}
                         />
-                        </div>
+                      </div>
                     </div>
                   </li>
                 ))}

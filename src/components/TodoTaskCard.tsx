@@ -10,7 +10,6 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
-
 interface Props {
   task: TodoOnlyTask;
   tab: 'undone' | 'done';
@@ -48,14 +47,12 @@ export default function TodoTaskCard({
   const [inputError, setInputError] = useState<string | null>(null);
   const [animatingTodoIds, setAnimatingTodoIds] = useState<Set<string>>(new Set());
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
-
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
   const filteredTodos = useMemo(
     () => (tab === 'done' ? todos.filter(todo => todo.done) : todos.filter(todo => !todo.done)),
     [todos, tab]
   );
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
@@ -220,36 +217,36 @@ export default function TodoTaskCard({
                   )}
                   type="button"
                 >
-                <span
-                  className={clsx(
-                    'absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white rounded-full text-center',
-                    count === 0
-                      ? 'bg-gray-300'
-                      : type === 'undone'
-                        ? 'bg-red-400'
-                        : 'bg-blue-400'
-                  )}
-                >
-                  {count}
-                </span>
+                  <span
+                    className={clsx(
+                      'absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white rounded-full text-center',
+                      count === 0
+                        ? 'bg-gray-300'
+                        : type === 'undone'
+                          ? 'bg-red-400'
+                          : 'bg-blue-400'
+                    )}
+                  >
+                    {count}
+                  </span>
 
                   {type === 'undone' ? '未処理' : '完了'}
                 </button>
               );
             })}
           </div>
-            <motion.button
-              onClick={handleDeleteClick}
-              animate={isDeleteAnimating ? 'shake' : undefined}
-              variants={shakeVariants}
-              className={clsx(
-                'text-2xl font-bold pr-1',
-                confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
-              )}
-              type="button"
-            >
-              ×
-            </motion.button>
+          <motion.button
+            onClick={handleDeleteClick}
+            animate={isDeleteAnimating ? 'shake' : undefined}
+            variants={shakeVariants}
+            className={clsx(
+              'text-2xl font-bold pr-1',
+              confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
+            )}
+            type="button"
+          >
+            ×
+          </motion.button>
 
         </div>
       </div>

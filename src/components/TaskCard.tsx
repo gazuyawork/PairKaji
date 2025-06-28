@@ -67,7 +67,7 @@ export default function TaskCard({
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showActions, setShowActions] = useState(false);
-  
+
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -182,57 +182,57 @@ export default function TaskCard({
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
             {/* 編集ボタン（爽やかな青） */}
-      {/* 編集ボタン（爽やかな青） */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowActions(false);
-          onEdit();
-        }}
-        className="w-12 h-12 rounded-full 
+            {/* 編集ボタン（爽やかな青） */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowActions(false);
+                onEdit();
+              }}
+              className="w-12 h-12 rounded-full 
                   bg-gradient-to-b from-green-300 to-green-600 
                   shadow ring-1 ring-green-300 ring-offset-1 
                   flex items-center justify-center 
                   text-white active:translate-y-0.5 
                   transition-all duration-150"
-      >
-        <Pencil className="w-5 h-5" />
-      </button>
+            >
+              <Pencil className="w-5 h-5" />
+            </button>
 
-      {/* フラグボタン（爽やかな赤） */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          alert('フラグ機能は未実装');
-        }}
-        className="w-12 h-12 rounded-full 
+            {/* フラグボタン（爽やかな赤） */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                alert('フラグ機能は未実装');
+              }}
+              className="w-12 h-12 rounded-full 
                   bg-gradient-to-b from-red-300 to-red-500 
                   shadow ring-1 ring-red-300 ring-offset-1 
                   flex items-center justify-center 
                   text-white active:translate-y-0.5 
                   transition-all duration-150"
-      >
-        <Flag className="w-5 h-5" />
-      </button>
+            >
+              <Flag className="w-5 h-5" />
+            </button>
 
-      {/* 鍵ボタン（爽やかな黄緑） */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          alert('鍵機能は未実装');
-        }}
-        className="w-12 h-12 rounded-full 
+            {/* 鍵ボタン（爽やかな黄緑） */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                alert('鍵機能は未実装');
+              }}
+              className="w-12 h-12 rounded-full 
                   bg-gradient-to-b from-yellow-300 to-yellow-500 
                   shadow ring-1 ring-yellow-300 ring-offset-1 
                   flex items-center justify-center 
                   text-white active:translate-y-0.5 
                   transition-all duration-150"
-      >
-        <Lock className="w-5 h-5" />
-      </button>
-    </div>
-  </div>
-)}
+            >
+              <Lock className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <motion.div
         {...swipeable}
@@ -253,26 +253,26 @@ export default function TaskCard({
         )}
       >
 
-      {/* 🔷 TODOバッジ（左上） */}
-      {task.visible && (
-        <div
-          className="absolute top-0 left-0 w-[30px] h-[30px] bg-gradient-to-br from-blue-400 to-blue-600 text-white text-[11px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
-          style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
-        >
-          <span className="translate-y-[-6px] translate-x-[-4px]">T</span>
-        </div>
+        {/* 🔷 TODOバッジ（左上） */}
+        {task.visible && (
+          <div
+            className="absolute top-0 left-0 w-[30px] h-[30px] bg-gradient-to-br from-blue-400 to-blue-600 text-white text-[11px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+            style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
+          >
+            <span className="translate-y-[-6px] translate-x-[-4px]">T</span>
+          </div>
 
-              )}
+        )}
 
-      {/* 🔶 Privateバッジ（右上） */}
-      {task.private && (
-        <div
-          className="absolute top-0 right-0 w-[30px] h-[30px] bg-gradient-to-bl bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
-          style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
-        >
-          <span className="translate-y-[-6px] translate-x-[5px]">P</span>
-        </div>
-      )}
+        {/* 🔶 Privateバッジ（右上） */}
+        {task.private && (
+          <div
+            className="absolute top-0 right-0 w-[30px] h-[30px] bg-gradient-to-bl bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+            style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
+          >
+            <span className="translate-y-[-6px] translate-x-[5px]">P</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
@@ -296,17 +296,16 @@ export default function TaskCard({
             </motion.div>
           </button>
 
-
           <div className={clsx('min-w-0', (task.scheduledDate || (task.daysOfWeek?.length ?? 0) > 0) ? 'w-[100%]' : 'w-[100%]')}>
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
           </div>
 
           {task.scheduledDate && (
             <div className="w-[5px]">
-            <span className="text-xs text-white whitespace-nowrap bg-gray-600 px-1.5 py-1 rounded-md">
-              <Calendar size={13} className="inline mr-0.5 pb-0.5" />
-              {task.scheduledDate.replace(/-/g, '/').slice(5)}
-            </span>
+              <span className="text-xs text-white whitespace-nowrap bg-gray-600 px-1.5 py-1 rounded-md">
+                <Calendar size={13} className="inline mr-0.5 pb-0.5" />
+                {task.scheduledDate.replace(/-/g, '/').slice(5)}
+              </span>
             </div>
           )}
 

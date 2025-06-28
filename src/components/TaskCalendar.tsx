@@ -67,10 +67,10 @@ export default function TaskCalendar({ tasks }: Props) {
             const bgColor = hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]';
 
             return (
-<div
-  key={idx}
-  className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor}`}
->
+              <div
+                key={idx}
+                className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor}`}
+              >
 
 
                 <div className="font-semibold text-gray-600">
@@ -90,22 +90,19 @@ export default function TaskCalendar({ tasks }: Props) {
                       isSameDay(parseISO(dateStr), day)
                     );
 
-
-
                     return (
-<div
-  key={i}
-  className={`mt-1 text-[10px] rounded px-1.5 py-[3px] truncate font-semibold border border-white/30 
-    ${isWeeklyTask
-      ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
-      : isDateTask
-      ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
-      : 'bg-gradient-to-b from-gray-100 to-gray-300 text-gray-700'}
-  `}
->
-  {task.name}
-</div>
-
+                      <div
+                        key={i}
+                        className={`mt-1 text-[10px] rounded px-1.5 py-[3px] truncate font-semibold border border-white/30 
+                        ${isWeeklyTask
+                            ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
+                            : isDateTask
+                              ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
+                              : 'bg-gradient-to-b from-gray-100 to-gray-300 text-gray-700'}
+                        `}
+                      >
+                        {task.name}
+                      </div>
                     );
                   })
                 ) : (

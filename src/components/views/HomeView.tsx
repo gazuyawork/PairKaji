@@ -121,47 +121,35 @@ export default function HomeView() {
             <PairInviteCard mode="no-partner" />
           )}
 
-          
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
-            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-              isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-            }`}
+            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+              }`}
           >
-            {/* {isLoading ? (
-              <div className="p-6">
-                <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse" />
-                <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
-              </div>
-            ) : (
-              <FinishDayTask tasks={tasks} />
-            )} */}
-
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
-                  isExpanded ? 'rotate-180' : ''
-                }`}
+                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
+                  }`}
               />
             </div>
           </div>
 
-            {isLoading ? (
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
-                <div className="h-4 bg-gray-200 rounded w-2/4 animate-pulse" />
-              </div>
-            ) : (
-              <TaskCalendar
-                tasks={tasks.map(({ id, name, period, dates, daysOfWeek }) => ({
-                  id,
-                  name,
-                  period: period ?? '毎日',
-                  dates,
-                  daysOfWeek,
-                }))}
-              />
-            )}
+          {isLoading ? (
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+              <div className="h-4 bg-gray-200 rounded w-2/4 animate-pulse" />
+            </div>
+          ) : (
+            <TaskCalendar
+              tasks={tasks.map(({ id, name, period, dates, daysOfWeek }) => ({
+                id,
+                name,
+                period: period ?? '毎日',
+                dates,
+                daysOfWeek,
+              }))}
+            />
+          )}
 
           {isLoading ? (
             <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />

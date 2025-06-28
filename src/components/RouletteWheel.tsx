@@ -80,8 +80,8 @@ export default function RouletteWheel({
               radial-gradient(circle at 30% 30%, #ffffff55, transparent),
               conic-gradient(
                 ${options
-                  .map((_, i) => pastelColors[i % pastelColors.length] + ' ' + (i * 100 / options.length) + '% ' + ((i + 1) * 100 / options.length) + '%')
-                  .join(',')}
+                .map((_, i) => pastelColors[i % pastelColors.length] + ' ' + (i * 100 / options.length) + '% ' + ((i + 1) * 100 / options.length) + '%')
+                .join(',')}
               )
             `,
             boxShadow:
@@ -89,22 +89,22 @@ export default function RouletteWheel({
           }}
         >
 
-        {fixedLabels.slice(0, options.length).map((char, i) => {
-          const segmentAngle = 360 / options.length;
-          const rotation = i * segmentAngle + segmentAngle / 2;
-          return (
-            <div
-              key={i} // ✅ indexベースでOK（固定ラベルなので重複しない）
-              className="absolute left-[47%] top-[44%] text-xs font-bold text-white pointer-events-none"
-              style={{
-                transform: `rotate(${rotation}deg) translateY(-250%) rotate(180deg)`,
-                transformOrigin: 'center center',
-              }}
-            >
-              {char}
-            </div>
-          );
-        })}
+          {fixedLabels.slice(0, options.length).map((char, i) => {
+            const segmentAngle = 360 / options.length;
+            const rotation = i * segmentAngle + segmentAngle / 2;
+            return (
+              <div
+                key={i} // ✅ indexベースでOK（固定ラベルなので重複しない）
+                className="absolute left-[47%] top-[44%] text-xs font-bold text-white pointer-events-none"
+                style={{
+                  transform: `rotate(${rotation}deg) translateY(-250%) rotate(180deg)`,
+                  transformOrigin: 'center center',
+                }}
+              >
+                {char}
+              </div>
+            );
+          })}
 
         </motion.div>
 

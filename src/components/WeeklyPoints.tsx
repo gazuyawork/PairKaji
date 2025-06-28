@@ -231,10 +231,10 @@ export default function WeeklyPoints() {
                     }}
                     className="absolute w-full h-full flex items-center justify-center"
                   >
-<div className="absolute bg-yellow-400 text-white font-bold text-lg rounded-full w-80 h-80 flex flex-col items-center justify-center text-center shadow-[inset_0_0_8px_rgba(255,255,255,0.7),_0_4px_6px_rgba(0,0,0,0.3)] border-[3px] border-yellow-500">
-  <p className="text-base">Goal completed!</p>
-  <p className="text-4xl mt-2 mb-8">Time to spin!</p>
-</div>
+                    <div className="absolute bg-yellow-400 text-white font-bold text-lg rounded-full w-80 h-80 flex flex-col items-center justify-center text-center shadow-[inset_0_0_8px_rgba(255,255,255,0.7),_0_4px_6px_rgba(0,0,0,0.3)] border-[3px] border-yellow-500">
+                      <p className="text-base">Goal completed!</p>
+                      <p className="text-4xl mt-2 mb-8">Time to spin!</p>
+                    </div>
 
                   </motion.div>
                 )}
