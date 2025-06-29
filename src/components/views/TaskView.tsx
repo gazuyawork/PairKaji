@@ -464,11 +464,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   }}
                   whileTap={{ scale: 1.2 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                  className={`w-12 h-9 rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
-          ${periodFilter || personFilter || todayFilter || privateFilter
+                  className={`w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
+                      ${periodFilter || personFilter || todayFilter || privateFilter
                       ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner'
                       : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:text-white'
                     }`}
+
                   title="フィルター解除"
                 >
                   <X className="w-5 h-5" />
