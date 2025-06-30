@@ -51,6 +51,7 @@ export type Task = {
   userId: string;
   todos?: unknown[];
   private: boolean;
+  flagged: boolean
 };
 
 

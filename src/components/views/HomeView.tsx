@@ -1,10 +1,8 @@
-// src/components/views/HomeView.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
-// import FinishDayTask from '@/components/FinishDayTask';
 import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -13,15 +11,17 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/PairInviteCard';
+import FlaggedTaskAlertCard from '@/components/home/FlaggedTaskAlertCard';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasPairInvite, setHasPairInvite] = useState(false);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [hasSentInvite, setHasSentInvite] = useState(false);
   const [hasPairConfirmed, setHasPairConfirmed] = useState(false);
+  const [flaggedCount, setFlaggedCount] = useState(0); // ✅ フラグ件数
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -55,8 +55,6 @@ export default function HomeView() {
     };
   }, []);
 
-
-
   useEffect(() => {
     const user = auth.currentUser;
     if (!user?.email) return;
@@ -74,7 +72,6 @@ export default function HomeView() {
     return () => unsubscribe();
   }, []);
 
-
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -86,7 +83,24 @@ export default function HomeView() {
 
       setTimeout(() => {
         setIsLoading(false);
-      }, 50); // ローディング猶予
+      }, 50);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const q = query(
+      collection(db, 'tasks'),
+      where('userIds', 'array-contains', uid),
+      where('flagged', '==', true)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setFlaggedCount(snapshot.size);
     });
 
     return () => unsubscribe();
@@ -112,7 +126,6 @@ export default function HomeView() {
           transition={{ duration: 0.4 }}
           className="space-y-1.5"
         >
-
           {!isLoading && hasPairInvite && (
             <PairInviteCard mode="invite-received" />
           )}
@@ -123,16 +136,19 @@ export default function HomeView() {
 
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
-            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
+            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'}`}
           >
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-                  }`}
+                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`}
               />
             </div>
           </div>
+
+          {/* ✅ フラグ付きタスク警告カード */}
+            {!isLoading && flaggedCount > 0 && (
+            <FlaggedTaskAlertCard flaggedCount={flaggedCount} />
+          )}
 
           {isLoading ? (
             <div className="space-y-2">
