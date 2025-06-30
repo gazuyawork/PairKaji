@@ -299,7 +299,7 @@ export default function TaskCard({
           </div>
         )}
 
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -323,7 +323,7 @@ export default function TaskCard({
 
           {/* ✅ フラグが ON のときだけ表示 */}
           {isFlagged && (
-            <Flag className="text-red-500 w-4 h-4 ml-1" />
+            <Flag className="text-red-500 w-6 h-6 ml-0" />
           )}
 
 
