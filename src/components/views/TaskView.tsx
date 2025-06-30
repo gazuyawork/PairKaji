@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 
@@ -56,6 +58,14 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   const [flaggedFilter, setFlaggedFilter] = useState(false);
 
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const flaggedParam = searchParams.get('flagged');
+    if (flaggedParam === 'true') {
+      setFlaggedFilter(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
