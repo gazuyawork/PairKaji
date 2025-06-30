@@ -229,27 +229,37 @@ export const generateInviteCode = (length = 6): string => {
  * @param taskId 更新対象のタスクID（新規作成時は null）
  * @param taskData 保存対象のタスクデータ
  */
-export const saveTaskToFirestore = async (taskId: string | null, taskData: FirestoreTask): Promise<void> => {
+// lib/firebaseUtils.ts 内
+
+export const saveTaskToFirestore = async (
+  taskId: string | null,
+  taskData: FirestoreTask
+): Promise<void> => {
   try {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');
 
-    // 🔑 ペア情報を必ずFirestoreから取得
+    // 🔑 userIds の初期値は自分だけ
     let userIds: string[] = [uid];
 
-    const pairId = sessionStorage.getItem('pairId'); // またはfetchPairId()で取得
-    if (pairId) {
-      const pairDoc = await getDoc(doc(db, 'pairs', pairId));
-      const pairData = pairDoc.data();
-      if (pairData?.userIds) {
-        userIds = pairData.userIds; // 必ず最新のペア情報をセット
+    // 🔐 プライベートタスクなら userIds は自分だけで確定
+    const isPrivate = taskData.private === true;
+
+    if (!isPrivate) {
+      const pairId = sessionStorage.getItem('pairId');
+      if (pairId) {
+        const pairDoc = await getDoc(doc(db, 'pairs', pairId));
+        const pairData = pairDoc.data();
+        if (pairData?.userIds) {
+          userIds = pairData.userIds;
+        }
       }
     }
 
     const commonData = {
       ...taskData,
-      private: taskData.private ?? false,
-      userIds, // 最新の「自分＋ペア」のUIDを含める
+      private: isPrivate,
+      userIds, // 必ず適切な userIds（自分のみ or 自分+ペア）
     };
 
     if (taskId) {
@@ -271,6 +281,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: Fires
     handleFirestoreError(_err);
   }
 };
+
 
 export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
   try {

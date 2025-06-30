@@ -114,9 +114,9 @@ export default function TaskCard({
   const handleClick = () => {
     if (showActions) return; // アクション表示中は処理しない
     if (task.done) {
-      const confirmed = window.confirm('このタスクを未処理に戻しますか？');
-      if (!confirmed) return;
-    } else {
+      // const confirmed = window.confirm('このタスクを未処理に戻しますか？');
+      // if (!confirmed) return;
+    // } else {
       setAnimateTrigger(prev => prev + 1);
     }
     onToggleDone(period, task.id);
