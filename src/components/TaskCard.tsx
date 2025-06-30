@@ -3,7 +3,7 @@
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Pencil, Flag, Lock, Trash2 } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -54,7 +54,7 @@ type Props = {
 
 export default function TaskCard({
   task, period, onToggleDone, onDelete,
-  userList, isPairConfirmed,
+  userList, isPairConfirmed, onEdit,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -202,11 +202,10 @@ export default function TaskCard({
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
             {/* 編集ボタン（爽やかな青） */}
-            {/* 編集ボタン（爽やかな青） */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                toggleFlag();
+                onEdit();
               }}
               className="w-12 h-12 rounded-full 
                   bg-gradient-to-b from-green-300 to-green-600 
@@ -219,40 +218,40 @@ export default function TaskCard({
             </button>
 
             {/* フラグボタン（トグル対応） */}
-<button
-  onClick={(e) => {
-    e.stopPropagation();
-    toggleFlag(); // ✅ Firestoreへの保存処理を呼び出す
-  }}
-  className={clsx(
-    'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150',
-    isFlagged
-      ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
-      : 'bg-gray-300 ring-1 ring-gray-300 text-white opacity-60'
-  )}
->
-  <Flag className="w-5 h-5" />
-</button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFlag(); // ✅ Firestoreへの保存処理を呼び出す
+              }}
+              className={clsx(
+                'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150',
+                isFlagged
+                  ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
+                  : 'bg-gray-300 ring-1 ring-gray-300 text-white opacity-60'
+              )}
+            >
+              <Flag className="w-5 h-5" />
+            </button>
 
 
             {/* 鍵ボタン（爽やかな黄緑） */}
-<button
-  onClick={(e) => {
-    e.stopPropagation();
-    setTimeout(() => {
-      setShowActionButtons(false);
-    }, 1000);
-    alert('鍵機能は未実装');
-  }}
-  className="w-12 h-12 rounded-full 
-      bg-gradient-to-b from-yellow-300 to-yellow-500 
-      shadow ring-1 ring-yellow-300 ring-offset-1 
-      flex items-center justify-center 
-      text-white active:translate-y-0.5 
-      transition-all duration-150"
->
-  <Lock className="w-5 h-5" />
-</button>
+            {/* <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setTimeout(() => {
+                  setShowActionButtons(false);
+                }, 1000);
+                alert('鍵機能は未実装');
+              }}
+              className="w-12 h-12 rounded-full 
+                  bg-gradient-to-b from-yellow-300 to-yellow-500 
+                  shadow ring-1 ring-yellow-300 ring-offset-1 
+                  flex items-center justify-center 
+                  text-white active:translate-y-0.5 
+                  transition-all duration-150"
+            >
+              <Lock className="w-5 h-5" />
+            </button> */}
 
           </div>
         </div>
