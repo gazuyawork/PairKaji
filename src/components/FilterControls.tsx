@@ -32,7 +32,6 @@ export default function FilterControls({
   personFilter,
   onTogglePeriod,
   onTogglePerson,
-  extraButton,
   pairStatus,
   todayFilter,
   onToggleTodayFilter,

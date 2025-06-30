@@ -243,14 +243,16 @@ export const splitSharedTasksOnPairRemoval = async (
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-    const myCopy: FirestoreTask = {
-      ...original,
-      userId,
-      userIds: [userId],
-      point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
-      private: true, // ✅ 追加
-    };
-    delete (myCopy as any).users; // ✅ users フィールドを削除
+const rest = { ...original };
+delete (rest as any).users;
+
+const myCopy: FirestoreTask = {
+  ...rest,
+  userId,
+  userIds: [userId],
+  point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
+  private: true,
+};
 
     const cleanedMyCopy = cleanObject(myCopy);
     cleanedMyCopy.createdAt = serverTimestamp() as Timestamp;
@@ -271,14 +273,16 @@ export const splitSharedTasksOnPairRemoval = async (
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-    const partnerCopy: FirestoreTask = {
-      ...original,
-      userId: partnerId,
-      userIds: [partnerId],
-      point: typeof original.point === 'string' ? Number(original.point) : original.point,
-      private: true, // ✅ 追加
-    };
-    delete (partnerCopy as any).users; // ✅ users フィールドを削除
+const partnerRest = { ...original };
+delete (partnerRest as any).users;
+
+const partnerCopy: FirestoreTask = {
+  ...partnerRest,
+  userId: partnerId,
+  userIds: [partnerId],
+  point: typeof original.point === 'string' ? Number(original.point) : original.point,
+  private: true,
+};
 
     const cleanedPartnerCopy = cleanObject(partnerCopy);
     cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;

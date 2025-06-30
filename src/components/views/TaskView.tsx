@@ -1,7 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
 import type { Task, Period } from '@/types/Task';
@@ -30,7 +30,6 @@ import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
-
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 
@@ -117,27 +116,27 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     { id: partnerUserId ?? '', name: 'パートナー', imageUrl: partnerImage },
   ];
 
-  const createEmptyTask = (): Task => {
-    return {
-      id: '',
-      name: '',
-      title: '',
-      point: 5,
-      period: '毎日',
-      dates: [],
-      daysOfWeek: [],
-      isTodo: false,
-      userId: currentUserId ?? '',
-      users: [currentUserId ?? ''],
-      userIds: [],
-      done: false,
-      skipped: false,
-      visible: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      todos: [],
-    } as unknown as Task;
-  };
+const createEmptyTask = useCallback((): Task => {
+  return {
+    id: '',
+    name: '',
+    title: '',
+    point: 5,
+    period: '毎日',
+    dates: [],
+    daysOfWeek: [],
+    isTodo: false,
+    userId: currentUserId ?? '',
+    users: [currentUserId ?? ''],
+    userIds: [],
+    done: false,
+    skipped: false,
+    visible: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    todos: [],
+  } as unknown as Task;
+}, [currentUserId]);
 
 
 

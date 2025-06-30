@@ -102,7 +102,7 @@ export default function TodoNoteModal({
       }
     };
     fetchTodoData();
-  }, [taskId, todoId]);
+}, [taskId, todoId, compareQuantity]);
 
   useEffect(() => {
     setMounted(true);
