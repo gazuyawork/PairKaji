@@ -59,6 +59,10 @@ body {
 html, body {
   overscroll-behavior: none; /* iOSの引っ張りバウンド防止 */
   touch-action: pan-x pan-y;  /* スクロール可能だが挙動を制限 */
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(to bottom, #fffaf1, #ffe9d2); /* ✅ スプラッシュと一致 */
+  color: #000; /* お好みで */
 }
 
 :root {
