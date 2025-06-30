@@ -9,6 +9,8 @@ import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 import { auth } from '@/lib/firebase';
+import React from 'react';
+
 
 interface Props {
   personFilter: string | null;
@@ -122,10 +124,9 @@ export default function FilterControls({
           users.map(user => {
             const isSelected = personFilter === user.id;
             return (
-              <>
+              <React.Fragment key={user.id + personClickKey}>
                 <div className="w-px h-6 bg-gray-300 self-center mx-1" />
                 <motion.button
-                  key={user.id + personClickKey}
                   onClick={() => {
                     setPersonClickKey(prev => prev + 1);
                     onTogglePerson(user.id);
@@ -144,11 +145,9 @@ export default function FilterControls({
                       }`}
                   />
                 </motion.button>
-              </>
+              </React.Fragment>
             );
           })}
-        {extraButton}
-
       </div>
     </div>
   );
