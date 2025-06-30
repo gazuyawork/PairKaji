@@ -70,7 +70,7 @@ export default function SplashScreen() {
     // ステップ④：画面遷移
     const step4 = setTimeout(() => {
       sessionStorage.setItem('fromSplash', '1');
-      router.replace(isAuthenticated ? '/main' : '/login');
+      router.replace(isAuthenticated ? '/main?skipQuickSplash=true' : '/login');
     }, 4300);
 
     return () => {

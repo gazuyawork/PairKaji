@@ -42,20 +42,32 @@ function MainContent() {
     else if (view === 'todo') setIndex(2);
   }, [searchParams, setIndex]);
 
-  // QuickSplash表示フラグをチェック
+  // QuickSplashまたはスキップ判定
   useEffect(() => {
     const withSplash = searchParams.get('withQuickSplash');
+    const skipSplash = searchParams.get('skipQuickSplash');
+
     if (withSplash === 'true') {
+      // ✅ 通常のQuickSplash表示ルート
       setShowQuickSplash(true);
       const timer = setTimeout(() => {
         setShowQuickSplash(false);
-        setContentVisible(true); // ← スプラッシュ消えた後に表示
+        setContentVisible(true);
       }, 1700);
       return () => clearTimeout(timer);
+    } else if (skipSplash === 'true') {
+      // ✅ SplashScreenからの遷移時 → QuickSplashは出さず、mainだけフェードイン
+      setShowQuickSplash(false);
+      const timer = setTimeout(() => {
+        setContentVisible(true); // ← フェードインだけ後追いで実行
+      }, 300); // 少し遅らせて自然に表示（お好みで調整可能）
+      return () => clearTimeout(timer);
     } else {
-      setContentVisible(true); // ← スプラッシュなければ即表示
+      // ✅ 通常起動（パラメータなし）→ すぐ表示
+      setContentVisible(true);
     }
   }, [searchParams]);
+
 
   // スワイプ処理
   const handleSwipe = (direction: "left" | "right") => {
