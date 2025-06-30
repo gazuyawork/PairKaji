@@ -400,10 +400,10 @@ const createEmptyTask = useCallback((): Task => {
                   whileTap={{ scale: 1.2 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 12 }}
                   className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
-          ${showSearchBox
+                    ${showSearchBox
                       ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
                       : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}
-        `}
+                    `}
                   title="検索"
                 >
                   <svg
@@ -422,6 +422,10 @@ const createEmptyTask = useCallback((): Task => {
                   </svg>
                 </motion.button>
               </div>
+
+
+
+              
 
               {pairStatus === 'confirmed' && (
                 <div className="flex items-center pr-2 border-r border-gray-300">
@@ -456,7 +460,7 @@ const createEmptyTask = useCallback((): Task => {
                 />
               </div>
 
-              {showClear && (
+              {(periodFilter || personFilter || todayFilter || privateFilter || showSearchBox || flaggedFilter || searchTerm) && (
                 <motion.button
                   onClick={() => {
                     setPeriodFilter(null);
@@ -464,16 +468,14 @@ const createEmptyTask = useCallback((): Task => {
                     handleClearSearch?.();
                     setTodayFilter(false);
                     setPrivateFilter(false);
+                    setShowSearchBox(false);       // ✅ 追加
+                    setFlaggedFilter(false);       // ✅ 追加
                   }}
                   whileTap={{ scale: 1.2 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 15 }}
                   className={`w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
-                      ${periodFilter || personFilter || todayFilter || privateFilter
-                      ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner'
-                      : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:text-white'
-                    }`}
-
-                  title="フィルター解除"
+                    bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner`}
+                  title="すべてのフィルターを解除"
                 >
                   <X className="w-5 h-5" />
                 </motion.button>
