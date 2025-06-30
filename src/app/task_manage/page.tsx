@@ -36,6 +36,7 @@ export default function TaskManagePage() {
     setTodayFilter((prev) => !prev);
   };
   const [privateFilter, setPrivateFilter] = useState(false);
+  const [flaggedFilter, setFlaggedFilter] = useState(false);
 
 
 
@@ -342,6 +343,8 @@ const confirmTasks = async () => {
                 onToggleTodayFilter={handleToggleTodayFilter}
                 privateFilter={privateFilter}
                 onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
+                flaggedFilter={flaggedFilter}
+                onToggleFlaggedFilter={() => setFlaggedFilter(prev => !prev)}
               />
             </div>
             <hr className="border-t border-gray-300 opacity-50 my-4" />

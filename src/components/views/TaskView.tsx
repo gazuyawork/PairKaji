@@ -54,6 +54,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [privateFilter, setPrivateFilter] = useState(false);
 
+  const [flaggedFilter, setFlaggedFilter] = useState(false);
+
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -449,6 +451,8 @@ const createEmptyTask = useCallback((): Task => {
                   onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
                   privateFilter={privateFilter}
                   onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
+                  flaggedFilter={flaggedFilter}
+                  onToggleFlaggedFilter={() => setFlaggedFilter(prev => !prev)}
                 />
               </div>
 
@@ -487,7 +491,8 @@ const createEmptyTask = useCallback((): Task => {
                   (!personFilter || task.users.includes(personFilter)) &&
                   (!searchTerm || task.name.includes(searchTerm)) &&
                   (!todayFilter || isTodayTask(task)) &&
-                  (!privateFilter || task.private === true)
+                  (!privateFilter || task.private === true) &&
+                  (!flaggedFilter || task.flagged === true)
                 );
 
               if (allFilteredTasks.length === 0) {
@@ -506,7 +511,8 @@ const createEmptyTask = useCallback((): Task => {
                   (!personFilter || task.users.includes(personFilter)) &&
                   (!searchTerm || task.name.includes(searchTerm)) &&
                   (!todayFilter || isTodayTask(task)) &&
-                  (!privateFilter || task.private === true)
+                  (!privateFilter || task.private === true) &&
+                  (!flaggedFilter || task.flagged === true)
                 );
                 const remaining = list.filter(task => !task.done).length;
 

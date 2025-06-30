@@ -12,8 +12,8 @@ export default function FlaggedTaskAlertCard({ flaggedCount }: Props) {
   const router = useRouter();
 
   const handleClick = () => {
-    // ✅ `view=task` と `index=2` をクエリパラメータで指定してタスク処理画面に遷移
-    router.push('/main?view=task&index=2');
+    const timestamp = new Date().getTime(); // 毎回変わる
+    router.push(`/main?view=task&index=2&flagged=true&_t=${timestamp}`);
   };
 
   return (
