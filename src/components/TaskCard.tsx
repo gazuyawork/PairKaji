@@ -53,28 +53,23 @@ type Props = {
 };
 
 export default function TaskCard({
-  task, period, onToggleDone, onDelete, onEdit,
+  task, period, onToggleDone, onDelete,
   userList, isPairConfirmed,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [animateTrigger, setAnimateTrigger] = useState(0);
-
   const assignedUserId = task.users?.[0];
   const assignedUser = userList.find(u => u.id === assignedUserId);
   const profileImage = assignedUser?.imageUrl ?? '/images/default.png';
   const profileName = assignedUser?.name ?? '未設定';
-
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showActions, setShowActions] = useState(false);
-
   const [showActionButtons, setShowActionButtons] = useState(true); // ✅ 3ボタン表示制御
   const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
 
-
-  // TaskCard 内に追加
   const toggleFlag = async () => {
     try {
       const newFlag = !isFlagged;
@@ -92,10 +87,6 @@ export default function TaskCard({
       console.error('フラグ更新エラー:', error);
     }
   };
-
-
-
-
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];

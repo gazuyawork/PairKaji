@@ -123,6 +123,7 @@ useEffect(() => {
         isNew: true,
         isEdited: false,
         private: false,
+        flagged: false,
         showDelete: false,
       },
     ]);

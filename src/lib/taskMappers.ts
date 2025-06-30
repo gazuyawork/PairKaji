@@ -27,7 +27,7 @@ export const mapFirestoreDocToTask = (doc: QueryDocumentSnapshot<FirestoreTask>)
     userId: data.userId ?? '',
     // private: data.private ?? false,
     private: typeof data.private === 'boolean' ? data.private : false,
-
+    flagged: typeof data.flagged === 'boolean' ? data.flagged : false,
 
     // ✅ これを追加してください！
     userIds: data.userIds ?? [],
