@@ -110,7 +110,7 @@ export default function HomeView() {
           initial={{ opacity: 0 }}
           animate={{ opacity: isLoading ? 0 : 1 }}
           transition={{ duration: 0.4 }}
-          className="space-y-4"
+          className="space-y-1.5"
         >
 
           {!isLoading && hasPairInvite && (
