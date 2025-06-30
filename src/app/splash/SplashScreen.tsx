@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import clsx from 'clsx';
+import { markSplashAsShown } from '@/lib/storageUtils'; // ✅ 追加
 
 const sentence = '家事をわけて、やさしさふえる。';
 
@@ -33,6 +34,11 @@ export default function SplashScreen() {
   const [fadeOutText, setFadeOutText] = useState(false);
   const [showSpinner, setShowSpinner] = useState(false);
   const [loadingDone, setLoadingDone] = useState(false);
+
+  // ✅ スプラッシュ表示フラグを保存（最初のマウント時に一度だけ）
+  useEffect(() => {
+    markSplashAsShown();
+  }, []);
 
   // 認証状態の確認
   useEffect(() => {
