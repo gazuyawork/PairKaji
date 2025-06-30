@@ -80,13 +80,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(false);
-  const showClear = !!(periodFilter || personFilter || searchTerm || todayFilter);
 
   const handleClearSearch = () => {
     setSearchTerm('');
   };
-
-
 
   const isTodayTask = (task: Task): boolean => {
     const today = new Date();

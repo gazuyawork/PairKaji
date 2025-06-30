@@ -6,13 +6,14 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   initializeFirestore,
   persistentLocalCache,
-} from 'firebase/firestore'; // ✅ 修正：キャッシュ対応
+} from 'firebase/firestore';
 import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
 } from 'firebase/auth';
-import { getStorage } from 'firebase/storage'; // ✅ 既存
+import { getStorage } from 'firebase/storage';
+import { getMessaging, type Messaging } from 'firebase/messaging'; // ✅ 追加
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -30,11 +31,14 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error('Auth persistence setting failed:', error);
 });
 
-// ✅ Firestore を persistentLocalCache 付きで初期化
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache(),
 });
 
 const storage = getStorage(app);
 
-export { auth, db, storage, app };
+// ✅ messaging はクライアントでのみ取得（SSR対策）
+const messaging: Messaging | undefined =
+  typeof window !== 'undefined' ? getMessaging(app) : undefined;
+
+export { auth, db, storage, app, messaging };
