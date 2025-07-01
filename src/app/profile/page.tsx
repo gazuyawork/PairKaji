@@ -334,7 +334,7 @@ const handleRemovePair = async () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16 fixed">
       <Header title="Profile" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
 
@@ -379,7 +379,7 @@ const handleRemovePair = async () => {
       )}
 
       </main>
-      <div className="text-center mt-auto mb-10">
+      <div className="text-center mt-auto mb-25">
         <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
           アカウントを削除する
         </Link>

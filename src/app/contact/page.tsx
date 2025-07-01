@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import { Mail, MessageCircle } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -16,6 +16,15 @@ export default function ContactPage() {
   const [emailError, setEmailError] = useState('');
   const [messageError, setMessageError] = useState('');
   const router = useRouter();
+
+  // スクロール無効化
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
 
   const validateEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -76,9 +85,9 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Contact" />
-      <main className="flex-1 px-4 py-6 overflow-y-auto">
+      <main className="flex-1 px-4 py-6">
         {submitted ? (
           <div className="text-center mt-20 space-y-4">
             <p className="text-lg font-bold text-[#5E5E5E]">お問い合わせを送信しました。</p>

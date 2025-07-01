@@ -1,3 +1,5 @@
+'use client';
+
 import {
   MoreVertical,
   User,
@@ -23,9 +25,8 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
   const pathname = usePathname();
 
   return (
-    // <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
     <header className="fixed top-0 left-0 right-0 z-50 bg-white h-16 flex items-center justify-center shadow-sm">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 ml-4">
         {/* 戻るボタン */}
         {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
           <button
@@ -36,23 +37,12 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
               }
               router.push('/main');
             }}
-
             className="text-[#5E5E5E]"
             aria-label="戻る"
           >
             <ArrowLeft size={24} />
           </button>
         )}
-        {/* ✅ TaskView 表示時だけタスク編集ボタン */}
-        {/* {pathname === '/main' && currentIndex === 1 && (
-          <motion.button
-            onClick={() => router.push('/task_manage')}
-            whileTap={{ scale: 0.85, rotate: -5 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          >
-            <Pencil className="w-5 h-5 text-gray-600" />
-          </motion.button>
-        )} */}
       </div>
 
       {/* タイトル */}
@@ -65,7 +55,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
         {saveStatus === 'saving' && <Loader2 className="animate-spin text-gray-400" size={20} />}
         {saveStatus === 'saved' && <CheckCircle className="text-green-500" size={20} />}
         <button
-          className="text-[#5E5E5E]"
+          className="text-[#5E5E5E] mr-5"
           onClick={() => setShowMenu(prev => !prev)}
           aria-label="メニュー"
         >
@@ -109,7 +99,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
                 onClick={async () => {
                   setShowMenu(false);
                   await signOut(auth);
-                  router.push('/');
+                  router.push('/login');
                 }}
               >
                 <LogOut size={16} />
@@ -119,7 +109,6 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
           </div>
         </>
       )}
-
     </header>
   );
 }
