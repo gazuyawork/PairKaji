@@ -20,7 +20,6 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import Header from '@/components/Header';
 import TodoTaskCard from '@/components/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { Plus, ChevronDown } from 'lucide-react';
@@ -214,7 +213,6 @@ export default function TodoView() {
 
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
-      <Header title="Todo" />
       {/* ✅ indexが2（TodoView）である場合のみ表示 */}
       {index === 2 && noteModalTask && noteModalTodo && (
         <TodoNoteModal

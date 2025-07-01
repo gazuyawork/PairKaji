@@ -1,6 +1,5 @@
 'use client';
 
-import Header from '@/components/Header';
 import { useState, useEffect, useCallback } from 'react';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
@@ -365,7 +364,6 @@ const createEmptyTask = useCallback((): Task => {
 
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
-      <Header title="Task" />
       {editTargetTask && (
         <EditTaskModal
           key={editTargetTask.id}
@@ -384,11 +382,6 @@ const createEmptyTask = useCallback((): Task => {
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-
-
-
-
-
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

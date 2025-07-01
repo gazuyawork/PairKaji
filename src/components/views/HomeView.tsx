@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Header from '@/components/Header';
 import WeeklyPoints from '@/components/WeeklyPoints';
 import TaskCalendar from '@/components/TaskCalendar';
 import type { Task } from '@/types/Task';
@@ -108,8 +107,6 @@ export default function HomeView() {
 
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
-      <Header title="Home" />
-
       <main
         className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20 pb-50"
         ref={scrollRef}

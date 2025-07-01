@@ -23,7 +23,8 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
   const pathname = usePathname();
 
   return (
-    <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
+    // <header className="relative w-full flex items-center justify-between bg-white px-4 py-6 border-b border-gray-200 shadow-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white h-16 flex items-center justify-center shadow-sm">
       <div className="flex items-center gap-2">
         {/* 戻るボタン */}
         {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
