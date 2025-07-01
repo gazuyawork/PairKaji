@@ -378,7 +378,7 @@ const createEmptyTask = useCallback((): Task => {
         />
       )}
 
-      <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50">
+      <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-70">
         {isLoading ? (
           <div className="flex items-center justify-center text-gray-400 text-sm h-200">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
