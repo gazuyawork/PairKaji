@@ -101,9 +101,9 @@ export default function MainContent() {
             initial={false}
             animate={{ x: `-${index * 100}vw` }}
             transition={{
-              type: 'spring',
-              stiffness: 300,
-              damping: 30,
+              type: 'tween',                  // ✅ グラグラを除去
+              ease: [0.25, 0.1, 0.25, 1],     // ✅ 滑らかだけどピタッと止まるイージング
+              duration: 0.35,                 // ✅ 適度な速さ（必要に応じて調整）
             }}
           >
             <div className="w-screen flex-shrink-0 h-full overflow-y-auto">

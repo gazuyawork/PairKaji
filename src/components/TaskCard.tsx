@@ -68,12 +68,12 @@ export default function TaskCard({
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showActions, setShowActions] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(true); // ✅ 3ボタン表示制御
-  const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
+  // const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
 
   const toggleFlag = async () => {
     try {
-      const newFlag = !isFlagged;
-      setIsFlagged(newFlag);
+      const newFlag = !task.flagged;
+      // setIsFlagged(newFlag);
       setTimeout(() => {
         setShowActionButtons(false);
       }, 1000);
@@ -225,7 +225,7 @@ export default function TaskCard({
               }}
               className={clsx(
                 'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150',
-                isFlagged
+                task.flagged
                   ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
                   : 'bg-gray-300 ring-1 ring-gray-300 text-white opacity-60'
               )}
@@ -321,7 +321,7 @@ export default function TaskCard({
           </button>
 
           {/* ✅ フラグが ON のときだけ表示 */}
-          {isFlagged && (
+          {task.flagged && (
             <Flag className="text-red-500 w-6 h-6 ml-0" />
           )}
 

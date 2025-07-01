@@ -322,23 +322,24 @@ export const toggleTaskDoneStatus = async (
       const pairDoc = await getDoc(doc(db, 'pairs', pairId));
       const pairData = pairDoc.data();
       if (pairData?.userIds) {
-        userIds = pairData.userIds; // ペアの userIds をセット
+        userIds = pairData.userIds;
       }
     }
 
     if (done) {
-      // 完了にする場合
+      // ✅ 完了にする場合
       await updateDoc(taskRef, {
         done: true,
         completedAt: serverTimestamp(),
         completedBy: userId,
+        flagged: false, // ✅ 追加: 完了時はフラグを自動的に外す
       });
 
       if (taskName && point !== undefined && person) {
         await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
       }
     } else {
-      // 未処理に戻す場合
+      // 未完了に戻す場合
       await updateDoc(taskRef, {
         done: false,
         completedAt: null,
@@ -360,6 +361,7 @@ export const toggleTaskDoneStatus = async (
     handleFirestoreError(error);
   }
 };
+
 
 /**
  * ユーザーの氏名をFirestoreに保存する
