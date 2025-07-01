@@ -9,9 +9,9 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
 
   // 📄 オフラインフォールバックページ（/offline.tsx or /offline.html を用意）
-  fallbacks: {
-    document: '/offline',
-  },
+  // fallbacks: {
+  //   document: '/offline',
+  // },
 
   // 🧠 キャッシュルール（API / 画像 / 静的ファイルなど）
   runtimeCaching: [
