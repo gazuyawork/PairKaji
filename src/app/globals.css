@@ -148,11 +148,11 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;             /* ✅ ページ全体のスクロールを禁止 */
+  /* overflow: hidden;             ✅ ページ全体のスクロールを禁止 */
   overscroll-behavior: none;    /* ✅ バウンス防止 */
   touch-action: pan-y;          /* ✅ 縦スクロールのみ許可 */
   -webkit-overflow-scrolling: touch; /* ✅ iOSでの慣性スクロールサポート */
-  position: fixed;              /* ✅ iOSでの不意なバウンス対策（必要に応じて） */
+  /* position: fixed;              ✅ iOSでの不意なバウンス対策（必要に応じて） */
   width: 100%;                  /* ✅ 横スクロール防止のため */
 }
 
