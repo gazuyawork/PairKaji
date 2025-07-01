@@ -243,8 +243,8 @@ export const splitSharedTasksOnPairRemoval = async (
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-const rest = { ...original };
-delete (rest as any).users;
+const rest = { ...original } as Record<string, unknown>;
+delete rest.users;
 
 const myCopy: FirestoreTask = {
   ...rest,
@@ -273,8 +273,8 @@ const myCopy: FirestoreTask = {
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-const partnerRest = { ...original };
-delete (partnerRest as any).users;
+const partnerRest = { ...original } as Record<string, unknown>;
+delete partnerRest.users;
 
 const partnerCopy: FirestoreTask = {
   ...partnerRest,
