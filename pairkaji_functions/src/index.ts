@@ -4,6 +4,9 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 const db = admin.firestore();
 
+/**
+ * ペア解除時のタスク分割処理
+ */
 export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (event) => {
   const beforeData = event.data?.before?.data();
   const afterData = event.data?.after?.data();
@@ -16,15 +19,11 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
 
   if (!userAId || !userBId) return;
 
-  // 承認時の処理は削除済み
-
-  // 解除時の処理
   if (beforeStatus !== 'removed' && afterStatus === 'removed') {
     console.log('ペア解除に伴うタスク分割処理を開始します');
 
     const currentUserIds = afterData?.userIds || [];
 
-    // 対象タスクの取得: private: false かつ userIds に両者のどちらかを含む
     const tasksSnap = await db.collection('tasks')
       .where('private', '==', false)
       .where('userIds', 'array-contains-any', [userAId, userBId])
@@ -36,13 +35,9 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
     for (const doc of tasksSnap.docs) {
       const task = doc.data();
       const originalUserIds: string[] = task.userIds || [];
-
-      // 共有ではないタスクはスキップ
       if (originalUserIds.length <= 1) continue;
 
-      // 分割対象ユーザーだけにコピー
       for (const targetUserId of originalUserIds) {
-        // 解除済みのユーザーはスキップ（現在の userIds に含まれていない）
         if (!currentUserIds.includes(targetUserId)) continue;
 
         const newTaskRef = db.collection('tasks').doc();
@@ -56,11 +51,8 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
           },
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-
-          // ✅ 最後に必ず true で上書きする
           private: true,
         };
-
 
         batch.set(newTaskRef, newTask);
         opCount++;
@@ -72,7 +64,6 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
         }
       }
 
-      // 元のタスクは削除
       batch.delete(doc.ref);
       opCount++;
 
@@ -87,7 +78,6 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
       await batch.commit();
     }
 
-    // タスク分割状態をクライアント通知用に記録
     await Promise.all([
       db.collection('task_split_logs').doc(userAId).set({
         status: 'done',
@@ -100,5 +90,55 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
     ]);
 
     console.log('タスク分割処理が完了しました');
+  }
+});
+
+/**
+ * タスクがフラグされたときの通知処理
+ */
+export const onTaskFlagged = onDocumentUpdated('tasks/{taskId}', async (event) => {
+  const before = event.data?.before?.data();
+  const after = event.data?.after?.data();
+
+  if (!before || !after) return;
+
+  if (!before.flagged && after.flagged) {
+    const userId = after.userId;
+    const taskName = after.name;
+
+    // 自分の通知トークン取得
+    const userSnap = await db.collection('users').doc(userId).get();
+    const userToken = userSnap.get('fcmToken');
+
+    // ペア情報の取得
+    const pairSnap = await db.collection('pairs')
+      .where('userIds', 'array-contains', userId)
+      .where('status', '==', 'confirmed')
+      .get();
+
+    let partnerToken = null;
+    if (!pairSnap.empty) {
+      const pairData = pairSnap.docs[0].data();
+      const partnerId = pairData.userIds.find((id: string) => id !== userId);
+      if (partnerId) {
+        const partnerSnap = await db.collection('users').doc(partnerId).get();
+        partnerToken = partnerSnap.get('fcmToken');
+      }
+    }
+
+    const payload = {
+      notification: {
+        title: 'フラグ付きタスク',
+        body: `「${taskName}」がフラグされました。`,
+      },
+    };
+
+    const tokens = [userToken, partnerToken].filter(Boolean);
+    if (tokens.length > 0) {
+      await admin.messaging().sendToDevice(tokens as string[], payload);
+      console.log('📤 通知を送信しました:', tokens);
+    } else {
+      console.log('⚠️ 通知先のトークンが見つかりませんでした');
+    }
   }
 });
