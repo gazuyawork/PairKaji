@@ -16,26 +16,28 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user || typeof window === 'undefined' || !messaging) return;
 
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.warn('通知が許可されていません');
+        return;
+      }
+
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      if (!vapidKey) return;
+
       try {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          console.warn('通知の許可がありません');
-          return;
-        }
-
-        const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-        if (!vapidKey) {
-          console.error('VAPIDキーが未設定です');
-          return;
-        }
-
         const token = await getToken(messaging, { vapidKey });
-        if (token) {
-          await setDoc(doc(db, 'users', user.uid), { fcmToken: token }, { merge: true });
-          console.log('✅ FCMトークン保存成功:', token);
-        }
+        console.log('📲 FCMトークン:', token);
+
+        await setDoc(
+          doc(db, 'users', user.uid),
+          { fcmToken: token },
+          { merge: true }
+        );
+
+        console.log('✅ FirestoreにfcmToken保存完了');
       } catch (err) {
-        console.error('🔥 FCMトークン保存失敗:', err);
+        console.error('🔥 トークン取得エラー:', err);
       }
     });
 

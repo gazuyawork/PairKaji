@@ -136,7 +136,6 @@ export const removePair = async (pairId: string) => {
 
   try {
     await deleteDoc(ref);
-    console.log('✅ ペアドキュメントを削除しました:', pairId);
   } catch (err) {
     console.error('ペア削除失敗:', err);
     throw err;
@@ -503,9 +502,6 @@ export const updateTodoInTask = async (
 ) => {
   try {
     const { memo, price, quantity, unit } = updates;
-
-    console.log('🛠 updateTodoInTask called with:', { taskId, todoId, memo, price, quantity, unit });
-
     const taskRef = doc(db, 'tasks', taskId);
 
     // ✅ ここで最新の task データを再取得
@@ -549,8 +545,6 @@ export const updateTodoInTask = async (
     await updateDoc(taskRef, {
       todos: updatedTodos,
     });
-
-    console.log('✅ updateTodoInTask 成功');
   } catch (err) {
     console.error('🔥 updateTodoInTask エラー:', err);
     throw err;

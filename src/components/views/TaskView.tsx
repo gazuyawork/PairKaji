@@ -68,7 +68,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
-    console.log('✅ currentUserId from auth:', uid);
     if (uid) {
       setCurrentUserId(uid);
     }
@@ -275,10 +274,6 @@ const createEmptyTask = useCallback((): Task => {
         const rawTasks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
           mapFirestoreDocToTask(doc)
         );
-
-        console.log('✅ rawTasks:', rawTasks);
-
-
         const updates: Promise<void>[] = [];
         for (const task of rawTasks) {
           if (task.completedAt != null) {

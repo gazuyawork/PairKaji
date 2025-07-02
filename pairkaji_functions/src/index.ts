@@ -20,10 +20,7 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
   if (!userAId || !userBId) return;
 
   if (beforeStatus !== 'removed' && afterStatus === 'removed') {
-    console.log('ペア解除に伴うタスク分割処理を開始します');
-
     const currentUserIds = afterData?.userIds || [];
-
     const tasksSnap = await db.collection('tasks')
       .where('private', '==', false)
       .where('userIds', 'array-contains-any', [userAId, userBId])
@@ -97,20 +94,26 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
  * タスクがフラグされたときの通知処理
  */
 export const onTaskFlagged = onDocumentUpdated('tasks/{taskId}', async (event) => {
+  console.log('🚀 onTaskFlagged 発火');
+
   const before = event.data?.before?.data();
   const after = event.data?.after?.data();
 
-  if (!before || !after) return;
+  if (!before || !after) {
+    console.log('⚠️ before/after が取得できません');
+    return;
+  }
 
   if (!before.flagged && after.flagged) {
+    console.log('✅ flagged: false → true を検出');
+
     const userId = after.userId;
     const taskName = after.name;
 
-    // 自分の通知トークン取得
     const userSnap = await db.collection('users').doc(userId).get();
     const userToken = userSnap.get('fcmToken');
+    console.log('📲 userToken:', userToken);
 
-    // ペア情報の取得
     const pairSnap = await db.collection('pairs')
       .where('userIds', 'array-contains', userId)
       .where('status', '==', 'confirmed')
@@ -120,10 +123,9 @@ export const onTaskFlagged = onDocumentUpdated('tasks/{taskId}', async (event) =
     if (!pairSnap.empty) {
       const pairData = pairSnap.docs[0].data();
       const partnerId = pairData.userIds.find((id: string) => id !== userId);
-      if (partnerId) {
-        const partnerSnap = await db.collection('users').doc(partnerId).get();
-        partnerToken = partnerSnap.get('fcmToken');
-      }
+      const partnerSnap = await db.collection('users').doc(partnerId).get();
+      partnerToken = partnerSnap.get('fcmToken');
+      console.log('👥 partnerToken:', partnerToken);
     }
 
     const payload = {
@@ -134,11 +136,16 @@ export const onTaskFlagged = onDocumentUpdated('tasks/{taskId}', async (event) =
     };
 
     const tokens = [userToken, partnerToken].filter(Boolean);
+    console.log('📦 送信対象トークン一覧:', tokens);
+
     if (tokens.length > 0) {
       await admin.messaging().sendToDevice(tokens as string[], payload);
-      console.log('📤 通知を送信しました:', tokens);
+      console.log('📤 通知を送信しました');
     } else {
-      console.log('⚠️ 通知先のトークンが見つかりませんでした');
+      console.log('⚠️ 通知先トークンが見つかりません');
     }
+  } else {
+    console.log('🟡 flagged の変化は検出されませんでした');
   }
 });
+

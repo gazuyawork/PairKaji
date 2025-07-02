@@ -174,46 +174,44 @@ export default function ProfilePage() {
 
     const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid));
 
-const unsubscribe = onSnapshot(
-  q,
-  (snapshot) => {
-    if (!snapshot.empty) {
-      const pairDoc = snapshot.docs[0];
-      const pair = pairDoc.data() as Pair;
-      setInviteCode(pair.inviteCode);
-      setPartnerEmail(pair.emailB ?? '');
-      setPairDocId(pairDoc.id);
-      setIsPairConfirmed(pair.status === 'confirmed');
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const pairDoc = snapshot.docs[0];
+          const pair = pairDoc.data() as Pair;
+          setInviteCode(pair.inviteCode);
+          setPartnerEmail(pair.emailB ?? '');
+          setPairDocId(pairDoc.id);
+          setIsPairConfirmed(pair.status === 'confirmed');
 
-      if (pair.partnerImageUrl) {
-        setPartnerImage(pair.partnerImageUrl);
-        localStorage.setItem('partnerImage', pair.partnerImageUrl);
-      } else {
-        setPartnerImage(null); // 🔥 忘れずに null を代入
-        localStorage.removeItem('partnerImage');
+          if (pair.partnerImageUrl) {
+            setPartnerImage(pair.partnerImageUrl);
+            localStorage.setItem('partnerImage', pair.partnerImageUrl);
+          } else {
+            setPartnerImage(null); // 🔥 忘れずに null を代入
+            localStorage.removeItem('partnerImage');
+          }
+
+
+        } else {
+          setInviteCode('');
+          setPartnerEmail('');
+          setPairDocId(null);
+          setIsPairConfirmed(false);
+          setPartnerImage(null);
+          localStorage.removeItem('partnerImage');
+        }
+      },
+      (error) => {
+        handleFirestoreError(error);
       }
-
-
-    } else {
-      setInviteCode('');
-      setPartnerEmail('');
-      setPairDocId(null);
-      setIsPairConfirmed(false);
-      setPartnerImage(null);
-      localStorage.removeItem('partnerImage');
-    }
-  },
-  (error) => {
-    handleFirestoreError(error);
-  }
-);
-
+    );
 
     return () => {
       unsubscribe();
     };
   }, []);
-
 
   const handleSendInvite = async () => {
     const user = auth.currentUser;
@@ -226,22 +224,13 @@ const unsubscribe = onSnapshot(
     setInviteCode(generatedCode);
 
     try {
-      console.log('📨 createPairInvite を呼び出します', {
-        userId: user.uid,
-        email: partnerEmail.trim(),
-        inviteCode: generatedCode,
-      });
-
       const docRef = await createPairInvite(user.uid, partnerEmail.trim(), generatedCode);
-
-
       setPairDocId(docRef.id);
       toast.success('招待コードを発行しました');
     } catch (_err: unknown) {
       handleFirestoreError(_err);
     }
   };
-
 
   // パートナー承認時の処理
   const handleApprovePair = async () => {
@@ -334,56 +323,57 @@ const handleRemovePair = async () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16 fixed">
+    <div className="fixed flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
+
       <Header title="Profile" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
 
-        {isLoading ? (
-          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
-            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
-            <ProfileCard
-              profileImage={profileImage}
-              setProfileImage={setProfileImage} // ←追加
-              name={name}
-              setName={setName}
-              isGoogleUser={isGoogleUser}
-              onEditName={onEditNameHandler}
-              onEditEmail={onEditEmailHandler}
-              onEditPassword={onEditPasswordHandler}
-              email={email}
-              isLoading={isLoading}
-              nameUpdateStatus={nameUpdateStatus} 
-            />
-
-            <PartnerSettings
-              isLoading={isLoading}
-              isPairLoading={isPairLoading}
-              pendingApproval={pendingApproval}
-              isPairConfirmed={isPairConfirmed}
-              partnerEmail={partnerEmail}
-              partnerImage={partnerImage ?? '/images/default.png'}
-              inviteCode={inviteCode}
-              pairDocId={pairDocId}
-              onApprovePair={handleApprovePair}
-              onRejectPair={handleRejectPair}
-              onCancelInvite={handleCancelInvite}
-              onSendInvite={handleSendInvite}
-              onRemovePair={handleRemovePair}
-              onChangePartnerEmail={setPartnerEmail}
-              isRemoving={isRemoving} 
-            />
-          </>
+      {isLoading ? (
+        <div className="flex items-center justify-center w-full h-[60vh]">
+          <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          <ProfileCard
+            profileImage={profileImage}
+            setProfileImage={setProfileImage}
+            name={name}
+            setName={setName}
+            isGoogleUser={isGoogleUser}
+            onEditName={onEditNameHandler}
+            onEditEmail={onEditEmailHandler}
+            onEditPassword={onEditPasswordHandler}
+            email={email}
+            isLoading={isLoading}
+            nameUpdateStatus={nameUpdateStatus}
+          />
+          <PartnerSettings
+            isLoading={isLoading}
+            isPairLoading={isPairLoading}
+            pendingApproval={pendingApproval}
+            isPairConfirmed={isPairConfirmed}
+            partnerEmail={partnerEmail}
+            partnerImage={partnerImage ?? '/images/default.png'}
+            inviteCode={inviteCode}
+            pairDocId={pairDocId}
+            onApprovePair={handleApprovePair}
+            onRejectPair={handleRejectPair}
+            onCancelInvite={handleCancelInvite}
+            onSendInvite={handleSendInvite}
+            onRemovePair={handleRemovePair}
+            onChangePartnerEmail={setPartnerEmail}
+            isRemoving={isRemoving}
+          />
+        <div className="text-center mt-auto">
+          <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
+            アカウントを削除する
+          </Link>
+        </div>
+        </>
       )}
 
+
       </main>
-      <div className="text-center mt-auto mb-25">
-        <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
-          アカウントを削除する
-        </Link>
-      </div>
       <EmailEditModal
         open={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
