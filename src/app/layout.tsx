@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="ja"
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
-      <body className="font-sans bg-white text-gray-800 h-full antialiased">
+      <body className="font-sans bg-white text-gray-800 h-full antialiase overflow-hidden">
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
