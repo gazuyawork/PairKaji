@@ -86,16 +86,15 @@ export default function MainContent() {
   const currentTitle = titles[index] ?? 'タイトル未設定';
 
   return (
-    <div className="flex flex-col min-h-screen relative">
+    <div className="h-[calc(100dvh-150px)]">
       <Header title={currentTitle} />
       <main
         className={clsx(
-          'transition-opacity duration-500 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pt-16', // ← ✅ pt-16 追加
+          'transition-opacity duration-500 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pt-16 h-[calc(100dvh-150px)]',
           contentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
 
-        <div className="flex-1 overflow-hidden relative">
           <motion.div
             className="flex w-[300vw] h-full"
             initial={false}
@@ -106,13 +105,13 @@ export default function MainContent() {
               duration: 0.35,                 // ✅ 適度な速さ（必要に応じて調整）
             }}
           >
-            <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
+            <div className="w-screen flex-shrink-0 h-[calc(100dvh-150px)]">
               <HomeView />
             </div>
-            <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
+            <div className="w-screen flex-shrink-0 overflow-y-auto min-h-[calc(100dvh-120px)]">
               <TaskView initialSearch={searchKeyword} />
             </div>
-            <div className="w-screen flex-shrink-0 h-full overflow-y-auto">
+            <div className="w-screen flex-shrink-0 overflow-y-auto min-h-[calc(100dvh-120px)]">
               <TodoView />
             </div>
           </motion.div>
@@ -122,13 +121,12 @@ export default function MainContent() {
               onClick={() => {
                 window.dispatchEvent(new Event('open-new-task-modal'));
               }}
-              className="fixed bottom-24 right-6 w-14 h-14 rounded-full text-white text-3xl font-bold bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center z-[1000]"
+              className="fixed bottom-26 right-6 w-14 h-14 rounded-full text-white text-3xl font-bold bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center z-[1000]"
               aria-label="新規タスク追加"
             >
               ＋
             </button>
           )}
-        </div>
 
         <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
           <FooterNav currentIndex={index} setIndex={setIndex} />
