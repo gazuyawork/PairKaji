@@ -13,7 +13,7 @@ import {
   browserLocalPersistence,
 } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
-import { getMessaging, type Messaging } from 'firebase/messaging'; // ✅ 追加
+import { getMessaging, isSupported, type Messaging } from 'firebase/messaging'; // ✅
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -37,8 +37,10 @@ const db = initializeFirestore(app, {
 
 const storage = getStorage(app);
 
-// ✅ messaging はクライアントでのみ取得（SSR対策）
-const messaging: Messaging | undefined =
-  typeof window !== 'undefined' ? getMessaging(app) : undefined;
+// ✅ messaging を Promise<Messaging | null> として安全に扱う
+const messagingPromise: Promise<Messaging | null> =
+  typeof window !== 'undefined'
+    ? isSupported().then((supported) => (supported ? getMessaging(app) : null))
+    : Promise.resolve(null);
 
-export { auth, db, storage, app, messaging };
+export { auth, db, storage, app, messagingPromise as messaging };

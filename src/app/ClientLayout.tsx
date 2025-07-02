@@ -12,6 +12,21 @@ import { doc, setDoc } from 'firebase/firestore';
 import { getToken } from 'firebase/messaging';
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
+  // 🔔 Service Worker 登録
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker
+      .register('/firebase-messaging-sw.js')
+      .then((registration) => {
+        console.log('✅ Service Worker 登録成功:', registration);
+      })
+      .catch((err) => {
+        console.error('❌ Service Worker 登録失敗:', err);
+      });
+  }, []);
+
+  // 🔐 FCM トークン取得と Firestore 保存
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user || typeof window === 'undefined' || !messaging) return;
@@ -23,10 +38,19 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       }
 
       const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-      if (!vapidKey) return;
+      if (!vapidKey) {
+        console.warn('VAPIDキーが未設定です');
+        return;
+      }
 
       try {
-        const token = await getToken(messaging, { vapidKey });
+        const msg = await messaging; // ✅ Promise を解決して Messaging を取得
+        if (!msg) {
+          console.warn('このブラウザは FCM に対応していません');
+          return;
+        }
+
+        const token = await getToken(msg, { vapidKey });
         console.log('📲 FCMトークン:', token);
 
         await setDoc(
