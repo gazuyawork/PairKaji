@@ -71,9 +71,10 @@ export default function TaskCard({
   // const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
 
   const toggleFlag = async () => {
+    if (task.done) return; // ✅ 完了タスクなら何もしない
+
     try {
       const newFlag = !task.flagged;
-      // setIsFlagged(newFlag);
       setTimeout(() => {
         setShowActionButtons(false);
       }, 1000);
@@ -221,18 +222,20 @@ export default function TaskCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                toggleFlag(); // ✅ Firestoreへの保存処理を呼び出す
+                toggleFlag();
               }}
+              disabled={task.done} // ✅ 完了タスクならボタン無効化
               className={clsx(
-                'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150',
-                task.flagged
-                  ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
-                  : 'bg-gray-300 ring-1 ring-gray-300 text-white opacity-60'
+                'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white transition-all duration-150',
+                task.done
+                  ? 'bg-gray-300 opacity-30 cursor-not-allowed' // ✅ 完了状態用スタイル
+                  : task.flagged
+                    ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
+                    : 'bg-gray-300 ring-1 ring-gray-300 text-white opacity-60'
               )}
             >
               <Flag className="w-5 h-5" />
             </button>
-
 
             {/* 鍵ボタン（爽やかな黄緑） */}
             {/* <button
