@@ -38,7 +38,7 @@ export default function PairInviteCard({ mode }: Props) {
 
   return (
     <div
-      className="relative mx-auto w-full max-w-md bg-gradient-to-r from-[#fff4e5] to-[#fffaf1] border border-orange-200 py-10 pr-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-[1.01] cursor-pointer"
+      className="relative mx-auto w-full max-w-xl bg-gradient-to-r from-[#fff4e5] to-[#fffaf1] border border-orange-200 py-10 pr-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-[1.01] cursor-pointer"
       onClick={handleClick}
     >
       {mode === 'no-partner' && (

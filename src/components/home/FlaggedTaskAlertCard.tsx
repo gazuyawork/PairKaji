@@ -24,7 +24,7 @@ export default function FlaggedTaskAlertCard({ flaggedCount }: Props) {
       className="mb-3"
     >
       <div
-        className="relative bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 cursor-pointer hover:shadow-lg transition overflow-hidden"
+        className="relative mx-auto w-full max-w-xl bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 cursor-pointer hover:shadow-lg transition overflow-hidden"
         onClick={handleClick}
       >
         <div className="flex items-center gap-4">

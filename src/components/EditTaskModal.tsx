@@ -192,13 +192,13 @@ export default function EditTaskModal({
         {editedTask.period === '週次' && (
           <div className="flex items-center flex-wrap gap-y-2">
             <label className="w-20 text-gray-600 shrink-0">曜日：</label>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-3 flex-wrap">
               {['月', '火', '水', '木', '金', '土', '日'].map((day) => (
                 <button
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-6 h-6 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
+                  className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
                       ? 'bg-[#5E5E5E] text-white'
                       : 'bg-gray-200 text-gray-600'
                     }`}

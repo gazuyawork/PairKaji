@@ -388,7 +388,7 @@ const createEmptyTask = useCallback((): Task => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 mx-auto w-full max-w-xl">
               <div className="flex items-center pr-2 border-r border-gray-300">
                 <motion.button
                   onClick={() => setShowSearchBox(prev => !prev)}
@@ -418,19 +418,15 @@ const createEmptyTask = useCallback((): Task => {
                 </motion.button>
               </div>
 
-
-
-              
-
               {pairStatus === 'confirmed' && (
                 <div className="flex items-center pr-2 border-r border-gray-300">
                   <button
                     onClick={() => setPrivateFilter(prev => !prev)}
                     className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
-            ${privateFilter
+                      ${privateFilter
                         ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
                         : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
-                    title="プライベートタスク"
+                      title="プライベートタスク"
                   >
                     P
                   </button>
@@ -521,7 +517,7 @@ const createEmptyTask = useCallback((): Task => {
                   content = null;
                 } else {
                   content = (
-                    <>
+                    <div className="mx-auto w-full max-w-xl">
                       <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
                         {period}（残り {remaining} 件）
                       </h2>
@@ -549,7 +545,7 @@ const createEmptyTask = useCallback((): Task => {
                           />
                         ))}
                       </ul>
-                    </>
+                    </div>
                   );
                 }
 

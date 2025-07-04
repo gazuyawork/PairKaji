@@ -172,10 +172,10 @@ export default function WeeklyPoints() {
   }, []);
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-xl">
       {/* 🟧 ルーレット全画面表示 */}
       {rouletteEnabled && (showGoalButton || showRoulette) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center　">
           {/* 背景: 白半透明 + ぼかし */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -316,7 +316,7 @@ export default function WeeklyPoints() {
         rouletteEnabled={rouletteEnabled}
         setRouletteEnabled={setRouletteEnabled}
       />
-    </>
+    </div>
   );
 
 
