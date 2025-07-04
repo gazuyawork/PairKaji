@@ -105,6 +105,8 @@ export default function HomeView() {
     return () => unsubscribe();
   }, []);
 
+  const flaggedTasks = tasks.filter((task) => task.flagged === true);
+
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
       <main
@@ -144,7 +146,8 @@ export default function HomeView() {
 
           {/* ✅ フラグ付きタスク警告カード */}
             {!isLoading && flaggedCount > 0 && (
-            <FlaggedTaskAlertCard flaggedCount={flaggedCount} />
+            <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />
+
           )}
 
           {isLoading ? (

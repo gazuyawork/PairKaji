@@ -3,16 +3,42 @@
 import { Flag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { getViewedFlaggedTaskIds, markTaskAsViewed } from '@/utils/viewedTasks';
+import type { Task } from '@/types/Task';
 
 type Props = {
-  flaggedCount: number;
+  flaggedTasks?: Task[]; // フラグ付きの全タスクを受け取る
 };
 
-export default function FlaggedTaskAlertCard({ flaggedCount }: Props) {
+export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
   const router = useRouter();
+  const [isNew, setIsNew] = useState(false);
+
+  useEffect(() => {
+    const viewed = getViewedFlaggedTaskIds();
+
+    console.log('[🟡Debug] flaggedTasks:', flaggedTasks);
+    console.log('[🟡Debug] viewed IDs:', viewed);
+
+    const hasUnviewed = flaggedTasks.some(
+      (task) => task.flagged && !viewed.includes(task.id)
+    );
+
+    console.log('[🟢Debug] hasUnviewed:', hasUnviewed);
+    setIsNew(hasUnviewed);
+  }, [flaggedTasks]);
+
 
   const handleClick = () => {
-    const timestamp = new Date().getTime(); // 毎回変わる
+    flaggedTasks.forEach((task) => {
+      if (task.flagged) {
+        markTaskAsViewed(task.id);
+      }
+    });
+    setIsNew(false);
+
+    const timestamp = new Date().getTime();
     router.push(`/main?view=task&index=2&flagged=true&_t=${timestamp}`);
   };
 
@@ -21,8 +47,15 @@ export default function FlaggedTaskAlertCard({ flaggedCount }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="mb-3"
+      className="mb-3 relative"
     >
+      {/* ✅ バッジを最上部に表示 */}
+      {isNew && (
+        <div className="absolute top-0 left-0 z-50 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-br-xl shadow">
+          New
+        </div>
+      )}
+
       <div
         className="relative mx-auto w-full max-w-xl bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 cursor-pointer hover:shadow-lg transition overflow-hidden"
         onClick={handleClick}
@@ -31,11 +64,9 @@ export default function FlaggedTaskAlertCard({ flaggedCount }: Props) {
           <Flag className="text-red-500 w-6 h-6 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-base font-semibold text-[#5E5E5E]">
-              フラグ付きのタスクが {flaggedCount} 件あります
+              フラグ付きのタスクが {flaggedTasks.length ?? 0} 件あります
             </p>
-            <p className="text-sm text-gray-500">
-              タスク処理画面で確認しましょう
-            </p>
+            <p className="text-sm text-gray-500">タスク処理画面で確認しましょう</p>
           </div>
         </div>
       </div>
