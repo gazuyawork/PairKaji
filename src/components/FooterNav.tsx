@@ -39,7 +39,6 @@ export default function FooterNav({ currentIndex, setIndex }: Props) {
                     alt="Task Icon"
                     width={45}
                     height={45}
-　　　　　　　　　　　　　　className="mt-4"
                   />
                 )}
               </div>
