@@ -291,18 +291,19 @@ export default function WeeklyPoints() {
           {Math.round(animatedSelfPoints + animatedPartnerPoints)} / {maxPoints} pt
         </p>
 
-        {hasPartner && (
-          <div className="flex justify-center gap-4 mt-4 text-xs text-[#5E5E5E]">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-[#FFA552]" />
-              <span>あなた</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-[#FFD97A]" />
-              <span>パートナー</span>
-            </div>
-          </div>
-        )}
+{hasPartner && (
+  <div className="flex justify-center gap-4 mt-4 text-xs text-[#5E5E5E]">
+    <div className="flex items-center gap-1">
+      <div className="w-3 h-3 rounded-full bg-[#FFA552]" />
+      <span>あなた（{Math.round(animatedSelfPoints)}pt）</span>
+    </div>
+    <div className="flex items-center gap-1">
+      <div className="w-3 h-3 rounded-full bg-[#FFD97A]" />
+      <span>パートナー（{Math.round(animatedPartnerPoints)}pt）</span>
+    </div>
+  </div>
+)}
+
       </div>
 
       {/* 🟨 編集モーダル */}

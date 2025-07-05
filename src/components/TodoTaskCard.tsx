@@ -128,7 +128,7 @@ export default function TodoTaskCard({
         return newSet;
       });
       setIsAnimating(false);
-    }, 1000);
+    }, 300);
   };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
