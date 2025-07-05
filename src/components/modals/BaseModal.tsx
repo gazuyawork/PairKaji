@@ -14,6 +14,7 @@ type BaseModalProps = {
   saveLabel?: string;
   disableCloseAnimation?: boolean;
   onCompleteAnimation?: () => void;
+  saveDisabled?: boolean; 
 };
 
 export default function BaseModal({
@@ -25,6 +26,7 @@ export default function BaseModal({
   children,
   saveLabel = '保存',
   onCompleteAnimation,
+  saveDisabled,
 }: BaseModalProps) {
   // ✅ 完了マーク表示後に onCompleteAnimation を呼び出すための遅延実行
   useEffect(() => {
@@ -74,11 +76,16 @@ export default function BaseModal({
           <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
             <button
               onClick={onSaveClick}
-              className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
-              disabled={isSaving || saveComplete}
+              className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
+                ${saveDisabled || isSaving || saveComplete
+                  ? 'bg-gray-300 text-white cursor-not-allowed'
+                  : 'bg-[#FFCB7D] text-white'}
+              `}
+              disabled={isSaving || saveComplete || saveDisabled}
             >
               {saveLabel}
             </button>
+
             <button
               onClick={onClose}
               className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"

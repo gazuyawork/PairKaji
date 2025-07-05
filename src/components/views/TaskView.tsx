@@ -368,6 +368,7 @@ const createEmptyTask = useCallback((): Task => {
           onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
           users={userList}
           isPairConfirmed={pairStatus === 'confirmed'}
+          existingTasks={Object.values(tasksState).flat()} 
         />
       )}
 

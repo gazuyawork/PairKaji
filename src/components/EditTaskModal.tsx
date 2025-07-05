@@ -20,6 +20,7 @@ type Props = {
   onSave: (updated: Task) => void;
   users: UserInfo[];
   isPairConfirmed: boolean;
+  existingTasks: Task[];
 };
 
 export default function EditTaskModal({
@@ -29,6 +30,7 @@ export default function EditTaskModal({
   onSave,
   users,
   isPairConfirmed,
+  existingTasks, 
 }: Props) {
   const [editedTask, setEditedTask] = useState<Task | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,6 +41,8 @@ export default function EditTaskModal({
   const saveRequestIdRef = useRef<number>(0);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldClose, setShouldClose] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null); // 🔸追加
+
 
   useEffect(() => {
     if (shouldClose) {
@@ -105,6 +109,15 @@ export default function EditTaskModal({
   const handleSave = () => {
     if (!editedTask) return;
 
+    // 🔸 タスク名の重複チェック（IDが異なる同名タスクが存在する場合）
+    const isDuplicate = existingTasks.some(
+      (t) => t.name === editedTask.name && t.id !== editedTask.id
+    );
+    if (isDuplicate) {
+      setNameError('すでに登録済みです。');
+      return; // 🔸 重複があれば保存処理を中断
+    }
+
     const transformed = {
       ...editedTask,
       daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
@@ -132,6 +145,7 @@ export default function EditTaskModal({
     }, 300);
   };
 
+
   if (!mounted || !isOpen || !editedTask) return null;
 
   return createPortal(
@@ -142,20 +156,38 @@ export default function EditTaskModal({
       onClose={onClose}
       onSaveClick={handleSave}
       disableCloseAnimation={true}
+      saveDisabled={!!nameError}
     >
       <div className="space-y-6">
 
         {/* 🏷 家事名入力 */}
-        <div className="flex items-center">
-          <label className="w-20 text-gray-600 shrink-0">家事名：</label>
-          <input
-            ref={nameInputRef}
-            type="text"
-            value={editedTask.name}
-            onChange={(e) => update('name', e.target.value)}
-            className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
-          />
+        <div className="mb-4">
+          <div className="flex items-center mb-0">
+            <label className="w-20 text-gray-600 shrink-0">家事名：</label>
+            <input
+              ref={nameInputRef}
+              type="text"
+              value={editedTask.name}
+              onChange={(e) => {
+                const newName = e.target.value;
+                update('name', newName);
+
+                // 🔸 重複チェック
+                const isDuplicate = existingTasks.some(
+                  (t) => t.name === newName && t.id !== editedTask.id
+                );
+                setNameError(isDuplicate ? 'すでに登録済みです。' : null);
+              }}
+              className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
+            />
+          </div>
+
+          {/* 🔻 エラーメッセージは下に */}
+          {nameError && (
+            <p className="text-xs text-red-500 ml-20 mt-1">{nameError}</p>
+          )}
         </div>
+
 
         {/* 🗓 頻度選択 */}
         <div className="flex items-center">
