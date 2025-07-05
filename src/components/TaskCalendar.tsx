@@ -1,8 +1,8 @@
 'use client';
 
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { useRef } from 'react';
 import { dayNumberToName } from '@/lib/constants';
+import { useRef, useState } from 'react'; // 追加
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -18,6 +18,7 @@ type Props = {
 };
 
 export default function TaskCalendar({ tasks }: Props) {
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const today = new Date();
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -66,10 +67,18 @@ export default function TaskCalendar({ tasks }: Props) {
             const hasTask = dailyTasks.length > 0;
             const bgColor = hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]';
 
+            const isExpanded = selectedDate && isSameDay(day, selectedDate);
+
             return (
               <div
                 key={idx}
                 className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor}`}
+               onClick={() =>
+                  isSameDay(selectedDate ?? new Date(0), day)
+                    ? setSelectedDate(null) // 同じ日ならトグルで閉じる
+                    : setSelectedDate(day)  // 違う日なら新たに展開
+                }
+
               >
 
 
@@ -93,7 +102,8 @@ export default function TaskCalendar({ tasks }: Props) {
                     return (
                       <div
                         key={i}
-                        className={`mt-1 text-[10px] rounded px-1.5 py-[3px] truncate font-semibold border border-white/30 
+                        className={`mt-1 text-[10px] rounded px-1.5 py-[3px] font-semibold border border-white/30
+                        ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
                         ${isWeeklyTask
                             ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
                             : isDateTask
@@ -104,6 +114,7 @@ export default function TaskCalendar({ tasks }: Props) {
                         {task.name}
                       </div>
                     );
+
                   })
                 ) : (
                   <div className="text-[10px] text-gray-400 mt-2">予定なし</div>
