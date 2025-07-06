@@ -46,7 +46,7 @@ export default function BaseModal({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="bg-white w-full max-w-md p-6 pt-8 rounded-xl shadow-lg relative border border-gray-300 max-h-[95vh] overflow-y-auto"
+        className="bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg relative border border-gray-300 max-h-[95vh] overflow-y-auto"
       >
         {(isSaving || saveComplete) && (
           <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">

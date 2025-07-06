@@ -125,23 +125,22 @@ export default function FilterControls({
             return (
               <React.Fragment key={user.id + personClickKey}>
                 <div className="w-px h-6 bg-gray-300 self-center mx-1" />
-                <motion.button
-                  onClick={() => {
-                    setPersonClickKey(prev => prev + 1);
-                    onTogglePerson(user.id);
-                  }}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 10 }}
-                  className={`w-10 h-10 rounded-full overflow-hidden border ${isSelected ? 'border-[#FFCB7D]' : 'border-gray-300'}`}
-                >
-                  <Image
-                    src={user.image || '/images/default.png'}
-                    alt={`${user.name}のフィルター`}
-                    width={40}
-                    height={40}
-                    className={`object-cover transition-opacity duration-300 ${isSelected ? 'opacity-100' : 'opacity-30'}`}
-                  />
-                </motion.button>
+                  <motion.button
+                    onClick={() => {
+                      setPersonClickKey(prev => prev + 1);
+                      onTogglePerson(user.id);
+                    }}
+                    whileTap={{ scale: 1.2 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+                    className={`w-10 h-10 rounded-full overflow-hidden border relative ${isSelected ? 'border-[#FFCB7D]' : 'border-gray-300'}`}
+                  >
+                    <Image
+                      src={user.image || '/images/default.png'}
+                      alt={`${user.name}のフィルター`}
+                      fill
+                      className={`object-cover object-center transition-opacity duration-300 ${isSelected ? 'opacity-100' : 'opacity-30'}`}
+                    />
+                  </motion.button>
               </React.Fragment>
             );
           })}

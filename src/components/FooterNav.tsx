@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Home, ListTodo } from 'lucide-react';
+import { Home, ListTodo, BookOpenCheck  } from 'lucide-react';
 
 type Props = {
   currentIndex: number;
@@ -11,7 +11,7 @@ type Props = {
 export default function FooterNav({ currentIndex, setIndex }: Props) {
   const navItems = [
     { name: 'Home', icon: Home },
-    { name: 'Task', icon: null }, // 中央アイコンは画像
+    { name: 'Task', icon: BookOpenCheck  }, // 中央アイコンは画像
     { name: 'Todo', icon: ListTodo },
   ];
 
@@ -27,21 +27,10 @@ export default function FooterNav({ currentIndex, setIndex }: Props) {
               onClick={() => setIndex(index)}
               className="relative flex flex-col items-center cursor-pointer"
             >
-              <div className="flex items-center justify-center">
-                {item.icon ? (
-                  <item.icon
-                    size={30}
-                    className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'}
-                  />
-                ) : (
-                  <Image
-                    src={isActive ? '/icons/task_on.png' : '/icons/task_off.png'}
-                    alt="Task Icon"
-                    width={45}
-                    height={45}
-                  />
-                )}
-              </div>
+              <item.icon
+                size={30}
+                className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'}
+              />
               <span
                 className={`mt-0 text-xs ${
                   isActive ? 'text-[#FFCB7D] font-semibold' : 'text-[#5E5E5E]'
