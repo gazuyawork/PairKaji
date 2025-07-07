@@ -110,13 +110,18 @@ export default function EditTaskModal({
     if (!editedTask) return;
 
     // 🔸 タスク名の重複チェック（IDが異なる同名タスクが存在する場合）
-    const isDuplicate = existingTasks.some(
-      (t) => t.name === editedTask.name && t.id !== editedTask.id
-    );
-    if (isDuplicate) {
-      setNameError('すでに登録済みです。');
-      return; // 🔸 重複があれば保存処理を中断
+    const isNewTask = !task.id; // IDが空なら新規とみなす
+
+    if (isNewTask) {
+      const isDuplicate = existingTasks.some(
+        (t) => t.name === editedTask.name && t.id !== editedTask.id
+      );
+      if (isDuplicate) {
+        setNameError('すでに登録済みです。');
+        return;
+      }
     }
+
 
     const transformed = {
       ...editedTask,
@@ -172,10 +177,10 @@ export default function EditTaskModal({
                 const newName = e.target.value;
                 update('name', newName);
 
-                // 🔸 重複チェック
-                const isDuplicate = existingTasks.some(
-                  (t) => t.name === newName && t.id !== editedTask.id
-                );
+                const isNewTask = !task.id;
+                const isDuplicate = isNewTask
+                  ? existingTasks.some((t) => t.name === newName)
+                  : false;
                 setNameError(isDuplicate ? 'すでに登録済みです。' : null);
               }}
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
