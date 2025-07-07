@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { Home, ListTodo, BookOpenCheck  } from 'lucide-react';
 
 type Props = {
