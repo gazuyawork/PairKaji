@@ -385,7 +385,8 @@ export default function TaskCard({
               alt={`${profileName}のアイコン`}
               width={38}
               height={38}
-              className="rounded-full border border-gray-300 object-cover aspect-square"
+              className="rounded-full border border-gray-300 object-cover aspect-square select-none touch-none"
+              draggable={false}
             />
           )}
         </div>
