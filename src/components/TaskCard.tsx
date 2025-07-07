@@ -63,15 +63,27 @@ export default function TaskCard({
   const assignedUserId = task.users?.[0];
   const assignedUser = userList.find(u => u.id === assignedUserId);
   const profileImage = assignedUser?.imageUrl ?? '/images/default.png';
-  const profileName = assignedUser?.name ?? '未設定';
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const profileName = assignedUser?.name ?? '未設定';  
   const [showActions, setShowActions] = useState(false);
-  const [showActionButtons, setShowActionButtons] = useState(true); // ✅ 3ボタン表示制御
+  const [showActionButtons, setShowActionButtons] = useState(true); // 3ボタン表示制御
   // const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!showActions) return;
+
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX);
+    const dy = Math.abs(touch.clientY);
+
+    // 一定以上スライド（＝スクロール）されたら非表示にする
+    if (dx > 10 || dy > 10) {
+      setShowActions(false);
+    }
+  };
+
+
   const toggleFlag = async () => {
-    if (task.done) return; // ✅ 完了タスクなら何もしない
+    if (task.done) return; // 完了タスクなら何もしない
 
     try {
       const newFlag = !task.flagged;
@@ -89,35 +101,15 @@ export default function TaskCard({
     }
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-
-    const timer = setTimeout(() => {
-      setShowActions(true);
-      setShowActionButtons(true);
-    }, 600);
-    setLongPressTimer(timer);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    const dx = Math.abs(touch.clientX - touchStartPos.current.x);
-    const dy = Math.abs(touch.clientY - touchStartPos.current.y);
-    if (dx > 10 || dy > 10) {
-      if (longPressTimer) clearTimeout(longPressTimer);
-      setLongPressTimer(null);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimer) clearTimeout(longPressTimer);
-    setLongPressTimer(null);
-  };
-
   const swipeable = useSwipeable({
-    onSwipedLeft: () => setSwipeDirection('left'),
-    onSwipedRight: () => setSwipeDirection('right'),
+    onSwipedLeft: () => {
+      setSwipeDirection('left');
+      setShowActions(false); // 🔧 スワイプ時にメニューを非表示
+    },
+    onSwipedRight: () => {
+      setSwipeDirection('right');
+      setShowActions(false); // 🔧 スワイプ時にメニューを非表示
+    },
     trackTouch: true,
   });
 
@@ -135,9 +127,6 @@ export default function TaskCard({
   const handleClick = () => {
     if (showActions) return; // アクション表示中は処理しない
     if (task.done) {
-      // const confirmed = window.confirm('このタスクを未処理に戻しますか？');
-      // if (!confirmed) return;
-    // } else {
       setAnimateTrigger(prev => prev + 1);
     }
     onToggleDone(period, task.id);
@@ -198,7 +187,7 @@ export default function TaskCard({
 
 
 
-      {/* ✅ 長押しメニュー表示 */}
+      {/* 長押しメニュー表示 */}
       {showActions && showActionButtons && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
@@ -224,11 +213,11 @@ export default function TaskCard({
                 e.stopPropagation();
                 toggleFlag();
               }}
-              disabled={task.done} // ✅ 完了タスクならボタン無効化
+              disabled={task.done} // 完了タスクならボタン無効化
               className={clsx(
                 'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white transition-all duration-150',
                 task.done
-                  ? 'bg-gray-300 opacity-30 cursor-not-allowed' // ✅ 完了状態用スタイル
+                  ? 'bg-gray-300 opacity-30 cursor-not-allowed' // 完了状態用スタイル
                   : task.flagged
                     ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
                     : 'bg-gray-300 ring-1 ring-gray-300 text-white opacity-60'
@@ -236,51 +225,26 @@ export default function TaskCard({
             >
               <Flag className="w-5 h-5" />
             </button>
-
-            {/* 鍵ボタン（爽やかな黄緑） */}
-            {/* <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setTimeout(() => {
-                  setShowActionButtons(false);
-                }, 1000);
-                alert('鍵機能は未実装');
-              }}
-              className="w-12 h-12 rounded-full 
-                  bg-gradient-to-b from-yellow-300 to-yellow-500 
-                  shadow ring-1 ring-yellow-300 ring-offset-1 
-                  flex items-center justify-center 
-                  text-white active:translate-y-0.5 
-                  transition-all duration-150"
-            >
-              <Lock className="w-5 h-5" />
-            </button> */}
-
           </div>
         </div>
       )}
 
       <motion.div
         {...swipeable}
-        // onClick={handleClick}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onContextMenu={(e) => {
-          e.preventDefault();
+        onClick={() => {
           setShowActions(true);
           setShowActionButtons(true);
         }}
+        onTouchMove={handleTouchMove}
         className={clsx(
           'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
-          // highlighted ? 'border-blue-400 bg-blue-50' : 'border-[#e5e5e5] bg-white'
           'border-[#e5e5e5] bg-white'
         )}
       >
 
-        {/* 🔷 TODOバッジ（左上） */}
+        {/* TODOバッジ（左上） */}
         {task.visible && (
           <div
             className="absolute top-0 left-0 w-[30px] h-[30px] bg-gradient-to-br from-blue-400 to-blue-600 text-white text-[11px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
@@ -291,7 +255,7 @@ export default function TaskCard({
 
         )}
 
-        {/* 🔶 Privateバッジ（右上） */}
+        {/* Privateバッジ（右上） */}
         {task.private && (
           <div
             className="absolute top-0 right-0 w-[30px] h-[30px] bg-gradient-to-bl bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
@@ -310,7 +274,7 @@ export default function TaskCard({
             className="focus:outline-none"
           >
             <div className="relative w-6 h-6">
-              {/* ✅ チェック済みアイコン（回転アニメーション） */}
+              {/* チェック済みアイコン（回転アニメーション） */}
               {task.done && (
                 <motion.div
                   key={animateTrigger}
@@ -323,7 +287,7 @@ export default function TaskCard({
                 </motion.div>
               )}
 
-              {/* ✅ 未チェックアイコン（常時表示） */}
+              {/* 未チェックアイコン（常時表示） */}
               {!task.done && (
                 <Circle className="text-gray-400 w-6 h-6" />
               )}
@@ -331,7 +295,7 @@ export default function TaskCard({
           </button>
 
 
-          {/* ✅ フラグが ON のときだけ表示 */}
+          {/* フラグが ON のときだけ表示 */}
           {task.flagged && (
             <Flag className="text-red-500 w-6 h-6 ml-0" />
           )}
