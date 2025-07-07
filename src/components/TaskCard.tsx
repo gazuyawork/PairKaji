@@ -68,20 +68,6 @@ export default function TaskCard({
   const [showActionButtons, setShowActionButtons] = useState(true); // 3ボタン表示制御
   // const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!showActions) return;
-
-    const touch = e.touches[0];
-    const dx = Math.abs(touch.clientX);
-    const dy = Math.abs(touch.clientY);
-
-    // 一定以上スライド（＝スクロール）されたら非表示にする
-    if (dx > 10 || dy > 10) {
-      setShowActions(false);
-    }
-  };
-
-
   const toggleFlag = async () => {
     if (task.done) return; // 完了タスクなら何もしない
 
@@ -102,14 +88,8 @@ export default function TaskCard({
   };
 
   const swipeable = useSwipeable({
-    onSwipedLeft: () => {
-      setSwipeDirection('left');
-      setShowActions(false); // 🔧 スワイプ時にメニューを非表示
-    },
-    onSwipedRight: () => {
-      setSwipeDirection('right');
-      setShowActions(false); // 🔧 スワイプ時にメニューを非表示
-    },
+    onSwipedLeft: () => setSwipeDirection('left'),
+    onSwipedRight: () => setSwipeDirection('right'),
     trackTouch: true,
   });
 
@@ -235,7 +215,6 @@ export default function TaskCard({
           setShowActions(true);
           setShowActionButtons(true);
         }}
-        onTouchMove={handleTouchMove}
         className={clsx(
           'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
