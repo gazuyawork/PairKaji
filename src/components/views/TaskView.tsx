@@ -357,6 +357,14 @@ const createEmptyTask = useCallback((): Task => {
   }, [editTargetTask, onModalOpenChange]);
 
 
+  // const getTimestampValue = (value: any): number => {
+  //   if (!value) return 0;
+  //   if (value instanceof Date) return value.getTime();
+  //   if (typeof value === 'string') return new Date(value).getTime();
+  //   if (typeof value.toDate === 'function') return value.toDate().getTime();
+  //   return 0;
+  // };
+
   return (
     <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
       {editTargetTask && (
@@ -523,28 +531,51 @@ const createEmptyTask = useCallback((): Task => {
                         {period}（残り {remaining} 件）
                       </h2>
                       <ul className="space-y-2">
-                        {list.map((task, idx) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            period={period}
-                            index={idx}
-                            onToggleDone={toggleDone}
-                            onDelete={deleteTask}
-                            onEdit={() =>
-                              setEditTargetTask({
-                                ...task,
-                                period: task.period,
-                                daysOfWeek: task.daysOfWeek ?? [],
-                                dates: task.dates ?? [],
-                                isTodo: task.isTodo ?? false,
-                              })
-                            }
-                            userList={userList}
-                            isPairConfirmed={pairStatus === 'confirmed'}
-                            onLongPress={(x, y) => setLongPressPosition({ x, y })}
-                          />
-                        ))}
+                        {list
+                          .slice() // 元配列の破壊防止
+.sort((a, b) => {
+  const getTimestampValue = (value: any): number => {
+    if (!value) return 0;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === 'string') return new Date(value).getTime();
+    if (typeof value.toDate === 'function') return value.toDate().getTime(); // Firestore Timestamp 型
+    return 0;
+  };
+
+  const aTime = getTimestampValue(a.createdAt);
+  const bTime = getTimestampValue(b.createdAt);
+
+  console.log('🔍 createdAt 比較:', {
+    a: { id: a.id, createdAt: a.createdAt, time: aTime },
+    b: { id: b.id, createdAt: b.createdAt, time: bTime },
+  });
+
+  return bTime - aTime;
+})
+
+
+                          .map((task, idx) => (
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              period={period}
+                              index={idx}
+                              onToggleDone={toggleDone}
+                              onDelete={deleteTask}
+                              onEdit={() =>
+                                setEditTargetTask({
+                                  ...task,
+                                  period: task.period,
+                                  daysOfWeek: task.daysOfWeek ?? [],
+                                  dates: task.dates ?? [],
+                                  isTodo: task.isTodo ?? false,
+                                })
+                              }
+                              userList={userList}
+                              isPairConfirmed={pairStatus === 'confirmed'}
+                              onLongPress={(x, y) => setLongPressPosition({ x, y })}
+                            />
+                          ))}
                       </ul>
                     </div>
                   );

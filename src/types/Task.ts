@@ -52,6 +52,7 @@ export type Task = {
   todos?: unknown[];
   private: boolean;
   flagged?: boolean;
+  createdAt?: Date | Timestamp | string | null;
 };
 
 
