@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useSwipeable } from 'react-swipeable';
 import { auth } from '@/lib/firebase';
 import FooterNav from '@/components/FooterNav';
 import HomeView from '@/components/views/HomeView';
@@ -58,25 +57,6 @@ export default function MainContent() {
     }
   }, [searchParams]);
 
-  const handleSwipe = (direction: 'left' | 'right') => {
-    if (direction === 'left' && index < 2) setIndex(index + 1);
-    else if (direction === 'right' && index > 0) setIndex(index - 1);
-  };
-
-  const swipeHandlers = useSwipeable({
-    onSwiped: (e) => {
-      if (e.event && e.event.target instanceof HTMLElement) {
-        const targetElement = e.event.target as HTMLElement;
-        if (!targetElement.closest('.swipe-area')) return;
-      }
-      if (e.dir === 'Left') handleSwipe('left');
-      else if (e.dir === 'Right') handleSwipe('right');
-    },
-    delta: 50,
-    trackTouch: true,
-    trackMouse: true,
-  });
-
   if (!authReady || showQuickSplash) {
     return <QuickSplash />;
   }
@@ -126,7 +106,7 @@ export default function MainContent() {
           </button>
         )}
 
-        <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
+        <div className="border-t border-gray-200">
           <FooterNav currentIndex={index} setIndex={setIndex} />
         </div>
       </main>
