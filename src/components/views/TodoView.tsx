@@ -212,7 +212,7 @@ export default function TodoView() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
+    <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] select-none overflow-hidden">
       {/* ✅ indexが2（TodoView）である場合のみ表示 */}
       {index === 2 && noteModalTask && noteModalTodo && (
         <TodoNoteModal
