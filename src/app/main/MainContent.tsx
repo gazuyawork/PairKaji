@@ -73,6 +73,7 @@ export default function MainContent() {
           contentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
+
         <motion.div
           className="flex w-[300vw] h-full"
           initial={false}
@@ -83,13 +84,13 @@ export default function MainContent() {
             duration: 0.35,
           }}
         >
-          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+          <div className="w-screen h-screen overflow-y-auto">
             <HomeView />
           </div>
-          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+          <div className="w-screen h-screen overflow-y-auto">
             <TaskView initialSearch={searchKeyword} />
           </div>
-          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+          <div className="w-screen h-screen overflow-y-auto">
             <TodoView />
           </div>
         </motion.div>

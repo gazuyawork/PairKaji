@@ -224,7 +224,6 @@ export default function TodoView() {
         />
       )}
 
-      {/* <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-50 mx-auto w-full max-w-xl"> */}
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-0 mx-auto w-full max-w-xl">
         <div className="flex gap-2 items-start">
           <div className="relative flex-1">
