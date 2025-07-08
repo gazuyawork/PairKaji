@@ -212,8 +212,10 @@ export default function TodoView() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] select-none overflow-x-hidden">
+    <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
 
+      <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20 pb-50">
+      
       {/* ✅ indexが2（TodoView）である場合のみ表示 */}
       {index === 2 && noteModalTask && noteModalTodo && (
         <TodoNoteModal
@@ -225,7 +227,6 @@ export default function TodoView() {
         />
       )}
 
-      <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-60 mx-auto w-full max-w-xl">
         <div className="flex gap-2 items-start">
           <div className="relative flex-1">
             <div className="relative">
