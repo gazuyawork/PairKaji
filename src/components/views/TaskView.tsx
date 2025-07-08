@@ -122,29 +122,27 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     { id: partnerUserId ?? '', name: 'パートナー', imageUrl: partnerImage },
   ];
 
-const createEmptyTask = useCallback((): Task => {
-  return {
-    id: '',
-    name: '',
-    title: '',
-    point: 5,
-    period: '毎日',
-    dates: [],
-    daysOfWeek: [],
-    isTodo: false,
-    userId: currentUserId ?? '',
-    users: [currentUserId ?? ''],
-    userIds: [],
-    done: false,
-    skipped: false,
-    visible: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    todos: [],
-  } as unknown as Task;
-}, [currentUserId]);
-
-
+  const createEmptyTask = useCallback((): Task => {
+    return {
+      id: '',
+      name: '',
+      title: '',
+      point: 5,
+      period: '毎日',
+      dates: [],
+      daysOfWeek: [],
+      isTodo: false,
+      userId: currentUserId ?? '',
+      users: [currentUserId ?? ''],
+      userIds: [],
+      done: false,
+      skipped: false,
+      visible: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      todos: [],
+    } as unknown as Task;
+  }, [currentUserId]);
 
   useEffect(() => {
     const handleOpenModal = () => {
@@ -154,8 +152,6 @@ const createEmptyTask = useCallback((): Task => {
     window.addEventListener('open-new-task-modal', handleOpenModal);
     return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
   }, [createEmptyTask]);
-
-
 
   useEffect(() => {
     const fetchPairStatus = async () => {
@@ -377,11 +373,11 @@ const createEmptyTask = useCallback((): Task => {
           onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
           users={userList}
           isPairConfirmed={pairStatus === 'confirmed'}
-          existingTasks={Object.values(tasksState).flat()} 
+          existingTasks={Object.values(tasksState).flat()}
         />
       )}
 
-      <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-60">
+      <main className="main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-60">
         {isLoading ? (
           <div className="flex items-center justify-center text-gray-400 text-sm h-200">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -392,98 +388,102 @@ const createEmptyTask = useCallback((): Task => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
           >
-            {showSearchBox && (
-              <div className="mb-4">
-                <SearchBox value={searchTerm} onChange={setSearchTerm} />
-              </div>
-            )}
+            <div className="sticky top-0 bg-transparent mb-2 z-999">
+              <div className="w-full max-w-xl m-auto p-2 backdrop-blur-md rounded-lg">
+                {showSearchBox && (
+                  <div className="mb-3">
+                    <SearchBox value={searchTerm} onChange={setSearchTerm} />
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
 
-            <div className="flex items-center gap-2 mb-2 mx-auto w-full max-w-xl">
-              <div className="flex items-center pr-2 border-r border-gray-300">
-                <motion.button
-                  onClick={() => setShowSearchBox(prev => !prev)}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 12 }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
-                    ${showSearchBox
-                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                      : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}
-                    `}
-                  title="検索"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  <div className="flex items-center pr-2 border-r border-gray-300">
+                    <motion.button
+                      onClick={() => setShowSearchBox(prev => !prev)}
+                      whileTap={{ scale: 1.2 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
+                          ${showSearchBox
+                          ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
+                          : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}
+                          `}
+                      title="検索"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    </motion.button>
+                  </div>
+
+                  {pairStatus === 'confirmed' && (
+                    <div className="flex items-center pr-2 border-r border-gray-300">
+                      <button
+                        onClick={() => setPrivateFilter(prev => !prev)}
+                        className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
+                            ${privateFilter
+                            ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
+                            : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
+                        title="プライベートタスク"
+                      >
+                        P
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex overflow-x-auto no-scrollbar space-x-2">
+                    <FilterControls
+                      periodFilter={periodFilter}
+                      personFilter={personFilter}
+                      onTogglePeriod={togglePeriod}
+                      onTogglePerson={togglePerson}
+                      searchTerm={searchTerm}
+                      onClearSearch={() => setSearchTerm('')}
+                      pairStatus={pairStatus}
+                      todayFilter={todayFilter}
+                      onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
+                      privateFilter={privateFilter}
+                      onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
+                      flaggedFilter={flaggedFilter}
+                      onToggleFlaggedFilter={() => setFlaggedFilter(prev => !prev)}
                     />
-                  </svg>
-                </motion.button>
-              </div>
+                  </div>
 
-              {pairStatus === 'confirmed' && (
-                <div className="flex items-center pr-2 border-r border-gray-300">
-                  <button
-                    onClick={() => setPrivateFilter(prev => !prev)}
-                    className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
-                      ${privateFilter
-                        ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
-                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'}`}
-                      title="プライベートタスク"
-                  >
-                    P
-                  </button>
+                  {(periodFilter || personFilter || todayFilter || privateFilter || showSearchBox || flaggedFilter || searchTerm) && (
+                    <motion.button
+                      onClick={() => {
+                        setPeriodFilter(null);
+                        setPersonFilter(null);
+                        handleClearSearch?.();
+                        setTodayFilter(false);
+                        setPrivateFilter(false);
+                        setShowSearchBox(false);       // ✅ 追加
+                        setFlaggedFilter(false);       // ✅ 追加
+                      }}
+                      whileTap={{ scale: 1.2 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                      className={`w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
+                          bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner`}
+                      title="すべてのフィルターを解除"
+                    >
+                      <X className="w-5 h-5" />
+                    </motion.button>
+                  )}
                 </div>
-              )}
-
-              <div className="flex overflow-x-auto no-scrollbar space-x-2">
-                <FilterControls
-                  periodFilter={periodFilter}
-                  personFilter={personFilter}
-                  onTogglePeriod={togglePeriod}
-                  onTogglePerson={togglePerson}
-                  searchTerm={searchTerm}
-                  onClearSearch={() => setSearchTerm('')}
-                  pairStatus={pairStatus}
-                  todayFilter={todayFilter}
-                  onToggleTodayFilter={() => setTodayFilter(prev => !prev)}
-                  privateFilter={privateFilter}
-                  onTogglePrivateFilter={() => setPrivateFilter(prev => !prev)}
-                  flaggedFilter={flaggedFilter}
-                  onToggleFlaggedFilter={() => setFlaggedFilter(prev => !prev)}
-                />
               </div>
-
-              {(periodFilter || personFilter || todayFilter || privateFilter || showSearchBox || flaggedFilter || searchTerm) && (
-                <motion.button
-                  onClick={() => {
-                    setPeriodFilter(null);
-                    setPersonFilter(null);
-                    handleClearSearch?.();
-                    setTodayFilter(false);
-                    setPrivateFilter(false);
-                    setShowSearchBox(false);       // ✅ 追加
-                    setFlaggedFilter(false);       // ✅ 追加
-                  }}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                  className={`w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center transition-all duration-300
-                    bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner`}
-                  title="すべてのフィルターを解除"
-                >
-                  <X className="w-5 h-5" />
-                </motion.button>
-              )}
             </div>
 
-            <hr className="border-t border-gray-300 opacity-50 my-4" />
+            <hr className="border-t border-gray-300 opacity-50 my-1" />
 
             {(() => {
               const allFilteredTasks = periods
@@ -534,22 +534,20 @@ const createEmptyTask = useCallback((): Task => {
                       <ul className="space-y-2">
                         {list
                           .slice() // 元配列の破壊防止
-.sort((a, b) => {
-  const getTimestampValue = (value: any): number => {
-    if (!value) return 0;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === 'string') return new Date(value).getTime();
-    if (typeof value.toDate === 'function') return value.toDate().getTime(); // Firestore Timestamp 型
-    return 0;
-  };
+                          .sort((a, b) => {
+                            const getTimestampValue = (value: any): number => {
+                              if (!value) return 0;
+                              if (value instanceof Date) return value.getTime();
+                              if (typeof value === 'string') return new Date(value).getTime();
+                              if (typeof value.toDate === 'function') return value.toDate().getTime(); // Firestore Timestamp 型
+                              return 0;
+                            };
 
-  const aTime = getTimestampValue(a.createdAt);
-  const bTime = getTimestampValue(b.createdAt);
+                            const aTime = getTimestampValue(a.createdAt);
+                            const bTime = getTimestampValue(b.createdAt);
 
-  return bTime - aTime;
-})
-
-
+                            return bTime - aTime;
+                          })
                           .map((task, idx) => (
                             <TaskCard
                               key={task.id}
