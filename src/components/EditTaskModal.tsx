@@ -109,20 +109,22 @@ export default function EditTaskModal({
   const handleSave = () => {
     if (!editedTask) return;
 
-    // 🔸 タスク名の重複チェック（IDが異なる同名タスクが存在する場合）
-    const isNewTask = !task.id; // IDが空なら新規とみなす
-
-    if (isNewTask) {
-      const isDuplicate = existingTasks.some(
-        (t) => t.name === editedTask.name && t.id !== editedTask.id
-      );
-      if (isDuplicate) {
-        setNameError('すでに登録済みです。');
-        return;
-      }
+    // 🔸 空チェック（trimして空かどうか）
+    if (!editedTask.name || editedTask.name.trim() === '') {
+      setNameError('タスク名を入力してください');
+      return;
     }
 
+    // 🔸 重複チェック（IDが異なる同名タスクが存在する場合）
+    const isDuplicate = existingTasks.some(
+      (t) => t.name === editedTask.name && t.id !== editedTask.id
+    );
+    if (isDuplicate) {
+      setNameError('すでに登録済みです。');
+      return;
+    }
 
+    // 🔄 正常時：保存処理
     const transformed = {
       ...editedTask,
       daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
@@ -132,7 +134,7 @@ export default function EditTaskModal({
     setIsSaving(true);
     onSave(transformed);
 
-    // 以前のタイマーをクリア（再表示時に誤発火しないように）
+    // タイマー初期化と完了表示
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
@@ -142,13 +144,13 @@ export default function EditTaskModal({
       setIsSaving(false);
       setSaveComplete(true);
 
-      // 保存完了表示 → 自動クローズ
       closeTimerRef.current = setTimeout(() => {
         setSaveComplete(false);
         setShouldClose(true);
       }, 1500);
     }, 300);
   };
+
 
 
   if (!mounted || !isOpen || !editedTask) return null;

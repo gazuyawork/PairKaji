@@ -56,7 +56,6 @@ export const buildFirestoreTaskData = (
     title: task.title ?? '',
     period: task.period ?? '毎日',
     point: task.point ?? 0,
-    // users: task.users ?? [],
     daysOfWeek: convertedDaysOfWeek,
     dates: task.dates ?? [],
     isTodo: task.isTodo ?? false,
@@ -167,7 +166,6 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
   }
 };
 
-
 /**
  * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、
  * 各ユーザーごとに単独タスクとして再登録する。
@@ -199,7 +197,6 @@ export const cleanObject = <T>(obj: T): T => {
   return obj;
 };
 
-
 /**
  * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、
  * 各ユーザーごとに単独タスクとして再登録する。
@@ -208,58 +205,45 @@ export const splitSharedTasksOnPairRemoval = async (
   userId: string,
   partnerId: string
 ): Promise<void> => {
-  console.log('🔁 splitSharedTasksOnPairRemoval 実行開始');
-  console.log('👤 userId:', userId);
-  console.log('🤝 partnerId:', partnerId);
-
   const tasksRef = collection(db, 'tasks');
-
   const sharedTasksQuery = query(
     tasksRef,
     where('userIds', 'array-contains', userId)
   );
   const snapshot = await getDocs(sharedTasksQuery);
-  console.log('📦 共有タスク取得件数:', snapshot.docs.length);
-
   const sharedTasks = snapshot.docs.filter((docSnap) => {
     const data = docSnap.data() as FirestoreTask;
     return Array.isArray(data.userIds) && data.userIds.includes(partnerId);
   });
-  console.log('✅ partnerId も含む共有タスク数:', sharedTasks.length);
 
   for (const docSnap of sharedTasks) {
     const original = docSnap.data() as FirestoreTask;
-    console.log('📋 処理対象タスク:', original.name, 'ID:', docSnap.id);
-
     const myTaskQuery = query(
       tasksRef,
       where('name', '==', original.name),
       where('userId', '==', userId)
     );
     const myTaskSnapshot = await getDocs(myTaskQuery);
-    console.log('🗑 自分用重複タスク件数:', myTaskSnapshot.docs.length);
     for (const existing of myTaskSnapshot.docs) {
-      console.log('🗑 削除: 自分用タスク ID:', existing.id);
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-const rest = { ...original } as Record<string, unknown>;
-delete rest.users;
+    const rest = { ...original } as Record<string, unknown>;
+    delete rest.users;
 
-const myCopy: FirestoreTask = {
-  ...rest,
-  userId,
-  userIds: [userId],
-  point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
-  private: true,
-};
+    const myCopy: FirestoreTask = {
+      ...rest,
+      userId,
+      userIds: [userId],
+      point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
+      private: true,
+    };
 
     const cleanedMyCopy = cleanObject(myCopy);
     cleanedMyCopy.createdAt = serverTimestamp() as Timestamp;
     cleanedMyCopy.updatedAt = serverTimestamp() as Timestamp;
 
     await addDoc(tasksRef, cleanedMyCopy);
-    console.log('✅ 自分用タスク登録完了:', original.name);
 
     const partnerTaskQuery = query(
       tasksRef,
@@ -267,32 +251,23 @@ const myCopy: FirestoreTask = {
       where('userId', '==', partnerId)
     );
     const partnerTaskSnapshot = await getDocs(partnerTaskQuery);
-    console.log('🗑 パートナー用重複タスク件数:', partnerTaskSnapshot.docs.length);
     for (const existing of partnerTaskSnapshot.docs) {
-      console.log('🗑 削除: パートナー用タスク ID:', existing.id);
       await deleteDoc(doc(db, 'tasks', existing.id));
     }
 
-const partnerRest = { ...original } as Record<string, unknown>;
-delete partnerRest.users;
+    const partnerRest = { ...original } as Record<string, unknown>;
+    delete partnerRest.users;
 
-const partnerCopy: FirestoreTask = {
-  ...partnerRest,
-  userId: partnerId,
-  userIds: [partnerId],
-  point: typeof original.point === 'string' ? Number(original.point) : original.point,
-  private: true,
-};
-
+    const partnerCopy: FirestoreTask = {
+      ...partnerRest,
+      userId: partnerId,
+      userIds: [partnerId],
+      point: typeof original.point === 'string' ? Number(original.point) : original.point,
+      private: true,
+    };
     const cleanedPartnerCopy = cleanObject(partnerCopy);
     cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;
     cleanedPartnerCopy.updatedAt = serverTimestamp() as Timestamp;
-
-    console.log('✅ パートナー用タスク登録準備:', original.name);
-
     await addDoc(tasksRef, cleanedPartnerCopy);
-    console.log('✅ パートナー用タスク登録完了:', original.name);
   }
-
-  console.log('🎉 splitSharedTasksOnPairRemoval 処理完了');
 };

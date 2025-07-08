@@ -17,15 +17,9 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
 
   useEffect(() => {
     const viewed = getViewedFlaggedTaskIds();
-
-    console.log('[🟡Debug] flaggedTasks:', flaggedTasks);
-    console.log('[🟡Debug] viewed IDs:', viewed);
-
     const hasUnviewed = flaggedTasks.some(
       (task) => task.flagged && !viewed.includes(task.id)
     );
-
-    console.log('[🟢Debug] hasUnviewed:', hasUnviewed);
     setIsNew(hasUnviewed);
   }, [flaggedTasks]);
 

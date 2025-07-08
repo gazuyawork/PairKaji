@@ -85,7 +85,5 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }),
     ]);
-
-    console.log('タスク分割処理が完了しました');
   }
 });
