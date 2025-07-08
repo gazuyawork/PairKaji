@@ -1,4 +1,3 @@
-// src/app/main/MainContent.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -90,43 +89,42 @@ export default function MainContent() {
       <Header title={currentTitle} />
       <main
         className={clsx(
-          'transition-opacity duration-500 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pt-16 h-[calc(100dvh-150px)]',
+          'transition-opacity duration-300 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pt-16 h-[calc(100dvh-82px)]',
           contentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
+        <motion.div
+          className="flex w-[300vw] h-full"
+          initial={false}
+          animate={{ x: `-${index * 100}vw` }}
+          transition={{
+            type: 'tween',
+            ease: [0.25, 0.1, 0.25, 1],
+            duration: 0.35,
+          }}
+        >
+          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+            <HomeView />
+          </div>
+          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+            <TaskView initialSearch={searchKeyword} />
+          </div>
+          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+            <TodoView />
+          </div>
+        </motion.div>
 
-          <motion.div
-            className="flex w-[300vw] h-full"
-            initial={false}
-            animate={{ x: `-${index * 100}vw` }}
-            transition={{
-              type: 'tween',                  // ✅ グラグラを除去
-              ease: [0.25, 0.1, 0.25, 1],     // ✅ 滑らかだけどピタッと止まるイージング
-              duration: 0.35,                 // ✅ 適度な速さ（必要に応じて調整）
+        {index === 1 && (
+          <button
+            onClick={() => {
+              window.dispatchEvent(new Event('open-new-task-modal'));
             }}
+            className="fixed bottom-26 right-6 w-14 h-14 rounded-full text-white text-3xl font-bold bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center z-[1000]"
+            aria-label="新規タスク追加"
           >
-            <div className="w-screen flex-shrink-0 h-[calc(100dvh-150px)]">
-              <HomeView />
-            </div>
-            <div className="w-screen flex-shrink-0 overflow-y-auto min-h-[calc(100dvh-120px)]">
-              <TaskView initialSearch={searchKeyword} />
-            </div>
-            <div className="w-screen flex-shrink-0 overflow-y-auto min-h-[calc(100dvh-120px)]">
-              <TodoView />
-            </div>
-          </motion.div>
-
-          {index === 1 && (
-            <button
-              onClick={() => {
-                window.dispatchEvent(new Event('open-new-task-modal'));
-              }}
-              className="fixed bottom-26 right-6 w-14 h-14 rounded-full text-white text-3xl font-bold bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center z-[1000]"
-              aria-label="新規タスク追加"
-            >
-              ＋
-            </button>
-          )}
+            ＋
+          </button>
+        )}
 
         <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
           <FooterNav currentIndex={index} setIndex={setIndex} />

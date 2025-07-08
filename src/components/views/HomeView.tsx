@@ -108,7 +108,7 @@ export default function HomeView() {
   const flaggedTasks = tasks.filter((task) => task.flagged === true);
 
   return (
-    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
+    <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
       <main
         className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-20 pb-50"
         ref={scrollRef}

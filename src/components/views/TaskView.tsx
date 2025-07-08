@@ -356,17 +356,8 @@ const createEmptyTask = useCallback((): Task => {
     }
   }, [editTargetTask, onModalOpenChange]);
 
-
-  // const getTimestampValue = (value: any): number => {
-  //   if (!value) return 0;
-  //   if (value instanceof Date) return value.getTime();
-  //   if (typeof value === 'string') return new Date(value).getTime();
-  //   if (typeof value.toDate === 'function') return value.toDate().getTime();
-  //   return 0;
-  // };
-
   return (
-    <div className="h-full flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
+    <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
       {editTargetTask && (
         <EditTaskModal
           key={editTargetTask.id}
@@ -380,7 +371,7 @@ const createEmptyTask = useCallback((): Task => {
         />
       )}
 
-      <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-70">
+      <main className="main-content flex-1 px-4 py-6 space-y-6 overflow-y-auto pb-60">
         {isLoading ? (
           <div className="flex items-center justify-center text-gray-400 text-sm h-200">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
