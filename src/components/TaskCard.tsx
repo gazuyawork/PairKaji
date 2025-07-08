@@ -75,7 +75,7 @@ export default function TaskCard({
       const newFlag = !task.flagged;
       setTimeout(() => {
         setShowActionButtons(false);
-      }, 1000);
+      }, 500);
 
       const taskRef = doc(db, 'tasks', task.id);
       await updateDoc(taskRef, {
@@ -200,7 +200,7 @@ export default function TaskCard({
                   ? 'bg-gray-300 opacity-30 cursor-not-allowed' // 完了状態用スタイル
                   : task.flagged
                     ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
-                    : 'bg-gray-300 ring-1 ring-gray-300 text-white opacity-60'
+                    : 'bg-gray-300 ring-1 ring-gray-300 text-white'
               )}
             >
               <Flag className="w-5 h-5" />
