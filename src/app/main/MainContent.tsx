@@ -93,27 +93,28 @@ export default function MainContent() {
           contentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
-        <motion.div
-          className="flex w-[300vw] h-full"
-          initial={false}
-          animate={{ x: `-${index * 100}vw` }}
-          transition={{
-            type: 'tween',
-            ease: [0.25, 0.1, 0.25, 1],
-            duration: 0.35,
-          }}
-        >
-          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
-            <HomeView />
-          </div>
-          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
-            <TaskView initialSearch={searchKeyword} />
-          </div>
-          <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
-            <TodoView />
-          </div>
-        </motion.div>
-
+        <div className="w-full h-full overflow-hidden">
+          <motion.div
+            className="flex w-[300vw] h-full"
+            initial={false}
+            animate={{ x: `-${index * 100}vw` }}
+            transition={{
+              type: 'tween',
+              ease: [0.25, 0.1, 0.25, 1],
+              duration: 0.35,
+            }}
+          >
+            <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+              <HomeView />
+            </div>
+            <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+              <TaskView initialSearch={searchKeyword} />
+            </div>
+            <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+              <TodoView />
+            </div>
+          </motion.div>
+        </div>
         {index === 1 && (
           <button
             onClick={() => {
