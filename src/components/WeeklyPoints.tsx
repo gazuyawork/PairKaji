@@ -277,12 +277,12 @@ export default function WeeklyPoints() {
         <div className="mt-4 h-6 w-full rounded-full overflow-hidden flex border border-gray-300 shadow-inner bg-gradient-to-b from-gray-100 to-gray-200">
           <div
             className="h-full bg-gradient-to-r from-[#FFC288] to-[#FFA552] rounded-l-full shadow-[inset_0_0_2px_rgba(255,255,255,0.5),0_2px_4px_rgba(0,0,0,0.1)]"
-            style={{ width: `${selfPercent}%`, transition: 'width 0.8s ease-out' }}
+            style={{ width: `${selfPercent}%`, transition: 'width 0.5s ease-out' }}
           />
           {hasPartner && (
             <div
               className="h-full bg-gradient-to-r from-[#FFF0AA] to-[#FFD97A] rounded-r-xs shadow-[inset_0_0_2px_rgba(255,255,255,0.5),0_2px_4px_rgba(0,0,0,0.1)]"
-              style={{ width: `${partnerPercent}%`, transition: 'width 0.8s ease-out' }}
+              style={{ width: `${partnerPercent}%`, transition: 'width 0.5s ease-out' }}
             />
           )}
         </div>
@@ -291,18 +291,18 @@ export default function WeeklyPoints() {
           {Math.round(animatedSelfPoints + animatedPartnerPoints)} / {maxPoints} pt
         </p>
 
-{hasPartner && (
-  <div className="flex justify-center gap-4 mt-4 text-xs text-[#5E5E5E]">
-    <div className="flex items-center gap-1">
-      <div className="w-3 h-3 rounded-full bg-[#FFA552]" />
-      <span>あなた（{Math.round(animatedSelfPoints)}pt）</span>
-    </div>
-    <div className="flex items-center gap-1">
-      <div className="w-3 h-3 rounded-full bg-[#FFD97A]" />
-      <span>パートナー（{Math.round(animatedPartnerPoints)}pt）</span>
-    </div>
-  </div>
-)}
+        {hasPartner && (
+          <div className="flex justify-center gap-4 mt-4 text-xs text-[#5E5E5E]">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-[#FFA552]" />
+              <span>あなた（{Math.round(animatedSelfPoints)}pt）</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-[#FFD97A]" />
+              <span>パートナー（{Math.round(animatedPartnerPoints)}pt）</span>
+            </div>
+          </div>
+        )}
 
       </div>
 

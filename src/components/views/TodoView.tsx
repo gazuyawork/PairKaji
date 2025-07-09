@@ -49,13 +49,22 @@ export default function TodoView() {
     setNoteModalTask(null);
     setNoteModalTodo(null);
   };
-  const taskNameOptions = useMemo(() => {
-    const names = tasks
-      .filter(task => !task.visible) // 非表示（visible: false）のものだけサジェスト表示
-      .map(task => task.name)
-      .filter(Boolean);
-    return Array.from(new Set(names));
-  }, [tasks]);
+
+const currentUserId = auth.currentUser?.uid;
+
+const taskNameOptions = useMemo(() => {
+  const names = tasks
+    .filter(task =>
+      !task.visible && (
+        task.userId === currentUserId ||        // 自分のタスク
+        task.private !== true                   // 共有タスク
+      )
+    )
+    .map(task => task.name)
+    .filter(Boolean);
+  return Array.from(new Set(names));
+}, [tasks, currentUserId]);
+
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -122,11 +131,6 @@ export default function TodoView() {
     }
   }, [tasks, selectedGroupId]);
 
-
-
-
-
-
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
 
@@ -144,68 +148,68 @@ export default function TodoView() {
         )}
 
 
-<div className="relative w-full mb-6">
-  {/* プレースホルダー的な入力欄（クリックで開く） */}
-  <input
-    type="text"
-    value=""
-    placeholder="タスクを選択してください。"
-    readOnly
-    onClick={() => setIsOpen(true)}
-    className="w-full border border-gray-300 bg-white rounded px-4 py-2 text-sm shadow cursor-pointer pr-10"
-  />
+{/* 🔁 Stickyラッパーでセレクトとフィルタをまとめて固定 */}
+<div className="sticky top-0 z-[999] w-full bg-transparent">
+  <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3">
 
-  {/* ×ボタン（常時表示・右上・赤色） */}
-  {isOpen && (
-    <button
-      onClick={() => setIsOpen(false)}
-      className="absolute right-3 top-0 text-red-500 hover:text-red-700 text-2xl font-bold"
-      aria-label="閉じる"
-    >
-      ×
-    </button>
-  )}
-
-  {/* セレクトリスト（開いたときだけ表示） */}
-  {isOpen && (
-    <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded shadow mt-1 max-h-70 overflow-y-auto text-sm">
-      {taskNameOptions.map((name) => (
-        <li
-          key={name}
-          onClick={async () => {
-            const matched = tasks.find(task => task.name === name);
-            if (matched && !matched.visible) {
-              await updateDoc(doc(db, 'tasks', matched.id), {
-                visible: true,
-                updatedAt: serverTimestamp(),
-              });
-              toast.success('非表示のタスクを再表示しました。');
-            }
-            setSelectedGroupId(matched?.id ?? null);
-            setFilterText('');
-            setIsOpen(false);
-          }}
-          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+    {/* ✅ セレクトボックス部分 */}
+    <div className="relative w-full mb-6">
+      <input
+        type="text"
+        value=""
+        placeholder="タスクを選択してください。"
+        readOnly
+        onClick={() => setIsOpen(true)}
+        className="w-full border border-gray-300 bg-white rounded px-4 py-2 text-sm shadow cursor-pointer pr-10"
+      />
+      {isOpen && (
+        <button
+          onClick={() => setIsOpen(false)}
+          className="absolute right-3 top-0 text-red-500 hover:text-red-700 text-2xl font-bold"
+          aria-label="閉じる"
         >
-          {name}
-        </li>
-      ))}
-    </ul>
-  )}
+          ×
+        </button>
+      )}
+      {isOpen && (
+        <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded shadow mt-1 max-h-70 overflow-y-auto text-sm">
+          {taskNameOptions.map((name) => (
+            <li
+              key={name}
+              onClick={async () => {
+                const matched = tasks.find(task => task.name === name);
+                if (matched && !matched.visible) {
+                  await updateDoc(doc(db, 'tasks', matched.id), {
+                    visible: true,
+                    updatedAt: serverTimestamp(),
+                  });
+                  toast.success('非表示のタスクを再表示しました。');
+                }
+                setSelectedGroupId(matched?.id ?? null);
+                setFilterText('');
+                setIsOpen(false);
+              }}
+              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+            >
+              {name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+
+    {/* ✅ グループセレクタ（フィルター）部分 */}
+    <GroupSelector
+      tasks={tasks}
+      selectedGroupId={selectedGroupId}
+      onSelectGroup={(groupId) => {
+        setSelectedGroupId(groupId);
+        setFilterText('');
+      }}
+    />
+  </div>
 </div>
 
-
-
-
-
-        <GroupSelector
-          tasks={tasks}
-          selectedGroupId={selectedGroupId}
-          onSelectGroup={(groupId) => {
-            setSelectedGroupId(groupId);
-            setFilterText(''); // ← ここでフィルタを解除
-          }}
-        />
 
         {(() => {
           const filteredTasks = tasks

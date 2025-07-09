@@ -17,4 +17,6 @@ export type TodoOnlyTask = {
   visible: boolean;
   isTodo: boolean;
   groupId?: string;
+  userId: string;
+  private?: boolean;
 };
