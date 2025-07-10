@@ -127,6 +127,17 @@ export default function TaskCard({
     setIndex(2);
   };
 
+  useEffect(() => {
+    if (showActions) {
+      const timeout = setTimeout(() => {
+        setShowActions(false);
+      }, 5000); // 5秒後に非表示
+
+      return () => clearTimeout(timeout); // クリーンアップ
+    }
+  }, [showActions]);
+
+
   return (
     <div className="relative" ref={cardRef}>
       {swipeDirection === 'left' && (

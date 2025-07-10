@@ -467,8 +467,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         handleClearSearch?.();
                         setTodayFilter(false);
                         setPrivateFilter(false);
-                        setShowSearchBox(false);       // ✅ 追加
-                        setFlaggedFilter(false);       // ✅ 追加
+                        setShowSearchBox(false);
+                        setFlaggedFilter(false);
                       }}
                       whileTap={{ scale: 1.2 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 15 }}
