@@ -123,7 +123,7 @@ export default function EditPointModal({
         />
 
         <div className="flex mt-4">
-          <p className="text-gray-600 font-bold pt-2 pl-2 pr-6">内訳</p>
+          <p className="text-gray-600 font-bold pt-2 pl-2 pr-4">内訳</p>
           <div className="flex justify-center gap-6">
             {userPoints.map((user) => (
               <div key={user.name} className="flex items-center gap-2">
@@ -152,7 +152,7 @@ export default function EditPointModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-4">
+        {/* <div className="flex items-center justify-between mt-4">
           <label className="flex items-center cursor-pointer">
             <span className="mr-3 text-sm text-gray-700">ルーレットを有効にする</span>
             <div className="relative">
@@ -172,7 +172,7 @@ export default function EditPointModal({
               ></div>
             </div>
           </label>
-        </div>
+        </div> */}
 
         {rouletteEnabled && (
           <RouletteInputSection
