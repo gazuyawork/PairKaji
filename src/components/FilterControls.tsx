@@ -118,13 +118,19 @@ export default function FilterControls({
           );
         })}
 
+
+        {/* 👥 担当者フィルター前の線 */}
+        {pairStatus === 'confirmed' && (
+          <div className="w-px h-6 bg-gray-300 self-center mx-1" />
+        )}
+
+
         {/* 👥 担当者フィルター */}
         {pairStatus === 'confirmed' &&
           users.map(user => {
             const isSelected = personFilter === user.id;
             return (
               <React.Fragment key={user.id + personClickKey}>
-                <div className="w-px h-6 bg-gray-300 self-center mx-1" />
                   <motion.button
                     onClick={() => {
                       setPersonClickKey(prev => prev + 1);
