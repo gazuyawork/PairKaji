@@ -35,12 +35,13 @@ export default function WeeklyPoints() {
   const { width, height } = useWindowSize();
   const [rouletteOptions, setRouletteOptions] = useState(['ご褒美A', 'ご褒美B', 'ご褒美C']);
   const [rouletteEnabled, setRouletteEnabled] = useState(true); // ← デフォルトON
-
-
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
+  const [selfTargetPoint, setSelfTargetPoint] = useState<number | null>(null);
+  const [partnerTargetPoint, setPartnerTargetPoint] = useState<number | null>(null);
+
 
   useEffect(() => {
     let unsubscribe1: (() => void) | null = null;
@@ -154,22 +155,39 @@ export default function WeeklyPoints() {
   };
 
   useEffect(() => {
-    const fetchInitialTargetPoint = async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-      const ref = doc(db, 'points', uid);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.weeklyTargetPoint) {
-          setMaxPoints(data.weeklyTargetPoint);
-        }
-      }
+    let unsubscribes: (() => void)[] = [];
+
+    const fetchAndListen = async () => {
+      const partnerUids = await fetchPairUserIds(uid);
+      const allUids = [uid, ...partnerUids];
+
+      allUids.forEach((targetUid) => {
+        const ref = doc(db, 'points', targetUid);
+        const unsubscribe = onSnapshot(ref, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            if (targetUid === uid && typeof data.selfPoint === 'number') {
+              setSelfTargetPoint(data.selfPoint);
+            } else if (targetUid !== uid && typeof data.selfPoint === 'number') {
+              setPartnerTargetPoint(data.selfPoint);
+            }
+          }
+        });
+        unsubscribes.push(unsubscribe);
+      });
     };
 
-    fetchInitialTargetPoint();
+    fetchAndListen();
+
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+    };
   }, []);
+
+
 
   return (
     <div className="mx-auto w-full max-w-xl">
@@ -295,15 +313,18 @@ export default function WeeklyPoints() {
           <div className="flex justify-center gap-4 mt-4 text-xs text-[#5E5E5E]">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-[#FFA552]" />
-              <span>あなた（{Math.round(animatedSelfPoints)}pt）</span>
+              <span>
+                あなた（{Math.round(animatedSelfPoints)} / {selfTargetPoint ?? '...'}pt）
+              </span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-[#FFD97A]" />
-              <span>パートナー（{Math.round(animatedPartnerPoints)}pt）</span>
+              <span>
+                パートナー（{Math.round(animatedPartnerPoints)} / {partnerTargetPoint ?? '...'}pt）
+              </span>
             </div>
           </div>
         )}
-
       </div>
 
       {/* 🟨 編集モーダル */}
