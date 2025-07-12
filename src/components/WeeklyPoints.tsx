@@ -9,7 +9,6 @@ import {
   onSnapshot,
   doc,
   setDoc,
-  getDoc
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from './EditPointModal';
@@ -158,7 +157,7 @@ export default function WeeklyPoints() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
-    let unsubscribes: (() => void)[] = [];
+    const unsubscribes: (() => void)[] = [];
 
     const fetchAndListen = async () => {
       const partnerUids = await fetchPairUserIds(uid);
