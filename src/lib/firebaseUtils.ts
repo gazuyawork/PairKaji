@@ -1,4 +1,5 @@
 // lib/firebaseUtils.ts
+
 import { toast } from 'sonner';
 import { 
   doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, 
@@ -324,7 +325,6 @@ export const toggleTaskDoneStatus = async (
         userIds = pairData.userIds;
       }
     }
-
     if (done) {
       // ✅ 完了にする場合
       await updateDoc(taskRef, {
@@ -333,8 +333,12 @@ export const toggleTaskDoneStatus = async (
         completedBy: userId,
         flagged: false, // ✅ 追加: 完了時はフラグを自動的に外す
       });
+      // 🔒 private タスクはポイント加算対象外
+      const taskSnap = await getDoc(taskRef);
+      const taskData = taskSnap.data();
+      const isPrivate = taskData?.private === true;
 
-      if (taskName && point !== undefined && person) {
+      if (!isPrivate && taskName && point !== undefined && person) {
         await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
       }
     } else {
@@ -585,3 +589,4 @@ export const addSavingsLog = async (
     throw error;
   }
 };
+

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { getViewedFlaggedTaskIds, markTaskAsViewed } from '@/utils/viewedTasks';
 import type { Task } from '@/types/Task';
+import { auth } from '@/lib/firebase'; // ✅ 追加
 
 type Props = {
   flaggedTasks?: Task[]; // フラグ付きの全タスクを受け取る
@@ -17,12 +18,26 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
 
   useEffect(() => {
     const viewed = getViewedFlaggedTaskIds();
-    const hasUnviewed = flaggedTasks.some(
-      (task) => task.flagged && !viewed.includes(task.id)
-    );
+    const currentUserId = auth.currentUser?.uid;
+
+    const hasUnviewed = flaggedTasks.some((task) => {
+      if (!task.flagged) return false;
+
+      const isPrivate = task.private === true;
+      const isOwnTask = task.userId === currentUserId;
+      const isUnviewed = !viewed.includes(task.id);
+
+      if (isPrivate) {
+        // 🔒 プライベートタスクは自分のもので未読なら表示
+        return isOwnTask && isUnviewed;
+      } else {
+        // 🤝 共有タスクは未読なら表示
+        return isUnviewed;
+      }
+    });
+
     setIsNew(hasUnviewed);
   }, [flaggedTasks]);
-
 
   const handleClick = () => {
     flaggedTasks.forEach((task) => {
@@ -43,7 +58,6 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="mb-3 relative"
     >
-      {/* ✅ バッジを最上部に表示 */}
       {isNew && (
         <div className="absolute top-0 left-0 z-50 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-br-xl shadow">
           New
@@ -67,3 +81,4 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
     </motion.div>
   );
 }
+
