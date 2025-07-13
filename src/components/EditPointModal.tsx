@@ -174,16 +174,16 @@ export default function EditPointModal({
           </label>
         </div> */}
 
-        {rouletteEnabled && (
+        {/* {rouletteEnabled && (
           <RouletteInputSection
             rouletteOptions={rouletteOptions}
             setRouletteOptions={setRouletteOptions}
           />
-        )}
+        )} */}
 
-        {error && (
+        {/* {error && (
           <p className="text-red-500 text-center text-sm pt-2">{error}</p>
-        )}
+        )} */}
       </div>
     </BaseModal>
   );
