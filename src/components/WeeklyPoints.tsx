@@ -129,23 +129,31 @@ export default function WeeklyPoints() {
   const selfPercent = total === 0 ? 0 : (animatedSelfPoints / total) * percent;
   const partnerPercent = total === 0 ? 0 : (animatedPartnerPoints / total) * percent;
 
-  const handleSave = async (newPoint: number) => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    const partnerUids = await fetchPairUserIds(uid);
+const handleSave = async (newPoint: number) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
 
-    setMaxPoints(newPoint);
-    await setDoc(
-      doc(db, 'points', uid),
-      {
-        userId: uid,
-        userIds: partnerUids,
-        weeklyTargetPoint: newPoint,
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-  };
+  const partnerUids = await fetchPairUserIds(uid);
+
+  // 仮に自分の内訳ポイントを newPoint の 50% とする（必要であれば正確に渡す）
+  const selfPoint = Math.floor(newPoint / 2);
+  const totalTargetPoint = newPoint;
+
+  setMaxPoints(totalTargetPoint);
+
+  await setDoc(
+    doc(db, 'points', uid),
+    {
+      userId: uid,
+      userIds: partnerUids,
+      selfPoint: selfPoint,                 // ✅ 自分の内訳ポイント
+      weeklyTargetPoint: totalTargetPoint,  // ✅ 合計目標ポイント
+      updatedAt: new Date(),
+    },
+    { merge: true }
+  );
+};
+
 
   // const handleGoalAchieved = () => {
   //   if (!rouletteEnabled) return;
@@ -171,8 +179,14 @@ export default function WeeklyPoints() {
         const unsubscribe = onSnapshot(ref, (snap) => {
           if (snap.exists()) {
             const data = snap.data();
+
             if (targetUid === uid && typeof data.selfPoint === 'number') {
               setSelfTargetPoint(data.selfPoint);
+
+              // 🟨 合計目標ポイントを maxPoints に反映
+              if (typeof data.weeklyTargetPoint === 'number') {
+                setMaxPoints(data.weeklyTargetPoint);
+              }
             } else if (targetUid !== uid && typeof data.selfPoint === 'number') {
               setPartnerTargetPoint(data.selfPoint);
             }
@@ -196,16 +210,16 @@ export default function WeeklyPoints() {
       {/* 🟧 ルーレット全画面表示 */}
       {/* {rouletteEnabled && (showGoalButton || showRoulette) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center　"> */}
-          {/* 背景: 白半透明 + ぼかし */}
-          {/* <motion.div
+      {/* 背景: 白半透明 + ぼかし */}
+      {/* <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8 }}
             className="absolute inset-0 bg-white/30 backdrop-blur-sm z-0 pointer-events-none"
           /> */}
 
-          {/* 🎊 Confetti */}
-          {/* {showConfetti && (
+      {/* 🎊 Confetti */}
+      {/* {showConfetti && (
             <div className="absolute inset-0 z-10 pointer-events-none">
               <Confetti
                 width={width}
@@ -218,8 +232,8 @@ export default function WeeklyPoints() {
             </div>
           )} */}
 
-          {/* 中央表示のルーレット本体 */}
-          {/* <div className="relative z-20 pointer-events-auto">
+      {/* 中央表示のルーレット本体 */}
+      {/* <div className="relative z-20 pointer-events-auto">
             {!showRoulette ? (
               <motion.div
                 onClick={(e) => {
@@ -283,13 +297,16 @@ export default function WeeklyPoints() {
 
       {/* 🟦 通常のカード */}
       <div
-        className="relative bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 text-center mb-3 cursor-pointer hover:shadow-lg transition overflow-hidden"
-        onClick={() => {
-          if (!showGoalButton && !showRoulette) {
-            setIsModalOpen(true);
-          }
-        }}
+        className="relative bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 text-center mb-3 cursor-pointer hover:shadow-lg transition verflow-visible"
+        onClick={() => setIsModalOpen(true)}
       >
+        {/* ✅ CLEARバッジ */}
+        {animatedSelfPoints + animatedPartnerPoints >= maxPoints && (
+          <div className="absolute -top-2 -left-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow z-50">
+            CLEAR
+          </div>
+        )}
+
         <p className="text-lg font-bold text-[#5E5E5E] mb-4">
           今週の合計ポイント {weekLabel}
         </p>
