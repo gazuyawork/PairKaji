@@ -13,10 +13,10 @@ import {
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from './EditPointModal';
 import { fetchPairUserIds } from '@/lib/taskUtils';
-import { motion } from 'framer-motion';
-import RouletteWheel from '@/components/RouletteWheel';
-import Confetti from 'react-confetti';
-import { useWindowSize } from 'react-use';
+// import { motion } from 'framer-motion';
+// import RouletteWheel from '@/components/RouletteWheel';
+// import Confetti from 'react-confetti';
+// import { useWindowSize } from 'react-use';
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,12 +26,15 @@ export default function WeeklyPoints() {
   const [animatedPartnerPoints, setAnimatedPartnerPoints] = useState(0);
   const [maxPoints, setMaxPoints] = useState(500);
   const [hasPartner, setHasPartner] = useState(false);
-  const [showRoulette, setShowRoulette] = useState(false);
-  const [isSpinning, setIsSpinning] = useState(false);
+  const [showRoulette] = useState(false);
+  // const [showRoulette, setShowRoulette] = useState(false);
+  // const [setIsSpinning] = useState(false);
+  // const [isSpinning, setIsSpinning] = useState(false);
   const [showGoalButton, setShowGoalButton] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
+  // const [setShowConfetti] = useState(false);
+  // const [showConfetti, setShowConfetti] = useState(false);
   const [, setIsLoadingPoints] = useState(true);
-  const { width, height } = useWindowSize();
+  // const { width, height } = useWindowSize();
   const [rouletteOptions, setRouletteOptions] = useState(['ご褒美A', 'ご褒美B', 'ご褒美C']);
   const [rouletteEnabled, setRouletteEnabled] = useState(true); // ← デフォルトON
   const today = new Date();
@@ -114,7 +117,7 @@ export default function WeeklyPoints() {
     if (rouletteEnabled && selfPoints + partnerPoints >= maxPoints && !showGoalButton) {
       const timer = setTimeout(() => {
         setShowGoalButton(true);
-        setShowConfetti(true);
+        // setShowConfetti(true);
       }, 1500);
       return () => clearTimeout(timer);
     }
@@ -144,14 +147,14 @@ export default function WeeklyPoints() {
     );
   };
 
-  const handleGoalAchieved = () => {
-    if (!rouletteEnabled) return;
-    setIsSpinning(true);
-    setTimeout(() => {
-      setShowRoulette(true);
-      setIsSpinning(false);
-    }, 1000);
-  };
+  // const handleGoalAchieved = () => {
+  //   if (!rouletteEnabled) return;
+  //   setIsSpinning(true);
+  //   setTimeout(() => {
+  //     setShowRoulette(true);
+  //     setIsSpinning(false);
+  //   }, 1000);
+  // };
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -191,18 +194,18 @@ export default function WeeklyPoints() {
   return (
     <div className="mx-auto w-full max-w-xl">
       {/* 🟧 ルーレット全画面表示 */}
-      {rouletteEnabled && (showGoalButton || showRoulette) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center　">
+      {/* {rouletteEnabled && (showGoalButton || showRoulette) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center　"> */}
           {/* 背景: 白半透明 + ぼかし */}
-          <motion.div
+          {/* <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8 }}
             className="absolute inset-0 bg-white/30 backdrop-blur-sm z-0 pointer-events-none"
-          />
+          /> */}
 
           {/* 🎊 Confetti */}
-          {showConfetti && (
+          {/* {showConfetti && (
             <div className="absolute inset-0 z-10 pointer-events-none">
               <Confetti
                 width={width}
@@ -213,10 +216,10 @@ export default function WeeklyPoints() {
                 recycle={true}
               />
             </div>
-          )}
+          )} */}
 
           {/* 中央表示のルーレット本体 */}
-          <div className="relative z-20 pointer-events-auto">
+          {/* <div className="relative z-20 pointer-events-auto">
             {!showRoulette ? (
               <motion.div
                 onClick={(e) => {
@@ -276,7 +279,7 @@ export default function WeeklyPoints() {
             )}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* 🟦 通常のカード */}
       <div

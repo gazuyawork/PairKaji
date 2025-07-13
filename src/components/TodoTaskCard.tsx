@@ -45,7 +45,8 @@ export default function TodoTaskCard({
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [animatingTodoIds, setAnimatingTodoIds] = useState<Set<string>>(new Set());
+  const [animatingTodoIds] = useState<Set<string>>(new Set());
+  // const [animatingTodoIds, setAnimatingTodoIds] = useState<Set<string>>(new Set());
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
@@ -113,23 +114,23 @@ export default function TodoTaskCard({
     });
   };
 
-  const [isAnimating, setIsAnimating] = useState(false);
+  // const [isAnimating, setIsAnimating] = useState(false);
 
-  const handleToggleWithAnimation = (id: string) => {
-    if (isAnimating) return;
+  // const handleToggleWithAnimation = (id: string) => {
+  //   if (isAnimating) return;
 
-    setIsAnimating(true);
-    setAnimatingTodoIds(prev => new Set(prev).add(id));
-    setTimeout(() => {
-      onToggleDone(id);
-      setAnimatingTodoIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
-      setIsAnimating(false);
-    }, 300);
-  };
+  //   setIsAnimating(true);
+  //   setAnimatingTodoIds(prev => new Set(prev).add(id));
+  //   setTimeout(() => {
+  //     onToggleDone(id);
+  //     setAnimatingTodoIds(prev => {
+  //       const newSet = new Set(prev);
+  //       newSet.delete(id);
+  //       return newSet;
+  //     });
+  //     setIsAnimating(false);
+  //   }, 300);
+  // };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleteAnimating, setIsDeleteAnimating] = useState(false);
@@ -262,7 +263,7 @@ export default function TodoTaskCard({
               <div className="flex items-center gap-2">
                 <motion.div
                   className="cursor-pointer"
-                  onClick={() => handleToggleWithAnimation(todo.id)}
+                  // onClick={() => handleToggleWithAnimation(todo.id)}
                   initial={false}
                   animate={animatingTodoIds.has(todo.id) ? { rotate: 360 } : { rotate: 0 }}
                   transition={{ duration: 0.2, ease: 'easeInOut' }}

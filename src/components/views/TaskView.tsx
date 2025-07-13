@@ -188,30 +188,37 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
   const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
-  const toggleDone = async (period: Period, taskId: string) => {
-    const task = tasksState[period].find(t => t.id === taskId);
-    if (!task) {
-      console.warn('[toggleDone] 対象タスクが見つかりません:', taskId);
-      return;
-    }
+const toggleDone = async (period: Period, taskId: string) => {
+  const task = tasksState[period].find(t => t.id === taskId);
+  if (!task) {
+    console.warn('[toggleDone] 対象タスクが見つかりません:', taskId);
+    return;
+  }
 
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      console.warn('[toggleDone] currentUser が null です');
-      return;
-    }
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    console.warn('[toggleDone] currentUser が null です');
+    return;
+  }
 
-    const uid = currentUser.uid;
+  // ✅ ここで確認ダイアログ
+  if (task.done) {
+    const confirmed = window.confirm('タスクを未処理に戻しますか？');
+    if (!confirmed) return;
+  }
 
-    await toggleTaskDoneStatus(
-      task.id,
-      uid,
-      !task.done,
-      task.name,
-      task.point,
-      task.person ?? ''
-    );
-  };
+  const uid = currentUser.uid;
+
+  await toggleTaskDoneStatus(
+    task.id,
+    uid,
+    !task.done,
+    task.name,
+    task.point,
+    task.person ?? ''
+  );
+};
+
 
   const deleteTask = async (period: Period, id: string) => {
     try {
