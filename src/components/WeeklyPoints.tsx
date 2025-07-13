@@ -26,7 +26,7 @@ export default function WeeklyPoints() {
   const [animatedPartnerPoints, setAnimatedPartnerPoints] = useState(0);
   const [maxPoints, setMaxPoints] = useState(500);
   const [hasPartner, setHasPartner] = useState(false);
-  const [showRoulette] = useState(false);
+  // const [showRoulette] = useState(false);
   // const [showRoulette, setShowRoulette] = useState(false);
   // const [setIsSpinning] = useState(false);
   // const [isSpinning, setIsSpinning] = useState(false);
