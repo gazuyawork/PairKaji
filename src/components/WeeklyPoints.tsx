@@ -363,7 +363,7 @@ export default function WeeklyPoints() {
       >
         {/* ✅ CLEARバッジ */}
         {animatedSelfPoints + animatedPartnerPoints >= maxPoints && (
-          <div className="absolute -top-2 -left-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow z-50">
+          <div className="absolute -top-2 -left-2 bg-gradient-to-b from-green-300 to-green-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow z-50">
             CLEAR
           </div>
         )}
