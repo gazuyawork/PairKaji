@@ -28,7 +28,7 @@ import { saveSingleTask } from '@/lib/taskUtils';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { X, Lightbulb } from 'lucide-react';
+import { X, Lightbulb, LightbulbOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/modals/ConfirmModal';
 
@@ -546,33 +546,40 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 } else {
                   content = (
                     <div className="mx-auto w-full max-w-xl">
+
                       <div className="flex items-center justify-between mt-4 mb-2 px-2">
                         <h2 className="text-lg font-bold text-[#5E5E5E] font-sans">
                           {period}（残り {remaining} 件）
                         </h2>
 
-<button
-  onClick={() =>
-    setShowCompletedMap((prev) => ({
-      ...prev,
-      [period]: !prev[period],
-    }))
-  }
-  title={showCompletedMap[period] ? '完了タスクを表示中（クリックで非表示）' : '完了タスクを非表示中（クリックで表示）'}
-  className={`p-2 mr-1 rounded-full border transition-all duration-300
-    ${showCompletedMap[period]
-      ? 'bg-gradient-to-b from-yellow-100 to-yellow-300 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
-      : 'bg-gradient-to-b from-gray-200 to-gray-300 border-gray-400 text-gray-600 shadow-inner'}
-  `}
->
-  <Lightbulb
-    size={20}
-    className={showCompletedMap[period] ? 'fill-yellow-500' : 'fill-gray-100'}
-  />
-</button>
-
-
+                        {list.some(task => task.done) && (
+                          <button
+                            onClick={() =>
+                              setShowCompletedMap((prev) => ({
+                                ...prev,
+                                [period]: !prev[period],
+                              }))
+                            }
+                            title={
+                              showCompletedMap[period]
+                                ? '完了タスクを表示中（クリックで非表示）'
+                                : '完了タスクを非表示中（クリックで表示）'
+                            }
+                            className={`p-2 rounded-full border transition-all duration-300
+        ${showCompletedMap[period]
+                                ? 'bg-gradient-to-b from-yellow-100 to-yellow-300 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
+                                : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'}
+      `}
+                          >
+                            {showCompletedMap[period] ? (
+                              <Lightbulb size={20} className="fill-yellow-500" />
+                            ) : (
+                              <LightbulbOff size={20} className="fill-gray-100" />
+                            )}
+                          </button>
+                        )}
                       </div>
+
 
 
 
