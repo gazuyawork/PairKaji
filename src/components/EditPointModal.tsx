@@ -131,8 +131,8 @@ export default function EditPointModal({
   src={user.imageUrl || '/images/default.png'}
   alt={user.name}
   width={40}
-  height={40} // ✅ width と height を同じにする
-  className="w-10 h-10 rounded-full object-cover border border-gray-300"
+  height={40}
+  className="rounded-full w-[40px] h-[40px] object-cover aspect-square border border-gray-300"
 />
                   <input
                     type="number"
