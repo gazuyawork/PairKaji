@@ -28,7 +28,7 @@ import { saveSingleTask } from '@/lib/taskUtils';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Lightbulb } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/modals/ConfirmModal';
 
@@ -54,13 +54,15 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   // const currentUserId = auth.currentUser?.uid;
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [privateFilter, setPrivateFilter] = useState(false);
-
   const [flaggedFilter, setFlaggedFilter] = useState(false);
-
   const searchParams = useSearchParams();
-
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [onConfirmCallback, setOnConfirmCallback] = useState<(() => void) | null>(null);
+  const [showCompletedMap, setShowCompletedMap] = useState<Record<Period, boolean>>({
+    毎日: true,
+    週次: true,
+    その他: true,
+  });
 
 
   useEffect(() => {
@@ -544,13 +546,47 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 } else {
                   content = (
                     <div className="mx-auto w-full max-w-xl">
-                      <h2 className="text-lg font-bold text-[#5E5E5E] font-sans mt-4 mb-2 ml-2">
-                        {period}（残り {remaining} 件）
-                      </h2>
+                      <div className="flex items-center justify-between mt-4 mb-2 px-2">
+                        <h2 className="text-lg font-bold text-[#5E5E5E] font-sans">
+                          {period}（残り {remaining} 件）
+                        </h2>
+
+<button
+  onClick={() =>
+    setShowCompletedMap((prev) => ({
+      ...prev,
+      [period]: !prev[period],
+    }))
+  }
+  title={showCompletedMap[period] ? '完了タスクを表示中（クリックで非表示）' : '完了タスクを非表示中（クリックで表示）'}
+  className={`p-2 mr-1 rounded-full border transition-all duration-300
+    ${showCompletedMap[period]
+      ? 'bg-gradient-to-b from-yellow-100 to-yellow-300 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
+      : 'bg-gradient-to-b from-gray-200 to-gray-300 border-gray-400 text-gray-600 shadow-inner'}
+  `}
+>
+  <Lightbulb
+    size={20}
+    className={showCompletedMap[period] ? 'fill-yellow-500' : 'fill-gray-100'}
+  />
+</button>
+
+
+                      </div>
+
+
+
+
                       <ul className="space-y-2">
                         {list
-                          .slice() // 元配列の破壊防止
+                          .slice()
                           .sort((a, b) => {
+                            // ✅ 完了タスクを下に移動
+                            if (a.done !== b.done) {
+                              return a.done ? 1 : -1;
+                            }
+
+                            // 🔁 createdAtの降順ソート（新しい順）
                             const getTimestampValue = (value: any): number => {
                               if (!value) return 0;
                               if (value instanceof Date) return value.getTime();
@@ -561,8 +597,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
                             const aTime = getTimestampValue(a.createdAt);
                             const bTime = getTimestampValue(b.createdAt);
-
                             return bTime - aTime;
+                          })
+                          .filter(task => {
+                            // ✅ 完了タスクを非表示にするオプションに対応
+                            return showCompletedMap[period] || !task.done;
                           })
                           .map((task, idx) => (
                             <TaskCard
@@ -587,6 +626,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             />
                           ))}
                       </ul>
+
                     </div>
                   );
                 }
