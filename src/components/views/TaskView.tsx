@@ -565,11 +565,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                                 ? '完了タスクを表示中（クリックで非表示）'
                                 : '完了タスクを非表示中（クリックで表示）'
                             }
-                            className={`p-2 rounded-full border transition-all duration-300
-        ${showCompletedMap[period]
+                            className={`p-1 mr-3 rounded-full border transition-all duration-300
+                              ${showCompletedMap[period]
                                 ? 'bg-gradient-to-b from-yellow-100 to-yellow-300 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
                                 : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'}
-      `}
+                              `}
                           >
                             {showCompletedMap[period] ? (
                               <Lightbulb size={20} className="fill-yellow-500" />
