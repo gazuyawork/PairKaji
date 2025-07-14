@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { useEditPointData } from '@/hooks/useEditPointData';
 import { handleSavePoints } from '@/utils/handleSavePoints';
-import RouletteInputSection from '@/components/points/RouletteInputSection';
+// import RouletteInputSection from '@/components/points/RouletteInputSection';
 import PointInputRow from '@/components/points/PointInputRow';
 import BaseModal from './modals/BaseModal';
 
@@ -12,7 +12,7 @@ interface Props {
   isOpen: boolean;
   initialPoint: number;
   onClose: () => void;
-  onSave: (value: number) => void;
+  onSave: (totalPoint: number, selfPoint: number) => void;
   rouletteOptions: string[];
   setRouletteOptions: (options: string[]) => void;
   rouletteEnabled: boolean;
@@ -78,8 +78,8 @@ export default function EditPointModal({
     await handleSavePoints(
       point,
       selfPoint,
-      rouletteEnabled,
-      rouletteOptions,
+      // rouletteEnabled,
+      // rouletteOptions,
       onSave,
       onClose,
       setIsSaving,
@@ -181,9 +181,9 @@ export default function EditPointModal({
           />
         )} */}
 
-        {/* {error && (
+        {error && (
           <p className="text-red-500 text-center text-sm pt-2">{error}</p>
-        )} */}
+        )}
       </div>
     </BaseModal>
   );

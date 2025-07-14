@@ -3,6 +3,8 @@
 import { setDoc, doc } from 'firebase/firestore';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { serverTimestamp } from 'firebase/firestore';
+
 
 /**
  * 自分とパートナーのselfPointを、それぞれのFirestoreドキュメントに保存する
@@ -14,9 +16,9 @@ import { auth, db } from '@/lib/firebase';
 export const handleSavePoints = async (
   point: number,
   selfPoint: number,
-  rouletteEnabled: boolean,
-  rouletteOptions: string[],
-  onSave: (value: number) => void,
+  // rouletteEnabled: boolean,
+  // rouletteOptions: string[],
+  onSave: (totalPoint: number, selfPoint: number) => void,
   onClose: () => void,
   setIsSaving: (value: boolean) => void,
   setSaveComplete: (value: boolean) => void
@@ -54,12 +56,20 @@ export const handleSavePoints = async (
     // 4. 自分のドキュメントに保存
     await setDoc(doc(db, 'points', uid), {
       selfPoint,
+      weeklyTargetPoint: point,
+      userId: uid,
+      userIds,
+      updatedAt: serverTimestamp(),
     }, { merge: true });
 
     // 5. パートナーがいる場合 → 相手の selfPoint をその人のドキュメントに保存
     if (partnerUid) {
       await setDoc(doc(db, 'points', partnerUid), {
         selfPoint: partnerPoint,
+        weeklyTargetPoint: point,
+        userId: partnerUid,
+        userIds,
+        updatedAt: serverTimestamp(),
       }, { merge: true });
     }
 
@@ -68,7 +78,7 @@ export const handleSavePoints = async (
     setTimeout(() => {
       setIsSaving(false);
       setSaveComplete(false);
-      onSave(point);
+      onSave(point, selfPoint);
       onClose();
     }, 1500);
   } catch (error) {

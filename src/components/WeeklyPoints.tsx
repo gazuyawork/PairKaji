@@ -129,30 +129,30 @@ export default function WeeklyPoints() {
   const selfPercent = total === 0 ? 0 : (animatedSelfPoints / total) * percent;
   const partnerPercent = total === 0 ? 0 : (animatedPartnerPoints / total) * percent;
 
-const handleSave = async (newPoint: number) => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
 
-  const partnerUids = await fetchPairUserIds(uid);
+  const handleSave = async (newPoint: number, newSelfPoint: number) => {
 
-  // 仮に自分の内訳ポイントを newPoint の 50% とする（必要であれば正確に渡す）
-  const selfPoint = Math.floor(newPoint / 2);
-  const totalTargetPoint = newPoint;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-  setMaxPoints(totalTargetPoint);
+    const partnerUids = await fetchPairUserIds(uid);
+    const selfPoint = newSelfPoint;
+    const totalTargetPoint = newPoint;
 
-  await setDoc(
-    doc(db, 'points', uid),
-    {
-      userId: uid,
-      userIds: partnerUids,
-      selfPoint: selfPoint,                 // ✅ 自分の内訳ポイント
-      weeklyTargetPoint: totalTargetPoint,  // ✅ 合計目標ポイント
-      updatedAt: new Date(),
-    },
-    { merge: true }
-  );
-};
+    setMaxPoints(totalTargetPoint);
+
+    await setDoc(
+      doc(db, 'points', uid),
+      {
+        userId: uid,
+        userIds: partnerUids,
+        selfPoint: selfPoint,                 // ✅ 自分の内訳ポイント
+        weeklyTargetPoint: totalTargetPoint,  // ✅ 合計目標ポイント
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
+  };
 
 
   // const handleGoalAchieved = () => {
@@ -351,12 +351,13 @@ const handleSave = async (newPoint: number) => {
         isOpen={isModalOpen}
         initialPoint={maxPoints}
         onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
+        onSave={handleSave} // ← ここを修正
         rouletteOptions={rouletteOptions}
         setRouletteOptions={setRouletteOptions}
         rouletteEnabled={rouletteEnabled}
         setRouletteEnabled={setRouletteEnabled}
       />
+
     </div>
   );
 
