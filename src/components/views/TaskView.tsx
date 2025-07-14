@@ -30,6 +30,7 @@ import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import ConfirmModal from '@/components/modals/ConfirmModal';
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 
@@ -57,6 +58,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [flaggedFilter, setFlaggedFilter] = useState(false);
 
   const searchParams = useSearchParams();
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [onConfirmCallback, setOnConfirmCallback] = useState<(() => void) | null>(null);
+
 
   useEffect(() => {
     const flaggedParam = searchParams.get('flagged');
@@ -203,14 +208,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
     // ✅ ここで確認ダイアログ
     if (task.done) {
-      const message =
-        pairStatus === 'confirmed'
-          ? 'タスクを未処理に戻しますか？\n※パートナーが完了したタスクのポイントは減算されません。'
-          : 'タスクを未処理に戻しますか？';
-
-      const confirmed = window.confirm(message);
-      if (!confirmed) return;
+      const proceed = await new Promise<boolean>((resolve) => {
+        setOnConfirmCallback(() => () => resolve(true));
+        setConfirmOpen(true);
+      });
+      if (!proceed) return;
     }
+
 
     const uid = currentUser.uid;
 
@@ -593,6 +597,38 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </motion.div>
         )}
       </main>
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title=""
+        message={
+          pairStatus === 'confirmed' ? (
+            <>
+              <div className="text-xl font-semibold mb-2">
+                タスクを未処理に戻しますか？
+              </div>
+              <div className="text-sm text-gray-600">
+                ※パートナーが完了したタスクのポイントは減算されません。
+              </div>
+            </>
+          ) : (
+            <div className="text-base font-semibold">
+              タスクを未処理に戻しますか？
+            </div>
+          )
+        }
+        onConfirm={() => {
+          setConfirmOpen(false);
+          onConfirmCallback?.(); // Promise resolve
+        }}
+        onCancel={() => {
+          setConfirmOpen(false);
+        }}
+        confirmLabel="OK"
+        cancelLabel="キャンセル"
+      />
+
+
     </div>
   );
 }
