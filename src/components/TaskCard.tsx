@@ -11,6 +11,7 @@ import clsx from 'clsx';
 import { useView } from '@/context/ViewContext';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import ConfirmModal from '@/components/modals/ConfirmModal';
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
@@ -63,10 +64,13 @@ export default function TaskCard({
   const assignedUserId = task.users?.[0];
   const assignedUser = userList.find(u => u.id === assignedUserId);
   const profileImage = assignedUser?.imageUrl ?? '/images/default.png';
-  const profileName = assignedUser?.name ?? '未設定';  
+  const profileName = assignedUser?.name ?? '未設定';
   const [showActions, setShowActions] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(true); // 3ボタン表示制御
   // const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [onConfirmCallback, setOnConfirmCallback] = useState<(() => void) | null>(null);
+
 
   const toggleFlag = async () => {
     if (task.done) return; // 完了タスクなら何もしない
@@ -113,14 +117,18 @@ export default function TaskCard({
   };
 
   const handleDelete = () => {
-    const confirmed = window.confirm('このタスクを削除しますか？');
-    if (confirmed) {
-      onDelete(period, task.id);
+    // Promiseでユーザー選択を待つ
+    new Promise<boolean>((resolve) => {
+      setOnConfirmCallback(() => () => resolve(true));
+      setConfirmOpen(true);
+    }).then((confirmed) => {
+      if (confirmed) {
+        onDelete(period, task.id);
+      }
       setSwipeDirection(null);
-    } else {
-      setSwipeDirection(null);
-    }
+    });
   };
+
 
   const handleTodoClick = () => {
     setSelectedTaskName(task.name);
@@ -345,6 +353,24 @@ export default function TaskCard({
           )}
         </div>
       </motion.div>
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title=""
+        message={
+          <div className="text-xl font-semibold">このタスクを削除しますか？</div>
+        }
+        onConfirm={() => {
+          setConfirmOpen(false);
+          onConfirmCallback?.(); // resolve(true)
+        }}
+        onCancel={() => {
+          setConfirmOpen(false);
+        }}
+        confirmLabel="削除する"
+        cancelLabel="キャンセル"
+      />
+
     </div>
 
   );
