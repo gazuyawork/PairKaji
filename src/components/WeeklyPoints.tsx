@@ -9,6 +9,8 @@ import {
   onSnapshot,
   doc,
   setDoc,
+  getDoc,
+  getDocs,
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from './EditPointModal';
@@ -17,6 +19,13 @@ import { fetchPairUserIds } from '@/lib/taskUtils';
 // import RouletteWheel from '@/components/RouletteWheel';
 // import Confetti from 'react-confetti';
 // import { useWindowSize } from 'react-use';
+
+type UserInfo = {
+  id: string;
+  name: string;
+  imageUrl: string;
+};
+
 
 export default function WeeklyPoints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,6 +52,9 @@ export default function WeeklyPoints() {
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
   const [selfTargetPoint, setSelfTargetPoint] = useState<number | null>(null);
   const [partnerTargetPoint, setPartnerTargetPoint] = useState<number | null>(null);
+
+  const [users, setUsers] = useState<UserInfo[]>([]);
+
 
 
   useEffect(() => {
@@ -204,6 +216,55 @@ export default function WeeklyPoints() {
   }, []);
 
 
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      const userArray: UserInfo[] = [];
+
+      // 自分の情報取得
+      const userDocRef = doc(db, 'users', uid);
+      const userSnap = await getDoc(userDocRef);
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        userArray.push({
+          id: uid,
+          name: data.name ?? '自分',
+          imageUrl: data.imageUrl ?? '/images/default.png',
+        });
+      }
+
+      // ペア情報取得（pairs コレクションから）
+      const pairSnap = await getDocs(
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
+      );
+
+      if (!pairSnap.empty) {
+        const pairData = pairSnap.docs[0].data();
+        const partnerId = pairData.userIds.find((id: string) => id !== uid);
+
+        if (partnerId) {
+          const partnerDoc = await getDoc(doc(db, 'users', partnerId));
+          if (partnerDoc.exists()) {
+            const data = partnerDoc.data();
+            userArray.push({
+              id: partnerId,
+              name: data.name ?? 'パートナー',
+              imageUrl: data.imageUrl ?? '/images/default.png',
+            });
+          }
+        }
+      }
+
+      setUsers(userArray);
+    };
+
+    fetchUsers();
+  }, []);
+
+
+
 
   return (
     <div className="mx-auto w-full max-w-xl">
@@ -356,8 +417,8 @@ export default function WeeklyPoints() {
         setRouletteOptions={setRouletteOptions}
         rouletteEnabled={rouletteEnabled}
         setRouletteEnabled={setRouletteEnabled}
+        users={users}
       />
-
     </div>
   );
 

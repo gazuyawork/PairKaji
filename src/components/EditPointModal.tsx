@@ -1,12 +1,18 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { useEditPointData } from '@/hooks/useEditPointData';
 import { handleSavePoints } from '@/utils/handleSavePoints';
 // import RouletteInputSection from '@/components/points/RouletteInputSection';
 import PointInputRow from '@/components/points/PointInputRow';
 import BaseModal from './modals/BaseModal';
+
+type UserInfo = {
+  id: string;
+  name: string;
+  imageUrl: string;
+};
 
 interface Props {
   isOpen: boolean;
@@ -17,6 +23,7 @@ interface Props {
   setRouletteOptions: (options: string[]) => void;
   rouletteEnabled: boolean;
   setRouletteEnabled: (enabled: boolean) => void;
+  users: UserInfo[]
 }
 
 export default function EditPointModal({
@@ -28,6 +35,7 @@ export default function EditPointModal({
   setRouletteOptions,
   rouletteEnabled,
   setRouletteEnabled,
+  users,
 }: Props) {
   const [error, setError] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
@@ -40,16 +48,6 @@ export default function EditPointModal({
     setSelfPoint,
     calculatePoints,
   } = useEditPointData(initialPoint, setRouletteEnabled, setRouletteOptions);
-
-  const userPoints = useMemo(
-    () => [
-      { name: 'たろう', image: '/images/taro.png' },
-      { name: 'はなこ', image: '/images/hanako.png' },
-    ],
-    []
-  );
-
-  const partnerPoint = Math.max(0, point - selfPoint);
 
   const invalidRouletteConditions = (): boolean => {
     if (!rouletteEnabled) return false;
@@ -125,30 +123,30 @@ export default function EditPointModal({
         <div className="flex mt-4">
           <p className="text-gray-600 font-bold pt-2 pl-2 pr-4">内訳</p>
           <div className="flex justify-center gap-6">
-            {userPoints.map((user) => (
-              <div key={user.name} className="flex items-center gap-2">
-                <Image
-                  src={user.image || '/images/default.png'}
-                  alt={user.name}
-                  width={40}
-                  height={42}
-                  className="rounded-full border border-gray-300"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={point}
-                  value={user.name === 'たろう' ? selfPoint : partnerPoint}
-                  onChange={(e) =>
-                    user.name === 'たろう' && setSelfPoint(Number(e.target.value))
-                  }
-                  disabled={user.name === 'はなこ'}
-                  className={`w-16 text-xl border-b border-gray-300 outline-none text-center text-gray-700 ${user.name === 'はなこ' ? 'bg-gray-100' : ''
-                    }`}
-                />
-                <span className="text-gray-600">pt</span>
-              </div>
-            ))}
+            {users.map((user, index) => {
+              const isSelf = index === 0;
+              return (
+                <div key={user.id} className="flex items-center gap-2">
+<Image
+  src={user.imageUrl || '/images/default.png'}
+  alt={user.name}
+  width={40}
+  height={40} // ✅ width と height を同じにする
+  className="w-10 h-10 rounded-full object-cover border border-gray-300"
+/>
+                  <input
+                    type="number"
+                    min={0}
+                    max={point}
+                    value={isSelf ? selfPoint : point - selfPoint}
+                    onChange={(e) => isSelf && setSelfPoint(Number(e.target.value))}
+                    disabled={!isSelf}
+                    className={`w-16 text-xl border-b border-gray-300 outline-none text-center text-gray-700 ${!isSelf ? 'bg-gray-100' : ''}`}
+                  />
+                  <span className="text-gray-600">pt</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
