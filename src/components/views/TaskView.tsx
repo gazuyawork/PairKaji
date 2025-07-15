@@ -608,7 +608,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             }
                             className={`p-1 mr-3 rounded-full border transition-all duration-300
                               ${showCompletedMap[period]
-                                ? 'bg-gradient-to-b from-yellow-100 to-yellow-300 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
+                                ? 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
                                 : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'}
                               `}
                           >
