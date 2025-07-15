@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 type BaseModalProps = {
   isOpen: boolean;
@@ -28,12 +29,14 @@ export default function BaseModal({
   onCompleteAnimation,
   saveDisabled,
 }: BaseModalProps) {
-  // ✅ 完了マーク表示後に onCompleteAnimation を呼び出すための遅延実行
+  const [mounted, setMounted] = useState(false);
+
+  // ✅ 完了マーク表示後に onCompleteAnimation を呼ぶ
   useEffect(() => {
     if (saveComplete) {
       const timer = setTimeout(() => {
-        onCompleteAnimation?.(); // モーダルを閉じるなどの処理を呼ぶ
-      }, 1500); // 完了マーク表示時間 (アニメーションと合わせて1.5秒)
+        onCompleteAnimation?.();
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [saveComplete, onCompleteAnimation]);
@@ -50,15 +53,26 @@ export default function BaseModal({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
-    <div className="fixed inset-0 bg-white/80 z-[9999] flex justify-center items-center px-2">
+  if (!mounted || !isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex justify-center items-center px-2">
+      {/* 背景オーバーレイ */}
+      <div
+        className="absolute inset-0 bg-white/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* モーダル本体 */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg relative border border-gray-300 max-h-[95vh] overflow-y-auto"
+        className="relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-y-auto"
       >
         {(isSaving || saveComplete) && (
           <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
@@ -108,6 +122,7 @@ export default function BaseModal({
           </div>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -300,55 +300,55 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           mapFirestoreDocToTask(doc)
         );
         const updates: Promise<void>[] = [];
-for (const task of rawTasks) {
-  if (task.completedAt != null) {
-    let completedDate: Date | null = null;
+        for (const task of rawTasks) {
+          if (task.completedAt != null) {
+            let completedDate: Date | null = null;
 
-    if (typeof task.completedAt === 'string') {
-      try {
-        completedDate = parseISO(task.completedAt);
-      } catch {
-        console.warn('parseISO失敗:', task.completedAt);
-      }
-    } else if (task.completedAt instanceof Timestamp) {
-      completedDate = task.completedAt.toDate();
-    } else if (
-      task.completedAt &&
-      typeof task.completedAt === 'object' &&
-      'toDate' in task.completedAt &&
-      typeof (task.completedAt as Timestamp).toDate === 'function'
-    ) {
-      completedDate = (task.completedAt as Timestamp).toDate();
-    } else {
-      console.warn('不明な completedAt の型:', task.completedAt);
-    }
+            if (typeof task.completedAt === 'string') {
+              try {
+                completedDate = parseISO(task.completedAt);
+              } catch {
+                console.warn('parseISO失敗:', task.completedAt);
+              }
+            } else if (task.completedAt instanceof Timestamp) {
+              completedDate = task.completedAt.toDate();
+            } else if (
+              task.completedAt &&
+              typeof task.completedAt === 'object' &&
+              'toDate' in task.completedAt &&
+              typeof (task.completedAt as Timestamp).toDate === 'function'
+            ) {
+              completedDate = (task.completedAt as Timestamp).toDate();
+            } else {
+              console.warn('不明な completedAt の型:', task.completedAt);
+            }
 
-    if (completedDate !== null && !isToday(completedDate)) {
-      const taskRef = doc(db, 'tasks', task.id);
+            if (completedDate !== null && !isToday(completedDate)) {
+              const taskRef = doc(db, 'tasks', task.id);
 
-      // ✅ ドキュメントの存在確認を追加
-      const taskSnap = await getDoc(taskRef);
-      if (!taskSnap.exists()) {
-        console.warn(`スキップ: タスクが存在しません（${task.id}）`);
-        continue;
-      }
+              // ✅ ドキュメントの存在確認を追加
+              const taskSnap = await getDoc(taskRef);
+              if (!taskSnap.exists()) {
+                console.warn(`スキップ: タスクが存在しません（${task.id}）`);
+                continue;
+              }
 
-      updates.push(
-        updateDoc(taskRef, {
-          done: false,
-          skipped: false,
-          completedAt: null,
-          completedBy: '',
-        })
-      );
+              updates.push(
+                updateDoc(taskRef, {
+                  done: false,
+                  skipped: false,
+                  completedAt: null,
+                  completedBy: '',
+                })
+              );
 
-      task.done = false;
-      task.skipped = false;
-      task.completedAt = null;
-      task.completedBy = '';
-    }
-  }
-}
+              task.done = false;
+              task.skipped = false;
+              task.completedAt = null;
+              task.completedBy = '';
+            }
+          }
+        }
 
 
         await Promise.all(updates);
@@ -405,6 +405,36 @@ for (const task of rawTasks) {
           existingTasks={Object.values(tasksState).flat()}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title=""
+        message={
+          pairStatus === 'confirmed' ? (
+            <>
+              <div className="text-xl font-semibold mb-2">
+                タスクを未処理に戻しますか？
+              </div>
+              <div className="text-sm text-gray-600">
+                ※パートナーが完了したタスクのポイントは減算されません。
+              </div>
+            </>
+          ) : (
+            <div className="text-base font-semibold">
+              タスクを未処理に戻しますか？
+            </div>
+          )
+        }
+        onConfirm={() => {
+          setConfirmOpen(false);
+          onConfirmCallback?.(); // Promise resolve
+        }}
+        onCancel={() => {
+          setConfirmOpen(false);
+        }}
+        confirmLabel="OK"
+        cancelLabel="キャンセル"
+      />
 
       <main className="main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-60">
         {isLoading ? (
@@ -656,35 +686,7 @@ for (const task of rawTasks) {
         )}
       </main>
 
-      <ConfirmModal
-        isOpen={confirmOpen}
-        title=""
-        message={
-          pairStatus === 'confirmed' ? (
-            <>
-              <div className="text-xl font-semibold mb-2">
-                タスクを未処理に戻しますか？
-              </div>
-              <div className="text-sm text-gray-600">
-                ※パートナーが完了したタスクのポイントは減算されません。
-              </div>
-            </>
-          ) : (
-            <div className="text-base font-semibold">
-              タスクを未処理に戻しますか？
-            </div>
-          )
-        }
-        onConfirm={() => {
-          setConfirmOpen(false);
-          onConfirmCallback?.(); // Promise resolve
-        }}
-        onCancel={() => {
-          setConfirmOpen(false);
-        }}
-        confirmLabel="OK"
-        cancelLabel="キャンセル"
-      />
+
 
 
     </div>

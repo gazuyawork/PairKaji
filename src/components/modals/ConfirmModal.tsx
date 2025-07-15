@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 
 type ConfirmModalProps = {
   isOpen: boolean;
@@ -26,13 +27,17 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-white/80 z-[9999] flex justify-center items-center px-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex justify-center items-center px-4">
+      {/* 背景オーバーレイ（別レイヤー） */}
+      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm" />
+
+      {/* モーダル本体 */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="bg-white min-w-[350px] max-w-[380px] p-6 pt-8 rounded-xl shadow-lg relative border border-gray-300 max-h-[95vh] overflow-y-auto"
+        className="relative z-10 bg-white min-w-[350px] max-w-[380px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-y-auto"
       >
         {title && (
           <h2 className="text-lg font-bold mb-4 text-center text-gray-700">{title}</h2>
@@ -58,6 +63,7 @@ export default function ConfirmModal({
           </button>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }
