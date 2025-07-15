@@ -9,7 +9,7 @@ import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import clsx from 'clsx';
 import { useView } from '@/context/ViewContext';
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/modals/ConfirmModal';
 
@@ -73,7 +73,7 @@ export default function TaskCard({
 
 
   const toggleFlag = async () => {
-    if (task.done) return; // 完了タスクなら何もしない
+    if (task.done) return;
 
     try {
       const newFlag = !task.flagged;
@@ -82,6 +82,13 @@ export default function TaskCard({
       }, 500);
 
       const taskRef = doc(db, 'tasks', task.id);
+      const taskSnap = await getDoc(taskRef);
+
+      if (!taskSnap.exists()) {
+        console.warn('該当タスクが存在しません');
+        return;
+      }
+
       await updateDoc(taskRef, {
         flagged: newFlag,
         updatedAt: new Date(),

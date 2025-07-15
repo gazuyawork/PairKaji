@@ -11,12 +11,14 @@ export default function Home() {
   const router = useRouter();
   const [showSplash, setShowSplash] = useState<boolean | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, user => {
       if (!user) {
-        router.replace('/login'); // 🔁 未ログインならログイン画面へ
+        setIsAuthenticated(false);
       } else {
+        setIsAuthenticated(true);
         const needSplash = shouldShowSplash();
         if (needSplash) {
           setShowSplash(true);
@@ -30,8 +32,14 @@ export default function Home() {
     return () => unsubscribe();
   }, [router]);
 
-  if (checkingAuth || showSplash === null) return null;
-  if (showSplash) return <SplashScreen />;
+  if (checkingAuth) return null;
 
+  if (!isAuthenticated) {
+    // 👇 遷移ではなくログインページをここで表示（または return null にして /login を静的に表示）
+    router.replace('/login');
+    return null;
+  }
+
+  if (showSplash) return <SplashScreen />;
   return null;
 }

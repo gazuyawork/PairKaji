@@ -17,6 +17,7 @@ import {
   getDocs,
   serverTimestamp,
   Timestamp,
+  getDoc,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
@@ -299,46 +300,56 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           mapFirestoreDocToTask(doc)
         );
         const updates: Promise<void>[] = [];
-        for (const task of rawTasks) {
-          if (task.completedAt != null) {
-            let completedDate: Date | null = null;
+for (const task of rawTasks) {
+  if (task.completedAt != null) {
+    let completedDate: Date | null = null;
 
-            if (typeof task.completedAt === 'string') {
-              try {
-                completedDate = parseISO(task.completedAt);
-              } catch {
-                console.warn('parseISO失敗:', task.completedAt);
-              }
-            } else if (task.completedAt instanceof Timestamp) {
-              completedDate = task.completedAt.toDate();
-            } else if (
-              task.completedAt &&
-              typeof task.completedAt === 'object' &&
-              'toDate' in task.completedAt &&
-              typeof (task.completedAt as Timestamp).toDate === 'function'
-            ) {
-              completedDate = (task.completedAt as Timestamp).toDate();
-            } else {
-              console.warn('不明な completedAt の型:', task.completedAt);
-            }
+    if (typeof task.completedAt === 'string') {
+      try {
+        completedDate = parseISO(task.completedAt);
+      } catch {
+        console.warn('parseISO失敗:', task.completedAt);
+      }
+    } else if (task.completedAt instanceof Timestamp) {
+      completedDate = task.completedAt.toDate();
+    } else if (
+      task.completedAt &&
+      typeof task.completedAt === 'object' &&
+      'toDate' in task.completedAt &&
+      typeof (task.completedAt as Timestamp).toDate === 'function'
+    ) {
+      completedDate = (task.completedAt as Timestamp).toDate();
+    } else {
+      console.warn('不明な completedAt の型:', task.completedAt);
+    }
 
-            if (completedDate !== null && !isToday(completedDate)) {
-              const taskRef = doc(db, 'tasks', task.id);
-              updates.push(
-                updateDoc(taskRef, {
-                  done: false,
-                  skipped: false,
-                  completedAt: null,
-                  completedBy: '',
-                })
-              );
-              task.done = false;
-              task.skipped = false;
-              task.completedAt = null;
-              task.completedBy = '';
-            }
-          }
-        }
+    if (completedDate !== null && !isToday(completedDate)) {
+      const taskRef = doc(db, 'tasks', task.id);
+
+      // ✅ ドキュメントの存在確認を追加
+      const taskSnap = await getDoc(taskRef);
+      if (!taskSnap.exists()) {
+        console.warn(`スキップ: タスクが存在しません（${task.id}）`);
+        continue;
+      }
+
+      updates.push(
+        updateDoc(taskRef, {
+          done: false,
+          skipped: false,
+          completedAt: null,
+          completedBy: '',
+        })
+      );
+
+      task.done = false;
+      task.skipped = false;
+      task.completedAt = null;
+      task.completedBy = '';
+    }
+  }
+}
+
 
         await Promise.all(updates);
 

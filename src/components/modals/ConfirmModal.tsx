@@ -33,7 +33,7 @@ export default function ConfirmModal({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg relative border border-gray-300"
+        className="bg-white w-full max-w-[400px] mx-4 p-6 pt-8 rounded-xl shadow-lg relative border border-gray-300"
       >
         {title && (
           <h2 className="text-lg font-bold mb-4 text-center text-gray-700">{title}</h2>
