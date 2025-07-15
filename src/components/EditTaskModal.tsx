@@ -41,8 +41,7 @@ export default function EditTaskModal({
   const saveRequestIdRef = useRef<number>(0);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldClose, setShouldClose] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null); // 🔸追加
-
+  const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
     if (shouldClose) {
@@ -88,6 +87,19 @@ export default function EditTaskModal({
 
     return () => clearTimeout(timer);
   }, [isOpen, task, isPairConfirmed]);
+
+useEffect(() => {
+  if (isOpen) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+  }
+  return () => {
+    document.body.style.overflow = '';
+  };
+}, [isOpen]);
+
+
 
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
     setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
