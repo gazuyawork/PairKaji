@@ -621,10 +621,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         )}
                       </div>
 
-
-
-
-
                       <ul className="space-y-2">
                         {list
                           .slice()
@@ -674,21 +670,15 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             />
                           ))}
                       </ul>
-
                     </div>
                   );
                 }
-
                 return <div key={period}>{content}</div>;
               });
             })()}
           </motion.div>
         )}
       </main>
-
-
-
-
     </div>
   );
 }
