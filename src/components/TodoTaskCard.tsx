@@ -57,6 +57,17 @@ export default function TodoTaskCard({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
+  const [localDoneMap, setLocalDoneMap] = useState<Record<string, boolean>>({});
+  const [animateTriggerMap, setAnimateTriggerMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const newMap: Record<string, boolean> = {};
+    todos.forEach(todo => {
+      newMap[todo.id] = todo.done;
+    });
+    setLocalDoneMap(newMap);
+  }, [todos]);
+
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -261,19 +272,40 @@ export default function TodoTaskCard({
           {filteredTodos.map(todo => (
             <div key={todo.id} className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <motion.div
-                  className="cursor-pointer"
-                  // onClick={() => handleToggleWithAnimation(todo.id)}
-                  initial={false}
-                  animate={animatingTodoIds.has(todo.id) ? { rotate: 360 } : { rotate: 0 }}
-                  transition={{ duration: 0.2, ease: 'easeInOut' }}
-                >
-                  {animatingTodoIds.has(todo.id) || todo.done ? (
-                    <CheckCircle className="text-yellow-500" />
-                  ) : (
-                    <Circle className="text-gray-400" />
-                  )}
-                </motion.div>
+
+<motion.div
+  key={animateTriggerMap[todo.id] ?? 0} // ✅ アニメーション強制発火用のキー
+  className="cursor-pointer"
+  onClick={() => {
+    // ✅ アニメーションのトリガーを更新（keyが変わることで再描画）
+    setAnimateTriggerMap(prev => ({
+      ...prev,
+      [todo.id]: (prev[todo.id] ?? 0) + 1,
+    }));
+
+    // ✅ 表示状態だけ先に更新（Circle ↔ CheckCircle）
+    setLocalDoneMap(prev => ({
+      ...prev,
+      [todo.id]: !prev[todo.id],
+    }));
+
+    // ✅ 実際のステータス切り替えはアニメ後に実行
+    setTimeout(() => {
+      onToggleDone(todo.id);
+    }, 300); // duration と合わせる
+  }}
+  initial={{ rotate: 0 }}
+  animate={{ rotate: 360 }}
+  transition={{ duration: 0.3, ease: 'easeInOut' }}
+>
+  {localDoneMap[todo.id] ? (
+    <CheckCircle className="text-yellow-500" />
+  ) : (
+    <Circle className="text-gray-400" />
+  )}
+</motion.div>
+
+
 
                 <input
                   type="text"
