@@ -45,7 +45,7 @@ export default function TodoTaskCard({
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [animatingTodoIds] = useState<Set<string>>(new Set());
+  // const [animatingTodoIds] = useState<Set<string>>(new Set());
   // const [animatingTodoIds, setAnimatingTodoIds] = useState<Set<string>>(new Set());
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
   const undoneCount = todos.filter(todo => !todo.done).length;
