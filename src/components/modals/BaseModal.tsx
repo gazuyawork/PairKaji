@@ -14,7 +14,7 @@ type BaseModalProps = {
   saveLabel?: string;
   disableCloseAnimation?: boolean;
   onCompleteAnimation?: () => void;
-  saveDisabled?: boolean; 
+  saveDisabled?: boolean;
 };
 
 export default function BaseModal({
@@ -37,6 +37,18 @@ export default function BaseModal({
       return () => clearTimeout(timer);
     }
   }, [saveComplete, onCompleteAnimation]);
+
+  // ✅ モーダル表示中は body スクロールを禁止
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
