@@ -224,8 +224,8 @@ export default function TodoTaskCard({
                       count === 0
                         ? 'bg-gray-300'
                         : type === 'undone'
-                          ? 'bg-red-400'
-                          : 'bg-blue-400'
+                          ? 'bg-gradient-to-b from-red-300 to-red-500'
+                          : 'bg-gradient-to-b from-blue-300 to-blue-500'
                     )}
                   >
                     {count}
