@@ -70,6 +70,11 @@ export default function TaskCard({
   // const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [onConfirmCallback, setOnConfirmCallback] = useState<(() => void) | null>(null);
+  const [localDone, setLocalDone] = useState(task.done);
+
+  useEffect(() => {
+    setLocalDone(task.done);
+  }, [task.done]);
 
 
   const toggleFlag = async () => {
@@ -116,12 +121,16 @@ export default function TaskCard({
   }, []);
 
   const handleClick = () => {
-    if (showActions) return; // アクション表示中は処理しない
-    if (task.done) {
-      setAnimateTrigger(prev => prev + 1);
-    }
-    onToggleDone(period, task.id);
+    if (showActions) return;
+
+    setAnimateTrigger(prev => prev + 1);
+    setLocalDone(true); // 仮で表示上「完了」にする
+
+    setTimeout(() => {
+      onToggleDone(period, task.id); // 実際の状態更新は後で
+    }, 300); // アニメーションと同じ時間
   };
+
 
   const handleDelete = () => {
     // Promiseでユーザー選択を待つ
@@ -280,7 +289,7 @@ export default function TaskCard({
           >
             <div className="relative w-6 h-6">
               {/* チェック済みアイコン（回転アニメーション） */}
-              {task.done && (
+              {localDone && (
                 <motion.div
                   key={animateTrigger}
                   className="absolute top-0 left-0 w-full h-full"
@@ -292,19 +301,16 @@ export default function TaskCard({
                 </motion.div>
               )}
 
-              {/* 未チェックアイコン（常時表示） */}
-              {!task.done && (
+              {!localDone && (
                 <Circle className="text-gray-400 w-6 h-6" />
               )}
             </div>
           </button>
 
-
           {/* フラグが ON のときだけ表示 */}
           {task.flagged && (
             <Flag className="text-red-500 w-6 h-6 ml-0" />
           )}
-
 
           <div className={clsx('min-w-0', (task.scheduledDate || (task.daysOfWeek?.length ?? 0) > 0) ? 'w-[100%]' : 'w-[100%]')}>
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
