@@ -292,7 +292,7 @@ export default function TodoTaskCard({
     // ✅ 実際のステータス切り替えはアニメ後に実行
     setTimeout(() => {
       onToggleDone(todo.id);
-    }, 300); // duration と合わせる
+    }, 600); // duration と合わせる
   }}
   initial={{ rotate: 0 }}
   animate={{ rotate: 360 }}
