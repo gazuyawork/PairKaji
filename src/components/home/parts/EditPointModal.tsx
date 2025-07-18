@@ -5,8 +5,8 @@ import Image from 'next/image';
 import { useEditPointData } from '@/hooks/useEditPointData';
 import { handleSavePoints } from '@/utils/handleSavePoints';
 // import RouletteInputSection from '@/components/points/RouletteInputSection';
-import PointInputRow from '@/components/home/PointInputRow';
-import BaseModal from './BaseModal';
+import PointInputRow from '@/components/home/parts/PointInputRow';
+import BaseModal from '../../common/modals/BaseModal';
 
 type UserInfo = {
   id: string;

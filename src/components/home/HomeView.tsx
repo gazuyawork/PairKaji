@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import WeeklyPoints from '@/components/home/WeeklyPoints';
-import TaskCalendar from '@/components/home/TaskCalendar';
+import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
+import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
-import PairInviteCard from '@/components/home/PairInviteCard';
-import FlaggedTaskAlertCard from '@/components/home/FlaggedTaskAlertCard';
+import PairInviteCard from '@/components/home/parts/PairInviteCard';
+import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);

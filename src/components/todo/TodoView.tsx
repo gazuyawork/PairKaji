@@ -17,13 +17,13 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import TodoTaskCard from '@/components/todo/TodoTaskCard';
+import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
-import GroupSelector from '@/components/todo/GroupSelector';
+import GroupSelector from '@/components/todo/parts/GroupSelector';
 import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
-import TodoNoteModal from '@/components/todo/TodoNoteModal';
+import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName } = useView();

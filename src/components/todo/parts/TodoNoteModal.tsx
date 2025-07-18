@@ -8,9 +8,9 @@ import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceAnimation';
-import ComparePriceTable from '@/components/todo/ComparePriceTable';
-import DetailInputFields from '@/components/todo/DetailInputFields';
-import BaseModal from '../modals/BaseModal';
+import ComparePriceTable from '@/components/todo/parts/ComparePriceTable';
+import DetailInputFields from '@/components/todo/parts/DetailInputFields';
+import BaseModal from '../../common/modals/BaseModal';
 
 interface TodoNoteModalProps {
   isOpen: boolean;

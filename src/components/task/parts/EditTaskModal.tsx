@@ -5,7 +5,7 @@ import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 import { createPortal } from 'react-dom';
-import BaseModal from './BaseModal';
+import BaseModal from '../../common/modals/BaseModal';
 
 type UserInfo = {
   id: string;

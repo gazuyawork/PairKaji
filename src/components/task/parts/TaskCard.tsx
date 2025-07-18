@@ -11,7 +11,7 @@ import clsx from 'clsx';
 import { useView } from '@/context/ViewContext';
 import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import ConfirmModal from '@/components/modals/ConfirmModal';
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',

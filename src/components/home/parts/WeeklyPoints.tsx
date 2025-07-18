@@ -13,7 +13,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
-import EditPointModal from '@/components/modals/EditPointModal';
+import EditPointModal from '@/components/home/parts/EditPointModal';
 import { fetchPairUserIds } from '@/lib/firebaseUtils';
 // import { motion } from 'framer-motion';
 // import RouletteWheel from '@/components/RouletteWheel';

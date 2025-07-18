@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import TaskCard from '@/components/task/TaskCard';
-import EditTaskModal from '@/components/modals/EditTaskModal';
+import TaskCard from '@/components/task/parts/TaskCard';
+import EditTaskModal from '@/components/task/parts/EditTaskModal';
 import type { Task, Period } from '@/types/Task';
-import SearchBox from '@/components/task/SearchBox';
-import FilterControls from '@/components/task/FilterControls';
+import SearchBox from '@/components/task/parts/SearchBox';
+import FilterControls from '@/components/task/parts/FilterControls';
 import {
   collection,
   onSnapshot,
@@ -31,7 +31,7 @@ import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
 import { X, Lightbulb, LightbulbOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import ConfirmModal from '@/components/modals/ConfirmModal';
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 
