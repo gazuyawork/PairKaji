@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import TaskCard from '@/components/TaskCard';
-import EditTaskModal from '@/components/EditTaskModal';
+import TaskCard from '@/components/task/TaskCard';
+import EditTaskModal from '@/components/modals/EditTaskModal';
 import type { Task, Period } from '@/types/Task';
-import SearchBox from '@/components/SearchBox';
-import FilterControls from '@/components/FilterControls';
+import SearchBox from '@/components/task/SearchBox';
+import FilterControls from '@/components/task/FilterControls';
 import {
   collection,
   onSnapshot,

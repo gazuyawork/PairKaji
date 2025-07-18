@@ -1,11 +1,11 @@
 'use client';
 
-import Header from '@/components/Header';
+import Header from '@/components/common/Header';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { toast } from 'sonner';
-import EmailEditModal from '@/components/EmailEditModal';
-import PasswordEditModal from '@/components/PasswordEditModal';
+import EmailEditModal from '@/components/modals/EmailEditModal';
+import PasswordEditModal from '@/components/modals/PasswordEditModal';
 import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
 import ProfileCard from '@/components/profile/ProfileCard';

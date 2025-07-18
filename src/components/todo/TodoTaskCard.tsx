@@ -1,5 +1,3 @@
-// ファイル名: TodoTaskCard.tsx
-
 'use client';
 
 import { CheckCircle, Circle, Trash2, Plus, ChevronsDown, Notebook } from 'lucide-react';
@@ -45,8 +43,6 @@ export default function TodoTaskCard({
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
-  // const [animatingTodoIds] = useState<Set<string>>(new Set());
-  // const [animatingTodoIds, setAnimatingTodoIds] = useState<Set<string>>(new Set());
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
   const undoneCount = todos.filter(todo => !todo.done).length;
   const doneCount = todos.filter(todo => todo.done).length;
@@ -67,7 +63,6 @@ export default function TodoTaskCard({
     });
     setLocalDoneMap(newMap);
   }, [todos]);
-
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -124,24 +119,6 @@ export default function TodoTaskCard({
       inputRef.current?.focus();
     });
   };
-
-  // const [isAnimating, setIsAnimating] = useState(false);
-
-  // const handleToggleWithAnimation = (id: string) => {
-  //   if (isAnimating) return;
-
-  //   setIsAnimating(true);
-  //   setAnimatingTodoIds(prev => new Set(prev).add(id));
-  //   setTimeout(() => {
-  //     onToggleDone(id);
-  //     setAnimatingTodoIds(prev => {
-  //       const newSet = new Set(prev);
-  //       newSet.delete(id);
-  //       return newSet;
-  //     });
-  //     setIsAnimating(false);
-  //   }, 300);
-  // };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleteAnimating, setIsDeleteAnimating] = useState(false);
@@ -273,39 +250,37 @@ export default function TodoTaskCard({
             <div key={todo.id} className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
 
-<motion.div
-  key={animateTriggerMap[todo.id] ?? 0} // ✅ アニメーション強制発火用のキー
-  className="cursor-pointer"
-  onClick={() => {
-    // ✅ アニメーションのトリガーを更新（keyが変わることで再描画）
-    setAnimateTriggerMap(prev => ({
-      ...prev,
-      [todo.id]: (prev[todo.id] ?? 0) + 1,
-    }));
+                <motion.div
+                  key={animateTriggerMap[todo.id] ?? 0} // ✅ アニメーション強制発火用のキー
+                  className="cursor-pointer"
+                  onClick={() => {
+                    // ✅ アニメーションのトリガーを更新（keyが変わることで再描画）
+                    setAnimateTriggerMap(prev => ({
+                      ...prev,
+                      [todo.id]: (prev[todo.id] ?? 0) + 1,
+                    }));
 
-    // ✅ 表示状態だけ先に更新（Circle ↔ CheckCircle）
-    setLocalDoneMap(prev => ({
-      ...prev,
-      [todo.id]: !prev[todo.id],
-    }));
+                    // ✅ 表示状態だけ先に更新（Circle ↔ CheckCircle）
+                    setLocalDoneMap(prev => ({
+                      ...prev,
+                      [todo.id]: !prev[todo.id],
+                    }));
 
-    // ✅ 実際のステータス切り替えはアニメ後に実行
-    setTimeout(() => {
-      onToggleDone(todo.id);
-    }, 600); // duration と合わせる
-  }}
-  initial={{ rotate: 0 }}
-  animate={{ rotate: 360 }}
-  transition={{ duration: 0.3, ease: 'easeInOut' }}
->
-  {localDoneMap[todo.id] ? (
-    <CheckCircle className="text-yellow-500" />
-  ) : (
-    <Circle className="text-gray-400" />
-  )}
-</motion.div>
-
-
+                    // ✅ 実際のステータス切り替えはアニメ後に実行
+                    setTimeout(() => {
+                      onToggleDone(todo.id);
+                    }, 600); // duration と合わせる
+                  }}
+                  initial={{ rotate: 0 }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                >
+                  {localDoneMap[todo.id] ? (
+                    <CheckCircle className="text-yellow-500" />
+                  ) : (
+                    <Circle className="text-gray-400" />
+                  )}
+                </motion.div>
 
                 <input
                   type="text"

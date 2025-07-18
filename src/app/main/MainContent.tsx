@@ -5,12 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { auth } from '@/lib/firebase';
-import FooterNav from '@/components/FooterNav';
-import HomeView from '@/components/views/HomeView';
-import TaskView from '@/components/views/TaskView';
-import TodoView from '@/components/views/TodoView';
-import QuickSplash from '@/components/QuickSplash';
-import Header from '@/components/Header';
+import FooterNav from '@/components/common/FooterNav';
+import HomeView from '@/components/home/HomeView';
+import TaskView from '@/components/task/TaskView';
+import TodoView from '@/components/todo/TodoView';
+import QuickSplash from '@/components/common/QuickSplash';
+import Header from '@/components/common/Header';
 import { useView } from '@/context/ViewContext';
 import clsx from 'clsx';
 

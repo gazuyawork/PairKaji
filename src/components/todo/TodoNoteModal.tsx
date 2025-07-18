@@ -10,7 +10,7 @@ import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/fires
 import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceAnimation';
 import ComparePriceTable from '@/components/todo/ComparePriceTable';
 import DetailInputFields from '@/components/todo/DetailInputFields';
-import BaseModal from './modals/BaseModal';
+import BaseModal from '../modals/BaseModal';
 
 interface TodoNoteModalProps {
   isOpen: boolean;
