@@ -1,38 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PairKaji（ペア家事管理アプリ）
 
-## Getting Started
+## 概要
 
-First, run the development server:
+PairKajiは、家事やTODOをペアで管理できるタスク管理アプリです。
+Firebase（Authentication, Firestore）とNext.js（App Router）を使用して構築されています。
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📁 ディレクトリ構成
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+pairkaji/
+├── public/ # アイコンや画像などの静的アセット
+│ ├── icons/ # タスクON/OFFのアイコン
+│ ├── images/ # プロフィール用画像
+│ └── ... # manifestやService Workerなど
+├── src/
+│ ├── app/ # Next.js App Router 対応の各ページ
+│ │ ├── main/ # タスク操作画面（スライドUI）
+│ │ ├── profile/ # プロフィールとペア設定画面
+│ │ ├── todo/ # TODO画面
+│ │ ├── login/, register/ # 認証画面
+│ │ └── splash/ # スプラッシュ画面
+│ ├── components/ # UI部品
+│ │ ├── common/ # 共通UI（ボタン等）
+│ │ ├── home/ # ホーム画面関連UI
+│ │ ├── profile/ # プロフィール画面専用コンポーネント
+│ │ ├── task/ # タスク関連UI（TaskCardなど）
+│ │ └── todo/ # TODO画面用UI
+│ ├── constants/ # バージョン情報などの定数定義
+│ ├── context/ # グローバルステート（ViewContextなど）
+│ ├── hooks/ # カスタムフック（プロフィール画像, アニメーションなど）
+│ ├── icons/ # オリジナルアイコン
+│ ├── lib/ # ロジック・Firestore操作群
+│ │ ├── firebase.ts # Firebase初期化
+│ │ ├── firebaseUtils.ts # Firestore関連ユーティリティ
+│ │ ├── taskUtils.ts # タスク保存・処理ロジック
+│ │ ├── pairUtils.ts # ペア関連処理
+│ │ ├── pointUtils.ts # ポイント関連処理
+│ │ └── ... # 各種ユーティリティ
+│ ├── store/ # Zustand等のグローバルストア（将来拡張用）
+│ ├── types/ # 型定義（Task, Pairなど）
+│ └── utils/ # 各種汎用関数（数値整形、ローカルストレージなど）
+├── pairkaji_functions/ # Firebase Cloud Functions (TypeScript)
+│ ├── src/index.ts # 関数エントリポイント
+│ └── lib/ # ビルド生成ファイル
+├── .gitignore
+├── firebase.json # Firebase 設定
+├── next.config.js # Next.js 設定
+├── tsconfig.json # TypeScript 設定
+├── tailwind.config.js # Tailwind 設定
+└── README.md
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+yaml
+コピーする
+編集する
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🔧 使用技術
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Next.js** (App Router)
+- **Firebase**
+  - Authentication
+  - Firestore
+  - Cloud Functions（TypeScript）
+- **Tailwind CSS**
+- **Framer Motion**
+- **Lucide Icons**
+- **Zustand** (予定)
+- **TypeScript**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🔐 認証・ペア機能
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Firebase Authentication によるログイン/新規登録
+- ペア設定（招待コード式）、承認・拒否・解除可能
+- ペア成立後、タスク・ポイント共有が可能
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# PairKaji
-# PairKaji
+---
+
+## 📝 今後の予定（例）
+
+- タグ/グループ分け機能
+- 通知機能
+- モバイルアプリ対応（PWA強化）
+
+---
+
+## 🗂 注意事項
+
+- Cloud Functions は `pairkaji_functions/` 以下に TypeScript で実装
+- セキュリティルールは Firestore の `userId`, `userIds` に基づいて制御
+- 開発中の未使用コンポーネントは `/src/components/common` または別途 `_archive` に整理予定
+
+---
