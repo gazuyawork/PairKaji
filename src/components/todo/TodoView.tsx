@@ -226,87 +226,89 @@ export default function TodoView() {
           }
 
           return filteredTasks.map(task => (
-            <TodoTaskCard
-              key={task.id}
-              task={task}
-              tab={activeTabs[task.id] ?? 'undone'}
-              setTab={(tab) =>
-                setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
-              }
-
-              onOpenNote={(text) => {
-                const todo = task.todos.find(t => t.text === text);
-                if (todo) {
-                  openNoteModal(task, todo);
+            <div key={task.id} className="mx-auto w-full max-w-xl">
+              <TodoTaskCard
+                key={task.id}
+                task={task}
+                tab={activeTabs[task.id] ?? 'undone'}
+                setTab={(tab) =>
+                  setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
                 }
-              }}
+
+                onOpenNote={(text) => {
+                  const todo = task.todos.find(t => t.text === text);
+                  if (todo) {
+                    openNoteModal(task, todo);
+                  }
+                }}
 
 
-              onAddTodo={async (todoId, text) => {
-                const newTodos = [...task.todos, { id: todoId, text, done: false }];
-                await updateDoc(doc(db, 'tasks', task.id), {
-                  todos: newTodos,
-                  updatedAt: serverTimestamp(),
-                });
-              }}
+                onAddTodo={async (todoId, text) => {
+                  const newTodos = [...task.todos, { id: todoId, text, done: false }];
+                  await updateDoc(doc(db, 'tasks', task.id), {
+                    todos: newTodos,
+                    updatedAt: serverTimestamp(),
+                  });
+                }}
 
 
-              onChangeTodo={(todoId, value) => {
-                const updated = tasks.map(t =>
-                  t.id === task.id
-                    ? {
-                      ...t,
-                      todos: t.todos.map(todo =>
-                        todo.id === todoId ? { ...todo, text: value } : todo
-                      ),
-                    }
-                    : t
-                );
-                setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
-              }}
+                onChangeTodo={(todoId, value) => {
+                  const updated = tasks.map(t =>
+                    t.id === task.id
+                      ? {
+                        ...t,
+                        todos: t.todos.map(todo =>
+                          todo.id === todoId ? { ...todo, text: value } : todo
+                        ),
+                      }
+                      : t
+                  );
+                  setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
+                }}
 
-              onToggleDone={async (todoId) => {
-                const updatedTodos = task.todos.map(todo =>
-                  todo.id === todoId ? { ...todo, done: !todo.done } : todo
-                );
-                await updateDoc(doc(db, 'tasks', task.id), {
-                  todos: updatedTodos,
-                  updatedAt: serverTimestamp(),
-                });
-              }}
+                onToggleDone={async (todoId) => {
+                  const updatedTodos = task.todos.map(todo =>
+                    todo.id === todoId ? { ...todo, done: !todo.done } : todo
+                  );
+                  await updateDoc(doc(db, 'tasks', task.id), {
+                    todos: updatedTodos,
+                    updatedAt: serverTimestamp(),
+                  });
+                }}
 
-              onBlurTodo={async (todoId, text) => {
-                const updatedTask = tasks.find(t => t.id === task.id);
-                if (!updatedTask) return;
+                onBlurTodo={async (todoId, text) => {
+                  const updatedTask = tasks.find(t => t.id === task.id);
+                  if (!updatedTask) return;
 
-                const newTodos = updatedTask.todos.map(todo =>
-                  todo.id === todoId ? { ...todo, text } : todo
-                );
+                  const newTodos = updatedTask.todos.map(todo =>
+                    todo.id === todoId ? { ...todo, text } : todo
+                  );
 
-                await saveTaskToFirestore(task.id, {
-                  ...updatedTask,
-                  todos: newTodos,
-                });
-              }}
+                  await saveTaskToFirestore(task.id, {
+                    ...updatedTask,
+                    todos: newTodos,
+                  });
+                }}
 
 
-              onDeleteTodo={async (todoId) => {
-                const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
-                await updateDoc(doc(db, 'tasks', task.id), {
-                  todos: updatedTodos,
-                  updatedAt: serverTimestamp(),
-                });
-              }}
-              onDeleteTask={async () => {
-                await updateDoc(doc(db, 'tasks', task.id), {
-                  visible: false,
-                  groupId: null,
-                  updatedAt: serverTimestamp(),
-                });
-              }}
-              todoRefs={todoRefs}
-              focusedTodoId={focusedTodoId}
-            />
+                onDeleteTodo={async (todoId) => {
+                  const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
+                  await updateDoc(doc(db, 'tasks', task.id), {
+                    todos: updatedTodos,
+                    updatedAt: serverTimestamp(),
+                  });
+                }}
+                onDeleteTask={async () => {
+                  await updateDoc(doc(db, 'tasks', task.id), {
+                    visible: false,
+                    groupId: null,
+                    updatedAt: serverTimestamp(),
+                  });
+                }}
+                todoRefs={todoRefs}
+                focusedTodoId={focusedTodoId}
+              />
+            </div>
           ));
         })()}
 
