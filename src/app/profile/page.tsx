@@ -25,7 +25,7 @@ import {
   approvePair,
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
-import { splitSharedTasksOnPairRemoval } from '@/lib/taskUtils';
+import { splitSharedTasksOnPairRemoval } from '@/lib/firebaseUtils';
 
 
 

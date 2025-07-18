@@ -25,7 +25,7 @@ import { isToday, parseISO } from 'date-fns';
 import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
-import { saveSingleTask } from '@/lib/taskUtils';
+import { saveSingleTask } from '@/lib/firebaseUtils';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';

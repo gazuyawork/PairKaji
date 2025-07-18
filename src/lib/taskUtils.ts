@@ -1,10 +1,26 @@
-// Firebase関連のインポート
+/**
+ * タスクに関連する Firestore 処理を一括で管理するユーティリティモジュール。
+ *
+ * 主な責務：
+ * - タスクの新規作成・更新・削除
+ * - タスクの完了・未完了の切り替え（ポイント処理も含む）
+ * - ToDo（サブタスク）の部分更新
+ * - 差額（節約）ログの記録
+ * - パートナー解除時の userIds 更新処理
+ *
+ * 依存モジュール：
+ * - Firebase Firestore
+ * - Firebase Auth
+ * - errorUtils（共通エラーハンドリング）
+ * - taskCompletions や savings など Firestore サブコレクション
+ */
 import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import { dayNameToNumber } from '@/lib/constants';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
+import { updateDoc, getDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { handleFirestoreError } from './errorUtils';
 
 /**
  * 指定されたpairIdのペアに属するuserIdsを取得する関数
@@ -269,5 +285,227 @@ export const splitSharedTasksOnPairRemoval = async (
     cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;
     cleanedPartnerCopy.updatedAt = serverTimestamp() as Timestamp;
     await addDoc(tasksRef, cleanedPartnerCopy);
+  }
+};
+
+
+
+
+/**
+ * タスクを Firestore に保存する（新規作成または更新）。
+ * - タスクが新規なら addDoc、既存なら updateDoc を使用。
+ * - userIds はログインユーザーのみ、もしくはペア共有の場合は全員を含める。
+ * - createdAt / updatedAt は自動的に付与される。
+ *
+ * @param taskId 更新対象のタスクID（null の場合は新規作成）
+ * @param taskData タスクの本体情報（任意のフィールドを含む）
+ */
+export const saveTaskToFirestore = async (taskId: string | null, taskData: any): Promise<void> => {
+  try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('ログインしていません');
+
+    let userIds: string[] = [uid];
+    const isPrivate = taskData.private === true;
+    if (!isPrivate) {
+      const pairId = sessionStorage.getItem('pairId');
+      if (pairId) {
+        const pairDoc = await getDoc(doc(db, 'pairs', pairId));
+        const pairData = pairDoc.data();
+        if (pairData?.userIds) userIds = pairData.userIds;
+      }
+    }
+
+    const commonData = { ...taskData, private: isPrivate, userIds };
+
+    if (taskId) {
+      await updateDoc(doc(db, 'tasks', taskId), {
+        ...commonData,
+        userId: uid,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      await addDoc(collection(db, 'tasks'), {
+        ...commonData,
+        userId: uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (err) {
+    handleFirestoreError(err);
+  }
+};
+
+/**
+ * 指定されたタスクIDの Firestore ドキュメントを削除する。
+ *
+ * @param taskId Firestore 上のタスクID
+ */
+export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'tasks', taskId));
+  } catch (err) {
+    handleFirestoreError(err);
+  }
+};
+
+/**
+ * 指定されたパートナーUIDを、ログインユーザーが関与しているすべてのタスクの userIds 配列から除外する。
+ * - 主にペア解除時に使用される。
+ *
+ * @param partnerUid 削除対象のパートナーUID
+ */
+export const removePartnerFromUserTasks = async (partnerUid: string) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('ユーザー情報が取得できません');
+
+  const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', user.uid));
+  const snapshot = await getDocs(q);
+
+  const batchUpdates = snapshot.docs.map(async (docRef) => {
+    const task = docRef.data();
+    const newUserIds = (task.userIds || []).filter((id: string) => id !== partnerUid);
+    await updateDoc(doc(db, 'tasks', docRef.id), {
+      userIds: newUserIds,
+      private: task.private ?? false,
+    });
+  });
+  await Promise.all(batchUpdates);
+};
+
+/**
+ * 指定されたタスク内のToDoアイテムを部分的に更新する。
+ * - 該当する todoId の要素を探し、memo / price / quantity / unit を上書き。
+ *
+ * @param taskId 対象タスクのID
+ * @param todoId 対象ToDoのID
+ * @param updates 更新するフィールド（任意）
+ */
+export const updateTodoInTask = async (
+  taskId: string,
+  todoId: string,
+  updates: {
+    memo?: string;
+    price?: number | null;
+    quantity?: number | null;
+    unit?: string;
+  }
+) => {
+  const taskRef = doc(db, 'tasks', taskId);
+  const latestSnap = await getDoc(taskRef);
+  if (!latestSnap.exists()) throw new Error('タスクが存在しません');
+
+  const taskData = latestSnap.data();
+  const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
+  const index = todos.findIndex((todo: any) => todo.id === todoId);
+  if (index === -1) throw new Error('TODOが見つかりません');
+
+  todos[index] = { ...todos[index], ...updates };
+  await updateDoc(taskRef, { todos });
+};
+
+/**
+ * 差額（節約）ログを Firestore の "savings" コレクションに追加する。
+ * - タスク内のToDoごとの価格比較履歴を記録する。
+ *
+ * @param userId 操作したユーザーのUID
+ * @param taskId 対象タスクのID
+ * @param todoId 対象ToDoのID
+ * @param currentUnitPrice 現在の単価（円）
+ * @param compareUnitPrice 比較対象の単価（円）
+ * @param difference 差額（円）※正の値なら節約
+ */
+export const addSavingsLog = async (
+  userId: string,
+  taskId: string,
+  todoId: string,
+  currentUnitPrice: number,
+  compareUnitPrice: number,
+  difference: number
+) => {
+  await addDoc(collection(db, 'savings'), {
+    userId,
+    taskId,
+    todoId,
+    currentUnitPrice,
+    compareUnitPrice,
+    difference,
+    savedAt: serverTimestamp(),
+  });
+};
+
+
+/**
+ * タスクの完了状態を切り替える処理（完了 ↔ 未完了）
+ * 完了時は `done`, `completedAt`, `completedBy` を更新し、
+ * 未完了に戻す場合は `taskCompletions` の履歴も削除する。
+ * 
+ * @param taskId 対象タスクのID
+ * @param userId 操作を行ったユーザーのUID
+ * @param done 完了状態（true: 完了にする、false: 未完了に戻す）
+ * @param taskName タスク名（ポイント記録用）
+ * @param point ポイント数（ポイント記録用）
+ * @param person 実行者名（ポイント記録用）
+ */
+export const toggleTaskDoneStatus = async (
+  taskId: string,
+  userId: string,
+  done: boolean,
+  taskName?: string,
+  point?: number,
+  person?: string
+) => {
+  try {
+    const taskRef = doc(db, 'tasks', taskId);
+
+    // ペア情報を取得して userIds を用意
+    let userIds = [userId];
+    const pairId = sessionStorage.getItem('pairId');
+
+    if (pairId) {
+      const pairDoc = await getDoc(doc(db, 'pairs', pairId));
+      const pairData = pairDoc.data();
+      if (pairData?.userIds) {
+        userIds = pairData.userIds;
+      }
+    }
+    if (done) {
+      // ✅ 完了にする場合
+      await updateDoc(taskRef, {
+        done: true,
+        completedAt: serverTimestamp(),
+        completedBy: userId,
+        flagged: false, // ✅ 追加: 完了時はフラグを自動的に外す
+      });
+      // 🔒 private タスクはポイント加算対象外
+      const taskSnap = await getDoc(taskRef);
+      const taskData = taskSnap.data();
+      const isPrivate = taskData?.private === true;
+
+      if (!isPrivate && taskName && point !== undefined && person) {
+        await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
+      }
+    } else {
+      // 未完了に戻す場合
+      await updateDoc(taskRef, {
+        done: false,
+        completedAt: null,
+        completedBy: '',
+      });
+
+      // taskCompletions から履歴削除
+      const q = query(
+        collection(db, 'taskCompletions'),
+        where('taskId', '==', taskId),
+        where('userId', '==', userId)
+      );
+
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    }
+  } catch (error) {
+    handleFirestoreError(error);
   }
 };

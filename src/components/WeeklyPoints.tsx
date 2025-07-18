@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from './EditPointModal';
-import { fetchPairUserIds } from '@/lib/taskUtils';
+import { fetchPairUserIds } from '@/lib/firebaseUtils';
 // import { motion } from 'framer-motion';
 // import RouletteWheel from '@/components/RouletteWheel';
 // import Confetti from 'react-confetti';
