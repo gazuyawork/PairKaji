@@ -316,14 +316,40 @@ export default function TaskCard({
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
           </div>
 
-          {task.scheduledDate && (
-            <div className="w-[5px]">
-              <span className="text-xs text-white whitespace-nowrap bg-gray-600 px-1.5 py-1 rounded-md">
-                <Calendar size={13} className="inline mr-0.5 pb-0.5" />
-                {task.scheduledDate.replace(/-/g, '/').slice(5)}
-              </span>
-            </div>
-          )}
+{(task.dates?.[0] || task.time) && (
+  <div className="flex flex-col items-center text-xs">
+    <div className="bg-gray-600 text-white px-2 py-1 rounded-md inline-block text-center leading-tight min-w-[68px]">
+      {/* 📅 日付（ある場合のみ） */}
+      {task.dates?.[0] && (
+        <div className="flex items-center justify-center gap-1">
+          <Calendar size={13} className="text-white" />
+          <span>{task.dates[0].replace(/-/g, '/').slice(5)}</span>
+        </div>
+      )}
+
+      {/* 🕒 時間（ある場合のみ） */}
+      {task.time && (
+        <div className="flex items-center justify-center gap-1 mt-0.5">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-[13px] h-[13px] text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 1m6-1a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>{task.time}</span>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+
+
+
 
           {task.daysOfWeek && (
             <div className="flex flex-wrap justify-end w-[105px]">

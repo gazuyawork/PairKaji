@@ -262,17 +262,34 @@ useEffect(() => {
         )}
 
         {/* 📆 日付選択（その他のみ） */}
+        {/* 📆 日付＆時間選択（その他のみ） */}
         {editedTask.period === 'その他' && (
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">日付：</label>
-            <input
-              type="date"
-              value={editedTask.dates[0] || ''}
-              onChange={(e) => update('dates', [e.target.value])}
-              className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
-            />
+            <div className="flex gap-2 w-full">
+<input
+  type="date"
+  value={editedTask.dates[0] || ''}
+  onChange={(e) => {
+    const date = e.target.value;
+    update('dates', [date]);
+    // ❌ time をセットしない（そのまま維持）
+  }}
+  className="w-1/2 border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
+/>
+              <input
+                type="time"
+                value={editedTask.time || ''}
+                onChange={(e) => {
+                  const time = e.target.value;
+                  update('time', time);
+                }}
+                className="w-1/2 border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
+              />
+            </div>
           </div>
         )}
+
 
         {/* ⭐ ポイント選択 */}
         <div className="flex items-center">

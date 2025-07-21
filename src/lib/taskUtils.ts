@@ -74,6 +74,7 @@ export const buildFirestoreTaskData = (
     point: task.point ?? 0,
     daysOfWeek: convertedDaysOfWeek,
     dates: task.dates ?? [],
+    time: task.time ?? '',
     isTodo: task.isTodo ?? false,
     done: task.done ?? false,
     skipped: task.skipped ?? false,
@@ -173,6 +174,7 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
       private: task.private ?? false, // ✅ ← 追加
       userIds,
       userId: uid,
+      time: task.time ?? '',
     };
 
     await saveTaskToFirestore(task.id, taskData);

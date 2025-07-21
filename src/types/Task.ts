@@ -25,6 +25,7 @@ export type FirestoreTask = {
   updatedAt?: Timestamp;
   [key: string]: unknown; // 任意フィールド許容（必要であれば）
   todos?: unknown[];
+  time?: string;
 };
 
 // アプリ共通で使うTask型（画面表示用ベース型）
@@ -53,6 +54,7 @@ export type Task = {
   private: boolean;
   flagged?: boolean;
   createdAt?: Date | Timestamp | string | null;
+  time?: string;
 };
 
 

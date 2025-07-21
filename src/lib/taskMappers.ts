@@ -28,6 +28,7 @@ export const mapFirestoreDocToTask = (doc: QueryDocumentSnapshot<FirestoreTask>)
     private: typeof data.private === 'boolean' ? data.private : false,
     flagged: typeof data.flagged === 'boolean' ? data.flagged : false,
     userIds: data.userIds ?? [],
+    time: data.time ?? '',
 
     // ✅ 追加：FirestoreのTimestampをDateに変換
     createdAt: data.createdAt?.toDate?.() ?? null,
