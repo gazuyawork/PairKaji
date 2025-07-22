@@ -244,130 +244,150 @@ export default function TaskCard({
         </div>
       )}
 
-<motion.div
-  {...swipeable}
-  onClick={() => {
-    setShowActions(true);
-    setShowActionButtons(true);
-  }}
-  className={clsx(
-    'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
-    task.done && 'opacity-50 scale-[0.99]',
-    'hover:shadow-md cursor-pointer',
-    'border-[#e5e5e5] bg-white'
-  )}
->
-  {/* 左側：チェックボックス・名前・曜日 */}
-  <div className="flex items-center gap-2 min-w-0 flex-1">
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        handleClick();
-      }}
-      className="focus:outline-none"
-    >
-      <div className="relative w-6 h-6">
-        {localDone && (
-          <motion.div
-            key={animateTrigger}
-            className="absolute top-0 left-0 w-full h-full"
-            initial={{ rotate: 0, scale: 1 }}
-            animate={{ rotate: 360, scale: [1, 1.3, 1] }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-          >
-            <CheckCircle className="text-yellow-500 w-6 h-6" />
-          </motion.div>
+      <motion.div
+        {...swipeable}
+        onClick={() => {
+          setShowActions(true);
+          setShowActionButtons(true);
+        }}
+        className={clsx(
+          'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
+          task.done && 'opacity-50 scale-[0.99]',
+          'hover:shadow-md cursor-pointer',
+          'border-[#e5e5e5] bg-white'
         )}
-        {!localDone && <Circle className="text-gray-400 w-6 h-6" />}
-      </div>
-    </button>
+      >
+        {/* TODOバッジ（左上） */}
+        {task.visible && (
+          <div
+            className="absolute top-0 left-0 w-[30px] h-[30px] bg-gradient-to-br from-blue-400 to-blue-600 text-white text-[11px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+            style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
+          >
+            <span className="translate-y-[-6px] translate-x-[-4px]">T</span>
+          </div>
+        )}
 
-    {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
+        {/* Privateバッジ（右上） */}
+        {task.private && (
+          <div
+            className="absolute top-0 right-0 w-[30px] h-[30px] bg-gradient-to-bl bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
+            style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
+          >
+            <span className="translate-y-[-6px] translate-x-[5px]">P</span>
+          </div>
+        )}
 
-    <div className="w-4/5 min-w-0 pr-2">
-      <span className="text-[#5E5E5E] font-medium font-sans truncate block">
-        {task.name}
-      </span>
-    </div>
-
-    {/* 曜日表示（残り50%領域内） */}
-    {task.daysOfWeek && (
-      <div className="flex flex-wrap justify-first max-w-[75px]">
-        {[...task.daysOfWeek]
-          .sort(
-            (a, b) =>
-              ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
-              ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
-          )
-          .map((d, i) => (
-            <div
-              key={i}
-              className={clsx(
-                'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
-                dayBaseClass,
-                dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+        {/* 左側：チェックボックス・名前・曜日 */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClick();
+            }}
+            className="focus:outline-none"
+          >
+            <div className="relative w-6 h-6">
+              {localDone && (
+                <motion.div
+                  key={animateTrigger}
+                  className="absolute top-0 left-0 w-full h-full"
+                  initial={{ rotate: 0, scale: 1 }}
+                  animate={{ rotate: 360, scale: [1, 1.3, 1] }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                >
+                  <CheckCircle className="text-yellow-500 w-6 h-6" />
+                </motion.div>
               )}
-            >
-              {d}
+              {!localDone && <Circle className="text-gray-400 w-6 h-6" />}
             </div>
-          ))}
-      </div>
-    )}
-  </div>
+          </button>
 
-  {/* 右側：日時・ポイント・画像 */}
-  <div className="flex items-center gap-1">
-    {/* 日時（曜日・日付・時間を1つのカラムで） */}
-    {(task.dates?.[0] || task.time) && (
-      <div className="flex flex-col items-center text-xs w-[65px]">
-        <div className="bg-gray-600 text-white px-2 py-1 rounded-md inline-block text-center leading-tight w-full">
-          {task.dates?.[0] && (
-            <div className="flex items-center justify-center gap-1">
-              <Calendar size={13} className="text-white" />
-              <span>{task.dates[0].replace(/-/g, '/').slice(5)}</span>
-            </div>
-          )}
-          {task.time && (
-            <div className="flex items-center justify-center gap-1 mt-0.5">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-[13px] h-[13px] text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 8v4l3 1m6-1a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span>{task.time}</span>
+          {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
+
+          <div className="w-4/5 min-w-0 pr-2">
+            <span className="text-[#5E5E5E] font-medium font-sans truncate block">
+              {task.name}
+            </span>
+          </div>
+
+          {/* 曜日表示（残り50%領域内） */}
+          {task.daysOfWeek && (
+            <div className="flex flex-wrap justify-first max-w-[75px]">
+              {[...task.daysOfWeek]
+                .sort(
+                  (a, b) =>
+                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
+                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
+                )
+                .map((d, i) => (
+                  <div
+                    key={i}
+                    className={clsx(
+                      'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
+                      dayBaseClass,
+                      dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+                    )}
+                  >
+                    {d}
+                  </div>
+                ))}
             </div>
           )}
         </div>
-      </div>
-    )}
 
-    {/* ポイント */}
-    <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right pr-1">
-      {task.point} <span className="text-sm">pt</span>
-    </p>
+        {/* 右側：日時・ポイント・画像 */}
+        <div className="flex items-center gap-1">
+          {/* 日時（曜日・日付・時間を1つのカラムで） */}
+          {(task.dates?.[0] || task.time) && (
+            <div className="flex flex-col items-center text-xs w-[65px]">
+              <div className="bg-gray-600 text-white px-2 py-1 rounded-md inline-block text-center leading-tight w-full">
+                {task.dates?.[0] && (
+                  <div className="flex items-center justify-center gap-1">
+                    <Calendar size={13} className="text-white" />
+                    <span>{task.dates[0].replace(/-/g, '/').slice(5)}</span>
+                  </div>
+                )}
+                {task.time && (
+                  <div className="flex items-center justify-center gap-1 mt-0.5">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-[13px] h-[13px] text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 8v4l3 1m6-1a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span>{task.time}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-    {/* 担当者アイコン */}
-    {isPairConfirmed && (
-      <Image
-        src={profileImage || '/images/default.png'}
-        alt={`${profileName}のアイコン`}
-        width={38}
-        height={38}
-        className="rounded-full border border-gray-300 object-cover aspect-square select-none touch-none"
-        draggable={false}
-      />
-    )}
-  </div>
-</motion.div>
+          {/* ポイント */}
+          <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
+            {task.point} <span className="text-sm">pt</span>
+          </p>
+
+          {/* 担当者アイコン */}
+          {isPairConfirmed && (
+            <Image
+              src={profileImage || '/images/default.png'}
+              alt={`${profileName}のアイコン`}
+              width={38}
+              height={38}
+              className="rounded-full border border-gray-300 object-cover aspect-square select-none touch-none"
+              draggable={false}
+            />
+          )}
+        </div>
+      </motion.div>
 
 
       <ConfirmModal
