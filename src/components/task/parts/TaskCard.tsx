@@ -351,7 +351,7 @@ export default function TaskCard({
     )}
 
     {/* ポイント */}
-    <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
+    <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right pr-1">
       {task.point} <span className="text-sm">pt</span>
     </p>
 
