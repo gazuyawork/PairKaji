@@ -30,7 +30,7 @@ export default function EditTaskModal({
   onSave,
   users,
   isPairConfirmed,
-  existingTasks, 
+  existingTasks,
 }: Props) {
   const [editedTask, setEditedTask] = useState<Task | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -88,16 +88,16 @@ export default function EditTaskModal({
     return () => clearTimeout(timer);
   }, [isOpen, task, isPairConfirmed]);
 
-useEffect(() => {
-  if (isOpen) {
-    document.body.style.overflow = 'hidden';
-  } else {
-    document.body.style.overflow = '';
-  }
-  return () => {
-    document.body.style.overflow = '';
-  };
-}, [isOpen]);
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
 
 
@@ -250,8 +250,8 @@ useEffect(() => {
                   type="button"
                   onClick={() => toggleDay(day)}
                   className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                      ? 'bg-[#5E5E5E] text-white'
-                      : 'bg-gray-200 text-gray-600'
+                    ? 'bg-[#5E5E5E] text-white'
+                    : 'bg-gray-200 text-gray-600'
                     }`}
                 >
                   {day}
@@ -267,16 +267,16 @@ useEffect(() => {
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">日付：</label>
             <div className="flex gap-2 w-full">
-<input
-  type="date"
-  value={editedTask.dates[0] || ''}
-  onChange={(e) => {
-    const date = e.target.value;
-    update('dates', [date]);
-    // ❌ time をセットしない（そのまま維持）
-  }}
-  className="w-1/2 border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
-/>
+              <input
+                type="date"
+                value={editedTask.dates[0] || ''}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  update('dates', [date]);
+                  // ❌ time をセットしない（そのまま維持）
+                }}
+                className="w-1/2 border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
+              />
               <input
                 type="time"
                 value={editedTask.time || ''}
@@ -321,8 +321,8 @@ useEffect(() => {
                       type="button"
                       onClick={() => toggleUser(user.id)}
                       className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected
-                          ? 'border-[#FFCB7D] opacity-100'
-                          : 'border-gray-300 opacity-30'
+                        ? 'border-[#FFCB7D] opacity-100'
+                        : 'border-gray-300 opacity-30'
                         }`}
                     >
                       <Image
