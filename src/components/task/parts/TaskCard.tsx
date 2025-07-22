@@ -13,19 +13,6 @@ import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
-// 👇★ここに追記する
-function formatWithWeekday(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-    const mmdd = dateStr.slice(5).replace(/-/g, '/');
-    const weekday = weekdays[date.getDay()];
-    return `${mmdd}（${weekday}）`;
-  } catch {
-    return dateStr;
-  }
-}
-
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
   '1': 'border-gray-300',
