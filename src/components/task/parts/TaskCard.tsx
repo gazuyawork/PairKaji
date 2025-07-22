@@ -284,7 +284,7 @@ export default function TaskCard({
 
     {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
 
-    <div className="w-4/5 min-w-0 pr-2">
+    <div className="w-[100%] min-w-0 pr-2">
       <span className="text-[#5E5E5E] font-medium font-sans truncate block">
         {task.name}
       </span>
@@ -316,7 +316,7 @@ export default function TaskCard({
   </div>
 
   {/* 右側：日時・ポイント・画像 */}
-  <div className="flex items-center gap-3">
+  <div className="flex items-center gap-2">
     {/* 日時（曜日・日付・時間を1つのカラムで） */}
     {(task.dates?.[0] || task.time) && (
       <div className="flex flex-col items-center text-xs w-[65px]">
@@ -351,7 +351,7 @@ export default function TaskCard({
     )}
 
     {/* ポイント */}
-    <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
+    <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right pr-2">
       {task.point} <span className="text-sm">pt</span>
     </p>
 
