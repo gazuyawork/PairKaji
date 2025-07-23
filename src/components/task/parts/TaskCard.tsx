@@ -50,6 +50,7 @@ type Props = {
   onEdit: () => void;
   userList: UserInfo[];
   isPairConfirmed: boolean;
+  isPrivate: boolean;
   onLongPress?: (x: number, y: number) => void;
 };
 
@@ -268,14 +269,14 @@ export default function TaskCard({
         )}
 
         {/* Privateバッジ（右上） */}
-        {task.private && (
+        {/* {task.private && (
           <div
             className="absolute top-0 right-0 w-[30px] h-[30px] bg-gradient-to-bl bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
             style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
           >
             <span className="translate-y-[-6px] translate-x-[5px]">P</span>
           </div>
-        )}
+        )} */}
 
         {/* 左側：チェックボックス・名前・曜日 */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -376,22 +377,38 @@ export default function TaskCard({
             </div>
           )}
 
-          {/* ポイント */}
-          <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
-            {task.point} <span className="text-sm">pt</span>
-          </p>
+          {/* ポイント + 担当者 or プライベートバッジ */}
+          {task.private ? (
+            <div className="flex items-center justify-center w-[90px] h-[38px]">
+              <span className="text-sm font-bold text-white px-2 py-[2px] rounded-full bg-gradient-to-br from-green-300 to-green-700 shadow-inner ring-1 ring-white/40">
+                Private
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 w-[90px]">
+              {/* ポイント */}
+              <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
+                {task.point} <span className="text-sm">pt</span>
+              </p>
 
-          {/* 担当者アイコン */}
-          {isPairConfirmed && (
-            <Image
-              src={profileImage || '/images/default.png'}
-              alt={`${profileName}のアイコン`}
-              width={38}
-              height={38}
-              className="rounded-full border border-gray-300 object-cover aspect-square select-none touch-none"
-              draggable={false}
-            />
+              {/* 担当者アイコン */}
+              {isPairConfirmed && (
+                <Image
+                  src={profileImage || '/images/default.png'}
+                  alt={`${profileName}のアイコン`}
+                  width={38}
+                  height={38}
+                  className="rounded-full border border-gray-300 object-cover aspect-square select-none touch-none"
+                  draggable={false}
+                />
+              )}
+            </div>
           )}
+
+
+
+
+
         </div>
       </motion.div>
 

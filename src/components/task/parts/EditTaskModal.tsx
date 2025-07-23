@@ -45,19 +45,19 @@ export default function EditTaskModal({
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-const [isIOS, setIsIOS] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
-useEffect(() => {
-  if (typeof window !== 'undefined') {
-    const ua = window.navigator.userAgent || '';
-    const platform = window.navigator.platform || '';
-    const isIOSDevice =
-      /iPhone|iPod/.test(ua) ||
-      (platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS判定
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = window.navigator.userAgent || '';
+      const platform = window.navigator.platform || '';
+      const isIOSDevice =
+        /iPhone|iPod/.test(ua) ||
+        (platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS判定
 
-    setIsIOS(isIOSDevice);
-  }
-}, []);
+      setIsIOS(isIOSDevice);
+    }
+  }, []);
 
 
 
@@ -285,113 +285,119 @@ useEffect(() => {
 
         {/* 📆 日付＆時間選択（その他のみ） */}
         {/* 📆 日付＆時間選択（その他のみ） */}
-{/* 📆 日付＆時間選択（その他のみ） */}
-{editedTask.period === 'その他' && (
-  <div className="flex items-center gap-2">
-    {/* 🏷 項目名 */}
-    <label className="w-20 text-gray-600 shrink-0">日付：</label>
+        {/* 📆 日付＆時間選択（その他のみ） */}
+        {editedTask.period === 'その他' && (
+          <div className="flex items-center gap-2">
+            {/* 🏷 項目名 */}
+            <label className="w-20 text-gray-600 shrink-0">日付：</label>
 
-    {/* 📅 日付入力 */}
-    <div className="relative w-[40%]">
-      {isIOS && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
-        <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-          yyyy-mm-dd
-        </span>
-      )}
-      <input
-        type="date"
-        value={editedTask.dates[0] || ''}
-        onChange={(e) => {
-          const date = e.target.value;
-          update('dates', [date]);
-        }}
-        className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
-      />
-    </div>
+            {/* 📅 日付入力 */}
+            <div className="relative w-[40%]">
+              {isIOS && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
+                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
+                  yyyy-mm-dd
+                </span>
+              )}
+              <input
+                type="date"
+                value={editedTask.dates[0] || ''}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  update('dates', [date]);
+                }}
+                className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
+              />
+            </div>
 
-    {/* ⏰ 時刻入力 */}
-    <div className="relative w-[30%]">
-      {isIOS && (!editedTask.time || editedTask.time === '') && (
-        <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-          --:--
-        </span>
-      )}
-      <input
-        type="time"
-        value={editedTask.time || ''}
-        onChange={(e) => {
-          const time = e.target.value;
-          update('time', time);
-        }}
-        className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
-      />
-    </div>
+            {/* ⏰ 時刻入力 */}
+            <div className="relative w-[30%]">
+              {isIOS && (!editedTask.time || editedTask.time === '') && (
+                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
+                  --:--
+                </span>
+              )}
+              <input
+                type="time"
+                value={editedTask.time || ''}
+                onChange={(e) => {
+                  const time = e.target.value;
+                  update('time', time);
+                }}
+                className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
+              />
+            </div>
 
-    {/* ✖ クリアボタン */}
-{(editedTask.dates[0] || editedTask.time) && (
-  <button
-    type="button"
-    onClick={() => {
-      update('dates', ['']);
-      update('time', '');
-    }}
-    className="text-red-500"
-    title="日付と時間をクリア"
-  >
-    <Eraser size={18} />
-  </button>
-)}
+            {/* ✖ クリアボタン */}
+            {(editedTask.dates[0] || editedTask.time) && (
+              <button
+                type="button"
+                onClick={() => {
+                  update('dates', ['']);
+                  update('time', '');
+                }}
+                className="text-red-500"
+                title="日付と時間をクリア"
+              >
+                <Eraser size={18} />
+              </button>
+            )}
 
-  </div>
-)}
+          </div>
+        )}
 
 
         {/* ⭐ ポイント選択 */}
-        <div className="flex items-center">
-          <label className="w-20 text-gray-600 shrink-0">ポイント：</label>
-          <select
-            value={editedTask.point}
-            onChange={(e) => update('point', Number(e.target.value))}
-            className="w-full border-b border-gray-300 outline-none pl-2"
-          >
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => (
-              <option key={val} value={val}>
-                {val} pt
-              </option>
-            ))}
-          </select>
-        </div>
+        {!isPrivate && (
+          <div className="flex items-center">
+            <label className="w-20 text-gray-600 shrink-0">ポイント：</label>
+            <select
+              value={editedTask.point}
+              onChange={(e) => update('point', Number(e.target.value))}
+              className="w-full border-b border-gray-300 outline-none pl-2"
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => (
+                <option key={val} value={val}>
+                  {val} pt
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
 
         {isPairConfirmed && (
           <>
             {/* 👤 担当者選択 */}
-            <div className="flex items-center">
-              <label className="w-20 text-gray-600 shrink-0">担当者：</label>
-              <div className="flex gap-2">
-                {users.map((user) => {
-                  const isSelected = editedTask.users[0] === user.id;
-                  return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => toggleUser(user.id)}
-                      className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected
-                        ? 'border-[#FFCB7D] opacity-100'
-                        : 'border-gray-300 opacity-30'
-                        }`}
-                    >
-                      <Image
-                        src={user.imageUrl || '/images/default.png'}
-                        alt={user.name}
-                        width={48}
-                        height={48}
-                        className="object-cover w-full h-full"
-                      />
-                    </button>
-                  );
-                })}
+            {!isPrivate && (
+              <div className="flex items-center">
+                <label className="w-20 text-gray-600 shrink-0">担当者：</label>
+                <div className="flex gap-2">
+                  {users.map((user) => {
+                    const isSelected = editedTask.users[0] === user.id;
+                    return (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => toggleUser(user.id)}
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected
+                            ? 'border-[#FFCB7D] opacity-100'
+                            : 'border-gray-300 opacity-30'
+                          }`}
+                      >
+                        <Image
+                          src={user.imageUrl || '/images/default.png'}
+                          alt={user.name}
+                          width={48}
+                          height={48}
+                          className="object-cover w-full h-full"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
+
 
             {/* 🔒 プライベートモード */}
             <div className="flex items-center gap-3 mt-2">

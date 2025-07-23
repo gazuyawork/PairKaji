@@ -666,6 +666,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                               }
                               userList={userList}
                               isPairConfirmed={pairStatus === 'confirmed'}
+                              isPrivate={task.private === true}
                               onLongPress={(x, y) => setLongPressPosition({ x, y })}
                             />
                           ))}
