@@ -252,7 +252,7 @@ export default function TaskCard({
           setShowActionButtons(true);
         }}
         className={clsx(
-          'w-full relative flex justify-between items-center px-4 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
+          'w-full relative flex justify-between items-center px-3 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
           'border-[#e5e5e5] bg-white'
@@ -305,7 +305,7 @@ export default function TaskCard({
 
           {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
 
-          <div className="w-4/5 min-w-0 pr-2">
+          <div className="w-[100%] min-w-0">
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">
               {task.name}
             </span>
@@ -315,7 +315,7 @@ export default function TaskCard({
           {task.daysOfWeek && (
             <div
               className={clsx(
-                'grid gap-[4px] w-[52px] pr-1',
+                'grid gap-x-[10px] gap-y-0 w-[52px] pr-1',
                 task.daysOfWeek.length === 1 ? 'grid-cols-1 place-items-end' : 'grid-cols-2'
               )}
             >
@@ -329,7 +329,7 @@ export default function TaskCard({
                   <div
                     key={i}
                     className={clsx(
-                      'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
+                      'w-5.5 h-5.5 aspect-square rounded-full text-white text-[10px] flex items-center justify-center flex-shrink-0 border-2',
                       dayBaseClass,
                       dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
                     )}
@@ -346,11 +346,11 @@ export default function TaskCard({
         <div className="flex items-center gap-1">
           {/* 日時（曜日・日付・時間を1つのカラムで） */}
           {(task.dates?.[0] || task.time) && (
-            <div className="flex flex-col items-center text-xs w-[65px]">
-              <div className="bg-gray-600 text-white px-2 py-1 rounded-md inline-block text-center leading-tight w-full">
+            <div className="flex flex-col items-center text-xs w-[45px]">
+              <div className="text-gray-600 inline-block text-center leading-tight w-full">
                 {task.dates?.[0] && (
                   <div className="flex items-center justify-center gap-1">
-                    <Calendar size={13} className="text-white" />
+                    <Calendar size={13} className="text-gray-600" />
                     <span>{task.dates[0].replace(/-/g, '/').slice(5)}</span>
                   </div>
                 )}
@@ -358,7 +358,7 @@ export default function TaskCard({
                   <div className="flex items-center justify-center gap-1 mt-0.5">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="w-[13px] h-[13px] text-white"
+                      className="w-[13px] h-[13px] text-gray-600"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -380,15 +380,15 @@ export default function TaskCard({
           {/* ポイント + 担当者 or プライベートバッジ */}
           {task.private ? (
             <div className="flex items-center justify-center w-[90px] h-[38px]">
-              <span className="text-sm text-white px-2 py-[2px] rounded-md bg-gradient-to-br from-green-300 to-green-700 shadow-inner ring-1 ring-white/40">
+              <span className="font-bold text-sm text-green-600 px-2 py-[2px] to-green-100 tracking-wider">
                 Private
               </span>
             </div>
           ) : (
             <div className="flex items-center gap-2 w-[90px]">
               {/* ポイント */}
-              <p className="font-bold text-[#5E5E5E] font-sans min-w-[44px] text-right">
-                {task.point} <span className="text-sm">pt</span>
+              <p className="text-[#5E5E5E] font-sans min-w-[46px] text-right">
+                {task.point} <span className="text-xs">pt</span>
               </p>
 
               {/* 担当者アイコン */}
