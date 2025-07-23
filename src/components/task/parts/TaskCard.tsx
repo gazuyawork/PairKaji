@@ -315,7 +315,7 @@ export default function TaskCard({
           {task.daysOfWeek && (
             <div
               className={clsx(
-                'grid gap-[4px] w-[52px]',
+                'grid gap-[4px] w-[52px] pr-1',
                 task.daysOfWeek.length === 1 ? 'grid-cols-1 place-items-end' : 'grid-cols-2'
               )}
             >
@@ -380,7 +380,7 @@ export default function TaskCard({
           {/* ポイント + 担当者 or プライベートバッジ */}
           {task.private ? (
             <div className="flex items-center justify-center w-[90px] h-[38px]">
-              <span className="text-sm font-bold text-white px-2 py-[2px] rounded-full bg-gradient-to-br from-green-300 to-green-700 shadow-inner ring-1 ring-white/40">
+              <span className="text-sm text-white px-2 py-[2px] rounded-md bg-gradient-to-br from-green-300 to-green-700 shadow-inner ring-1 ring-white/40">
                 Private
               </span>
             </div>
