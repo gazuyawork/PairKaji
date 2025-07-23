@@ -294,7 +294,7 @@ useEffect(() => {
     {/* 📅 日付入力 */}
     <div className="relative w-[40%]">
       {isIOS && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
-        <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
+        <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
           yyyy-mm-dd
         </span>
       )}
@@ -305,14 +305,14 @@ useEffect(() => {
           const date = e.target.value;
           update('dates', [date]);
         }}
-        className="w-[100%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10"
+        className="w-[95%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
       />
     </div>
 
     {/* ⏰ 時刻入力 */}
     <div className="relative w-[30%]">
       {isIOS && (!editedTask.time || editedTask.time === '') && (
-        <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
+        <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
           --:--
         </span>
       )}
@@ -323,7 +323,7 @@ useEffect(() => {
           const time = e.target.value;
           update('time', time);
         }}
-        className="w-[100%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10"
+        className="w-[95%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
       />
     </div>
 
