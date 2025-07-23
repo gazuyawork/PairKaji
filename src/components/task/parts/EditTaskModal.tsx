@@ -305,7 +305,7 @@ useEffect(() => {
           const date = e.target.value;
           update('dates', [date]);
         }}
-        className="w-[95%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
+        className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
       />
     </div>
 
@@ -323,7 +323,7 @@ useEffect(() => {
           const time = e.target.value;
           update('time', time);
         }}
-        className="w-[95%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
+        className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
       />
     </div>
 
