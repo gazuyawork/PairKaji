@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 import { createPortal } from 'react-dom';
 import BaseModal from '../../common/modals/BaseModal';
+import { Eraser } from 'lucide-react';
+
 
 type UserInfo = {
   id: string;
@@ -283,49 +285,66 @@ useEffect(() => {
 
         {/* 📆 日付＆時間選択（その他のみ） */}
         {/* 📆 日付＆時間選択（その他のみ） */}
-        {editedTask.period === 'その他' && (
-          <div className="flex items-center">
-            <label className="w-20 text-gray-600 shrink-0">日付：</label>
-            <div className="flex gap-2 w-full">
+{/* 📆 日付＆時間選択（その他のみ） */}
+{editedTask.period === 'その他' && (
+  <div className="flex items-center gap-2">
+    {/* 🏷 項目名 */}
+    <label className="w-20 text-gray-600 shrink-0">日付：</label>
 
-              {/* 📅 日付入力（プレースホルダー風ラベル付き） */}
-              <div className="w-1/2 relative">
-                {isIOS && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
-                  <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
-                    yyyy-mm-dd
-                  </span>
-                )}
-                <input
-                  type="date"
-                  value={editedTask.dates[0] || ''}
-                  onChange={(e) => {
-                    const date = e.target.value;
-                    update('dates', [date]);
-                  }}
-                  className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none relative z-10"
-                />
-              </div>
+    {/* 📅 日付入力 */}
+    <div className="relative w-[40%]">
+      {isIOS && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
+        <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
+          yyyy-mm-dd
+        </span>
+      )}
+      <input
+        type="date"
+        value={editedTask.dates[0] || ''}
+        onChange={(e) => {
+          const date = e.target.value;
+          update('dates', [date]);
+        }}
+        className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10"
+      />
+    </div>
 
-              {/* ⏰ 時間入力（プレースホルダー風ラベル付き） */}
-              <div className="w-1/2 relative">
-                {isIOS && (!editedTask.time || editedTask.time === '') && (
-                  <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
-                    --:--
-                  </span>
-                )}
-                <input
-                  type="time"
-                  value={editedTask.time || ''}
-                  onChange={(e) => {
-                    const time = e.target.value;
-                    update('time', time);
-                  }}
-                  className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none relative z-10"
-                />
-              </div>
-            </div>
-          </div>
-        )}
+    {/* ⏰ 時刻入力 */}
+    <div className="relative w-[30%]">
+      {isIOS && (!editedTask.time || editedTask.time === '') && (
+        <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
+          --:--
+        </span>
+      )}
+      <input
+        type="time"
+        value={editedTask.time || ''}
+        onChange={(e) => {
+          const time = e.target.value;
+          update('time', time);
+        }}
+        className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10"
+      />
+    </div>
+
+    {/* ✖ クリアボタン */}
+{(editedTask.dates[0] || editedTask.time) && (
+  <button
+    type="button"
+    onClick={() => {
+      update('dates', ['']);
+      update('time', '');
+    }}
+    className="text-red-500"
+    title="日付と時間をクリア"
+  >
+    <Eraser size={18} />
+  </button>
+)}
+
+  </div>
+)}
+
 
         {/* ⭐ ポイント選択 */}
         <div className="flex items-center">
