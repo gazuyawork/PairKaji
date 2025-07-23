@@ -311,28 +311,34 @@ export default function TaskCard({
           </div>
 
           {/* 曜日表示（残り50%領域内） */}
-          {task.daysOfWeek && (
-            <div className="flex flex-wrap justify-first max-w-[75px]">
-              {[...task.daysOfWeek]
-                .sort(
-                  (a, b) =>
-                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
-                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
-                )
-                .map((d, i) => (
-                  <div
-                    key={i}
-                    className={clsx(
-                      'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
-                      dayBaseClass,
-                      dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
-                    )}
-                  >
-                    {d}
-                  </div>
-                ))}
-            </div>
+{task.daysOfWeek && (
+  <div
+    className={clsx(
+      'grid gap-[4px] w-[52px]',
+      task.daysOfWeek.length === 1 ? 'grid-cols-1 place-items-end' : 'grid-cols-2'
+    )}
+  >
+    {[...task.daysOfWeek]
+      .sort(
+        (a, b) =>
+          ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
+          ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
+      )
+      .map((d, i) => (
+        <div
+          key={i}
+          className={clsx(
+            'w-6 h-6 aspect-square rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 border-2',
+            dayBaseClass,
+            dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
           )}
+        >
+          {d}
+        </div>
+      ))}
+  </div>
+)}
+
         </div>
 
         {/* 右側：日時・ポイント・画像 */}
