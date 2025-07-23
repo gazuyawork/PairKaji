@@ -339,15 +339,14 @@ export default function TaskCard({
                 ))}
             </div>
           )}
-
         </div>
 
         {/* 右側：日時・ポイント・画像 */}
         <div className="flex items-center gap-1">
           {/* 日時（曜日・日付・時間を1つのカラムで） */}
           {(task.dates?.[0] || task.time) && (
-            <div className="flex flex-col items-center text-xs w-[45px]">
-              <div className="text-gray-600 inline-block text-center leading-tight w-full">
+            <div className="flex flex-col items-center text-xs w-[32px]">
+              <div className="text-gray-600 inline-block text-center leading-tight">
                 {task.dates?.[0] && (
                   <div className="flex items-center justify-center gap-1">
                     <Calendar size={13} className="text-gray-600" />
@@ -404,11 +403,6 @@ export default function TaskCard({
               )}
             </div>
           )}
-
-
-
-
-
         </div>
       </motion.div>
 
