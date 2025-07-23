@@ -621,7 +621,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         )}
                       </div>
 
-                      <ul className="space-y-2">
+                      <ul className="space-y-1.5">
                         {list
                           .slice()
                           .sort((a, b) => {
