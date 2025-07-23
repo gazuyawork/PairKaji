@@ -99,8 +99,6 @@ export default function EditTaskModal({
     };
   }, [isOpen]);
 
-
-
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
     setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
@@ -128,9 +126,14 @@ export default function EditTaskModal({
     }
 
     // 🔸 重複チェック（IDが異なる同名タスクが存在する場合）
+    // 🔸 重複チェック（IDが異なる同名タスクが存在し、かつユーザーが重複している場合）
     const isDuplicate = existingTasks.some(
-      (t) => t.name === editedTask.name && t.id !== editedTask.id
+      (t) =>
+        t.name === editedTask.name &&
+        t.id !== editedTask.id &&
+        t.userIds?.some((uid) => editedTask.users.includes(uid))
     );
+
     if (isDuplicate) {
       setNameError('すでに登録済みです。');
       return;
@@ -163,8 +166,6 @@ export default function EditTaskModal({
     }, 300);
   };
 
-
-
   if (!mounted || !isOpen || !editedTask) return null;
 
   return createPortal(
@@ -191,12 +192,16 @@ export default function EditTaskModal({
                 const newName = e.target.value;
                 update('name', newName);
 
-                const isNewTask = !task.id;
-                const isDuplicate = isNewTask
-                  ? existingTasks.some((t) => t.name === newName)
-                  : false;
+                const isDuplicate = existingTasks.some(
+                  (t) =>
+                    t.name === newName &&
+                    t.id !== task.id &&
+                    t.userIds?.some((uid) => editedTask?.users.includes(uid))
+                );
+
                 setNameError(isDuplicate ? 'すでに登録済みです。' : null);
               }}
+
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
             />
           </div>
@@ -206,7 +211,6 @@ export default function EditTaskModal({
             <p className="text-xs text-red-500 ml-20 mt-1">{nameError}</p>
           )}
         </div>
-
 
         {/* 🗓 頻度選択 */}
         <div className="flex items-center">
@@ -261,7 +265,6 @@ export default function EditTaskModal({
           </div>
         )}
 
-        {/* 📆 日付選択（その他のみ） */}
         {/* 📆 日付＆時間選択（その他のみ） */}
         {editedTask.period === 'その他' && (
           <div className="flex items-center">
@@ -289,7 +292,6 @@ export default function EditTaskModal({
             </div>
           </div>
         )}
-
 
         {/* ⭐ ポイント選択 */}
         <div className="flex items-center">
