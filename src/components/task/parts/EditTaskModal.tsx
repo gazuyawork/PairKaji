@@ -43,6 +43,22 @@ export default function EditTaskModal({
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
+const [isIOS, setIsIOS] = useState(false);
+
+useEffect(() => {
+  if (typeof window !== 'undefined') {
+    const ua = window.navigator.userAgent || '';
+    const platform = window.navigator.platform || '';
+    const isIOSDevice =
+      /iPhone|iPod/.test(ua) ||
+      (platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS判定
+
+    setIsIOS(isIOSDevice);
+  }
+}, []);
+
+
+
   useEffect(() => {
     if (shouldClose) {
       onClose();
@@ -266,29 +282,47 @@ export default function EditTaskModal({
         )}
 
         {/* 📆 日付＆時間選択（その他のみ） */}
+        {/* 📆 日付＆時間選択（その他のみ） */}
         {editedTask.period === 'その他' && (
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">日付：</label>
             <div className="flex gap-2 w-full">
-              <input
-                type="date"
-                value={editedTask.dates[0] || ''}
-                onChange={(e) => {
-                  const date = e.target.value;
-                  update('dates', [date]);
-                  // ❌ time をセットしない（そのまま維持）
-                }}
-                className="w-1/2 border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
-              />
-              <input
-                type="time"
-                value={editedTask.time || ''}
-                onChange={(e) => {
-                  const time = e.target.value;
-                  update('time', time);
-                }}
-                className="w-1/2 border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none"
-              />
+
+              {/* 📅 日付入力（プレースホルダー風ラベル付き） */}
+              <div className="w-1/2 relative">
+                {isIOS && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
+                  <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
+                    yyyy-mm-dd
+                  </span>
+                )}
+                <input
+                  type="date"
+                  value={editedTask.dates[0] || ''}
+                  onChange={(e) => {
+                    const date = e.target.value;
+                    update('dates', [date]);
+                  }}
+                  className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none relative z-10"
+                />
+              </div>
+
+              {/* ⏰ 時間入力（プレースホルダー風ラベル付き） */}
+              <div className="w-1/2 relative">
+                {isIOS && (!editedTask.time || editedTask.time === '') && (
+                  <span className="absolute left-2 top-1.5 text-gray-400 text-sm pointer-events-none z-0">
+                    --:--
+                  </span>
+                )}
+                <input
+                  type="time"
+                  value={editedTask.time || ''}
+                  onChange={(e) => {
+                    const time = e.target.value;
+                    update('time', time);
+                  }}
+                  className="w-full border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none relative z-10"
+                />
+              </div>
             </div>
           </div>
         )}
