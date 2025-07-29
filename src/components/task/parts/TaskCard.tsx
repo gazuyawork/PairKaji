@@ -377,13 +377,13 @@ export default function TaskCard({
           )}
 
           {/* ポイント + 担当者 or プライベートバッジ */}
-          {task.private ? (
-            <div className="flex items-center justify-center w-[90px] h-[38px]">
-              <span className="font-bold text-sm text-green-600 px-2 py-[2px] to-green-100 tracking-wider">
-                Private
-              </span>
-            </div>
-          ) : (
+{task.private ? (
+  <div className="flex items-center justify-center w-[90px] h-[38px]">
+    <span className="font-pacifico text-sm px-2 py-[2px] tracking-wider bg-gradient-to-r from-green-500 to-green-800 text-transparent bg-clip-text">
+      Private
+    </span>
+  </div>
+) : (
             <div className="flex items-center gap-2 w-[90px]">
               {/* ポイント */}
               <p className="text-[#5E5E5E] font-sans min-w-[46px] text-right">
