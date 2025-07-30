@@ -5,7 +5,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 /**
- * ペア解除時のタスク分割処理
+ * ペア解除時の処理：共有タスクを削除（複製はしない）
  */
 export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (event) => {
   const beforeData = event.data?.before?.data();
@@ -20,8 +20,10 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
   if (!userAId || !userBId) return;
 
   if (beforeStatus !== 'removed' && afterStatus === 'removed') {
-    const currentUserIds = afterData?.userIds || [];
-    const tasksSnap = await db.collection('tasks')
+    console.log('👥 ペア解除検出：共有タスクを削除します');
+
+    const tasksSnap = await db
+      .collection('tasks')
       .where('private', '==', false)
       .where('userIds', 'array-contains-any', [userAId, userBId])
       .get();
@@ -30,37 +32,6 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
     let opCount = 0;
 
     for (const doc of tasksSnap.docs) {
-      const task = doc.data();
-      const originalUserIds: string[] = task.userIds || [];
-      if (originalUserIds.length <= 1) continue;
-
-      for (const targetUserId of originalUserIds) {
-        if (!currentUserIds.includes(targetUserId)) continue;
-
-        const newTaskRef = db.collection('tasks').doc();
-
-        const newTask = {
-          ...task,
-          userId: targetUserId,
-          userIds: [targetUserId],
-          users: {
-            [targetUserId]: task.users?.[targetUserId] || null,
-          },
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          private: true,
-        };
-
-        batch.set(newTaskRef, newTask);
-        opCount++;
-
-        if (opCount >= 450) {
-          await batch.commit();
-          batch = db.batch();
-          opCount = 0;
-        }
-      }
-
       batch.delete(doc.ref);
       opCount++;
 
@@ -77,13 +48,15 @@ export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (eve
 
     await Promise.all([
       db.collection('task_split_logs').doc(userAId).set({
-        status: 'done',
+        status: 'deleted',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }),
       db.collection('task_split_logs').doc(userBId).set({
-        status: 'done',
+        status: 'deleted',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }),
     ]);
+
+    console.log('🗑️ 共有タスクの削除が完了しました');
   }
 });
