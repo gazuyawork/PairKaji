@@ -309,12 +309,11 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
 
     let userIds: string[] = [uid];
     const isPrivate = taskData.private === true;
+
     if (!isPrivate) {
-      const pairId = sessionStorage.getItem('pairId');
-      if (pairId) {
-        const pairDoc = await getDoc(doc(db, 'pairs', pairId));
-        const pairData = pairDoc.data();
-        if (pairData?.userIds) userIds = pairData.userIds;
+      const pairUserIds = await fetchPairUserIds(uid); // 🔽 Firestoreから直接取得
+      if (pairUserIds.length > 0) {
+        userIds = pairUserIds;
       }
     }
 
