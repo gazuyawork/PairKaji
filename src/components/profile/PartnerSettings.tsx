@@ -1,3 +1,4 @@
+// src/components/profile/PartnerSettings.tsx
 'use client';
 
 import { X } from 'lucide-react';
@@ -37,11 +38,8 @@ export default function PartnerSettings({
   onRemovePair,
   onChangePartnerEmail,
   partnerImage,
-  isRemoving, // ✅ これを追加
+  isRemoving,
 }: PartnerSettingsProps) {
-
-  // const { partnerImage } = useProfileImages(); // ✅ 修正ポイント
-
   return (
     <motion.div
       className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-3"
@@ -59,7 +57,7 @@ export default function PartnerSettings({
         </div>
       ) : (
         <>
-          {pendingApproval && (
+          {pendingApproval ? (
             <>
               <p className="text-gray-600 text-sm">{pendingApproval.emailB} さんとして招待されています</p>
               <p className="text-gray-600 text-sm">招待コード: {pendingApproval.inviteCode}</p>
@@ -76,9 +74,31 @@ export default function PartnerSettings({
                 拒否する
               </button>
             </>
-          )}
-
-          {!isPairConfirmed && !pendingApproval && (
+          ) : isPairConfirmed ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="relative w-16 h-16 rounded-full border border-gray-300 overflow-hidden">
+                  <Image
+                    src={partnerImage || '/images/default.png'}
+                    alt="パートナー画像"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="text-[#5E5E5E]">
+                  <p className="font-semibold">パートナー承認済み</p>
+                  <p>{partnerEmail}</p>
+                </div>
+                <button
+                  onClick={onRemovePair}
+                  disabled={isRemoving}
+                  className={`text-red-500 ${isRemoving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isRemoving ? '処理中...' : <X size={24} />}
+                </button>
+              </div>
+            </div>
+          ) : (
             <>
               <div>
                 <input
@@ -105,33 +125,6 @@ export default function PartnerSettings({
               </button>
             </>
           )}
-
-{isPairConfirmed && (
-  <div className="space-y-4">
-    <div className="flex items-center gap-3">
-      <div className="relative w-16 h-16 rounded-full border border-gray-300 overflow-hidden">
-        <Image
-          src={partnerImage || '/images/default.png'}
-          alt="パートナー画像"
-          fill
-          className="object-cover"
-        />
-      </div>
-      <div className="text-[#5E5E5E]">
-        <p className="font-semibold">パートナー承認済み</p>
-        <p>{partnerEmail}</p>
-      </div>
-      <button
-        onClick={onRemovePair}
-        disabled={isRemoving} // ✅ ローディング中は押せない
-        className={`text-red-500 ${isRemoving ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        {isRemoving ? '処理中...' : <X size={24} />}
-      </button>
-    </div>
-  </div>
-)}
-
         </>
       )}
     </motion.div>

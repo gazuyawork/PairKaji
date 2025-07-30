@@ -248,8 +248,8 @@ export default function ProfilePage() {
       await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
 
       toast.success('ペア設定を承認しました');
-      setIsPairConfirmed(true);
       setPendingApproval(null);
+      setIsPairConfirmed(true);
     } catch (_err: unknown) {
       handleFirestoreError(_err);
     }
