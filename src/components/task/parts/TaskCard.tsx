@@ -375,34 +375,41 @@ export default function TaskCard({
               </div>
             </div>
           )}
+          
 
-          {/* ポイント + 担当者 or プライベートバッジ */}
-{task.private ? (
+{/* ポイント + 担当者 or プライベートバッジ or ダミー余白 */}
+{task.private && isPairConfirmed ? (
   <div className="flex items-center justify-center w-[90px] h-[38px]">
     <span className="font-pacifico text-sm px-2 py-[2px] tracking-wider bg-gradient-to-r from-green-500 to-green-800 text-transparent bg-clip-text">
       Private
     </span>
   </div>
-) : (
-            <div className="flex items-center gap-2 w-[90px]">
-              {/* ポイント */}
-              <p className="text-[#5E5E5E] font-sans min-w-[46px] text-right">
-                {task.point} <span className="text-xs">pt</span>
-              </p>
+) : !task.private ? (
+  <div className="flex items-center gap-2 w-[90px]">
+    {/* ポイント */}
+    <p className="text-[#5E5E5E] font-sans min-w-[46px] text-right">
+      {task.point} <span className="text-xs">pt</span>
+    </p>
 
-              {/* 担当者アイコン */}
-              {isPairConfirmed && (
-                <Image
-                  src={profileImage || '/images/default.png'}
-                  alt={`${profileName}のアイコン`}
-                  width={38}
-                  height={38}
-                  className="rounded-full border border-gray-300 object-cover aspect-square select-none touch-none"
-                  draggable={false}
-                />
-              )}
-            </div>
-          )}
+    {/* 担当者アイコン */}
+    {isPairConfirmed && (
+      <Image
+        src={profileImage || '/images/default.png'}
+        alt={`${profileName}のアイコン`}
+        width={38}
+        height={38}
+        className="rounded-full border border-gray-300 object-cover aspect-square select-none touch-none"
+        draggable={false}
+      />
+    )}
+  </div>
+) : (
+  // パートナーがいない状態の余白調整
+  <div className="w-[20px] h-[38px]" />
+)}
+
+
+          
         </div>
       </motion.div>
 
