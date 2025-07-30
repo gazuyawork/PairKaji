@@ -267,7 +267,7 @@ const handleRemovePair = async () => {
   const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
   if (!partnerId) return;
 
-  const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。');
+  const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクは削除されます。\n※この操作は取り消せません。');
   if (!confirmed) return;
 
   setIsRemoving(true); // 🟡 ローディング開始
