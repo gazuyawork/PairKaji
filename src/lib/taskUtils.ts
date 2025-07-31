@@ -219,76 +219,76 @@ export const cleanObject = <T>(obj: T): T => {
  * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、
  * 各ユーザーごとに単独タスクとして再登録する。
  */
-export const splitSharedTasksOnPairRemoval = async (
-  userId: string,
-  partnerId: string
-): Promise<void> => {
-  const tasksRef = collection(db, 'tasks');
-  const sharedTasksQuery = query(
-    tasksRef,
-    where('userIds', 'array-contains', userId)
-  );
-  const snapshot = await getDocs(sharedTasksQuery);
-  const sharedTasks = snapshot.docs.filter((docSnap) => {
-    const data = docSnap.data() as FirestoreTask;
-    return Array.isArray(data.userIds) && data.userIds.includes(partnerId);
-  });
+// export const splitSharedTasksOnPairRemoval = async (
+//   userId: string,
+//   partnerId: string
+// ): Promise<void> => {
+//   const tasksRef = collection(db, 'tasks');
+//   const sharedTasksQuery = query(
+//     tasksRef,
+//     where('userIds', 'array-contains', userId)
+//   );
+//   const snapshot = await getDocs(sharedTasksQuery);
+//   const sharedTasks = snapshot.docs.filter((docSnap) => {
+//     const data = docSnap.data() as FirestoreTask;
+//     return Array.isArray(data.userIds) && data.userIds.includes(partnerId);
+//   });
 
-  for (const docSnap of sharedTasks) {
-    const original = docSnap.data() as FirestoreTask;
-    const myTaskQuery = query(
-      tasksRef,
-      where('name', '==', original.name),
-      where('userId', '==', userId)
-    );
-    const myTaskSnapshot = await getDocs(myTaskQuery);
-    for (const existing of myTaskSnapshot.docs) {
-      await deleteDoc(doc(db, 'tasks', existing.id));
-    }
+//   for (const docSnap of sharedTasks) {
+//     const original = docSnap.data() as FirestoreTask;
+//     const myTaskQuery = query(
+//       tasksRef,
+//       where('name', '==', original.name),
+//       where('userId', '==', userId)
+//     );
+//     const myTaskSnapshot = await getDocs(myTaskQuery);
+//     for (const existing of myTaskSnapshot.docs) {
+//       await deleteDoc(doc(db, 'tasks', existing.id));
+//     }
 
-    const rest = { ...original } as Record<string, unknown>;
-    delete rest.users;
+//     const rest = { ...original } as Record<string, unknown>;
+//     delete rest.users;
 
-    const myCopy: FirestoreTask = {
-      ...rest,
-      userId,
-      userIds: [userId],
-      point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
-      private: true,
-    };
+//     const myCopy: FirestoreTask = {
+//       ...rest,
+//       userId,
+//       userIds: [userId],
+//       point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
+//       private: true,
+//     };
 
-    const cleanedMyCopy = cleanObject(myCopy);
-    cleanedMyCopy.createdAt = serverTimestamp() as Timestamp;
-    cleanedMyCopy.updatedAt = serverTimestamp() as Timestamp;
+//     const cleanedMyCopy = cleanObject(myCopy);
+//     cleanedMyCopy.createdAt = serverTimestamp() as Timestamp;
+//     cleanedMyCopy.updatedAt = serverTimestamp() as Timestamp;
 
-    await addDoc(tasksRef, cleanedMyCopy);
+//     await addDoc(tasksRef, cleanedMyCopy);
 
-    const partnerTaskQuery = query(
-      tasksRef,
-      where('name', '==', original.name),
-      where('userId', '==', partnerId)
-    );
-    const partnerTaskSnapshot = await getDocs(partnerTaskQuery);
-    for (const existing of partnerTaskSnapshot.docs) {
-      await deleteDoc(doc(db, 'tasks', existing.id));
-    }
+//     const partnerTaskQuery = query(
+//       tasksRef,
+//       where('name', '==', original.name),
+//       where('userId', '==', partnerId)
+//     );
+//     const partnerTaskSnapshot = await getDocs(partnerTaskQuery);
+//     for (const existing of partnerTaskSnapshot.docs) {
+//       await deleteDoc(doc(db, 'tasks', existing.id));
+//     }
 
-    const partnerRest = { ...original } as Record<string, unknown>;
-    delete partnerRest.users;
+//     const partnerRest = { ...original } as Record<string, unknown>;
+//     delete partnerRest.users;
 
-    const partnerCopy: FirestoreTask = {
-      ...partnerRest,
-      userId: partnerId,
-      userIds: [partnerId],
-      point: typeof original.point === 'string' ? Number(original.point) : original.point,
-      private: true,
-    };
-    const cleanedPartnerCopy = cleanObject(partnerCopy);
-    cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;
-    cleanedPartnerCopy.updatedAt = serverTimestamp() as Timestamp;
-    await addDoc(tasksRef, cleanedPartnerCopy);
-  }
-};
+//     const partnerCopy: FirestoreTask = {
+//       ...partnerRest,
+//       userId: partnerId,
+//       userIds: [partnerId],
+//       point: typeof original.point === 'string' ? Number(original.point) : original.point,
+//       private: true,
+//     };
+//     const cleanedPartnerCopy = cleanObject(partnerCopy);
+//     cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;
+//     cleanedPartnerCopy.updatedAt = serverTimestamp() as Timestamp;
+//     await addDoc(tasksRef, cleanedPartnerCopy);
+//   }
+// };
 
 
 

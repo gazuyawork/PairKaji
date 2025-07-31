@@ -1,62 +1,61 @@
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
+import { logger } from 'firebase-functions';
+import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp } from 'firebase-admin/app';
 
-admin.initializeApp();
-const db = admin.firestore();
+initializeApp();
+const db = getFirestore();
 
-/**
- * ペア解除時の処理：共有タスクを削除（複製はしない）
- */
 export const onPairStatusChange = onDocumentUpdated('pairs/{pairId}', async (event) => {
-  const beforeData = event.data?.before?.data();
-  const afterData = event.data?.after?.data();
+  const beforeData = event.data?.before.data();
+  const afterData = event.data?.after.data();
+  const pairId = event.params.pairId;
 
-  const beforeStatus = beforeData?.status;
-  const afterStatus = afterData?.status;
+  if (!beforeData || !afterData) {
+    logger.warn(`ペアデータが不完全: pairId=${pairId}`);
+    return;
+  }
 
-  const userAId = afterData?.userAId;
-  const userBId = afterData?.userBId;
+  const beforeStatus = beforeData.status;
+  const afterStatus = afterData.status;
 
-  if (!userAId || !userBId) return;
+  logger.info(`ペア状態変更検知: pairId=${pairId}, beforeStatus=${beforeStatus}, afterStatus=${afterStatus}`);
 
-  if (beforeStatus !== 'removed' && afterStatus === 'removed') {
-    console.log('👥 ペア解除検出：共有タスクを削除します');
+  // 「confirmed → removed」に変化したときに共通タスクを更新
+  if (beforeStatus === 'confirmed' && afterStatus === 'removed') {
+    try {
+      logger.info(`共通タスク削除処理開始: pairId=${pairId}`);
 
-    const tasksSnap = await db
-      .collection('tasks')
-      .where('private', '==', false)
-      .where('userIds', 'array-contains-any', [userAId, userBId])
-      .get();
+      const removedUid: string = afterData.removedBy; // 削除したユーザーID（事前に設定されている想定）
 
-    let batch = db.batch();
-    let opCount = 0;
+      const tasksSnapshot = await db
+        .collection('tasks')
+        .where('userIds', 'array-contains', removedUid)
+        .get();
 
-    for (const doc of tasksSnap.docs) {
-      batch.delete(doc.ref);
-      opCount++;
+      logger.info(`userIds に ${removedUid} を含むタスク数: ${tasksSnapshot.size}`);
 
-      if (opCount >= 450) {
-        await batch.commit();
-        batch = db.batch();
-        opCount = 0;
-      }
-    }
+      const batch = db.batch();
 
-    if (opCount > 0) {
+      tasksSnapshot.docs.forEach((doc) => {
+        const task = doc.data();
+        if (task.private === true) {
+          logger.info(`スキップ（private=true）: ${doc.id}`);
+          return;
+        }
+
+        const newUserIds = task.userIds.filter((uid: string) => uid !== removedUid);
+
+        const taskRef = db.collection('tasks').doc(doc.id);
+        batch.update(taskRef, { userIds: newUserIds });
+
+        logger.info(`updated userIds for task: ${doc.id}`);
+      });
+
       await batch.commit();
+      logger.info(`共通タスクの userIds 更新完了`);
+    } catch (error) {
+      logger.error(`共通タスク削除処理中にエラー: ${error}`);
     }
-
-    await Promise.all([
-      db.collection('task_split_logs').doc(userAId).set({
-        status: 'deleted',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }),
-      db.collection('task_split_logs').doc(userBId).set({
-        status: 'deleted',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }),
-    ]);
-
-    console.log('🗑️ 共有タスクの削除が完了しました');
   }
 });
