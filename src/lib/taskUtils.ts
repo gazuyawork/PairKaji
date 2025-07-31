@@ -14,7 +14,7 @@
  * - errorUtils（共通エラーハンドリング）
  * - taskCompletions や savings など Firestore サブコレクション
  */
-import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
 import { dayNameToNumber } from '@/lib/constants';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
