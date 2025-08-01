@@ -1,3 +1,6 @@
+// パートナー開始時の処理はクラウドファンクションで行う必要がなくなったため、
+// 削除とする。
+
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions';
 import { getFirestore } from 'firebase-admin/firestore';

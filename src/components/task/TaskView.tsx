@@ -32,8 +32,11 @@ import { motion } from 'framer-motion';
 import { X, Lightbulb, LightbulbOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
+import { removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
+
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
+
 
 type Props = {
   initialSearch?: string;
@@ -64,6 +67,52 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     週次: true,
     その他: true,
   });
+  const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
+
+useEffect(() => {
+  const checkAndRunOrphanCleanup = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      console.warn('[OrphanCheck] ユーザー未ログイン');
+      return;
+    }
+
+    try {
+      // Firestore の users/{uid} からフラグ取得
+      const userDocRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userDocRef);
+
+      const alreadyCleaned = userSnap.exists() && userSnap.data()?.sharedTasksCleaned === true;
+
+      if (alreadyCleaned) {
+        console.info('[OrphanCheck] 共有タスクはすでに削除済み');
+        return;
+      }
+
+      // confirmed なペアが存在しないか確認
+      const pairSnap = await getDocs(
+        query(
+          collection(db, 'pairs'),
+          where('userIds', 'array-contains', user.uid),
+          where('status', '==', 'confirmed')
+        )
+      );
+
+      if (!pairSnap.empty) {
+        console.info('[OrphanCheck] ペアが存在するため、削除処理スキップ');
+        return;
+      }
+
+      // ✅ モーダル表示
+      console.info('[OrphanCheck] モーダル表示');
+      setShowOrphanConfirm(true);
+    } catch (error) {
+      console.error('[OrphanCheck] チェック中にエラー:', error);
+    }
+  };
+
+  checkAndRunOrphanCleanup();
+}, []);
 
 
   useEffect(() => {
@@ -435,6 +484,38 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         confirmLabel="OK"
         cancelLabel="キャンセル"
       />
+
+<ConfirmModal
+  isOpen={showOrphanConfirm}
+  title=""
+  message={
+    <div className="text-base font-semibold">
+      パートナーが存在しないため、共有タスクを削除します。よろしいですか？
+    </div>
+  }
+  onConfirm={async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    console.info('[OrphanCheck] モーダルOK → 削除実行');
+    await removeOrphanSharedTasksIfPairMissing();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        sharedTasksCleaned: true,
+      });
+      console.info('[OrphanCheck] sharedTasksCleaned フラグを保存');
+    } catch (err) {
+      console.error('[OrphanCheck] フラグ保存に失敗:', err);
+    }
+
+    setShowOrphanConfirm(false);
+  }}
+  confirmLabel="OK"
+  // ✅ キャンセルラベルを削除または undefined にして非表示化
+/>
+
+
 
       <main className="main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-60">
         {isLoading ? (

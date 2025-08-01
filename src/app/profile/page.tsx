@@ -12,7 +12,7 @@ import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
-import { getDocs, doc, getDoc, Query, QuerySnapshot } from 'firebase/firestore';
+import { getDocs, doc, getDoc, Query, QuerySnapshot, updateDoc } from 'firebase/firestore';
 import {
   getUserProfile,
   createUserProfile,
@@ -26,8 +26,6 @@ import {
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
 // import { splitSharedTasksOnPairRemoval } from '@/lib/firebaseUtils';
-
-
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -233,27 +231,37 @@ export default function ProfilePage() {
   };
 
   // パートナー承認時の処理
-  const handleApprovePair = async () => {
-    const user = auth.currentUser;
-    if (!user || !pendingApproval) return;
+const handleApprovePair = async () => {
+  const user = auth.currentUser;
+  if (!user || !pendingApproval) return;
 
-    try {
-      if (!pendingApproval?.inviterUid) {
-        console.error('[ERROR] inviterUid が undefined です。処理をスキップします。');
-        toast.error('ペア情報が不完全なため、承認できません。');
-        return;
-      }
-
-      // Firestoreのペア情報を更新
-      await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
-
-      toast.success('ペア設定を承認しました');
-      setPendingApproval(null);
-      setIsPairConfirmed(true);
-    } catch (_err: unknown) {
-      handleFirestoreError(_err);
+  try {
+    if (!pendingApproval?.inviterUid) {
+      console.error('[ERROR] inviterUid が undefined です。処理をスキップします。');
+      toast.error('ペア情報が不完全なため、承認できません。');
+      return;
     }
-  };
+
+    // Firestoreのペア情報を更新
+    await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
+
+    // 👇 この処理を追加（両ユーザーの sharedTasksCleaned を false に更新）
+    const userRef = doc(db, 'users', user.uid);
+    const partnerRef = doc(db, 'users', pendingApproval.inviterUid);
+    await Promise.all([
+      updateDoc(userRef, { sharedTasksCleaned: false }),
+      updateDoc(partnerRef, { sharedTasksCleaned: false }),
+    ]);
+
+    toast.success('ペア設定を承認しました');
+    setIsPairConfirmed(true);
+    setPendingApproval(null);
+  } catch (_err: unknown) {
+    handleFirestoreError(_err);
+  }
+};
+
+
 
 // パートナー解除時の処理
 const handleRemovePair = async () => {
@@ -267,7 +275,7 @@ const handleRemovePair = async () => {
   const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
   if (!partnerId) return;
 
-  const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクは削除されます。\n※この操作は取り消せません。');
+  const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。');
   if (!confirmed) return;
 
   setIsRemoving(true); // 🟡 ローディング開始

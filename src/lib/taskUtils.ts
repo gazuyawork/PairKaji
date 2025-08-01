@@ -510,3 +510,52 @@ export const toggleTaskDoneStatus = async (
     handleFirestoreError(error);
   }
 };
+
+
+/**
+ * ペアが存在しない場合に共有タスク（userIdsが2人以上）を削除する
+ */
+export const removeOrphanSharedTasksIfPairMissing = async (): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // ① 自身のペアが存在するか確認（status: confirmed）
+    const pairSnap = await getDocs(
+      query(
+        collection(db, 'pairs'),
+        where('userIds', 'array-contains', user.uid),
+        where('status', '==', 'confirmed')
+      )
+    );
+
+    const hasConfirmedPair = !pairSnap.empty;
+
+    if (hasConfirmedPair) {
+      return; // ✅ ペアが存在するなら何もしない
+    }
+
+    // ② 自身が含まれる userIds で、共有タスクを検索
+    const taskSnap = await getDocs(
+      query(
+        collection(db, 'tasks'),
+        where('userIds', 'array-contains', user.uid)
+      )
+    );
+
+    const deletePromises: Promise<void>[] = [];
+
+    taskSnap.forEach((taskDoc) => {
+      const taskData = taskDoc.data();
+      const userIds = Array.isArray(taskData.userIds) ? taskData.userIds : [];
+
+      if (userIds.length > 1) {
+        deletePromises.push(deleteDoc(doc(db, 'tasks', taskDoc.id)));
+      }
+    });
+
+    await Promise.all(deletePromises);
+  } catch (error) {
+    handleFirestoreError(error);
+  }
+};

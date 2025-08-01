@@ -1,3 +1,5 @@
+// 修正対象ファイル: ConfirmModal.tsx
+
 'use client';
 
 import { ReactNode } from 'react';
@@ -9,7 +11,7 @@ type ConfirmModalProps = {
   title?: string;
   message: ReactNode;
   onConfirm: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   confirmLabel?: string;
   cancelLabel?: string;
   isProcessing?: boolean;
@@ -22,17 +24,21 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   confirmLabel = 'OK',
-  cancelLabel = 'キャンセル',
+  cancelLabel,
   isProcessing = false,
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
+  // ✅ UIレンダリング後に少し遅らせてonConfirm実行する
+  const handleConfirm = () => {
+    setTimeout(() => {
+      onConfirm();
+    }, 100); // 100ms遅延
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex justify-center items-center px-4">
-      {/* 背景オーバーレイ（別レイヤー） */}
       <div className="absolute inset-0 bg-white/80 backdrop-blur-sm" />
-
-      {/* モーダル本体 */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -46,7 +52,7 @@ export default function ConfirmModal({
 
         <div className="mt-6 flex flex-row justify-end gap-3">
           <button
-            onClick={onConfirm}
+            onClick={handleConfirm}
             disabled={isProcessing}
             className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
               ${isProcessing ? 'bg-gray-300 text-white cursor-not-allowed' : 'bg-[#FFCB7D] text-white'}
@@ -54,13 +60,16 @@ export default function ConfirmModal({
           >
             {confirmLabel}
           </button>
-          <button
-            onClick={onCancel}
-            disabled={isProcessing}
-            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
-          >
-            {cancelLabel}
-          </button>
+
+          {cancelLabel && onCancel && (
+            <button
+              onClick={onCancel}
+              disabled={isProcessing}
+              className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+            >
+              {cancelLabel}
+            </button>
+          )}
         </div>
       </motion.div>
     </div>,
