@@ -69,50 +69,45 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   });
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
 
-useEffect(() => {
-  const checkAndRunOrphanCleanup = async () => {
+  useEffect(() => {
     const user = auth.currentUser;
-    if (!user) {
-      console.warn('[OrphanCheck] ユーザー未ログイン');
-      return;
-    }
+    if (!user) return;
 
-    try {
-      // Firestore の users/{uid} からフラグ取得
-      const userDocRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userDocRef);
+    const userRef = doc(db, 'users', user.uid);
 
-      const alreadyCleaned = userSnap.exists() && userSnap.data()?.sharedTasksCleaned === true;
+    const unsubscribe = onSnapshot(
+      query(
+        collection(db, 'pairs'),
+        where('userIds', 'array-contains', user.uid)
+      ),
+      async (snapshot) => {
+        const confirmedPairs = snapshot.docs.filter(doc => doc.data()?.status === 'confirmed');
 
-      if (alreadyCleaned) {
-        console.info('[OrphanCheck] 共有タスクはすでに削除済み');
-        return;
+        if (confirmedPairs.length > 0) {
+          // パートナーが存在するなら何もしない
+          return;
+        }
+
+        try {
+          const userSnap = await getDoc(userRef);
+          const alreadyCleaned = userSnap.exists() && userSnap.data()?.sharedTasksCleaned === true;
+
+          if (alreadyCleaned) {
+            console.info('[OrphanCheck] 共有タスクはすでに削除済み（リアルタイム）');
+            return;
+          }
+
+          console.info('[OrphanCheck] confirmedペアがなくなったためモーダル表示（リアルタイム）');
+          setShowOrphanConfirm(true);
+        } catch (error) {
+          console.error('[OrphanCheck] リアルタイムチェック中にエラー:', error);
+        }
       }
+    );
 
-      // confirmed なペアが存在しないか確認
-      const pairSnap = await getDocs(
-        query(
-          collection(db, 'pairs'),
-          where('userIds', 'array-contains', user.uid),
-          where('status', '==', 'confirmed')
-        )
-      );
+    return () => unsubscribe();
+  }, []);
 
-      if (!pairSnap.empty) {
-        console.info('[OrphanCheck] ペアが存在するため、削除処理スキップ');
-        return;
-      }
-
-      // ✅ モーダル表示
-      console.info('[OrphanCheck] モーダル表示');
-      setShowOrphanConfirm(true);
-    } catch (error) {
-      console.error('[OrphanCheck] チェック中にエラー:', error);
-    }
-  };
-
-  checkAndRunOrphanCleanup();
-}, []);
 
 
   useEffect(() => {
@@ -485,35 +480,35 @@ useEffect(() => {
         cancelLabel="キャンセル"
       />
 
-<ConfirmModal
-  isOpen={showOrphanConfirm}
-  title=""
-  message={
-    <div className="text-base font-semibold">
-      パートナーが存在しないため、共有タスクを削除します。よろしいですか？
-    </div>
-  }
-  onConfirm={async () => {
-    const user = auth.currentUser;
-    if (!user) return;
+      <ConfirmModal
+        isOpen={showOrphanConfirm}
+        title=""
+        message={
+          <div className="text-base font-semibold">
+            パートナーを解消したため、不要なデータを削除します。
+          </div>
+        }
+        onConfirm={async () => {
+          const user = auth.currentUser;
+          if (!user) return;
 
-    console.info('[OrphanCheck] モーダルOK → 削除実行');
-    await removeOrphanSharedTasksIfPairMissing();
+          console.info('[OrphanCheck] モーダルOK → 削除実行');
+          await removeOrphanSharedTasksIfPairMissing();
 
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        sharedTasksCleaned: true,
-      });
-      console.info('[OrphanCheck] sharedTasksCleaned フラグを保存');
-    } catch (err) {
-      console.error('[OrphanCheck] フラグ保存に失敗:', err);
-    }
+          try {
+            await updateDoc(doc(db, 'users', user.uid), {
+              sharedTasksCleaned: true,
+            });
+            console.info('[OrphanCheck] sharedTasksCleaned フラグを保存');
+          } catch (err) {
+            console.error('[OrphanCheck] フラグ保存に失敗:', err);
+          }
 
-    setShowOrphanConfirm(false);
-  }}
-  confirmLabel="OK"
-  // ✅ キャンセルラベルを削除または undefined にして非表示化
-/>
+          setShowOrphanConfirm(false);
+        }}
+        confirmLabel="OK"
+      // ✅ キャンセルラベルを削除または undefined にして非表示化
+      />
 
 
 
