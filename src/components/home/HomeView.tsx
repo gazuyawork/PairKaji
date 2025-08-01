@@ -11,6 +11,9 @@ import { ChevronDown, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
+import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
+import { isToday } from 'date-fns';
+
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -67,12 +70,12 @@ export default function HomeView() {
   }, []);
 
 
-useEffect(() => {
-  if (hasPairConfirmed) {
-    localStorage.removeItem(WEEKLY_POINTS_HIDE_KEY);
-    setIsWeeklyPointsHidden(false);
-  }
-}, [hasPairConfirmed]);
+  useEffect(() => {
+    if (hasPairConfirmed) {
+      localStorage.removeItem(WEEKLY_POINTS_HIDE_KEY);
+      setIsWeeklyPointsHidden(false);
+    }
+  }, [hasPairConfirmed]);
 
 
 
@@ -190,33 +193,42 @@ useEffect(() => {
               />
             )}
 
-{isLoading ? (
-  <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
-) : (
-  !isWeeklyPointsHidden && (
-    <div className="relative">
-      <WeeklyPoints />
-      {!hasPairConfirmed && (
-        <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4">
-          <button
-            onClick={handleCloseOverlay}
-            className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
-            aria-label="閉じる"
-          >
-            ×
-          </button>
-<p className="text-md font-semibold text-center flex items-center gap-1">
-  <Info className="w-4 h-4 text-gray-700" />
-  パートナー設定完了後に使用できます。
-</p>
-        </div>
-      )}
-    </div>
-  )
-)}
+            {isLoading ? (
+              <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
+            ) : (
+              !isWeeklyPointsHidden && (
+                <div className="relative">
+                  <WeeklyPoints />
+                  {!hasPairConfirmed && (
+                    <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4">
+                      <button
+                        onClick={handleCloseOverlay}
+                        className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
+                        aria-label="閉じる"
+                      >
+                        ×
+                      </button>
+                      <p className="text-md font-semibold text-center flex items-center gap-1">
+                        <Info className="w-4 h-4 text-gray-700" />
+                        パートナー設定完了後に使用できます。
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
 
-
-
+            <TodayCompletedTasksCard
+              tasks={tasks.filter(
+                (task) =>
+                  task.completedAt &&
+                  isToday(
+                    typeof task.completedAt === 'string'
+                      ? new Date(task.completedAt)
+                      : task.completedAt.toDate()
+                  )
+              )}
+            />
           </motion.div>
         </main>
       </div>
