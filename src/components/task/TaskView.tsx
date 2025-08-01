@@ -71,44 +71,64 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
 
 
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) {
+    console.warn('[OrphanCheck] auth.currentUser が未定義');
+    return;
+  }
 
-    const userRef = doc(db, 'users', user.uid);
+  console.info('[OrphanCheck] 現在のユーザーUID:', user.uid);
 
-    const unsubscribe = onSnapshot(
-      query(
-        collection(db, 'pairs'),
-        where('userIds', 'array-contains', user.uid)
-      ),
-      async (snapshot) => {
-        const confirmedPairs = snapshot.docs.filter(doc => doc.data()?.status === 'confirmed');
+  const userRef = doc(db, 'users', user.uid);
 
-        if (confirmedPairs.length > 0) {
-          // パートナーが存在するなら何もしない
+  const unsubscribe = onSnapshot(
+    query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid)),
+    async (snapshot) => {
+      console.info('[OrphanCheck] pairs クエリスナップショット取得:', snapshot.docs.length);
+
+      const confirmedPairs = snapshot.docs.filter(
+        (doc) => doc.data()?.status === 'confirmed'
+      );
+
+      console.info('[OrphanCheck] confirmed ペア数:', confirmedPairs.length);
+
+      if (confirmedPairs.length > 0) {
+        console.info('[OrphanCheck] confirmed ペアが存在 → モーダル非表示');
+        return;
+      }
+
+      try {
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          console.warn('[OrphanCheck] users ドキュメントが存在しません → モーダル非表示');
           return;
         }
 
-        try {
-          const userSnap = await getDoc(userRef);
-          const alreadyCleaned = userSnap.exists() && userSnap.data()?.sharedTasksCleaned === true;
+        const data = userSnap.data();
+        const cleaned = data?.sharedTasksCleaned;
 
-          if (alreadyCleaned) {
-            console.info('[OrphanCheck] 共有タスクはすでに削除済み（リアルタイム）');
-            return;
-          }
+        console.info('[OrphanCheck] Firestore ユーザーデータ:', data);
+        console.info('[OrphanCheck] sharedTasksCleaned フラグ:', cleaned);
 
-          console.info('[OrphanCheck] confirmedペアがなくなったためモーダル表示（リアルタイム）');
+        if (cleaned === false) {
+          console.info('[OrphanCheck] sharedTasksCleaned: false → モーダル表示');
           setShowOrphanConfirm(true);
-        } catch (error) {
-          console.error('[OrphanCheck] リアルタイムチェック中にエラー:', error);
+        } else if (cleaned === true) {
+          console.info('[OrphanCheck] sharedTasksCleaned: true → モーダル非表示');
+        } else {
+          console.info('[OrphanCheck] sharedTasksCleaned: undefined → モーダル非表示');
         }
+      } catch (error) {
+        console.error('[OrphanCheck] Firestore 読み込み中エラー:', error);
       }
-    );
+    }
+  );
 
-    return () => unsubscribe();
-  }, []);
+  return () => unsubscribe();
+}, []);
+
 
 
 

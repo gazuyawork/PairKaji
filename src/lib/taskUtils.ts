@@ -105,6 +105,22 @@ export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds
   }
 };
 
+
+const checkDuplicateSharedTaskName = async (name: string, uid: string): Promise<boolean> => {
+  const pairUserIds = await fetchPairUserIds(uid);
+  if (pairUserIds.length === 0) return false;
+
+  const q = query(
+    collection(db, 'tasks'),
+    where('name', '==', name),
+    where('private', '==', false),
+    where('userIds', 'array-contains-any', pairUserIds)
+  );
+
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+};
+
 /**
  * タスクの完了履歴をtaskCompletionsコレクションに追加する関数
  * @param taskId 対象タスクのID
@@ -162,6 +178,16 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
         userIds = data.userIds;
       }
     });
+
+    const isPrivate = task.private ?? false;
+
+    // 🔽 追加チェック：private → shared に変える場合のみ
+    if (!isPrivate) {
+      const isDup = await checkDuplicateSharedTaskName(task.name, uid);
+      if (isDup) {
+        throw new Error('同名の共有タスクが既に存在します。名前を変更してください。');
+      }
+    }
 
     // ✅ Firestore に保存するデータを構築
     const taskData = {

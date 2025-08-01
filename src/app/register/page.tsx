@@ -7,6 +7,9 @@ import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { FirebaseError } from 'firebase/app';
 import { auth } from '@/lib/firebase';
+import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // すでにある場合は重複不要
+
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -15,7 +18,6 @@ export default function RegisterPage() {
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-
   const handleRegister = async () => {
     setEmailError('');
     setPasswordError('');
@@ -43,6 +45,14 @@ export default function RegisterPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+
+      // ✅ Firestore に users ドキュメントを初期作成
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email ?? '',
+        createdAt: serverTimestamp(),
+        sharedTasksCleaned: true, // ← ここで初期状態を保存
+      });
+
       await sendEmailVerification(user);
       router.push('/verify');
     } catch (error: unknown) {
@@ -53,6 +63,7 @@ export default function RegisterPage() {
       }
     }
   };
+
 
   return (
     <motion.div

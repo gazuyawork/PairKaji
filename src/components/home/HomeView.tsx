@@ -7,7 +7,7 @@ import type { Task } from '@/types/Task';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
@@ -21,6 +21,20 @@ export default function HomeView() {
   const [hasPairConfirmed, setHasPairConfirmed] = useState(false);
   const [flaggedCount, setFlaggedCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [isWeeklyPointsHidden, setIsWeeklyPointsHidden] = useState(false);
+  const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
+
+  const handleCloseOverlay = () => {
+    localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
+    setIsWeeklyPointsHidden(true);
+  };
+
+
+  useEffect(() => {
+    const stored = localStorage.getItem(WEEKLY_POINTS_HIDE_KEY);
+    setIsWeeklyPointsHidden(stored === 'true');
+  }, []);
+
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -51,6 +65,16 @@ export default function HomeView() {
       unsubscribeConfirmed();
     };
   }, []);
+
+
+useEffect(() => {
+  if (hasPairConfirmed) {
+    localStorage.removeItem(WEEKLY_POINTS_HIDE_KEY);
+    setIsWeeklyPointsHidden(false);
+  }
+}, [hasPairConfirmed]);
+
+
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -134,15 +158,13 @@ export default function HomeView() {
 
             <div
               onClick={() => setIsExpanded((prev) => !prev)}
-              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-                isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
+              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+                }`}
             >
               <div className="absolute top-5 right-6 pointer-events-none z-10">
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
+                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
+                    }`}
                 />
               </div>
             </div>
@@ -168,11 +190,33 @@ export default function HomeView() {
               />
             )}
 
-            {isLoading ? (
-              <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
-            ) : (
-              <WeeklyPoints />
-            )}
+{isLoading ? (
+  <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
+) : (
+  !isWeeklyPointsHidden && (
+    <div className="relative">
+      <WeeklyPoints />
+      {!hasPairConfirmed && (
+        <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4">
+          <button
+            onClick={handleCloseOverlay}
+            className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
+            aria-label="閉じる"
+          >
+            ×
+          </button>
+<p className="text-md font-semibold text-center flex items-center gap-1">
+  <Info className="w-4 h-4 text-gray-700" />
+  パートナー設定完了後に使用できます。
+</p>
+        </div>
+      )}
+    </div>
+  )
+)}
+
+
+
           </motion.div>
         </main>
       </div>
