@@ -68,6 +68,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     その他: true,
   });
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -744,6 +746,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                               isPairConfirmed={pairStatus === 'confirmed'}
                               isPrivate={task.private === true}
                               onLongPress={(x, y) => setLongPressPosition({ x, y })}
+                              deletingTaskId={deletingTaskId}
+                              onSwipeLeft={(taskId) => setDeletingTaskId(taskId)}
                             />
                           ))}
                       </ul>

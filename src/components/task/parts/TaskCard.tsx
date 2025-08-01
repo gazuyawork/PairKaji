@@ -52,11 +52,13 @@ type Props = {
   isPairConfirmed: boolean;
   isPrivate: boolean;
   onLongPress?: (x: number, y: number) => void;
+    deletingTaskId: string | null;
+  onSwipeLeft: (taskId: string) => void
 };
 
 export default function TaskCard({
   task, period, onToggleDone, onDelete,
-  userList, isPairConfirmed, onEdit,
+  userList, isPairConfirmed, onEdit, onSwipeLeft, deletingTaskId
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -72,6 +74,9 @@ export default function TaskCard({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [onConfirmCallback, setOnConfirmCallback] = useState<(() => void) | null>(null);
   const [localDone, setLocalDone] = useState(task.done);
+
+
+  
 
   useEffect(() => {
     setLocalDone(task.done);
@@ -104,11 +109,19 @@ export default function TaskCard({
     }
   };
 
-  const swipeable = useSwipeable({
-    onSwipedLeft: () => setSwipeDirection('left'),
-    onSwipedRight: () => setSwipeDirection('right'),
-    trackTouch: true,
-  });
+const swipeable = useSwipeable({
+  onSwipedLeft: () => {
+    setSwipeDirection('left');
+    setShowActions(false); // ✅ 編集フラグと同時表示を防ぐ
+    onSwipeLeft(task.id); // ✅ 親に通知して削除対象IDをセット
+  },
+  onSwipedRight: () => {
+    setSwipeDirection('right');
+    setShowActions(false); // ✅ 編集/フラグを同時に消す
+  },
+  trackTouch: true,
+});
+
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -165,7 +178,7 @@ export default function TaskCard({
 
   return (
     <div className="relative" ref={cardRef}>
-      {swipeDirection === 'left' && (
+      {swipeDirection === 'left' && deletingTaskId === task.id && !showActions && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
           <button
             className="w-8 h-8 flex items-center justify-center 
@@ -203,8 +216,8 @@ export default function TaskCard({
 
 
 
-      {/* 長押しメニュー表示 */}
-      {showActions && showActionButtons && (
+      {/* メニュー表示 */}
+      {showActions && showActionButtons && swipeDirection === null && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
             {/* 編集ボタン（爽やかな青） */}
@@ -248,11 +261,12 @@ export default function TaskCard({
       <motion.div
         {...swipeable}
         onClick={() => {
+          setSwipeDirection(null);
           setShowActions(true);
           setShowActionButtons(true);
         }}
         className={clsx(
-          'w-full relative flex justify-between items-center px-2.5 py-1 rounded-2xl shadow-sm border overflow-hidden border-2',
+          'w-full relative flex justify-between items-center px-2.5 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
           'border-[#e5e5e5] bg-white'
