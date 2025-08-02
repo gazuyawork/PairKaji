@@ -10,7 +10,7 @@ type Props = {
 
 export default function TodayCompletedTasksCard({ tasks }: Props) {
     return (
-        <div className="bg-white rounded-lg shadow-md p-4 ">
+        <div className="bg-white rounded-lg shadow-md p-4 mx-auto w-full max-w-xl">
             <div className="flex items-center justify-center mb-2">
                 <CheckCircle className="w-6 h-6 text-green-500" />
                 <h3 className="ml-2 font-bold text-lg text-gray-800">本日の完了タスク</h3>

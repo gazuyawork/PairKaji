@@ -51,7 +51,7 @@ export default function ProfileCard({
 
   return (
     <motion.div
-      className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6"
+      className="min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6 mx-auto w-full max-w-xl"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -66,23 +66,22 @@ export default function ProfileCard({
             <div className="w-24 h-24 bg-gray-200 animate-pulse rounded-full" />
           ) : (
             <>
-{isUploadingImage ? (
-  <div
-    style={{ width: 100, height: 100 }}
-    className="bg-white rounded-full border border-gray-300 flex items-center justify-center"
-  >
-    <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
-  </div>
-) : (
-  <Image
-    src={profileImage || '/images/default.png'}
-    alt="プロフィール画像"
-    width={100}
-    height={100}
-    className="aspect-square rounded-full object-cover border border-gray-300"
-  />
-)}
-
+              {isUploadingImage ? (
+                <div
+                  style={{ width: 100, height: 100 }}
+                  className="bg-white rounded-full border border-gray-300 flex items-center justify-center"
+                >
+                  <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+                </div>
+              ) : (
+                <Image
+                  src={profileImage || '/images/default.png'}
+                  alt="プロフィール画像"
+                  width={100}
+                  height={100}
+                  className="aspect-square rounded-full object-cover border border-gray-300"
+                />
+              )}
 
               <input
                 type="file"

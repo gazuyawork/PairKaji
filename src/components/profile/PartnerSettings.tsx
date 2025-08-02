@@ -42,7 +42,7 @@ export default function PartnerSettings({
 }: PartnerSettingsProps) {
   return (
     <motion.div
-      className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-3"
+      className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-3 mx-auto w-full max-w-xl"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}

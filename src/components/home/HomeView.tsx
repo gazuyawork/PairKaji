@@ -200,7 +200,7 @@ export default function HomeView() {
                 <div className="relative">
                   <WeeklyPoints />
                   {!hasPairConfirmed && (
-                    <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4">
+                    <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4 mx-auto w-full max-w-xl">
                       <button
                         onClick={handleCloseOverlay}
                         className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
