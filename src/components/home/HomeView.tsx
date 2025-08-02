@@ -135,7 +135,7 @@ export default function HomeView() {
   return (
     <>
       <div
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-hidden"
         ref={scrollRef}
         onTouchStart={(e) => {
           const target = e.target as HTMLElement;
