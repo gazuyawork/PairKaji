@@ -2,7 +2,8 @@
 
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { dayNumberToName } from '@/lib/constants';
-import { useRef, useState } from 'react'; // 追加
+import { useRef, useState } from 'react';
+import { ja } from 'date-fns/locale';
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -83,10 +84,7 @@ export default function TaskCalendar({ tasks }: Props) {
 
 
                 <div className="font-semibold text-gray-600">
-                  {format(day, 'E')}
-                </div>
-                <div className="text-gray-400 text-[10px]">
-                  {format(day, 'M/d')}
+                  {format(day, 'M/d (EEE)', { locale: ja })}
                 </div>
                 <hr className="my-1 border-gray-300 opacity-40" />
                 {hasTask ? (
