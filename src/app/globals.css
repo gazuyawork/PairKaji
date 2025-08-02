@@ -157,7 +157,8 @@ html, body {
 }
 
 .main-content {
-  height: calc(var(--vh, 1vh) * 100);       /* ✅ 正確なビューポート高さを使用 */
+  /* height: calc(var(--vh, 1vh) * 100);        */
+  /* ✅ 正確なビューポート高さを使用 */
   overflow-y: auto;                         /* ✅ 縦スクロール許可 */
   overscroll-behavior: none;                /* ✅ バウンス防止 */
   -webkit-overflow-scrolling: touch;        /* ✅ iOSでの慣性スクロール */
