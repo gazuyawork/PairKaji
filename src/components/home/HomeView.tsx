@@ -144,7 +144,8 @@ export default function HomeView() {
           }
         }}
       >
-        <main className="main-content px-4 py-5 space-y-4 pb-20">
+        {/* <main className="main-content px-4 py-5 space-y-4 pb-20"> */}
+        <main className="main-content min-h-[100dvh] overflow-y-auto px-4 py-5 space-y-4 pb-20">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: isLoading ? 0 : 1 }}
