@@ -33,6 +33,7 @@ import { X, Lightbulb, LightbulbOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import { removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
+import AdCard_02 from '@/components/task/parts/AdCard_02';
 
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
@@ -779,6 +780,8 @@ useEffect(() => {
             })()}
           </motion.div>
         )}
+                {/* ✅ 広告カード（画面の末尾） */}
+        <AdCard_02 />
       </main>
     </div>
   );

@@ -13,7 +13,7 @@ import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
 import { isToday } from 'date-fns';
-
+import AdCard from '@/components/home/parts/AdCard';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -230,6 +230,9 @@ export default function HomeView() {
                   )
               )}
             />
+
+            {!isLoading && <AdCard />}
+
           </motion.div>
         </main>
       </div>

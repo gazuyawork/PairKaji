@@ -24,6 +24,7 @@ import GroupSelector from '@/components/todo/parts/GroupSelector';
 import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
+import AdCard_03 from '@/components/todo/parts/AdCard_03';
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName } = useView();
@@ -311,7 +312,7 @@ export default function TodoView() {
             </div>
           ));
         })()}
-
+        <AdCard_03 />
       </main>
     </div>
   );
