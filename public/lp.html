@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PairKaji - 夫婦・カップルで使えるタスク管理アプリ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: "Helvetica Neue", sans-serif;
+      background-color: #FFF7EE;
+      color: #333;
+    }
+    header {
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+    }
+    .logo {
+      font-family: 'Pacifico', cursive;
+      font-size: 2.5rem;
+      color: #555;
+    }
+    h2 {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 1.75rem;
+    }
+    .carousel-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+    .carousel {
+      overflow-x: hidden;
+      display: flex;
+      gap: 1rem;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      padding: 1rem 0;
+      width: 90%;
+      justify-content: center;
+    }
+    .carousel img {
+      scroll-snap-align: center;
+      flex: 0 0 auto;
+      width: 240px;
+      height: 480px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      margin: 0 auto;
+    }
+    .carousel-arrow {
+      background-color: #ffffffaa;
+      border: none;
+      font-size: 2rem;
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1;
+      color: #333;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .carousel-arrow.left {
+      left: 0.5rem;
+    }
+    .carousel-arrow.right {
+      right: 0.5rem;
+    }
+    .carousel-dots {
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+    .carousel-dots span {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin: 0 4px;
+      background: #ccc;
+      border-radius: 50%;
+    }
+    .carousel-dots .active {
+      background: #555;
+    }
+    .steps {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .step {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .step h3 {
+      margin-bottom: 0.5rem;
+      font-size: 1.2rem;
+    }
+    .faq {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .faq-item {
+      background: white;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
+    .faq-answer {
+      display: none;
+      padding-top: 0.5rem;
+      color: #555;
+    }
+    .footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      font-size: 0.9rem;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">PairKaji</div>
+    <p>ふたりで家事やタスクを簡単に共有・管理しよう！</p>
+  </header>
+
+  <h2>アプリ画面イメージ</h2>
+  <div class="carousel-wrapper">
+    <button class="carousel-arrow left" onclick="scrollCarousel(-1)">&#8249;</button>
+    <div class="carousel" id="carousel">
+      <img src="/screenshots/home.png" alt="ホーム画面">
+      <img src="/screenshots/task.png" alt="タスク画面">
+      <img src="/screenshots/login.png" alt="ログイン画面">
+      <img src="/screenshots/extra.png" alt="その他画面">
+    </div>
+    <button class="carousel-arrow right" onclick="scrollCarousel(1)">&#8250;</button>
+  </div>
+  <div class="carousel-dots" id="dots">
+    <span class="active"></span>
+    <span></span>
+    <span></span>
+    <span></span>
+  </div>
+
+  <section class="steps">
+    <h2>使い方はかんたん3ステップ！</h2>
+    <div class="step">
+      <h3>① アカウントを作成</h3>
+      <p>メールアドレスだけで簡単に登録可能！初期設定も数ステップで完了します。</p>
+    </div>
+    <div class="step">
+      <h3>② パートナーを招待</h3>
+      <p>発行された招待コードを共有するだけ。お互いの予定やタスクを一元管理できます。</p>
+    </div>
+    <div class="step">
+      <h3>③ タスクを作成・分担</h3>
+      <p>カテゴリ・期限・担当などを設定して、家事や予定をスマートに共有！</p>
+    </div>
+  </section>
+
+  <section class="faq">
+    <h2>よくあるご質問</h2>
+    <div class="faq-item" onclick="toggleAnswer(this)">
+      Q. 個人でも使えますか？
+      <div class="faq-answer">はい、個人のタスク管理にもご利用いただけます。</div>
+    </div>
+    <div class="faq-item" onclick="toggleAnswer(this)">
+      Q. パートナーがいなくても使えますか？
+      <div class="faq-answer">もちろんです。後からパートナーを追加することも可能です。</div>
+    </div>
+    <div class="faq-item" onclick="toggleAnswer(this)">
+      Q. スマートフォンに対応していますか？
+      <div class="faq-answer">はい、モバイルファーストで設計されています。</div>
+    </div>
+  </section>
+
+  <div class="footer">
+    &copy; 2025 PairKaji - タスク管理アプリ
+  </div>
+
+  <script>
+    // スクロール誘導アニメーション
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.scrollTo({ top: 100, behavior: 'smooth' });
+      }, 1000);
+    });
+
+    // FAQトグル
+    function toggleAnswer(el) {
+      const answer = el.querySelector('.faq-answer');
+      answer.style.display = answer.style.display === 'block' ? 'none' : 'block';
+    }
+
+    // カルーセル制御
+    const carousel = document.getElementById('carousel');
+    const dots = document.getElementById('dots').children;
+    let currentIndex = 0;
+    const imageWidth = 240 + 16; // 幅 + gap
+
+    function updateDots(index) {
+      [...dots].forEach(dot => dot.classList.remove('active'));
+      if (dots[index]) dots[index].classList.add('active');
+    }
+
+    function scrollCarousel(direction) {
+      const maxIndex = dots.length - 1;
+      currentIndex = Math.min(Math.max(currentIndex + direction, 0), maxIndex);
+      carousel.scrollTo({
+        left: currentIndex * imageWidth,
+        behavior: 'smooth'
+      });
+      updateDots(currentIndex);
+    }
+
+    carousel.addEventListener('scroll', () => {
+      const index = Math.round(carousel.scrollLeft / imageWidth);
+      currentIndex = index;
+      updateDots(index);
+    });
+  </script>
+</body>
+</html>
