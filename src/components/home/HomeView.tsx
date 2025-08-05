@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot,doc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { ChevronDown, Info } from 'lucide-react';
@@ -34,6 +34,24 @@ export default function HomeView() {
     localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
     setIsWeeklyPointsHidden(true);
   };
+
+  const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
+
+useEffect(() => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+
+  const userRef = doc(db, 'users', uid);
+
+  const unsubscribe = onSnapshot(userRef, (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      setIsLineLinked(!!data.linkedWithLine);
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
 
 
   useEffect(() => {
@@ -234,7 +252,8 @@ export default function HomeView() {
               )}
             />
 
-            <LineLinkCard />
+            {!isLineLinked && <LineLinkCard />}
+
 
             {!isLoading && <AdCard />}
 

@@ -28,6 +28,7 @@ import {
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
 // import { splitSharedTasksOnPairRemoval } from '@/lib/firebaseUtils';
+import LineLinkCard from '@/components/profile/LineLinkCard';
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -403,6 +404,8 @@ export default function ProfilePage() {
               onChangePartnerEmail={setPartnerEmail}
               isRemoving={isRemoving}
             />
+
+            <LineLinkCard />
 
             {plan !== 'free' && (
               <div className="flex justify-center">

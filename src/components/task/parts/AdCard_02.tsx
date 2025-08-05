@@ -7,7 +7,7 @@ import Image from 'next/image';
 
 export default function AdCard_02() {
   return (
-    <div className="bg-white rounded-lg shadow-md p-2 mt-3 flex items-center justify-center">
+    <div className="bg-white rounded-lg shadow-md p-2 mt-3 flex items-center justify-center max-w-xl mx-auto">
       <Image
         src="/koukoku_02.png"
         alt="広告"
