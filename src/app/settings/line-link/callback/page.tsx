@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 function LineLinkHandler() {
   const router = useRouter();
@@ -16,6 +16,14 @@ function LineLinkHandler() {
     const handleLineCallback = async () => {
       const code = searchParams.get('code');
       if (!code) {
+        console.error('[LINE連携] code が取得できませんでした');
+        setStatus('error');
+        return;
+      }
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error('[LINE連携] Firebaseログインユーザーが存在しません');
         setStatus('error');
         return;
       }
@@ -40,9 +48,16 @@ function LineLinkHandler() {
           }),
         });
 
+        if (!tokenRes.ok) {
+          const errorData = await tokenRes.json();
+          console.error('[LINE連携] アクセストークン取得失敗:', errorData);
+          setStatus('error');
+          return;
+        }
+
         const tokenData = await tokenRes.json();
         if (!tokenData.access_token) {
-          console.error('アクセストークンの取得に失敗', tokenData);
+          console.error('[LINE連携] アクセストークンが存在しません', tokenData);
           setStatus('error');
           return;
         }
@@ -54,33 +69,44 @@ function LineLinkHandler() {
           },
         });
 
+        if (!profileRes.ok) {
+          const errorData = await profileRes.json();
+          console.error('[LINE連携] プロフィール取得失敗:', errorData);
+          setStatus('error');
+          return;
+        }
+
         const profileData = await profileRes.json();
         if (!profileData.userId) {
-          console.error('LINEユーザーIDの取得に失敗', profileData);
+          console.error('[LINE連携] LINEユーザーIDが取得できません', profileData);
           setStatus('error');
           return;
         }
 
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          console.error('Firebaseログインユーザーが不在');
-          setStatus('error');
-          return;
-        }
-
-        // Firestoreに保存
+        // Firestoreに保存（存在しなくてもOK）
         const userRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(userRef, {
-          lineUserId: profileData.userId,
-          lineLinked: true,
-        });
+        try {
+          await setDoc(userRef, {
+            lineUserId: profileData.userId,
+            lineDisplayName: profileData.displayName || '',
+            linePictureUrl: profileData.pictureUrl || '',
+            lineLinked: true,
+            plan: 'premium',
+            premiumType: 'none',
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        } catch (firestoreError) {
+          console.error('[LINE連携] Firestore 書き込み失敗:', firestoreError);
+          setStatus('error');
+          return;
+        }
 
         setStatus('success');
         setTimeout(() => {
           router.push('/');
         }, 2000);
       } catch (error) {
-        console.error('LINE連携エラー', error);
+        console.error('[LINE連携] 処理全体で予期せぬエラー:', error);
         setStatus('error');
       }
     };
