@@ -351,7 +351,8 @@ export default function ProfilePage() {
 
     try {
       await updateDoc(doc(db, 'users', user.uid), {
-        plan: 'free',
+        plan: 'free', // プランをFreeに戻す
+        lineLinked: false, // LINE連携を解除
       });
       toast.success('プランをFreeに戻しました');
       setPlan('free');
