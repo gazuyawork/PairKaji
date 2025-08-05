@@ -46,7 +46,7 @@ useEffect(() => {
   const unsubscribe = onSnapshot(userRef, (snap) => {
     if (snap.exists()) {
       const data = snap.data();
-      setIsLineLinked(!!data.linkedWithLine);
+      setIsLineLinked(!!data.lineLinked);
     }
   });
 

@@ -23,7 +23,7 @@ export default function LineLinkCard() {
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           const data = snap.data();
-          setIsLinked(!!data.linkedWithLine);
+          setIsLinked(!!data.lineLinked);
         } else {
           setIsLinked(false);
         }
