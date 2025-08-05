@@ -1,6 +1,8 @@
 // src/components/profile/PartnerSettings.tsx
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import type { PendingApproval } from '@/types/Pair';

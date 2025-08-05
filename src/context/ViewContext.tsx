@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 // ✅ Context の型定義：どのような値を保持・更新するかを明示

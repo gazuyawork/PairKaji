@@ -1,6 +1,8 @@
 // src/app/settings/line-link/page.tsx
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { MessageCircle } from 'lucide-react';
 import { useEffect } from 'react';
 

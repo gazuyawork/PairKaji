@@ -2,6 +2,8 @@
 
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { useState } from 'react';
 import { Heart } from 'lucide-react';
 

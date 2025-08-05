@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import PairInit from '@/components/common/PairInit';

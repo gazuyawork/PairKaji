@@ -2,6 +2,8 @@
 
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   price: string;
   quantity: string;

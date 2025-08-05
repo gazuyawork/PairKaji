@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { dayNumberToName } from '@/lib/constants';
 import { useRef, useState } from 'react';

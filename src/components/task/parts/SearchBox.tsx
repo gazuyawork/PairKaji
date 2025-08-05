@@ -2,6 +2,8 @@
 
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { Search } from 'lucide-react';
 
 export default function SearchBox({

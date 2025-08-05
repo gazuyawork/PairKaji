@@ -2,6 +2,8 @@
 
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { CheckCircle, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatWithComma } from '@/utils/number';

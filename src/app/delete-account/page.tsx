@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import Header from '@/components/common/Header';
 import { auth } from '@/lib/firebase';
 import {

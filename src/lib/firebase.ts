@@ -2,6 +2,8 @@
 
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   initializeFirestore,

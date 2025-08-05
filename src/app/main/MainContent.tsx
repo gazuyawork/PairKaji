@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -115,17 +117,20 @@ export default function MainContent() {
             </div>
           </motion.div>
         </div>
-        {index === 1 && (
-          <button
-            onClick={() => {
-              window.dispatchEvent(new Event('open-new-task-modal'));
-            }}
-            className="fixed bottom-26 right-6 w-14 h-14 rounded-full text-white text-3xl font-bold bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center z-[1000]"
-            aria-label="新規タスク追加"
-          >
-            ＋
-          </button>
-        )}
+{index === 1 && (
+  <button
+    onClick={() => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('open-new-task-modal'));
+      }
+    }}
+    className="fixed bottom-26 right-6 w-14 h-14 rounded-full text-white text-3xl font-bold bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center z-[1000]"
+    aria-label="新規タスク追加"
+  >
+    ＋
+  </button>
+)}
+
 
         <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
           <FooterNav currentIndex={index} setIndex={setIndex} />

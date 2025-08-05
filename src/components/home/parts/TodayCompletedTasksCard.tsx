@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { CheckCircle } from 'lucide-react';
 import type { Task } from '@/types/Task';
 import { format } from 'date-fns';

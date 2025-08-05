@@ -1,6 +1,8 @@
 // src/components/TaskCard.tsx
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2 } from 'lucide-react';

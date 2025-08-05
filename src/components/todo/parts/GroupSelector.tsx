@@ -1,6 +1,8 @@
 // ファイル名: GroupSelector.tsx
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { useRef, useEffect, useState } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { motion } from 'framer-motion';

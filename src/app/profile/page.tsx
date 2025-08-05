@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import Header from '@/components/common/Header';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';

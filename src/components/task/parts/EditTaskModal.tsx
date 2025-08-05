@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect, useRef } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';

@@ -1,6 +1,8 @@
 // src/components/home/parts/LineLinkCard.tsx
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { X, MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';

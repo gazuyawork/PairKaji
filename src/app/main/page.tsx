@@ -1,6 +1,8 @@
 // src/app/main/page.tsx
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { Suspense } from 'react';
 import { ViewProvider } from '@/context/ViewContext';
 import MainContent from './MainContent';

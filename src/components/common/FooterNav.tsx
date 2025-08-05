@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'
+
 import { Home, ListTodo, BookOpenCheck  } from 'lucide-react';
 
 type Props = {

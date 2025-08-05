@@ -1,12 +1,13 @@
-// src/app/settings/line-link/callback/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
-export default function LineLinkCallbackPage() {
+function LineLinkHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -14,8 +15,6 @@ export default function LineLinkCallbackPage() {
   useEffect(() => {
     const handleLineCallback = async () => {
       const code = searchParams.get('code');
-      const state = searchParams.get('state');
-
       if (!code) {
         setStatus('error');
         return;
@@ -26,7 +25,7 @@ export default function LineLinkCallbackPage() {
         const clientId = 'YOUR_LINE_CHANNEL_ID';
         const clientSecret = 'YOUR_LINE_CHANNEL_SECRET';
 
-        // ① アクセストークン取得
+        // アクセストークン取得
         const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
           method: 'POST',
           headers: {
@@ -42,14 +41,13 @@ export default function LineLinkCallbackPage() {
         });
 
         const tokenData = await tokenRes.json();
-
         if (!tokenData.access_token) {
           console.error('アクセストークンの取得に失敗', tokenData);
           setStatus('error');
           return;
         }
 
-        // ② プロフィール取得
+        // プロフィール取得
         const profileRes = await fetch('https://api.line.me/v2/profile', {
           headers: {
             Authorization: `Bearer ${tokenData.access_token}`,
@@ -57,7 +55,6 @@ export default function LineLinkCallbackPage() {
         });
 
         const profileData = await profileRes.json();
-
         if (!profileData.userId) {
           console.error('LINEユーザーIDの取得に失敗', profileData);
           setStatus('error');
@@ -71,7 +68,7 @@ export default function LineLinkCallbackPage() {
           return;
         }
 
-        // ③ Firestoreに保存
+        // Firestoreに保存
         const userRef = doc(db, 'users', currentUser.uid);
         await updateDoc(userRef, {
           lineUserId: profileData.userId,
@@ -79,9 +76,8 @@ export default function LineLinkCallbackPage() {
         });
 
         setStatus('success');
-
         setTimeout(() => {
-          router.push('/'); // ホームなどに戻す
+          router.push('/');
         }, 2000);
       } catch (error) {
         console.error('LINE連携エラー', error);
@@ -100,5 +96,13 @@ export default function LineLinkCallbackPage() {
         {status === 'error' && <p className="text-red-500 text-lg font-semibold">LINE連携に失敗しました</p>}
       </div>
     </div>
+  );
+}
+
+export default function LineLinkCallbackPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-8">処理中...</div>}>
+      <LineLinkHandler />
+    </Suspense>
   );
 }
