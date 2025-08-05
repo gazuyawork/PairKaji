@@ -30,7 +30,7 @@ function LineLinkHandler() {
 
       try {
         const redirectUri = 'https://pair-kaji.vercel.app/settings/line-link/callback';
-        const clientId = '2007876785';
+        const clientId = '2007877129';
         const clientSecret = 'e896cb4c5169ed0bb2a971abcdc5a656';
 
         const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {

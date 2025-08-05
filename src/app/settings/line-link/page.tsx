@@ -15,7 +15,6 @@ export default function LineLinkPage() {
     const clientId = '2007877129';
     const state = 'secureRandomString';
     const scope = 'profile openid';
-
     const loginUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&scope=${scope}`;
 
     window.location.href = loginUrl;
