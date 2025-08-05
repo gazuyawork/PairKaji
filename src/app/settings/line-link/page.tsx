@@ -1,16 +1,17 @@
-// src/app/settings/line-link/page.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
-import { MessageCircle } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { MessageCircle, Info } from 'lucide-react';
 
 export default function LineLinkPage() {
+  const [showDetails, setShowDetails] = useState(false);
+
   const handleLineLogin = () => {
     const redirectUri = encodeURIComponent('https://your-app.com/settings/line-link/callback');
-    const clientId = 'YOUR_LINE_CHANNEL_ID'; // ← LINE Developersから取得
-    const state = 'secureRandomString'; // CSRF対策（ランダム文字列を推奨）
+    const clientId = 'YOUR_LINE_CHANNEL_ID';
+    const state = 'secureRandomString';
     const scope = 'profile openid';
 
     const loginUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&scope=${scope}`;
@@ -29,12 +30,13 @@ export default function LineLinkPage() {
           <div className="bg-sky-100 rounded-full p-3 mb-4">
             <MessageCircle className="text-sky-500 w-8 h-8" />
           </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">LINEと連携する</h1>
-          <p className="text-sm text-gray-600 mb-6">
-            タスクのリマインダーをLINEで受け取れるようになります。
+          <h1 className="text-xl font-bold text-gray-800 mb-4">LINEと連携する</h1>
+
+          <div className="bg-yellow-50 text-yellow-800 border border-yellow-300 rounded-md text-sm p-3 mb-4 w-full text-left">
+            ※ LINE通知のご利用には、<strong>月額300円のプレミアムプラン</strong>への加入が必要です。
             <br />
-            通知を見逃さずに、ふたりで快適な家事分担を。
-          </p>
+            無料プランではLINE通知をご利用いただけません。
+          </div>
 
           <button
             onClick={handleLineLogin}
@@ -42,6 +44,27 @@ export default function LineLinkPage() {
           >
             LINEで連携する
           </button>
+
+          <button
+            onClick={() => setShowDetails((prev) => !prev)}
+            className="mt-4 text-sm text-sky-600 underline hover:text-sky-800 flex items-center gap-1"
+          >
+            <Info className="w-4 h-4" />
+            プレミアムプランの詳細を見る
+          </button>
+
+          {showDetails && (
+            <div className="mt-4 w-full text-sm text-gray-700 bg-gray-50 p-4 rounded-md border border-gray-200 text-left">
+              <p className="font-semibold mb-2">プレミアムプラン（300円/月）でできること：</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>タスクのリマインダーをLINEで受信</li>
+                <li>アプリ内の広告が完全に非表示に</li>
+              </ul>
+              <p className="mt-3 text-xs text-gray-500">
+                ※ プランはいつでも解約可能です。キャンセル後も契約期間中はご利用いただけます。
+              </p>
+            </div>
+          )}
 
           <p className="text-xs text-gray-400 mt-4">
             LINEログイン後、通知許可を求められます。
