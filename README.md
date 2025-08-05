@@ -41,7 +41,7 @@ pairkaji/
 │ ├── store/ # Zustand等のグローバルストア（将来拡張用）
 │ ├── types/ # 型定義（Task, Pairなど）
 │ └── utils/ # 各種汎用関数（数値整形、ローカルストレージなど）
-├── pairkaji_functions/ # Firebase Cloud Functions (TypeScript)
+├── functions/ # Firebase Cloud Functions (TypeScript)
 │ ├── src/index.ts # 関数エントリポイント
 │ └── lib/ # ビルド生成ファイル
 ├── .gitignore
@@ -90,7 +90,7 @@ yaml
 
 ## 🗂 注意事項
 
-- Cloud Functions は `pairkaji_functions/` 以下に TypeScript で実装
+- Cloud Functions は `functions/` 以下に TypeScript で実装
 - セキュリティルールは Firestore の `userId`, `userIds` に基づいて制御
 - 開発中の未使用コンポーネントは `/src/components/common` または別途 `_archive` に整理予定
 

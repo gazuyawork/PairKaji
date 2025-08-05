@@ -1,8 +1,8 @@
 {
   "functions": [
     {
-      "source": "pairkaji_functions",
-      "codebase": "pairkaji_functions",
+      "source": "functions",
+      "codebase": "functions",
       "ignore": [
         "node_modules",
         ".git",
