@@ -12,7 +12,7 @@ export default function LineLinkPage() {
 
   const handleLineLogin = () => {
     const redirectUri = encodeURIComponent('https://pair-kaji.vercel.app/settings/line-link/callback');
-    const clientId = '2007876785';
+    const clientId = '2007877129';
     const state = 'secureRandomString';
     const scope = 'profile openid';
 
