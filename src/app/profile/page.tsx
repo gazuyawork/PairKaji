@@ -52,6 +52,8 @@ export default function ProfilePage() {
   const [isRemoving, setIsRemoving] = useState(false);
   const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
+  const [plan, setPlan] = useState<string>(''); // 🔽 plan 状態追加
+
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -101,6 +103,10 @@ export default function ProfilePage() {
         if (snap.exists()) {
           const data = snap.data();
           setName(data.name || user.email?.split('@')[0] || '');
+
+          if (data.plan) {
+            setPlan(data.plan); // 🔽 ここを追加！
+          }
 
           if (data.imageUrl) {
             setProfileImage(data.imageUrl);
@@ -233,69 +239,69 @@ export default function ProfilePage() {
   };
 
   // パートナー承認時の処理
-const handleApprovePair = async () => {
-  const user = auth.currentUser;
-  if (!user || !pendingApproval) return;
+  const handleApprovePair = async () => {
+    const user = auth.currentUser;
+    if (!user || !pendingApproval) return;
 
-  try {
-    if (!pendingApproval?.inviterUid) {
-      console.error('[ERROR] inviterUid が undefined です。処理をスキップします。');
-      toast.error('ペア情報が不完全なため、承認できません。');
-      return;
+    try {
+      if (!pendingApproval?.inviterUid) {
+        console.error('[ERROR] inviterUid が undefined です。処理をスキップします。');
+        toast.error('ペア情報が不完全なため、承認できません。');
+        return;
+      }
+
+      // Firestoreのペア情報を更新
+      await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
+
+      // 👇 この処理を追加（両ユーザーの sharedTasksCleaned を false に更新）
+      const userRef = doc(db, 'users', user.uid);
+      const partnerRef = doc(db, 'users', pendingApproval.inviterUid);
+      await Promise.all([
+        updateDoc(userRef, { sharedTasksCleaned: false }),
+        updateDoc(partnerRef, { sharedTasksCleaned: false }),
+      ]);
+
+      toast.success('ペア設定を承認しました');
+      setIsPairConfirmed(true);
+      setPendingApproval(null);
+    } catch (_err: unknown) {
+      handleFirestoreError(_err);
     }
-
-    // Firestoreのペア情報を更新
-    await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
-
-    // 👇 この処理を追加（両ユーザーの sharedTasksCleaned を false に更新）
-    const userRef = doc(db, 'users', user.uid);
-    const partnerRef = doc(db, 'users', pendingApproval.inviterUid);
-    await Promise.all([
-      updateDoc(userRef, { sharedTasksCleaned: false }),
-      updateDoc(partnerRef, { sharedTasksCleaned: false }),
-    ]);
-
-    toast.success('ペア設定を承認しました');
-    setIsPairConfirmed(true);
-    setPendingApproval(null);
-  } catch (_err: unknown) {
-    handleFirestoreError(_err);
-  }
-};
+  };
 
 
 
-// パートナー解除時の処理
-const handleRemovePair = async () => {
-  const user = auth.currentUser;
-  if (!user || !pairDocId) return;
+  // パートナー解除時の処理
+  const handleRemovePair = async () => {
+    const user = auth.currentUser;
+    if (!user || !pairDocId) return;
 
-  const pairSnap = await getDoc(doc(db, 'pairs', pairDocId));
-  if (!pairSnap.exists()) return;
+    const pairSnap = await getDoc(doc(db, 'pairs', pairDocId));
+    if (!pairSnap.exists()) return;
 
-  const pairData = pairSnap.data();
-  const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
-  if (!partnerId) return;
+    const pairData = pairSnap.data();
+    const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
+    if (!partnerId) return;
 
-  const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。');
-  if (!confirmed) return;
+    const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。');
+    if (!confirmed) return;
 
-  setIsRemoving(true); // 🟡 ローディング開始
-  try {
-    await removePair(pairDocId);
-    // await splitSharedTasksOnPairRemoval(user.uid, partnerId);
+    setIsRemoving(true); // 🟡 ローディング開始
+    try {
+      await removePair(pairDocId);
+      // await splitSharedTasksOnPairRemoval(user.uid, partnerId);
 
-    toast.success('ペアを解除しました');
-    setIsPairConfirmed(false);
-    setPartnerEmail('');
-    setInviteCode('');
-    setPairDocId(null);
-  } catch (_err: unknown) {
-    handleFirestoreError(_err);
-  } finally {
-    setIsRemoving(false); // 🔵 ローディング終了
-  }
-};
+      toast.success('ペアを解除しました');
+      setIsPairConfirmed(false);
+      setPartnerEmail('');
+      setInviteCode('');
+      setPairDocId(null);
+    } catch (_err: unknown) {
+      handleFirestoreError(_err);
+    } finally {
+      setIsRemoving(false); // 🔵 ローディング終了
+    }
+  };
 
 
 
@@ -332,55 +338,94 @@ const handleRemovePair = async () => {
     }
   };
 
+  const handleCancelPlan = async () => {
+    const confirmed = confirm('本当にFreeプランに戻しますか？');
+    if (!confirmed) return;
+
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error('ユーザー情報が取得できません');
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        plan: 'free',
+      });
+      toast.success('プランをFreeに戻しました');
+      setPlan('free');
+    } catch (err) {
+      console.error('[プラン解約エラー]', err);
+      toast.error('プラン変更に失敗しました');
+    }
+  };
+
+
   return (
     <div className="fixed flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
 
       <Header title="Profile" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
 
-      {isLoading ? (
-        <div className="flex items-center justify-center w-full h-[60vh]">
-          <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : (
-        <>
-          <ProfileCard
-            profileImage={profileImage}
-            setProfileImage={setProfileImage}
-            name={name}
-            setName={setName}
-            isGoogleUser={isGoogleUser}
-            onEditName={onEditNameHandler}
-            onEditEmail={onEditEmailHandler}
-            onEditPassword={onEditPasswordHandler}
-            email={email}
-            isLoading={isLoading}
-            nameUpdateStatus={nameUpdateStatus}
-          />
-          <PartnerSettings
-            isLoading={isLoading}
-            isPairLoading={isPairLoading}
-            pendingApproval={pendingApproval}
-            isPairConfirmed={isPairConfirmed}
-            partnerEmail={partnerEmail}
-            partnerImage={partnerImage ?? '/images/default.png'}
-            inviteCode={inviteCode}
-            pairDocId={pairDocId}
-            onApprovePair={handleApprovePair}
-            onRejectPair={handleRejectPair}
-            onCancelInvite={handleCancelInvite}
-            onSendInvite={handleSendInvite}
-            onRemovePair={handleRemovePair}
-            onChangePartnerEmail={setPartnerEmail}
-            isRemoving={isRemoving}
-          />
-        <div className="text-center mt-auto">
-          <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
-            アカウントを削除する
-          </Link>
-        </div>
-        </>
-      )}
+        {isLoading ? (
+          <div className="flex items-center justify-center w-full h-[60vh]">
+            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            <ProfileCard
+              profileImage={profileImage}
+              setProfileImage={setProfileImage}
+              name={name}
+              setName={setName}
+              isGoogleUser={isGoogleUser}
+              onEditName={onEditNameHandler}
+              onEditEmail={onEditEmailHandler}
+              onEditPassword={onEditPasswordHandler}
+              email={email}
+              isLoading={isLoading}
+              nameUpdateStatus={nameUpdateStatus}
+            />
+            <PartnerSettings
+              isLoading={isLoading}
+              isPairLoading={isPairLoading}
+              pendingApproval={pendingApproval}
+              isPairConfirmed={isPairConfirmed}
+              partnerEmail={partnerEmail}
+              partnerImage={partnerImage ?? '/images/default.png'}
+              inviteCode={inviteCode}
+              pairDocId={pairDocId}
+              onApprovePair={handleApprovePair}
+              onRejectPair={handleRejectPair}
+              onCancelInvite={handleCancelInvite}
+              onSendInvite={handleSendInvite}
+              onRemovePair={handleRemovePair}
+              onChangePartnerEmail={setPartnerEmail}
+              isRemoving={isRemoving}
+            />
+
+            {plan !== 'free' && (
+              <div className="flex justify-center">
+                <button
+                  onClick={handleCancelPlan}
+                  className="mt-4 bg-red-100 text-red-600 font-semibold py-2 px-4 rounded hover:bg-red-200 transition text-sm"
+                >
+                  プランをFreeに戻す
+                </button>
+              </div>
+            )}
+
+
+
+
+
+            <div className="text-center mt-auto">
+              <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
+                アカウントを削除する
+              </Link>
+            </div>
+          </>
+        )}
 
 
       </main>
