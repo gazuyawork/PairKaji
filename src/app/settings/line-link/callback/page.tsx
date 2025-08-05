@@ -11,20 +11,20 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 function LineLinkHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | string>('loading');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         console.error('[LINE連携] Firebaseログインユーザーが存在しません');
-        setStatus('error');
+        setStatus('[Firebase認証エラー] ログインユーザーが存在しません');
         return;
       }
 
       const code = searchParams.get('code');
       if (!code) {
         console.error('[LINE連携] code が取得できませんでした');
-        setStatus('error');
+        setStatus('[コード取得エラー] LINEからの認可コードが存在しません');
         return;
       }
 
@@ -50,14 +50,14 @@ function LineLinkHandler() {
         if (!tokenRes.ok) {
           const errorData = await tokenRes.json();
           console.error('[LINE連携] アクセストークン取得失敗:', errorData);
-          setStatus('error');
+          setStatus('[トークン取得失敗] ' + JSON.stringify(errorData));
           return;
         }
 
         const tokenData = await tokenRes.json();
         if (!tokenData.access_token) {
           console.error('[LINE連携] アクセストークンが存在しません', tokenData);
-          setStatus('error');
+          setStatus('[トークン不在] アクセストークンが取得できませんでした');
           return;
         }
 
@@ -70,14 +70,14 @@ function LineLinkHandler() {
         if (!profileRes.ok) {
           const errorData = await profileRes.json();
           console.error('[LINE連携] プロフィール取得失敗:', errorData);
-          setStatus('error');
+          setStatus('[プロフィール取得失敗] ' + JSON.stringify(errorData));
           return;
         }
 
         const profileData = await profileRes.json();
         if (!profileData.userId) {
           console.error('[LINE連携] LINEユーザーIDが取得できません', profileData);
-          setStatus('error');
+          setStatus('[LINEユーザーID取得失敗] userId が見つかりません');
           return;
         }
 
@@ -94,7 +94,7 @@ function LineLinkHandler() {
           }, { merge: true });
         } catch (firestoreError) {
           console.error('[LINE連携] Firestore 書き込み失敗:', firestoreError);
-          setStatus('error');
+          setStatus('[Firestore書き込み失敗] ' + String(firestoreError));
           return;
         }
 
@@ -104,7 +104,7 @@ function LineLinkHandler() {
         }, 2000);
       } catch (error) {
         console.error('[LINE連携] 予期せぬエラー:', error);
-        setStatus('error');
+        setStatus('[予期せぬエラー] ' + String(error));
       }
     });
 
@@ -113,10 +113,18 @@ function LineLinkHandler() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-4">
-      <div className="text-center">
-        {status === 'loading' && <p className="text-gray-600 text-lg">LINE連携を処理中です...</p>}
-        {status === 'success' && <p className="text-green-600 text-lg font-semibold">LINE連携が完了しました！</p>}
-        {status === 'error' && <p className="text-red-500 text-lg">LINE連携に失敗しました</p>}
+      <div className="text-center max-w-[90vw]">
+        {status === 'loading' && (
+          <p className="text-gray-600 text-lg">LINE連携を処理中です...</p>
+        )}
+        {status === 'success' && (
+          <p className="text-green-600 text-lg font-semibold">LINE連携が完了しました！</p>
+        )}
+        {typeof status === 'string' && status !== 'loading' && status !== 'success' && (
+          <p className="text-red-500 text-sm whitespace-pre-wrap break-words">
+            エラー: {status}
+          </p>
+        )}
       </div>
     </div>
   );
