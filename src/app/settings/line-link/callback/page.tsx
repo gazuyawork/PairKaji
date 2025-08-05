@@ -29,7 +29,7 @@ function LineLinkHandler() {
       }
 
       try {
-        const redirectUri = 'https://your-app.com/settings/line-link/callback';
+        const redirectUri = 'https://pair-kaji.vercel.app/settings/line-link/callback';
         const clientId = '2007876785';
         const clientSecret = 'e896cb4c5169ed0bb2a971abcdc5a656';
 
