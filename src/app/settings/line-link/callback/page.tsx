@@ -22,8 +22,8 @@ function LineLinkHandler() {
 
       try {
         const redirectUri = 'https://your-app.com/settings/line-link/callback';
-        const clientId = 'YOUR_LINE_CHANNEL_ID';
-        const clientSecret = 'YOUR_LINE_CHANNEL_SECRET';
+        const clientId = '2007876785';
+        const clientSecret = 'e896cb4c5169ed0bb2a971abcdc5a656';
 
         // アクセストークン取得
         const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
@@ -93,7 +93,7 @@ function LineLinkHandler() {
       <div className="text-center">
         {status === 'loading' && <p className="text-gray-600 text-lg">LINE連携を処理中です...</p>}
         {status === 'success' && <p className="text-green-600 text-lg font-semibold">LINE連携が完了しました！</p>}
-        {status === 'error' && <p className="text-red-500 text-lg font-semibold">LINE連携に失敗しました</p>}
+        {status === 'error' && <p className="text-red-500 text-lg">LINE連携に失敗しました</p>}
       </div>
     </div>
   );
