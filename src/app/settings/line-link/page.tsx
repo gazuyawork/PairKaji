@@ -3,14 +3,16 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { MessageCircle, Info } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { MessageCircle, Info, ArrowLeft } from 'lucide-react';
 
 export default function LineLinkPage() {
   const [showDetails, setShowDetails] = useState(false);
+  const router = useRouter();
 
   const handleLineLogin = () => {
-    const redirectUri = encodeURIComponent('https://your-app.com/settings/line-link/callback');
-    const clientId = 'YOUR_LINE_CHANNEL_ID';
+    const redirectUri = encodeURIComponent('https://pair-kaji.vercel.app/settings/line-link/callback');
+    const clientId = '2007876785';
     const state = 'secureRandomString';
     const scope = 'profile openid';
 
@@ -24,13 +26,22 @@ export default function LineLinkPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f9fcff] flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-[#f9fcff] flex items-center justify-center px-4 py-12 relative">
+      {/* 戻るボタン */}
+      <button
+        onClick={() => router.back()}
+        className="absolute top-4 left-4 text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        戻る
+      </button>
+
       <div className="max-w-md w-full bg-white rounded-xl shadow-md border border-gray-200 p-6">
         <div className="flex flex-col items-center text-center">
           <div className="bg-sky-100 rounded-full p-3 mb-4">
             <MessageCircle className="text-sky-500 w-8 h-8" />
           </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-4">LINEと連携する</h1>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">LINEと連携する</h1>
 
           <div className="bg-yellow-50 text-yellow-800 border border-yellow-300 rounded-md text-sm p-3 mb-4 w-full text-left">
             ※ LINE通知のご利用には、<strong>月額300円のプレミアムプラン</strong>への加入が必要です。
