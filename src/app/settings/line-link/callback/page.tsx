@@ -4,9 +4,9 @@ export const dynamic = 'force-dynamic';
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { toast } from 'sonner';
 
 function LineLinkHandler() {
   const router = useRouter();
@@ -14,19 +14,16 @@ function LineLinkHandler() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
-    const handleLineCallback = async () => {
-      const code = searchParams.get('code');
-      if (!code) {
-        console.error('[LINE連携] code が取得できませんでした');
-        toast.error('LINE連携に失敗しました（コード未取得）');
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        console.error('[LINE連携] Firebaseログインユーザーが存在しません');
         setStatus('error');
         return;
       }
 
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        console.error('[LINE連携] Firebaseログインユーザーが存在しません');
-        toast.error('ログイン状態が無効です。再度ログインしてください。');
+      const code = searchParams.get('code');
+      if (!code) {
+        console.error('[LINE連携] code が取得できませんでした');
         setStatus('error');
         return;
       }
@@ -36,7 +33,6 @@ function LineLinkHandler() {
         const clientId = '2007876785';
         const clientSecret = 'e896cb4c5169ed0bb2a971abcdc5a656';
 
-        // アクセストークン取得
         const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
           method: 'POST',
           headers: {
@@ -54,7 +50,6 @@ function LineLinkHandler() {
         if (!tokenRes.ok) {
           const errorData = await tokenRes.json();
           console.error('[LINE連携] アクセストークン取得失敗:', errorData);
-          toast.error('LINE連携に失敗しました（トークン取得エラー）');
           setStatus('error');
           return;
         }
@@ -62,12 +57,10 @@ function LineLinkHandler() {
         const tokenData = await tokenRes.json();
         if (!tokenData.access_token) {
           console.error('[LINE連携] アクセストークンが存在しません', tokenData);
-          toast.error('LINE連携に失敗しました（アクセストークンなし）');
           setStatus('error');
           return;
         }
 
-        // プロフィール取得
         const profileRes = await fetch('https://api.line.me/v2/profile', {
           headers: {
             Authorization: `Bearer ${tokenData.access_token}`,
@@ -77,7 +70,6 @@ function LineLinkHandler() {
         if (!profileRes.ok) {
           const errorData = await profileRes.json();
           console.error('[LINE連携] プロフィール取得失敗:', errorData);
-          toast.error('LINE連携に失敗しました（プロフィール取得エラー）');
           setStatus('error');
           return;
         }
@@ -85,13 +77,12 @@ function LineLinkHandler() {
         const profileData = await profileRes.json();
         if (!profileData.userId) {
           console.error('[LINE連携] LINEユーザーIDが取得できません', profileData);
-          toast.error('LINE連携に失敗しました（ユーザーID未取得）');
           setStatus('error');
           return;
         }
 
         try {
-          const userRef = doc(db, 'users', currentUser.uid);
+          const userRef = doc(db, 'users', user.uid);
           await setDoc(userRef, {
             lineUserId: profileData.userId,
             lineDisplayName: profileData.displayName || '',
@@ -103,25 +94,21 @@ function LineLinkHandler() {
           }, { merge: true });
         } catch (firestoreError) {
           console.error('[LINE連携] Firestore 書き込み失敗:', firestoreError);
-          toast.error('LINE連携に失敗しました（データ保存エラー）');
           setStatus('error');
           return;
         }
 
-        toast.success('LINE連携が完了しました！');
         setStatus('success');
-
         setTimeout(() => {
           router.push('/');
         }, 2000);
       } catch (error) {
-        console.error('[LINE連携] 処理全体で予期せぬエラー:', error);
-        toast.error('LINE連携中に予期せぬエラーが発生しました');
+        console.error('[LINE連携] 予期せぬエラー:', error);
         setStatus('error');
       }
-    };
+    });
 
-    handleLineCallback();
+    return () => unsubscribe(); // cleanup
   }, [searchParams, router]);
 
   return (
