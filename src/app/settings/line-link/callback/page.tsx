@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 function LineLinkHandler() {
   const router = useRouter();
@@ -17,6 +18,7 @@ function LineLinkHandler() {
       const code = searchParams.get('code');
       if (!code) {
         console.error('[LINE連携] code が取得できませんでした');
+        toast.error('LINE連携に失敗しました（コード未取得）');
         setStatus('error');
         return;
       }
@@ -24,6 +26,7 @@ function LineLinkHandler() {
       const currentUser = auth.currentUser;
       if (!currentUser) {
         console.error('[LINE連携] Firebaseログインユーザーが存在しません');
+        toast.error('ログイン状態が無効です。再度ログインしてください。');
         setStatus('error');
         return;
       }
@@ -51,6 +54,7 @@ function LineLinkHandler() {
         if (!tokenRes.ok) {
           const errorData = await tokenRes.json();
           console.error('[LINE連携] アクセストークン取得失敗:', errorData);
+          toast.error('LINE連携に失敗しました（トークン取得エラー）');
           setStatus('error');
           return;
         }
@@ -58,6 +62,7 @@ function LineLinkHandler() {
         const tokenData = await tokenRes.json();
         if (!tokenData.access_token) {
           console.error('[LINE連携] アクセストークンが存在しません', tokenData);
+          toast.error('LINE連携に失敗しました（アクセストークンなし）');
           setStatus('error');
           return;
         }
@@ -72,6 +77,7 @@ function LineLinkHandler() {
         if (!profileRes.ok) {
           const errorData = await profileRes.json();
           console.error('[LINE連携] プロフィール取得失敗:', errorData);
+          toast.error('LINE連携に失敗しました（プロフィール取得エラー）');
           setStatus('error');
           return;
         }
@@ -79,13 +85,13 @@ function LineLinkHandler() {
         const profileData = await profileRes.json();
         if (!profileData.userId) {
           console.error('[LINE連携] LINEユーザーIDが取得できません', profileData);
+          toast.error('LINE連携に失敗しました（ユーザーID未取得）');
           setStatus('error');
           return;
         }
 
-        // Firestoreに保存（存在しなくてもOK）
-        const userRef = doc(db, 'users', currentUser.uid);
         try {
+          const userRef = doc(db, 'users', currentUser.uid);
           await setDoc(userRef, {
             lineUserId: profileData.userId,
             lineDisplayName: profileData.displayName || '',
@@ -97,16 +103,20 @@ function LineLinkHandler() {
           }, { merge: true });
         } catch (firestoreError) {
           console.error('[LINE連携] Firestore 書き込み失敗:', firestoreError);
+          toast.error('LINE連携に失敗しました（データ保存エラー）');
           setStatus('error');
           return;
         }
 
+        toast.success('LINE連携が完了しました！');
         setStatus('success');
+
         setTimeout(() => {
           router.push('/');
         }, 2000);
       } catch (error) {
         console.error('[LINE連携] 処理全体で予期せぬエラー:', error);
+        toast.error('LINE連携中に予期せぬエラーが発生しました');
         setStatus('error');
       }
     };
