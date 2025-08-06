@@ -3,15 +3,17 @@ import fetch from 'node-fetch';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { admin } from './lib/firebaseAdmin';
+import * as functions from 'firebase-functions';
 
 const db = admin.firestore();
 
 export const sendDailyTaskReminder = onSchedule(
   {
-    schedule: '0 23 * * *', // 日本時間8時 = UTC23時
+    schedule: "* * * * *", // 日本時間8時 = UTC23時
     timeZone: 'Asia/Tokyo',
   },
   async () => {
+    console.log("✅ sendDailyTaskReminder 実行されました");
     const today = new Date();
     const dayOfWeek = today.getDay().toString(); // "0"=日, "1"=月...
     const todayDateStr = format(today, 'yyyy-MM-dd');
@@ -56,7 +58,7 @@ export const sendDailyTaskReminder = onSchedule(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': process.env.LINE_CHANNEL_ACCESS_TOKEN!,
+          'Authorization': functions.config().line.token,
         },
         body: JSON.stringify({
           to: lineUserId,
