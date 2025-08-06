@@ -21,8 +21,9 @@ function LineLinkHandler() {
       console.log('[LINE連携] Firebaseユーザー:', user);
 
       if (!user) {
-        console.error('[LINE連携] Firebaseログインユーザーが存在しません');
-        setStatus('[Firebase認証エラー] ログインユーザーが存在しません');
+        console.error('[LINE連携] Firebaseログインユーザーが存在しません（スマホセッション切れの可能性）');
+        alert('ログイン状態が切れています。もう一度ログインしてください。');
+        router.push('/login'); // ← 必要に応じてログイン画面パスを修正
         return;
       }
 
@@ -63,7 +64,6 @@ function LineLinkHandler() {
         });
 
         console.log('[LINE連携] tokenRes.status:', tokenRes.status);
-
         const tokenResText = await tokenRes.text();
         console.log('[LINE連携] tokenRes body:', tokenResText);
 
