@@ -14,7 +14,12 @@ function LineLinkHandler() {
   const [status, setStatus] = useState<'loading' | 'success' | string>('loading');
 
   useEffect(() => {
+    console.log('[LINE連携] useEffect開始');
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('[LINE連携] onAuthStateChanged発火');
+      console.log('[LINE連携] Firebaseユーザー:', user);
+
       if (!user) {
         console.error('[LINE連携] Firebaseログインユーザーが存在しません');
         setStatus('[Firebase認証エラー] ログインユーザーが存在しません');
@@ -22,6 +27,14 @@ function LineLinkHandler() {
       }
 
       const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+
+      console.log('[LINE連携] URLパラメータ取得');
+      console.log('[LINE連携] code:', code);
+      console.log('[LINE連携] state:', state);
+      console.log('[LINE連携] error:', error);
+
       if (!code) {
         console.error('[LINE連携] code が取得できませんでした');
         setStatus('[コード取得エラー] LINEからの認可コードが存在しません');
@@ -32,6 +45,8 @@ function LineLinkHandler() {
         const redirectUri = 'https://pair-kaji.vercel.app/settings/line-link/callback';
         const clientId = '2007877129';
         const clientSecret = '712e1a48c57ba2fc875b50305653b35d';
+
+        console.log('[LINE連携] アクセストークン取得開始');
 
         const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
           method: 'POST',
@@ -47,19 +62,27 @@ function LineLinkHandler() {
           }),
         });
 
+        console.log('[LINE連携] tokenRes.status:', tokenRes.status);
+
+        const tokenResText = await tokenRes.text();
+        console.log('[LINE連携] tokenRes body:', tokenResText);
+
         if (!tokenRes.ok) {
-          const errorData = await tokenRes.json();
-          console.error('[LINE連携] アクセストークン取得失敗:', errorData);
-          setStatus('[トークン取得失敗] ' + JSON.stringify(errorData));
+          console.error('[LINE連携] アクセストークン取得失敗');
+          setStatus('[トークン取得失敗] ' + tokenResText);
           return;
         }
 
-        const tokenData = await tokenRes.json();
+        const tokenData = JSON.parse(tokenResText);
+        console.log('[LINE連携] tokenData:', tokenData);
+
         if (!tokenData.access_token) {
           console.error('[LINE連携] アクセストークンが存在しません', tokenData);
           setStatus('[トークン不在] アクセストークンが取得できませんでした');
           return;
         }
+
+        console.log('[LINE連携] プロフィール取得開始');
 
         const profileRes = await fetch('https://api.line.me/v2/profile', {
           headers: {
@@ -67,19 +90,26 @@ function LineLinkHandler() {
           },
         });
 
+        const profileText = await profileRes.text();
+        console.log('[LINE連携] profileRes.status:', profileRes.status);
+        console.log('[LINE連携] profileRes body:', profileText);
+
         if (!profileRes.ok) {
-          const errorData = await profileRes.json();
-          console.error('[LINE連携] プロフィール取得失敗:', errorData);
-          setStatus('[プロフィール取得失敗] ' + JSON.stringify(errorData));
+          console.error('[LINE連携] プロフィール取得失敗');
+          setStatus('[プロフィール取得失敗] ' + profileText);
           return;
         }
 
-        const profileData = await profileRes.json();
+        const profileData = JSON.parse(profileText);
+        console.log('[LINE連携] profileData:', profileData);
+
         if (!profileData.userId) {
           console.error('[LINE連携] LINEユーザーIDが取得できません', profileData);
           setStatus('[LINEユーザーID取得失敗] userId が見つかりません');
           return;
         }
+
+        console.log('[LINE連携] Firestore書き込み開始');
 
         try {
           const userRef = doc(db, 'users', user.uid);
@@ -92,12 +122,14 @@ function LineLinkHandler() {
             premiumType: 'none',
             updatedAt: serverTimestamp(),
           }, { merge: true });
+          console.log('[LINE連携] Firestore書き込み成功');
         } catch (firestoreError) {
           console.error('[LINE連携] Firestore 書き込み失敗:', firestoreError);
           setStatus('[Firestore書き込み失敗] ' + String(firestoreError));
           return;
         }
 
+        console.log('[LINE連携] 全処理成功');
         setStatus('success');
         setTimeout(() => {
           router.push('/');
@@ -108,7 +140,10 @@ function LineLinkHandler() {
       }
     });
 
-    return () => unsubscribe(); // cleanup
+    return () => {
+      console.log('[LINE連携] useEffect cleanup');
+      unsubscribe();
+    };
   }, [searchParams, router]);
 
   return (
