@@ -106,7 +106,20 @@ export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds
 };
 
 
-const checkDuplicateSharedTaskName = async (name: string, uid: string): Promise<boolean> => {
+/**
+ * 同名の共有タスクがすでに存在するかを確認する関数
+ * 編集時には自タスク（excludeTaskId）を除外してチェック可能
+ *
+ * @param name タスク名
+ * @param uid 現在のユーザーID
+ * @param excludeTaskId 除外するタスクID（編集時に自分自身を除外するために使用）
+ * @returns 重複が存在するかどうか
+ */
+const checkDuplicateSharedTaskName = async (
+  name: string,
+  uid: string,
+  excludeTaskId?: string
+): Promise<boolean> => {
   const pairUserIds = await fetchPairUserIds(uid);
   if (pairUserIds.length === 0) return false;
 
@@ -118,8 +131,13 @@ const checkDuplicateSharedTaskName = async (name: string, uid: string): Promise<
   );
 
   const snapshot = await getDocs(q);
-  return !snapshot.empty;
+
+  // 🔽 編集時は、自分自身のタスクを除外
+  const filtered = snapshot.docs.filter((doc) => doc.id !== excludeTaskId);
+
+  return filtered.length > 0;
 };
+
 
 /**
  * タスクの完了履歴をtaskCompletionsコレクションに追加する関数
@@ -183,7 +201,7 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
 
     // 🔽 追加チェック：private → shared に変える場合のみ
     if (!isPrivate) {
-      const isDup = await checkDuplicateSharedTaskName(task.name, uid);
+      const isDup = await checkDuplicateSharedTaskName(task.name, uid, task.id);
       if (isDup) {
         throw new Error('同名の共有タスクが既に存在します。名前を変更してください。');
       }
@@ -355,6 +373,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
       await addDoc(collection(db, 'tasks'), {
         ...commonData,
         userId: uid,
+        done: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -363,6 +382,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
     handleFirestoreError(err);
   }
 };
+
 
 /**
  * 指定されたタスクIDの Firestore ドキュメントを削除する。

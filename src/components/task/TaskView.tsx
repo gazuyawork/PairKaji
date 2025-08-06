@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import TaskCard from '@/components/task/parts/TaskCard';
 import EditTaskModal from '@/components/task/parts/EditTaskModal';
-import type { Task, Period } from '@/types/Task';
 import SearchBox from '@/components/task/parts/SearchBox';
 import FilterControls from '@/components/task/parts/FilterControls';
 import {
@@ -34,6 +33,8 @@ import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import { removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
 import AdCard_02 from '@/components/task/parts/AdCard_02';
+import type { Task, Period, TaskManageTask } from '@/types/Task';
+
 
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
@@ -307,18 +308,24 @@ useEffect(() => {
     }
   };
 
-  const updateTask = async (oldPeriod: Period, updated: Task) => {
-    try {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+const updateTask = async (oldPeriod: Period, updated: Task) => {
+  try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-      await saveSingleTask(updated, uid);
-      setEditTargetTask(null);
-    } catch (error) {
-      console.error('タスク更新に失敗しました:', error);
-      toast.error('タスクの保存に失敗しました');
-    }
-  };
+    // ✅ idを補完した上で明示的にTaskManageTaskとして扱う
+    const updatedTask: TaskManageTask = {
+      ...(updated as TaskManageTask),
+      id: updated.id ?? '', // 念のため空文字も防げる
+    };
+
+    await saveSingleTask(updatedTask, uid);
+    setEditTargetTask(null);
+  } catch (error) {
+    console.error('タスク更新に失敗しました:', error);
+    toast.error('タスクの保存に失敗しました');
+  }
+};
 
   useEffect(() => {
     resetCompletedTasks().catch(console.error);
