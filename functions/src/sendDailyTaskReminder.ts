@@ -1,21 +1,26 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { defineSecret } from 'firebase-functions/params'; // ✅ Secret定義用
 import fetch from 'node-fetch';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { admin } from './lib/firebaseAdmin';
-import * as functions from 'firebase-functions';
 
 const db = admin.firestore();
 
+// ✅ Firebase Secret として定義（CLIで設定する）
+const LINE_CHANNEL_ACCESS_TOKEN = defineSecret('LINE_CHANNEL_ACCESS_TOKEN');
+
 export const sendDailyTaskReminder = onSchedule(
   {
-    schedule: "* * * * *", // 日本時間8時 = UTC23時
+    schedule: '0 23 * * *', // 毎日23時に実行
     timeZone: 'Asia/Tokyo',
+    secrets: [LINE_CHANNEL_ACCESS_TOKEN], // ✅ 必須
   },
   async () => {
     console.log("✅ sendDailyTaskReminder 実行されました");
+
     const today = new Date();
-    const dayOfWeek = today.getDay().toString(); // "0"=日, "1"=月...
+    const dayOfWeek = today.getDay().toString(); // "0"=日曜
     const todayDateStr = format(today, 'yyyy-MM-dd');
 
     const usersSnap = await db
@@ -54,11 +59,11 @@ export const sendDailyTaskReminder = onSchedule(
 
       const messageText = `📋 今日のタスク（${format(today, 'M月d日（eee）', { locale: ja })}）\n\n${taskList.join('\n')}\n\n👉 アプリを開く\nhttps://pair-kaji.vercel.app/`;
 
-      await fetch('https://api.line.me/v2/bot/message/push', {
+      const res = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': functions.config().line.token,
+          'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN.value()}`, // ✅ 正式な取得方法
         },
         body: JSON.stringify({
           to: lineUserId,
@@ -71,7 +76,12 @@ export const sendDailyTaskReminder = onSchedule(
         }),
       });
 
-      console.log(`[LINE通知] 送信済: ${userId}`);
+      if (res.ok) {
+        console.log(`[LINE通知] 送信済: ${userId}`);
+      } else {
+        const errorText = await res.text();
+        console.error(`[ERROR] LINE通知失敗: ${userId} / status=${res.status} - ${errorText}`);
+      }
     }
   }
 );

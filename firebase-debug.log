@@ -1,0 +1,314 @@
+[debug] [2025-08-06T04:52:09.324Z] ----------------------------------------------------------------------
+[debug] [2025-08-06T04:52:09.329Z] Command:       /root/.nvm/versions/node/v20.19.4/bin/node /root/.nvm/versions/node/v20.19.4/bin/firebase deploy --only functions
+[debug] [2025-08-06T04:52:09.330Z] CLI Version:   14.11.2
+[debug] [2025-08-06T04:52:09.330Z] Platform:      linux
+[debug] [2025-08-06T04:52:09.331Z] Node Version:  v20.19.4
+[debug] [2025-08-06T04:52:09.331Z] Time:          Wed Aug 06 2025 13:52:09 GMT+0900 (Japan Standard Time)
+[debug] [2025-08-06T04:52:09.331Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-08-06T04:52:09.541Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-06T04:52:09.541Z] > authorizing via signed-in user (gazuyawork@gmail.com)
+[debug] [2025-08-06T04:52:09.541Z] [iam] checking project pairkaji-alpha for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-08-06T04:52:09.542Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:09.543Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:09.544Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions [none]
+[debug] [2025-08-06T04:52:09.544Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions x-goog-quota-user=projects/pairkaji-alpha
+[debug] [2025-08-06T04:52:09.544Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-08-06T04:52:10.257Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions 200
+[debug] [2025-08-06T04:52:10.258Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-08-06T04:52:10.259Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:10.259Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:10.259Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-08-06T04:52:10.259Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-08-06T04:52:11.197Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-08-06T04:52:11.198Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/pairkaji-alpha/serviceAccounts/pairkaji-alpha@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'pairkaji-alpha'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2025-08-06T04:52:13.542Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:13.542Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:13.542Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha [none]
+[debug] [2025-08-06T04:52:13.729Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha 200
+[debug] [2025-08-06T04:52:13.730Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha {"projectNumber":"234090861945","projectId":"pairkaji-alpha","lifecycleState":"ACTIVE","name":"pairkaji-alpha","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-04-29T08:28:48.437132Z"}
+[info] i  functions: preparing codebase functions for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-08-06T04:52:13.736Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:13.737Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:13.737Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/pairkaji-alpha/adminSdkConfig [none]
+[debug] [2025-08-06T04:52:14.692Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/pairkaji-alpha/adminSdkConfig 200
+[debug] [2025-08-06T04:52:14.693Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/pairkaji-alpha/adminSdkConfig {"projectId":"pairkaji-alpha","storageBucket":"pairkaji-alpha.firebasestorage.app"}
+[debug] [2025-08-06T04:52:14.694Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:14.694Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:14.694Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs [none]
+[debug] [2025-08-06T04:52:15.045Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs 200
+[debug] [2025-08-06T04:52:15.045Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs {"configs":[{"name":"projects/pairkaji-alpha/configs/line"}]}
+[debug] [2025-08-06T04:52:15.046Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:15.046Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:15.046Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs/line/variables [none]
+[debug] [2025-08-06T04:52:15.329Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs/line/variables 200
+[debug] [2025-08-06T04:52:15.331Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs/line/variables {"variables":[{"name":"projects/pairkaji-alpha/configs/line/variables/token","updateTime":"2025-08-06T02:10:46.339690645Z"}]}
+[debug] [2025-08-06T04:52:15.333Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:15.333Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:15.334Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs/line/variables/token [none]
+[debug] [2025-08-06T04:52:15.570Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs/line/variables/token 200
+[debug] [2025-08-06T04:52:15.570Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/pairkaji-alpha/configs/line/variables/token {"name":"projects/pairkaji-alpha/configs/line/variables/token","updateTime":"2025-08-06T02:10:46.339690645Z","text":"Bearer NklGczBUrQb3t6Jfbn7gr8k30wkIFpIoac6+54X1326Ofe5Z8jltAOpOBzoFNATxlNoA2DDKGbW0+Z6rw+tl6ziVIlrqmdNqJsTzU0TYryu7ruZnMfvJJBb9ce2oeWyRRJRnxjTs9kSfydWnYQbm7AdB04t89/1O/w1cDnyilFU="}
+[debug] [2025-08-06T04:52:15.573Z] Validating nodejs source
+[debug] [2025-08-06T04:52:16.121Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "lint": "eslint .",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.2.1",
+    "firebase-admin": "^11.5.0",
+    "firebase-functions": "^6.4.0",
+    "lru-cache": "6.0.0",
+    "node-fetch": "^3.3.2",
+    "rimraf": "3.0.2"
+  },
+  "devDependencies": {
+    "@types/node-fetch": "^2.6.13",
+    "@typescript-eslint/eslint-plugin": "^5.12.0",
+    "@typescript-eslint/parser": "^5.12.0",
+    "eslint": "^8.9.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-import": "^2.25.4",
+    "firebase-functions-test": "^3.1.0",
+    "typescript": "^5.7.3"
+  },
+  "private": true
+}
+[debug] [2025-08-06T04:52:16.121Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase functions to determine what to deploy 
+[debug] [2025-08-06T04:52:16.122Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-08-06T04:52:16.127Z] Found firebase-functions binary at '/root/pairkaji/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8036
+
+[info] [dotenv@17.2.1] injecting env (1) from .env -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
+
+[debug] [2025-08-06T04:52:16.513Z] Got response from /__/functions.yaml {"endpoints":{"sendDailyTaskReminder":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","secretEnvironmentVariables":[{"key":"LINE_CHANNEL_ACCESS_TOKEN"}],"labels":{},"scheduleTrigger":{"schedule":"* * * * *","retryConfig":{},"timeZone":"Asia/Tokyo"},"entryPoint":"sendDailyTaskReminder"},"sendUpcomingTaskReminder":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"scheduleTrigger":{"schedule":"every 5 minutes","retryConfig":{},"timeZone":"Asia/Tokyo"},"entryPoint":"sendUpcomingTaskReminder"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{},"params":[{"type":"secret","name":"LINE_CHANNEL_ACCESS_TOKEN"}]}
+[info] i  extensions: ensuring required API firebaseextensions.googleapis.com is enabled... 
+[debug] [2025-08-06T04:52:20.559Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-06T04:52:20.559Z] > authorizing via signed-in user (gazuyawork@gmail.com)
+[debug] [2025-08-06T04:52:20.559Z] [iam] checking project pairkaji-alpha for permissions ["firebase.projects.get","firebaseextensions.instances.list"]
+[debug] [2025-08-06T04:52:20.560Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:20.560Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:20.560Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions [none]
+[debug] [2025-08-06T04:52:20.560Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions x-goog-quota-user=projects/pairkaji-alpha
+[debug] [2025-08-06T04:52:20.560Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-08-06T04:52:21.239Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions 200
+[debug] [2025-08-06T04:52:21.240Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-08-06T04:52:21.241Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:21.241Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:21.243Z] >>> [apiv2][query] GET https://firebaseextensions.googleapis.com/v1beta/projects/pairkaji-alpha/instances pageSize=100&pageToken=
+[debug] [2025-08-06T04:52:22.067Z] <<< [apiv2][status] GET https://firebaseextensions.googleapis.com/v1beta/projects/pairkaji-alpha/instances 200
+[debug] [2025-08-06T04:52:22.067Z] <<< [apiv2][body] GET https://firebaseextensions.googleapis.com/v1beta/projects/pairkaji-alpha/instances {}
+[info] i  functions: Loaded environment variables from .env. 
+[info] i  functions: preparing functions directory for uploading... 
+[info] i  functions: packaged /root/pairkaji/functions (109.61 KB) for uploading 
+[debug] [2025-08-06T04:52:22.180Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:22.180Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:22.180Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v1/projects/pairkaji-alpha/locations/-/functions [none]
+[debug] [2025-08-06T04:52:22.973Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v1/projects/pairkaji-alpha/locations/-/functions 200
+[debug] [2025-08-06T04:52:22.974Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v1/projects/pairkaji-alpha/locations/-/functions {}
+[debug] [2025-08-06T04:52:22.975Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:22.975Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:22.976Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/-/functions filter=environment%3D%22GEN_2%22
+[debug] [2025-08-06T04:52:24.247Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/-/functions 200
+[debug] [2025-08-06T04:52:24.248Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/-/functions {"functions":[{"name":"projects/pairkaji-alpha/locations/us-central1/functions/sendUpcomingTaskReminder","buildConfig":{"build":"projects/234090861945/locations/us-central1/builds/d6ad5f73-9b76-468e-a0c5-9b0cd7a488fc","runtime":"nodejs20","entryPoint":"sendUpcomingTaskReminder","source":{"storageSource":{"bucket":"gcf-v2-sources-234090861945-us-central1","object":"sendUpcomingTaskReminder/function-source.zip","generation":"1754455779834016"}},"environmentVariables":{"GOOGLE_NODE_RUN_SCRIPTS":""},"dockerRepository":"projects/pairkaji-alpha/locations/us-central1/repositories/gcf-artifacts","sourceProvenance":{"resolvedStorageSource":{"bucket":"gcf-v2-sources-234090861945-us-central1","object":"sendUpcomingTaskReminder/function-source.zip","generation":"1754455779834016"}},"dockerRegistry":"ARTIFACT_REGISTRY","serviceAccount":"projects/pairkaji-alpha/serviceAccounts/234090861945-compute@developer.gserviceaccount.com","automaticUpdatePolicy":{}},"serviceConfig":{"service":"projects/pairkaji-alpha/locations/us-central1/services/sendupcomingtaskreminder","timeoutSeconds":60,"environmentVariables":{"LINE_CHANNEL_ACCESS_TOKEN":"Bearer NklGczBUrQb3t6Jfbn7gr8k30wkIFpIoac6+54X1326Ofe5Z8jltAOpOBzoFNATxlNoA2DDKGbW0+Z6rw+tl6ziVIlrqmdNqJsTzU0TYryu7ruZnMfvJJBb9ce2oeWyRRJRnxjTs9kSfydWnYQbm7AdB04t89/1O/w1cDnyilFU=","FIREBASE_CONFIG":"{\"projectId\":\"pairkaji-alpha\",\"storageBucket\":\"pairkaji-alpha.firebasestorage.app\"}","GCLOUD_PROJECT":"pairkaji-alpha","EVENTARC_CLOUD_EVENT_SOURCE":"projects/pairkaji-alpha/locations/us-central1/services/sendUpcomingTaskReminder","FUNCTION_TARGET":"sendUpcomingTaskReminder","LOG_EXECUTION_ID":"true"},"maxInstanceCount":20,"ingressSettings":"ALLOW_ALL","uri":"https://sendupcomingtaskreminder-v25zrfhjsq-uc.a.run.app","serviceAccountEmail":"234090861945-compute@developer.gserviceaccount.com","availableMemory":"256Mi","allTrafficOnLatestRevision":true,"revision":"sendupcomingtaskreminder-00006-dow","maxInstanceRequestConcurrency":80,"availableCpu":"1"},"state":"ACTIVE","updateTime":"2025-08-06T04:50:58.027789264Z","labels":{"deployment-tool":"cli-firebase","deployment-scheduled":"true","firebase-functions-codebase":"functions","firebase-functions-hash":"a017726e8f02198cb5fc268d80d951884d373b81"},"environment":"GEN_2","url":"https://us-central1-pairkaji-alpha.cloudfunctions.net/sendUpcomingTaskReminder","createTime":"2025-08-05T08:34:16.788939920Z","satisfiesPzi":true},{"name":"projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder","buildConfig":{"build":"projects/234090861945/locations/us-central1/builds/101b9828-ae55-4eb5-9333-836dba607692","runtime":"nodejs20","entryPoint":"sendDailyTaskReminder","source":{"storageSource":{"bucket":"gcf-v2-sources-234090861945-us-central1","object":"sendDailyTaskReminder/function-source.zip","generation":"1754454818293454"}},"environmentVariables":{"GOOGLE_NODE_RUN_SCRIPTS":""},"dockerRepository":"projects/pairkaji-alpha/locations/us-central1/repositories/gcf-artifacts","sourceProvenance":{"resolvedStorageSource":{"bucket":"gcf-v2-sources-234090861945-us-central1","object":"sendDailyTaskReminder/function-source.zip","generation":"1754454818293454"}},"dockerRegistry":"ARTIFACT_REGISTRY","serviceAccount":"projects/pairkaji-alpha/serviceAccounts/234090861945-compute@developer.gserviceaccount.com","automaticUpdatePolicy":{}},"serviceConfig":{"service":"projects/pairkaji-alpha/locations/us-central1/services/senddailytaskreminder","timeoutSeconds":60,"environmentVariables":{"FIREBASE_CONFIG":"{\"projectId\":\"pairkaji-alpha\",\"storageBucket\":\"pairkaji-alpha.firebasestorage.app\"}","GCLOUD_PROJECT":"pairkaji-alpha","EVENTARC_CLOUD_EVENT_SOURCE":"projects/pairkaji-alpha/locations/us-central1/services/sendDailyTaskReminder","FUNCTION_TARGET":"sendDailyTaskReminder","LOG_EXECUTION_ID":"true"},"maxInstanceCount":20,"ingressSettings":"ALLOW_ALL","uri":"https://senddailytaskreminder-v25zrfhjsq-uc.a.run.app","serviceAccountEmail":"234090861945-compute@developer.gserviceaccount.com","availableMemory":"256Mi","allTrafficOnLatestRevision":true,"revision":"senddailytaskreminder-00007-rin","maxInstanceRequestConcurrency":80,"availableCpu":"1"},"state":"ACTIVE","updateTime":"2025-08-06T04:34:51.435240217Z","labels":{"deployment-tool":"cli-firebase","deployment-scheduled":"true","firebase-functions-codebase":"functions","firebase-functions-hash":"b26c1f2d9fdc3b1e7591863739f723931ac94608"},"environment":"GEN_2","url":"https://us-central1-pairkaji-alpha.cloudfunctions.net/sendDailyTaskReminder","createTime":"2025-08-05T08:33:18.902480045Z","satisfiesPzi":true}]}
+[info] i  functions: ensuring required API cloudscheduler.googleapis.com is enabled... 
+[info] i  functions: ensuring required API run.googleapis.com is enabled... 
+[info] i  functions: ensuring required API eventarc.googleapis.com is enabled... 
+[info] i  functions: ensuring required API pubsub.googleapis.com is enabled... 
+[info] i  functions: ensuring required API storage.googleapis.com is enabled... 
+[info] i  functions: generating the service identity for pubsub.googleapis.com... 
+[debug] [2025-08-06T04:52:24.263Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:24.263Z] Checked if tokens are valid: true, expires at: 1754458392782
+[info] i  functions: generating the service identity for eventarc.googleapis.com... 
+[debug] [2025-08-06T04:52:24.264Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:24.264Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:24.265Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/pubsub.googleapis.com:generateServiceIdentity [none]
+[debug] [2025-08-06T04:52:24.265Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/pubsub.googleapis.com:generateServiceIdentity x-goog-quota-user=projects/234090861945
+[debug] [2025-08-06T04:52:24.265Z] >>> [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/pubsub.googleapis.com:generateServiceIdentity {}
+[debug] [2025-08-06T04:52:24.269Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/eventarc.googleapis.com:generateServiceIdentity [none]
+[debug] [2025-08-06T04:52:24.269Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/eventarc.googleapis.com:generateServiceIdentity x-goog-quota-user=projects/234090861945
+[debug] [2025-08-06T04:52:24.269Z] >>> [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/eventarc.googleapis.com:generateServiceIdentity {}
+[debug] [2025-08-06T04:52:25.319Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/eventarc.googleapis.com:generateServiceIdentity 200
+[debug] [2025-08-06T04:52:25.319Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/eventarc.googleapis.com:generateServiceIdentity {"name":"operations/finished.DONE_OPERATION","done":true,"response":{"@type":"type.googleapis.com/google.api.serviceusage.v1beta1.ServiceIdentity","email":"service-234090861945@gcp-sa-eventarc.iam.gserviceaccount.com","uniqueId":"108098024589425686250"}}
+[debug] [2025-08-06T04:52:25.494Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/pubsub.googleapis.com:generateServiceIdentity 200
+[debug] [2025-08-06T04:52:25.495Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/234090861945/services/pubsub.googleapis.com:generateServiceIdentity {"name":"operations/finished.DONE_OPERATION","done":true,"response":{"@type":"type.googleapis.com/google.api.serviceusage.v1beta1.ServiceIdentity","email":"service-234090861945@gcp-sa-pubsub.iam.gserviceaccount.com","uniqueId":"117239023112607491114"}}
+[info] i  functions: ensuring required API secretmanager.googleapis.com is enabled... 
+[debug] [2025-08-06T04:52:25.501Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:25.502Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:25.502Z] >>> [apiv2][query] GET https://secretmanager.googleapis.com/v1/projects/pairkaji-alpha/secrets/LINE_CHANNEL_ACCESS_TOKEN/versions/latest [none]
+[debug] [2025-08-06T04:52:25.803Z] <<< [apiv2][status] GET https://secretmanager.googleapis.com/v1/projects/pairkaji-alpha/secrets/LINE_CHANNEL_ACCESS_TOKEN/versions/latest 200
+[debug] [2025-08-06T04:52:25.804Z] <<< [apiv2][body] GET https://secretmanager.googleapis.com/v1/projects/pairkaji-alpha/secrets/LINE_CHANNEL_ACCESS_TOKEN/versions/latest {"name":"projects/234090861945/secrets/LINE_CHANNEL_ACCESS_TOKEN/versions/1","createTime":"2025-08-06T04:45:32.609976Z","state":"ENABLED","replicationStatus":{"automatic":{}},"etag":"\"163bab02cba1b8\""}
+[debug] [2025-08-06T04:52:25.805Z] Resolved secret version of LINE_CHANNEL_ACCESS_TOKEN to 1.
+[debug] [2025-08-06T04:52:25.810Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:25.810Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:25.811Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha [none]
+[debug] [2025-08-06T04:52:25.998Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha 200
+[debug] [2025-08-06T04:52:25.999Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/pairkaji-alpha {"projectNumber":"234090861945","projectId":"pairkaji-alpha","lifecycleState":"ACTIVE","name":"pairkaji-alpha","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-04-29T08:28:48.437132Z"}
+[debug] [2025-08-06T04:52:26.000Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:26.000Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:26.001Z] >>> [apiv2][query] GET https://compute.googleapis.com/compute/v1/projects/234090861945 [none]
+[debug] [2025-08-06T04:52:27.064Z] <<< [apiv2][status] GET https://compute.googleapis.com/compute/v1/projects/234090861945 403
+[debug] [2025-08-06T04:52:27.065Z] <<< [apiv2][body] GET https://compute.googleapis.com/compute/v1/projects/234090861945 {"error":{"code":403,"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","errors":[{"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","domain":"usageLimits","reason":"accessNotConfigured","extendedHelp":"https://console.developers.google.com"}],"status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com","metadata":{"containerInfo":"234090861945","service":"compute.googleapis.com","consumer":"projects/234090861945","serviceTitle":"Compute Engine API","activationUrl":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developers console API activation","url":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945"}]}]}}
+[debug] [2025-08-06T04:52:27.066Z] unable to look up default compute service account. Falling back to 234090861945-compute@developer.gserviceaccount.com. Error: {"name":"FirebaseError","children":[],"context":{"body":{"error":{"code":403,"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","errors":[{"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","domain":"usageLimits","reason":"accessNotConfigured","extendedHelp":"https://console.developers.google.com"}],"status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com","metadata":{"containerInfo":"234090861945","service":"compute.googleapis.com","consumer":"projects/234090861945","serviceTitle":"Compute Engine API","activationUrl":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developers console API activation","url":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945"}]}]}},"response":{"statusCode":403}},"exit":1,"message":"Request to https://compute.googleapis.com/compute/v1/projects/234090861945 had HTTP Error: 403, Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","status":403}
+[debug] [2025-08-06T04:52:27.067Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:27.068Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:27.068Z] >>> [apiv2][query] GET https://compute.googleapis.com/compute/v1/projects/234090861945 [none]
+[debug] [2025-08-06T04:52:27.312Z] <<< [apiv2][status] GET https://compute.googleapis.com/compute/v1/projects/234090861945 403
+[debug] [2025-08-06T04:52:27.313Z] <<< [apiv2][body] GET https://compute.googleapis.com/compute/v1/projects/234090861945 {"error":{"code":403,"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","errors":[{"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","domain":"usageLimits","reason":"accessNotConfigured","extendedHelp":"https://console.developers.google.com"}],"status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com","metadata":{"activationUrl":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945","consumer":"projects/234090861945","service":"compute.googleapis.com","containerInfo":"234090861945","serviceTitle":"Compute Engine API"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developers console API activation","url":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945"}]}]}}
+[debug] [2025-08-06T04:52:27.314Z] unable to look up default compute service account. Falling back to 234090861945-compute@developer.gserviceaccount.com. Error: {"name":"FirebaseError","children":[],"context":{"body":{"error":{"code":403,"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","errors":[{"message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","domain":"usageLimits","reason":"accessNotConfigured","extendedHelp":"https://console.developers.google.com"}],"status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com","metadata":{"activationUrl":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945","consumer":"projects/234090861945","service":"compute.googleapis.com","containerInfo":"234090861945","serviceTitle":"Compute Engine API"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developers console API activation","url":"https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945"}]}]}},"response":{"statusCode":403}},"exit":1,"message":"Request to https://compute.googleapis.com/compute/v1/projects/234090861945 had HTTP Error: 403, Compute Engine API has not been used in project 234090861945 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=234090861945 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","status":403}
+[info] i  functions: ensuring 234090861945-compute@developer.gserviceaccount.com access to secret LINE_CHANNEL_ACCESS_TOKEN. 
+[debug] [2025-08-06T04:52:27.317Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:27.317Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:27.317Z] >>> [apiv2][query] GET https://secretmanager.googleapis.com/v1/projects/pairkaji-alpha/secrets/LINE_CHANNEL_ACCESS_TOKEN:getIamPolicy [none]
+[debug] [2025-08-06T04:52:27.745Z] <<< [apiv2][status] GET https://secretmanager.googleapis.com/v1/projects/pairkaji-alpha/secrets/LINE_CHANNEL_ACCESS_TOKEN:getIamPolicy 200
+[debug] [2025-08-06T04:52:27.745Z] <<< [apiv2][body] GET https://secretmanager.googleapis.com/v1/projects/pairkaji-alpha/secrets/LINE_CHANNEL_ACCESS_TOKEN:getIamPolicy {"version":1,"etag":"BwY7qxE0upk=","bindings":[{"role":"roles/secretmanager.secretAccessor","members":["serviceAccount:234090861945-compute@developer.gserviceaccount.com"]}]}
+[info] ✔  secretmanager: Granted roles/secretmanager.secretAccessor on projects/pairkaji-alpha/secrets/LINE_CHANNEL_ACCESS_TOKEN to 234090861945-compute@developer.gserviceaccount.com 
+[info] ✔  functions: ensured 234090861945-compute@developer.gserviceaccount.com access to LINE_CHANNEL_ACCESS_TOKEN. 
+[debug] [2025-08-06T04:52:27.750Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:27.751Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:27.751Z] >>> [apiv2][query] GET https://cloudbilling.googleapis.com/v1/projects/pairkaji-alpha/billingInfo [none]
+[debug] [2025-08-06T04:52:28.829Z] <<< [apiv2][status] GET https://cloudbilling.googleapis.com/v1/projects/pairkaji-alpha/billingInfo 200
+[debug] [2025-08-06T04:52:28.829Z] <<< [apiv2][body] GET https://cloudbilling.googleapis.com/v1/projects/pairkaji-alpha/billingInfo {"name":"projects/pairkaji-alpha/billingInfo","projectId":"pairkaji-alpha","billingAccountName":"billingAccounts/017559-D6A7E9-404BB1","billingEnabled":true}
+[debug] [2025-08-06T04:52:28.834Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:28.834Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:28.835Z] >>> [apiv2][query] POST https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions:generateUploadUrl [none]
+[debug] [2025-08-06T04:52:29.882Z] <<< [apiv2][status] POST https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions:generateUploadUrl 200
+[debug] [2025-08-06T04:52:29.883Z] <<< [apiv2][body] POST https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions:generateUploadUrl {"uploadUrl":"https://storage.googleapis.com/gcf-v2-uploads-234090861945.us-central1.cloudfunctions.appspot.com/837d2027-e543-45e1-bbf8-ab0612a3aade.zip?GoogleAccessId=service-234090861945@gcf-admin-robot.iam.gserviceaccount.com&Expires=1754457751&Signature=YUpR64TTdMaRu4oHa1ku6JnrFfcFW2nn4DuiO2M0BqsyY3s42ZB6t0Y%2FwwiPYKazMx0xalkK9khnUz2wd4YqkoX5XejQGap3ASLOFGOsNgWAruCBViAk0AM%2FxxBfhkg7i1zPSg%2BLtj31H3pYpXHLHysbdGTFoMVfpCzootzGd2WMLtNugPLQKFaBntAzuSizlgAq%2FJnYTEOFQgp7o%2BhIPGqVNZaF3gEy9SNOM3ZaTmKPgteMDH9Kpo6EpHEH7lVkz62oGkrQGhPJDh%2BvzwSuQywreVazfXfLzTlVW3kA63HNhszN0mFmIeaB%2B5Ie5%2FjpyEQEXt239ryoQjYDzaY8hQ%3D%3D","storageSource":{"bucket":"gcf-v2-uploads-234090861945.us-central1.cloudfunctions.appspot.com","object":"837d2027-e543-45e1-bbf8-ab0612a3aade.zip"}}
+[debug] [2025-08-06T04:52:29.887Z] >>> [apiv2][query] PUT https://storage.googleapis.com/gcf-v2-uploads-234090861945.us-central1.cloudfunctions.appspot.com/837d2027-e543-45e1-bbf8-ab0612a3aade.zip GoogleAccessId=service-234090861945%40gcf-admin-robot.iam.gserviceaccount.com&Expires=1754457751&Signature=YUpR64TTdMaRu4oHa1ku6JnrFfcFW2nn4DuiO2M0BqsyY3s42ZB6t0Y%2FwwiPYKazMx0xalkK9khnUz2wd4YqkoX5XejQGap3ASLOFGOsNgWAruCBViAk0AM%2FxxBfhkg7i1zPSg%2BLtj31H3pYpXHLHysbdGTFoMVfpCzootzGd2WMLtNugPLQKFaBntAzuSizlgAq%2FJnYTEOFQgp7o%2BhIPGqVNZaF3gEy9SNOM3ZaTmKPgteMDH9Kpo6EpHEH7lVkz62oGkrQGhPJDh%2BvzwSuQywreVazfXfLzTlVW3kA63HNhszN0mFmIeaB%2B5Ie5%2FjpyEQEXt239ryoQjYDzaY8hQ%3D%3D
+[debug] [2025-08-06T04:52:29.887Z] >>> [apiv2][body] PUT https://storage.googleapis.com/gcf-v2-uploads-234090861945.us-central1.cloudfunctions.appspot.com/837d2027-e543-45e1-bbf8-ab0612a3aade.zip [stream]
+[debug] [2025-08-06T04:52:30.665Z] <<< [apiv2][status] PUT https://storage.googleapis.com/gcf-v2-uploads-234090861945.us-central1.cloudfunctions.appspot.com/837d2027-e543-45e1-bbf8-ab0612a3aade.zip 200
+[debug] [2025-08-06T04:52:30.665Z] <<< [apiv2][body] PUT https://storage.googleapis.com/gcf-v2-uploads-234090861945.us-central1.cloudfunctions.appspot.com/837d2027-e543-45e1-bbf8-ab0612a3aade.zip [omitted]
+[info] ✔  functions: functions folder uploaded successfully 
+[info] i  functions: Skipping the deploy of unchanged functions. 
+[info] ✔  functions[functions:sendUpcomingTaskReminder(us-central1)] Skipped (No changes detected) 
+[info] i  functions: updating Node.js 20 (2nd Gen) function functions:sendDailyTaskReminder(us-central1)... 
+[debug] [2025-08-06T04:52:30.675Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:30.676Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:30.676Z] >>> [apiv2][query] PATCH https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder updateMask=name%2CbuildConfig.runtime%2CbuildConfig.entryPoint%2CbuildConfig.source.storageSource.bucket%2CbuildConfig.source.storageSource.object%2CbuildConfig.environmentVariables%2CbuildConfig.sourceToken%2CserviceConfig.environmentVariables%2CserviceConfig.secretEnvironmentVariables%2CserviceConfig.ingressSettings%2CserviceConfig.timeoutSeconds%2CserviceConfig.serviceAccountEmail%2CserviceConfig.availableMemory%2CserviceConfig.minInstanceCount%2CserviceConfig.maxInstanceCount%2CserviceConfig.maxInstanceRequestConcurrency%2CserviceConfig.availableCpu%2CserviceConfig.vpcConnector%2CserviceConfig.vpcConnectorEgressSettings%2Clabels
+[debug] [2025-08-06T04:52:30.676Z] >>> [apiv2][body] PATCH https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder {"name":"projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder","buildConfig":{"runtime":"nodejs20","entryPoint":"sendDailyTaskReminder","source":{"storageSource":{"bucket":"gcf-v2-uploads-234090861945.us-central1.cloudfunctions.appspot.com","object":"837d2027-e543-45e1-bbf8-ab0612a3aade.zip"}},"environmentVariables":{"GOOGLE_NODE_RUN_SCRIPTS":""}},"serviceConfig":{"environmentVariables":{"LINE_CHANNEL_ACCESS_TOKEN":"Bearer NklGczBUrQb3t6Jfbn7gr8k30wkIFpIoac6+54X1326Ofe5Z8jltAOpOBzoFNATxlNoA2DDKGbW0+Z6rw+tl6ziVIlrqmdNqJsTzU0TYryu7ruZnMfvJJBb9ce2oeWyRRJRnxjTs9kSfydWnYQbm7AdB04t89/1O/w1cDnyilFU=","FIREBASE_CONFIG":"{\"projectId\":\"pairkaji-alpha\",\"storageBucket\":\"pairkaji-alpha.firebasestorage.app\"}","GCLOUD_PROJECT":"pairkaji-alpha","EVENTARC_CLOUD_EVENT_SOURCE":"projects/pairkaji-alpha/locations/us-central1/services/sendDailyTaskReminder","FUNCTION_TARGET":"sendDailyTaskReminder","LOG_EXECUTION_ID":"true"},"secretEnvironmentVariables":[{"key":"LINE_CHANNEL_ACCESS_TOKEN","secret":"LINE_CHANNEL_ACCESS_TOKEN","projectId":"pairkaji-alpha","version":"1"}],"ingressSettings":null,"timeoutSeconds":null,"serviceAccountEmail":null,"availableMemory":"256Mi","minInstanceCount":null,"maxInstanceCount":null,"maxInstanceRequestConcurrency":80,"availableCpu":"1","vpcConnector":null,"vpcConnectorEgressSettings":null},"labels":{"deployment-tool":"cli-firebase","deployment-scheduled":"true","firebase-functions-codebase":"functions","firebase-functions-hash":"b164819d6b68c92c9995dd629fc5791014246ab5"}}
+[debug] [2025-08-06T04:52:31.950Z] <<< [apiv2][status] PATCH https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder 400
+[debug] [2025-08-06T04:52:31.950Z] <<< [apiv2][body] PATCH https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder {"error":{"code":400,"message":"Could not update Cloud Run service projects/pairkaji-alpha/locations/us-central1/services/senddailytaskreminder. spec.template.spec.containers[0].env: Secret environment variable overlaps non secret environment variable: LINE_CHANNEL_ACCESS_TOKEN","status":"INVALID_ARGUMENT"}}
+[warn] ⚠  functions: Request to https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder?updateMask=name%2CbuildConfig.runtime%2CbuildConfig.entryPoint%2CbuildConfig.source.storageSource.bucket%2CbuildConfig.source.storageSource.object%2CbuildConfig.environmentVariables%2CbuildConfig.sourceToken%2CserviceConfig.environmentVariables%2CserviceConfig.secretEnvironmentVariables%2CserviceConfig.ingressSettings%2CserviceConfig.timeoutSeconds%2CserviceConfig.serviceAccountEmail%2CserviceConfig.availableMemory%2CserviceConfig.minInstanceCount%2CserviceConfig.maxInstanceCount%2CserviceConfig.maxInstanceRequestConcurrency%2CserviceConfig.availableCpu%2CserviceConfig.vpcConnector%2CserviceConfig.vpcConnectorEgressSettings%2Clabels had HTTP Error: 400, Could not update Cloud Run service projects/pairkaji-alpha/locations/us-central1/services/senddailytaskreminder. spec.template.spec.containers[0].env: Secret environment variable overlaps non secret environment variable: LINE_CHANNEL_ACCESS_TOKEN 
+[warn] ⚠  functions:  failed to update function projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder 
+[error] Failed to update function projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder
+[debug] [2025-08-06T04:52:31.973Z] Total Function Deployment time: 1284
+[debug] [2025-08-06T04:52:31.973Z] 1 Functions Deployed
+[debug] [2025-08-06T04:52:31.973Z] 1 Functions Errored
+[debug] [2025-08-06T04:52:31.974Z] 0 Function Deployments Aborted
+[debug] [2025-08-06T04:52:31.974Z] Average Function Deployment time: 1283
+[info] 
+[info] Functions deploy had errors with the following functions:
+	functions:sendDailyTaskReminder(us-central1)
+[debug] [2025-08-06T04:52:32.132Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:32.133Z] Checked if tokens are valid: true, expires at: 1754458392782
+[debug] [2025-08-06T04:52:32.133Z] >>> [apiv2][query] GET https://artifactregistry.googleapis.com/v1/projects/pairkaji-alpha/locations/us-central1/repositories/gcf-artifacts [none]
+[debug] [2025-08-06T04:52:33.204Z] <<< [apiv2][status] GET https://artifactregistry.googleapis.com/v1/projects/pairkaji-alpha/locations/us-central1/repositories/gcf-artifacts 200
+[debug] [2025-08-06T04:52:33.205Z] <<< [apiv2][body] GET https://artifactregistry.googleapis.com/v1/projects/pairkaji-alpha/locations/us-central1/repositories/gcf-artifacts {"name":"projects/pairkaji-alpha/locations/us-central1/repositories/gcf-artifacts","format":"DOCKER","description":"This repository is created and used by Cloud Functions for storing function docker images.","labels":{"goog-managed-by":"cloudfunctions"},"createTime":"2025-05-30T02:51:11.141610Z","updateTime":"2025-08-06T04:50:35.334557Z","mode":"STANDARD_REPOSITORY","cleanupPolicies":{"firebase-functions-cleanup":{"id":"firebase-functions-cleanup","action":"DELETE","condition":{"tagState":"ANY","olderThan":"86400s"}}},"sizeBytes":"262498064","vulnerabilityScanningConfig":{"lastEnableTime":"2025-05-30T02:51:02.309688412Z","enablementState":"SCANNING_DISABLED","enablementStateReason":"API containerscanning.googleapis.com is not enabled."},"satisfiesPzi":true,"registryUri":"us-central1-docker.pkg.dev/pairkaji-alpha/gcf-artifacts"}
+[debug] [2025-08-06T04:52:33.206Z] Functions deploy failed.
+[debug] [2025-08-06T04:52:33.206Z] {
+  "endpoint": {
+    "id": "sendDailyTaskReminder",
+    "project": "pairkaji-alpha",
+    "region": "us-central1",
+    "entryPoint": "sendDailyTaskReminder",
+    "platform": "gcfv2",
+    "runtime": "nodejs20",
+    "scheduleTrigger": {
+      "schedule": "* * * * *",
+      "timeZone": "Asia/Tokyo",
+      "retryConfig": {}
+    },
+    "labels": {
+      "deployment-tool": "cli-firebase"
+    },
+    "secretEnvironmentVariables": [
+      {
+        "key": "LINE_CHANNEL_ACCESS_TOKEN",
+        "secret": "LINE_CHANNEL_ACCESS_TOKEN",
+        "projectId": "pairkaji-alpha",
+        "version": "1"
+      }
+    ],
+    "serviceAccount": null,
+    "ingressSettings": null,
+    "availableMemoryMb": null,
+    "timeoutSeconds": null,
+    "maxInstances": null,
+    "minInstances": null,
+    "concurrency": 80,
+    "vpc": null,
+    "environmentVariables": {
+      "LINE_CHANNEL_ACCESS_TOKEN": "Bearer NklGczBUrQb3t6Jfbn7gr8k30wkIFpIoac6+54X1326Ofe5Z8jltAOpOBzoFNATxlNoA2DDKGbW0+Z6rw+tl6ziVIlrqmdNqJsTzU0TYryu7ruZnMfvJJBb9ce2oeWyRRJRnxjTs9kSfydWnYQbm7AdB04t89/1O/w1cDnyilFU=",
+      "FIREBASE_CONFIG": "{\"projectId\":\"pairkaji-alpha\",\"storageBucket\":\"pairkaji-alpha.firebasestorage.app\"}",
+      "GCLOUD_PROJECT": "pairkaji-alpha",
+      "EVENTARC_CLOUD_EVENT_SOURCE": "projects/pairkaji-alpha/locations/us-central1/services/sendDailyTaskReminder"
+    },
+    "codebase": "functions",
+    "runServiceId": "senddailytaskreminder",
+    "cpu": 1,
+    "securityLevel": "SECURE_ALWAYS",
+    "targetedByOnly": false,
+    "hash": "b164819d6b68c92c9995dd629fc5791014246ab5"
+  },
+  "op": "update",
+  "original": {
+    "name": "FirebaseError",
+    "children": [],
+    "context": {
+      "function": "projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder"
+    },
+    "exit": 1,
+    "message": "Failed to update function projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder",
+    "original": {
+      "name": "FirebaseError",
+      "children": [],
+      "context": {
+        "body": {
+          "error": {
+            "code": 400,
+            "message": "Could not update Cloud Run service projects/pairkaji-alpha/locations/us-central1/services/senddailytaskreminder. spec.template.spec.containers[0].env: Secret environment variable overlaps non secret environment variable: LINE_CHANNEL_ACCESS_TOKEN",
+            "status": "INVALID_ARGUMENT"
+          }
+        },
+        "response": {
+          "statusCode": 400
+        }
+      },
+      "exit": 1,
+      "message": "Request to https://cloudfunctions.googleapis.com/v2/projects/pairkaji-alpha/locations/us-central1/functions/sendDailyTaskReminder?updateMask=name%2CbuildConfig.runtime%2CbuildConfig.entryPoint%2CbuildConfig.source.storageSource.bucket%2CbuildConfig.source.storageSource.object%2CbuildConfig.environmentVariables%2CbuildConfig.sourceToken%2CserviceConfig.environmentVariables%2CserviceConfig.secretEnvironmentVariables%2CserviceConfig.ingressSettings%2CserviceConfig.timeoutSeconds%2CserviceConfig.serviceAccountEmail%2CserviceConfig.availableMemory%2CserviceConfig.minInstanceCount%2CserviceConfig.maxInstanceCount%2CserviceConfig.maxInstanceRequestConcurrency%2CserviceConfig.availableCpu%2CserviceConfig.vpcConnector%2CserviceConfig.vpcConnectorEgressSettings%2Clabels had HTTP Error: 400, Could not update Cloud Run service projects/pairkaji-alpha/locations/us-central1/services/senddailytaskreminder. spec.template.spec.containers[0].env: Secret environment variable overlaps non secret environment variable: LINE_CHANNEL_ACCESS_TOKEN",
+      "status": 400
+    },
+    "status": 400,
+    "code": 400
+  }
+}
+[debug] [2025-08-06T04:52:33.265Z] Error: Failed to update function sendDailyTaskReminder in region us-central1
+    at /root/.nvm/versions/node/v20.19.4/lib/node_modules/firebase-tools/lib/deploy/functions/release/fabricator.js:399:19
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Fabricator.updateV2Function (/root/.nvm/versions/node/v20.19.4/lib/node_modules/firebase-tools/lib/deploy/functions/release/fabricator.js:388:32)
+    at async Fabricator.updateEndpoint (/root/.nvm/versions/node/v20.19.4/lib/node_modules/firebase-tools/lib/deploy/functions/release/fabricator.js:155:13)
+    at async handle (/root/.nvm/versions/node/v20.19.4/lib/node_modules/firebase-tools/lib/deploy/functions/release/fabricator.js:89:17)
+[error] 
+[error] Error: There was an error deploying functions
