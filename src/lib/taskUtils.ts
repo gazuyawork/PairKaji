@@ -397,9 +397,16 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
         userId: uid,
         updatedAt: serverTimestamp(),
       });
+    } else {
+      // 🔽 新規タスク作成（notifyLogs は対象外なのでこのままでOK）
+      await addDoc(collection(db, 'tasks'), {
+        ...commonData,
+        userId: uid,
+        done: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
     }
-
-
 
   } catch (err) {
     handleFirestoreError(err);
