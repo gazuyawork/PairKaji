@@ -217,7 +217,8 @@ export default function TodoView() {
             .filter(task =>
               task.visible &&
               (!selectedGroupId || task.id === selectedGroupId) &&
-              (filterText.trim() === '' || task.name.includes(filterText))
+              (filterText.trim() === '' || task.name.includes(filterText)) &&
+              (task.userId === currentUserId || task.private !== true) // 自分のタスクまたは共有タスク
             );
 
           if (filteredTasks.length === 0) {
