@@ -13,8 +13,8 @@ import { ChevronDown, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
-import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
-import { isToday } from 'date-fns';
+// import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
+// import { isToday } from 'date-fns';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
 
@@ -240,7 +240,7 @@ useEffect(() => {
               )
             )}
 
-            <TodayCompletedTasksCard
+            {/* <TodayCompletedTasksCard
               tasks={tasks.filter(
                 (task) =>
                   task.completedAt &&
@@ -250,7 +250,7 @@ useEffect(() => {
                       : task.completedAt.toDate()
                   )
               )}
-            />
+            /> */}
 
             {!isLineLinked && <LineLinkCard />}
 
