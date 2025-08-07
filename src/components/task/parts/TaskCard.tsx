@@ -177,7 +177,6 @@ const swipeable = useSwipeable({
     }
   }, [showActions]);
 
-
   return (
     <div className="relative" ref={cardRef}>
       {swipeDirection === 'left' && deletingTaskId === task.id && !showActions && (
@@ -200,7 +199,6 @@ const swipeable = useSwipeable({
         </div>
       )}
 
-
       {swipeDirection === 'right' && task.visible && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
@@ -215,8 +213,6 @@ const swipeable = useSwipeable({
           </button>
         </div>
       )}
-
-
 
       {/* メニュー表示 */}
       {showActions && showActionButtons && swipeDirection === null && (

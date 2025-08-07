@@ -286,8 +286,6 @@ export default function EditTaskModal({
         )}
 
         {/* 📆 日付＆時間選択（その他のみ） */}
-        {/* 📆 日付＆時間選択（その他のみ） */}
-        {/* 📆 日付＆時間選択（その他のみ） */}
         {editedTask.period === 'その他' && (
           <div className="flex items-center gap-2">
             {/* 🏷 項目名 */}
@@ -347,7 +345,6 @@ export default function EditTaskModal({
           </div>
         )}
 
-
         {/* ⭐ ポイント選択 */}
         {!isPrivate && (
           <div className="flex items-center">
@@ -365,7 +362,6 @@ export default function EditTaskModal({
             </select>
           </div>
         )}
-
 
         {isPairConfirmed && (
           <>
@@ -399,7 +395,6 @@ export default function EditTaskModal({
                 </div>
               </div>
             )}
-
 
             {/* 🔒 プライベートモード */}
             <div className="flex items-center gap-3 mt-2">
