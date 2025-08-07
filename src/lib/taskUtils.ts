@@ -21,6 +21,7 @@ import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
 import { updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { handleFirestoreError } from './errorUtils';
+import { arrayRemove, writeBatch } from 'firebase/firestore';
 
 /**
  * 指定されたpairIdのペアに属するuserIdsを取得する関数
@@ -386,12 +387,27 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
 
 /**
  * 指定されたタスクIDの Firestore ドキュメントを削除する。
+ * - 対応：削除前に notifyLogs からも taskId を削除
  *
  * @param taskId Firestore 上のタスクID
  */
 export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, 'tasks', taskId));
+    const taskRef = doc(db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+
+    if (!taskSnap.exists()) {
+      console.warn('タスクが存在しません:', taskId);
+      return;
+    }
+
+    const taskData = taskSnap.data();
+    const userId = taskData.userId;
+    const dates: string[] = taskData.dates ?? [];
+
+    await removeTaskIdFromNotifyLogs(userId, taskId, dates); // 🔽 通知ログから削除
+
+    await deleteDoc(taskRef); // 🔽 タスク自体を削除
   } catch (err) {
     handleFirestoreError(err);
   }
@@ -482,6 +498,27 @@ export const addSavingsLog = async (
   });
 };
 
+/**
+ * 通知ログから taskId を削除する
+ */
+const removeTaskIdFromNotifyLogs = async (
+  userId: string,
+  taskId: string,
+  dates: string[]
+) => {
+  if (!dates || dates.length === 0) return;
+
+  const batch = writeBatch(db);
+  for (const date of dates) {
+    const notifyRef = doc(db, 'users', userId, 'notifyLogs', date);
+    batch.update(notifyRef, {
+      taskIds: arrayRemove(taskId),
+    });
+  }
+  await batch.commit();
+};
+
+
 
 /**
  * タスクの完了状態を切り替える処理（完了 ↔ 未完了）
@@ -517,15 +554,16 @@ export const toggleTaskDoneStatus = async (
         userIds = pairData.userIds;
       }
     }
+
     if (done) {
       // ✅ 完了にする場合
       await updateDoc(taskRef, {
         done: true,
         completedAt: serverTimestamp(),
         completedBy: userId,
-        flagged: false, // ✅ 追加: 完了時はフラグを自動的に外す
+        flagged: false, // ✅ フラグを解除
       });
-      // 🔒 private タスクはポイント加算対象外
+
       const taskSnap = await getDoc(taskRef);
       const taskData = taskSnap.data();
       const isPrivate = taskData?.private === true;
@@ -534,14 +572,21 @@ export const toggleTaskDoneStatus = async (
         await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
       }
     } else {
-      // 未完了に戻す場合
+      // ✅ 未完了に戻す場合
       await updateDoc(taskRef, {
         done: false,
         completedAt: null,
         completedBy: '',
       });
 
-      // taskCompletions から履歴削除
+      // 🔽 通知ログから削除
+      const taskSnap = await getDoc(taskRef);
+      const taskData = taskSnap.data();
+      const taskDates: string[] = taskData?.dates ?? [];
+
+      await removeTaskIdFromNotifyLogs(userId, taskId, taskDates);
+
+      // 🔽 taskCompletions 履歴削除
       const q = query(
         collection(db, 'taskCompletions'),
         where('taskId', '==', taskId),

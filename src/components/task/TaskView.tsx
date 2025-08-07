@@ -73,63 +73,63 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
 
 
-useEffect(() => {
-  const user = auth.currentUser;
-  if (!user) {
-    console.warn('[OrphanCheck] auth.currentUser が未定義');
-    return;
-  }
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      console.warn('[OrphanCheck] auth.currentUser が未定義');
+      return;
+    }
 
-  console.info('[OrphanCheck] 現在のユーザーUID:', user.uid);
+    console.info('[OrphanCheck] 現在のユーザーUID:', user.uid);
 
-  const userRef = doc(db, 'users', user.uid);
+    const userRef = doc(db, 'users', user.uid);
 
-  const unsubscribe = onSnapshot(
-    query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid)),
-    async (snapshot) => {
-      console.info('[OrphanCheck] pairs クエリスナップショット取得:', snapshot.docs.length);
+    const unsubscribe = onSnapshot(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid)),
+      async (snapshot) => {
+        console.info('[OrphanCheck] pairs クエリスナップショット取得:', snapshot.docs.length);
 
-      const confirmedPairs = snapshot.docs.filter(
-        (doc) => doc.data()?.status === 'confirmed'
-      );
+        const confirmedPairs = snapshot.docs.filter(
+          (doc) => doc.data()?.status === 'confirmed'
+        );
 
-      console.info('[OrphanCheck] confirmed ペア数:', confirmedPairs.length);
+        console.info('[OrphanCheck] confirmed ペア数:', confirmedPairs.length);
 
-      if (confirmedPairs.length > 0) {
-        console.info('[OrphanCheck] confirmed ペアが存在 → モーダル非表示');
-        return;
-      }
-
-      try {
-        const userSnap = await getDoc(userRef);
-
-        if (!userSnap.exists()) {
-          console.warn('[OrphanCheck] users ドキュメントが存在しません → モーダル非表示');
+        if (confirmedPairs.length > 0) {
+          console.info('[OrphanCheck] confirmed ペアが存在 → モーダル非表示');
           return;
         }
 
-        const data = userSnap.data();
-        const cleaned = data?.sharedTasksCleaned;
+        try {
+          const userSnap = await getDoc(userRef);
 
-        console.info('[OrphanCheck] Firestore ユーザーデータ:', data);
-        console.info('[OrphanCheck] sharedTasksCleaned フラグ:', cleaned);
+          if (!userSnap.exists()) {
+            console.warn('[OrphanCheck] users ドキュメントが存在しません → モーダル非表示');
+            return;
+          }
 
-        if (cleaned === false) {
-          console.info('[OrphanCheck] sharedTasksCleaned: false → モーダル表示');
-          setShowOrphanConfirm(true);
-        } else if (cleaned === true) {
-          console.info('[OrphanCheck] sharedTasksCleaned: true → モーダル非表示');
-        } else {
-          console.info('[OrphanCheck] sharedTasksCleaned: undefined → モーダル非表示');
+          const data = userSnap.data();
+          const cleaned = data?.sharedTasksCleaned;
+
+          console.info('[OrphanCheck] Firestore ユーザーデータ:', data);
+          console.info('[OrphanCheck] sharedTasksCleaned フラグ:', cleaned);
+
+          if (cleaned === false) {
+            console.info('[OrphanCheck] sharedTasksCleaned: false → モーダル表示');
+            setShowOrphanConfirm(true);
+          } else if (cleaned === true) {
+            console.info('[OrphanCheck] sharedTasksCleaned: true → モーダル非表示');
+          } else {
+            console.info('[OrphanCheck] sharedTasksCleaned: undefined → モーダル非表示');
+          }
+        } catch (error) {
+          console.error('[OrphanCheck] Firestore 読み込み中エラー:', error);
         }
-      } catch (error) {
-        console.error('[OrphanCheck] Firestore 読み込み中エラー:', error);
       }
-    }
-  );
+    );
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
 
 
@@ -308,24 +308,24 @@ useEffect(() => {
     }
   };
 
-const updateTask = async (oldPeriod: Period, updated: Task) => {
-  try {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+  const updateTask = async (oldPeriod: Period, updated: Task) => {
+    try {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
 
-    // ✅ idを補完した上で明示的にTaskManageTaskとして扱う
-    const updatedTask: TaskManageTask = {
-      ...(updated as TaskManageTask),
-      id: updated.id ?? '', // 念のため空文字も防げる
-    };
+      // ✅ idを補完した上で明示的にTaskManageTaskとして扱う
+      const updatedTask: TaskManageTask = {
+        ...(updated as TaskManageTask),
+        id: updated.id ?? '', // 念のため空文字も防げる
+      };
 
-    await saveSingleTask(updatedTask, uid);
-    setEditTargetTask(null);
-  } catch (error) {
-    console.error('タスク更新に失敗しました:', error);
-    toast.error('タスクの保存に失敗しました');
-  }
-};
+      await saveSingleTask(updatedTask, uid);
+      setEditTargetTask(null);
+    } catch (error) {
+      console.error('タスク更新に失敗しました:', error);
+      toast.error('タスクの保存に失敗しました');
+    }
+  };
 
   useEffect(() => {
     resetCompletedTasks().catch(console.error);
@@ -397,7 +397,7 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
               console.warn('不明な completedAt の型:', task.completedAt);
             }
 
-            if (completedDate !== null && !isToday(completedDate)) {
+            if (completedDate !== null && !isToday(completedDate) && task.period !== 'その他') {
               const taskRef = doc(db, 'tasks', task.id);
 
               // ✅ ドキュメントの存在確認を追加
@@ -787,7 +787,7 @@ const updateTask = async (oldPeriod: Period, updated: Task) => {
             })()}
           </motion.div>
         )}
-                {/* ✅ 広告カード（画面の末尾） */}
+        {/* ✅ 広告カード（画面の末尾） */}
         <AdCard_02 />
       </main>
     </div>
