@@ -364,21 +364,43 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
 
     const commonData = { ...taskData, private: isPrivate, userIds };
 
+
     if (taskId) {
-      await updateDoc(doc(db, 'tasks', taskId), {
+      const taskRef = doc(db, 'tasks', taskId);
+
+      // 🔽 変更前のデータ取得
+      const originalSnap = await getDoc(taskRef);
+      const originalData = originalSnap.data();
+
+      const originalDates: string[] = originalData?.dates ?? [];
+      const newDates: string[] = taskData.dates ?? [];
+
+      // 🔽 dates から削除された日付を特定
+      const removedDates = originalDates.filter((d) => !newDates.includes(d));
+
+      // 🔽 time が変更されたか確認
+      const originalTime = originalData?.time;
+      const newTime = taskData.time;
+
+      // 🔽 notifyLogs から taskId を削除（条件に応じて）
+      if (removedDates.length > 0) {
+        await removeTaskIdFromNotifyLogs(uid, taskId, removedDates);
+      }
+
+      if (originalTime && newTime && originalTime !== newTime) {
+        await removeTaskIdFromNotifyLogs(uid, taskId, newDates);
+      }
+
+      // 🔽 タスクの更新
+      await updateDoc(taskRef, {
         ...commonData,
         userId: uid,
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      await addDoc(collection(db, 'tasks'), {
-        ...commonData,
-        userId: uid,
-        done: false,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
     }
+
+
+
   } catch (err) {
     handleFirestoreError(err);
   }
