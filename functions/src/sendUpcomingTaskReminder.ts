@@ -10,7 +10,7 @@ const LINE_CHANNEL_ACCESS_TOKEN = defineSecret('LINE_CHANNEL_ACCESS_TOKEN');
 
 export const sendUpcomingTaskReminder = onSchedule(
   {
-    schedule: 'every 1 minutes',
+    schedule: 'every 5 minutes',
     timeZone: 'Asia/Tokyo',
     secrets: [LINE_CHANNEL_ACCESS_TOKEN], // ✅ Secretsを明示
   },

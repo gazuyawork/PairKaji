@@ -12,7 +12,7 @@ const LINE_CHANNEL_ACCESS_TOKEN = defineSecret('LINE_CHANNEL_ACCESS_TOKEN');
 
 export const sendDailyTaskReminder = onSchedule(
   {
-    schedule: '0 23 * * *', // 毎日23時に実行
+    schedule: '0 8 * * *', // 毎日8時に実行
     timeZone: 'Asia/Tokyo',
     secrets: [LINE_CHANNEL_ACCESS_TOKEN], // ✅ 必須
   },
