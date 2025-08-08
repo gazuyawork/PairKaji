@@ -7,6 +7,7 @@ import { useRef, useEffect, useState } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { motion } from 'framer-motion';
 import { ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { auth } from '@/lib/firebase';
 
 type Props = {
   tasks: TodoOnlyTask[];
@@ -28,6 +29,16 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
     }
   };
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      setCurrentUserId(uid);
+    }
+  }, []);
+
+
   useEffect(() => {
     updateArrows();
     const container = scrollRef.current;
@@ -37,7 +48,11 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
     }
   }, []);
 
-  const filteredTasks = tasks.filter(task => task.visible);
+  const filteredTasks = tasks.filter(task =>
+    task.visible &&
+    (task.userId === currentUserId || task.private !== true)
+  );
+
 
   return (
     <div className="relative py-0 mb-3 mt-[-12px] flex items-center">
