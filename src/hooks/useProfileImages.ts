@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection,
   query,
@@ -12,6 +12,7 @@ import {
   doc,
   onSnapshot,
 } from 'firebase/firestore';
+import { useUserUid } from '@/hooks/useUserUid';
 
 /**
  * プロフィール画像とパートナー画像の取得・監視・保存を行うカスタムフック
@@ -20,12 +21,12 @@ export const useProfileImages = () => {
   const [profileImage, setProfileImage] = useState<string>('');     // 自分のプロフィール画像URL
   const [partnerImage, setPartnerImage] = useState<string>('');     // パートナーのプロフィール画像URL
   const [partnerId, setPartnerId] = useState<string | null>(null);  // パートナーのユーザーID
+  const uid = useUserUid();
 
   /**
    * 自分のプロフィール画像を Firestore から取得し、リアルタイムで監視
    */
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
     if (!uid) return;
 
     const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), (docSnap) => {
@@ -46,7 +47,7 @@ export const useProfileImages = () => {
    * 自分に紐づく confirmed 状態のペア（partnerId）を Firestore から1回取得
    */
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
+  
     if (!uid) return;
 
     const fetchPartnerId = async () => {

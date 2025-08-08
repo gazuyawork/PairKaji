@@ -35,6 +35,7 @@ import { removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
 import AdCard_02 from '@/components/task/parts/AdCard_02';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
+import { useUserUid } from '@/hooks/useUserUid';
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 
@@ -71,6 +72,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const { isPremium, isChecking } = usePremiumStatus();
+  const uid = useUserUid();
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -141,7 +143,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [searchParams]);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
     if (uid) {
       setCurrentUserId(uid);
     }
@@ -230,9 +231,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   useEffect(() => {
     const fetchPairStatus = async () => {
-      const uid = auth.currentUser?.uid;
       if (!uid) return;
-
       try {
         const pairsSnap = await getDocs(
           query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
@@ -259,7 +258,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     };
 
     fetchPairStatus();
-  }, []);
+  }, [uid]);
 
   const togglePeriod = (p: Period | null) => setPeriodFilter(prev => (prev === p ? null : p));
   const togglePerson = (name: string | null) => setPersonFilter(prev => (prev === name ? null : name));
@@ -309,7 +308,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   const updateTask = async (oldPeriod: Period, updated: Task) => {
     try {
-      const uid = auth.currentUser?.uid;
       if (!uid) return;
 
       // ✅ idを補完した上で明示的にTaskManageTaskとして扱う
@@ -334,7 +332,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     let unsubscribe: () => void;
 
     const fetchTasks = async () => {
-      const uid = auth.currentUser?.uid;
       if (!uid) return;
 
       const pairsSnap = await getDocs(

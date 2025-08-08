@@ -18,6 +18,7 @@ import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
+import { useUserUid } from '@/hooks/useUserUid';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -31,7 +32,7 @@ export default function HomeView() {
   const [isWeeklyPointsHidden, setIsWeeklyPointsHidden] = useState(false);
   const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
   const { isPremium, isChecking } = usePremiumStatus();
-
+  const uid = useUserUid();
   const handleCloseOverlay = () => {
     localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
     setIsWeeklyPointsHidden(true);
@@ -40,9 +41,8 @@ export default function HomeView() {
   const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
 
+    if (!uid) return;
     const userRef = doc(db, 'users', uid);
 
     const unsubscribe = onSnapshot(userRef, (snap) => {
@@ -53,7 +53,7 @@ export default function HomeView() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [uid]);
 
 
   useEffect(() => {
@@ -63,7 +63,6 @@ export default function HomeView() {
 
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
     if (!uid) return;
 
     const sentQuery = query(
@@ -90,7 +89,7 @@ export default function HomeView() {
       unsubscribeSent();
       unsubscribeConfirmed();
     };
-  }, []);
+  }, [uid]);
 
 
   useEffect(() => {
@@ -120,7 +119,7 @@ export default function HomeView() {
   }, []);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
+  
     if (!uid) return;
 
     const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
@@ -134,10 +133,10 @@ export default function HomeView() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [uid]);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
+  
     if (!uid) return;
 
     const q = query(
@@ -151,7 +150,7 @@ export default function HomeView() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [uid]);
 
   const flaggedTasks = tasks.filter((task) => task.flagged === true);
 

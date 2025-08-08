@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { CheckCircle, Circle, Trash2, Plus, ChevronsDown, Notebook } from 'lucide-react';
+import { CheckCircle, Circle, Trash2, Plus, Notebook } from 'lucide-react';
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
@@ -394,13 +394,13 @@ export default function TodoTaskCard({
               placeholder="TODOを入力してEnter"
             />
 
-            {isScrollable && (
+            {/* {isScrollable && (
               <div className="absolute right-3 animate-pulse">
                 <div className="w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
                   <ChevronsDown className="text-white" size={16} />
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         )}
         {inputError && (

@@ -28,6 +28,7 @@ import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard_03 from '@/components/todo/parts/AdCard_03';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
+import { useUserUid } from '@/hooks/useUserUid';
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName } = useView();
@@ -54,7 +55,7 @@ export default function TodoView() {
     setNoteModalTask(null);
     setNoteModalTodo(null);
   };
-
+  const uid = useUserUid();
   const currentUserId = auth.currentUser?.uid;
 
   const taskNameOptions = useMemo(() => {
@@ -92,7 +93,7 @@ export default function TodoView() {
 
   useEffect(() => {
     const fetchTasks = async () => {
-      const uid = auth.currentUser?.uid;
+
       if (!uid) return;
 
       const pairsSnap = await getDocs(
@@ -126,7 +127,7 @@ export default function TodoView() {
     };
 
     fetchTasks().catch(console.error);
-  }, []);
+  }, [uid]);
 
   useEffect(() => {
     if (focusedTodoId && todoRefs.current[focusedTodoId]) {

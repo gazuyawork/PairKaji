@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection,
   query,
@@ -21,6 +21,7 @@ import { fetchPairUserIds } from '@/lib/firebaseUtils';
 // import RouletteWheel from '@/components/RouletteWheel';
 // import Confetti from 'react-confetti';
 // import { useWindowSize } from 'react-use';
+import { useUserUid } from '@/hooks/useUserUid';
 
 type UserInfo = {
   id: string;
@@ -54,16 +55,13 @@ export default function WeeklyPoints() {
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
   const [selfTargetPoint, setSelfTargetPoint] = useState<number | null>(null);
   const [partnerTargetPoint, setPartnerTargetPoint] = useState<number | null>(null);
-
   const [users, setUsers] = useState<UserInfo[]>([]);
-
-
+  const uid = useUserUid();
 
   useEffect(() => {
     let unsubscribe1: (() => void) | null = null;
 
     const fetchPoints = async () => {
-      const uid = auth.currentUser?.uid;
       if (!uid) return;
 
       const today = new Date();
@@ -110,7 +108,7 @@ export default function WeeklyPoints() {
     return () => {
       if (unsubscribe1) unsubscribe1();
     };
-  }, []); // ← weekStart/End は fetchPoints 内に閉じたので依存不要
+  }, [uid]); // ← weekStart/End は fetchPoints 内に閉じたので依存不要
 
 
 
@@ -146,7 +144,6 @@ export default function WeeklyPoints() {
 
   const handleSave = async (newPoint: number, newSelfPoint: number) => {
 
-    const uid = auth.currentUser?.uid;
     if (!uid) return;
 
     const partnerUids = await fetchPairUserIds(uid);
@@ -179,7 +176,6 @@ export default function WeeklyPoints() {
   // };
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
     if (!uid) return;
 
     const unsubscribes: (() => void)[] = [];
@@ -215,12 +211,11 @@ export default function WeeklyPoints() {
     return () => {
       unsubscribes.forEach((unsub) => unsub());
     };
-  }, []);
+  }, [uid]);
 
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const uid = auth.currentUser?.uid;
       if (!uid) return;
 
       const userArray: UserInfo[] = [];
@@ -263,7 +258,7 @@ export default function WeeklyPoints() {
     };
 
     fetchUsers();
-  }, []);
+  }, [uid]);
 
 
 

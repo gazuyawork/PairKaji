@@ -8,6 +8,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import Image from 'next/image';
 import type { Task } from '@/types/Task';
 import { useProfileImages } from '@/hooks/useProfileImages';
+import { useUserUid } from '@/hooks/useUserUid';
 
 interface CompletionLog {
   taskId: string;
@@ -27,10 +28,10 @@ type Props = {
 export default function FinishDayTask({ tasks }: Props) {
   const [logs, setLogs] = useState<CompletionLog[]>([]);
   const { profileImage, partnerImage } = useProfileImages();
+  const uid = useUserUid();
 
   useEffect(() => {
     const fetchAndSubscribe = async () => {
-      const uid = auth.currentUser?.uid;
       if (!uid) return;
 
       const taskIds = tasks.map(task => task.id);
@@ -109,7 +110,7 @@ export default function FinishDayTask({ tasks }: Props) {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [tasks]);
+  }, [tasks, uid]);
 
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-md overflow-hidden max-h-[300px]">

@@ -15,6 +15,7 @@ import {
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import type { Pair } from '@/types/Pair';
+import { useUserUid } from '@/hooks/useUserUid';
 
 interface UserPoints {
   [userId: string]: {
@@ -29,10 +30,10 @@ export default function PairPoints() {
   const [userPoints, setUserPoints] = useState<UserPoints | null>(null);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'pending' | 'none'>('none');
   const { profileImage, partnerImage } = useProfileImages();
+  const uid = useUserUid();
 
   useEffect(() => {
     const fetchData = async () => {
-      const uid = auth.currentUser?.uid;
       const email = auth.currentUser?.email;
 
       if (!uid || !email) {

@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import {
   format,
@@ -14,6 +14,7 @@ import {
   isWithinInterval
 } from 'date-fns';
 import Image from 'next/image';
+import { useUserUid } from '@/hooks/useUserUid';
 
 interface CompletionLog {
   taskId: string;
@@ -28,14 +29,13 @@ interface CompletionLog {
 export default function TaskHistory() {
   const [logs, setLogs] = useState<CompletionLog[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
-
   const today = new Date();
   const weekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
+  const uid = useUserUid();
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const uid = auth.currentUser?.uid;
       if (!uid) return;
 
       const q = query(collection(db, 'taskCompletions'), where('userId', '==', uid));
@@ -53,7 +53,7 @@ export default function TaskHistory() {
     };
 
     fetchLogs();
-  }, [weekStart, weekEnd]);
+  }, [weekStart, weekEnd, uid]);
 
   const getProfileImage = (person?: string) => {
     if (person === '太郎') return localStorage.getItem('profileImage') || '/images/taro.png';

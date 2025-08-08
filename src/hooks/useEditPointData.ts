@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, query, where, doc, getDocs, onSnapshot } from 'firebase/firestore';
+import { useUserUid } from '@/hooks/useUserUid'
 
 /**
  * ポイント編集モーダル用のカスタムフック。
@@ -17,13 +18,14 @@ export function useEditPointData(
 ) {
   const [point, setPoint] = useState<number>(0);         // 合計ポイント（週次目標）
   const [selfPoint, setSelfPoint] = useState<number>(0); // 自分が担うポイント
+  const uid = useUserUid();
 
   /**
    * Firestore上のタスク情報から合計ポイントを計算。
    * 各タスクの頻度・ポイントに応じて週次ポイントを算出。
    */
   const calculatePoints = useCallback(async () => {
-    const uid = auth.currentUser?.uid;
+    
     if (!uid) return;
 
     try {
@@ -52,13 +54,12 @@ export function useEditPointData(
     } catch (err) {
       console.error('ポイント自動算出失敗:', err);
     }
-  }, []);
+  }, [uid]);
 
   /**
    * 初回レンダリング & Firestore上のポイントデータが更新されたときの処理。
    */
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
     if (!uid) return;
 
     if (initialPoint && initialPoint > 0) {
@@ -92,7 +93,7 @@ export function useEditPointData(
 
     // コンポーネントアンマウント時に監視解除
     return () => unsubscribe();
-  }, [initialPoint, setRouletteEnabled, setRouletteOptions, calculatePoints]);
+  }, [initialPoint, setRouletteEnabled, setRouletteOptions, calculatePoints, uid]);
 
   return {
     point,
