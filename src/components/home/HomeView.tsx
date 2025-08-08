@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
-import { collection, query, where, onSnapshot,doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { ChevronDown, Info } from 'lucide-react';
@@ -17,6 +17,7 @@ import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 // import { isToday } from 'date-fns';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
+import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -29,6 +30,7 @@ export default function HomeView() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isWeeklyPointsHidden, setIsWeeklyPointsHidden] = useState(false);
   const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
+  const { isPremium, isChecking } = usePremiumStatus();
 
   const handleCloseOverlay = () => {
     localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
@@ -37,21 +39,21 @@ export default function HomeView() {
 
   const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
 
-useEffect(() => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-  const userRef = doc(db, 'users', uid);
+    const userRef = doc(db, 'users', uid);
 
-  const unsubscribe = onSnapshot(userRef, (snap) => {
-    if (snap.exists()) {
-      const data = snap.data();
-      setIsLineLinked(!!data.lineLinked);
-    }
-  });
+    const unsubscribe = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setIsLineLinked(!!data.lineLinked);
+      }
+    });
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
 
   useEffect(() => {
@@ -255,7 +257,7 @@ useEffect(() => {
             {!isLineLinked && <LineLinkCard />}
 
 
-            {!isLoading && <AdCard />}
+            {!isLoading && !isChecking && !isPremium && <AdCard />}
 
           </motion.div>
         </main>

@@ -27,6 +27,7 @@ import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard_03 from '@/components/todo/parts/AdCard_03';
+import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName } = useView();
@@ -42,6 +43,7 @@ export default function TodoView() {
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
   const { index } = useView();
+  const { isPremium, isChecking } = usePremiumStatus();
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
     setNoteModalTodo(todo);
@@ -315,7 +317,9 @@ export default function TodoView() {
             </div>
           ));
         })()}
-        <AdCard_03 />
+        {/* ✅ 広告カード（画面の末尾） */}
+        {!isChecking && !isPremium && <AdCard_03 />}
+
       </main>
     </div>
   );

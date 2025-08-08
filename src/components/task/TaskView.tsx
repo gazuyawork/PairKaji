@@ -34,8 +34,7 @@ import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import { removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
 import AdCard_02 from '@/components/task/parts/AdCard_02';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
-
-
+import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 
@@ -71,7 +70,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   });
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
-
+  const { isPremium, isChecking } = usePremiumStatus();
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -788,7 +787,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </motion.div>
         )}
         {/* ✅ 広告カード（画面の末尾） */}
-        <AdCard_02 />
+        {!isChecking && !isPremium && <AdCard_02 />}
       </main>
     </div>
   );
