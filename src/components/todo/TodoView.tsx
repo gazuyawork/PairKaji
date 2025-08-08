@@ -70,6 +70,25 @@ export default function TodoView() {
     return Array.from(new Set(names));
   }, [tasks, currentUserId]);
 
+  // TodoViewコンポーネント内に追加
+  const selectBoxRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isOpen &&
+        selectBoxRef.current &&
+        !selectBoxRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -157,7 +176,7 @@ export default function TodoView() {
         <div className="sticky top-0 z-[999] w-full bg-transparent">
           <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3">
             {/* ✅ セレクトボックス部分 */}
-            <div className="relative w-full mb-6">
+            <div ref={selectBoxRef} className="relative w-full mb-6">
               <input
                 type="text"
                 value=""
