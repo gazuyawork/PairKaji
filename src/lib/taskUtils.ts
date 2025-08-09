@@ -375,28 +375,63 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
       const originalDates: string[] = originalData?.dates ?? [];
       const newDates: string[] = taskData.dates ?? [];
 
-      // 🔽 dates から削除された日付を特定
+      // 🔽 dates から削除された日付を特定（period切替等で日付が消えた分）
       const removedDates = originalDates.filter((d) => !newDates.includes(d));
 
-      // 🔽 time が変更されたか確認
-      const originalTime = originalData?.time;
-      const newTime = taskData.time;
+      // 🔽 time の変更/削除を検知（null/undefined対策で空文字に正規化）
+      const originalTime = (originalData?.time ?? '') as string;
+      const newTimeInput = (taskData.time ?? '') as string;
 
-      // 🔽 notifyLogs から taskId を削除（条件に応じて）
+      // 🔽 period の変更を検知
+      const originalPeriod = (originalData?.period ?? '') as string;
+      const newPeriod = (taskData.period ?? '') as string;
+
+      // 🔽 「その他 → 週次/毎日」に切替えたら、dates と time をクリアして保存する
+      const isOtherToRecurring =
+        originalPeriod !== newPeriod && (newPeriod === '週次' || newPeriod === '毎日');
+
+      // この後 update 用に使う最終値（強制クリアの判定に使う）
+      let finalDates: string[] = newDates;
+      let finalTime: string = newTimeInput;
+
+      // 1) 日付が消えた分は削除
       if (removedDates.length > 0) {
         await removeTaskIdFromNotifyLogs(uid, taskId, removedDates);
       }
 
-      if (originalTime && newTime && originalTime !== newTime) {
-        await removeTaskIdFromNotifyLogs(uid, taskId, newDates);
+      // 2) time が「変更」された場合：共通日付に対して削除
+      if (originalTime && newTimeInput && originalTime !== newTimeInput) {
+        const intersectDates = originalDates.filter((d) => newDates.includes(d));
+        if (intersectDates.length > 0) {
+          await removeTaskIdFromNotifyLogs(uid, taskId, intersectDates);
+        }
       }
 
-      // 🔽 タスクの更新
+      // 3) time が「削除」された場合（例: '08:00' → ''）：元々の dates から削除
+      if (originalTime && !newTimeInput && originalDates.length > 0) {
+        await removeTaskIdFromNotifyLogs(uid, taskId, originalDates);
+      }
+
+      // 4) ★ 新規追加ロジック：その他 → 週次/毎日
+      //    - 通知再送防止のため、元 dates から削除
+      //    - 保存時は dates=[], time='' に強制上書き
+      if (isOtherToRecurring) {
+        if (originalDates.length > 0 && originalTime) {
+          await removeTaskIdFromNotifyLogs(uid, taskId, originalDates);
+        }
+        finalDates = [];
+        finalTime = '';
+      }
+
+      // 🔽 タスクの更新（dates/time は final* を保存）
       await updateDoc(taskRef, {
         ...commonData,
+        dates: finalDates,
+        time: finalTime,
         userId: uid,
         updatedAt: serverTimestamp(),
       });
+
     } else {
       // 🔽 新規タスク作成（notifyLogs は対象外なのでこのままでOK）
       await addDoc(collection(db, 'tasks'), {
@@ -538,14 +573,24 @@ const removeTaskIdFromNotifyLogs = async (
   if (!dates || dates.length === 0) return;
 
   const batch = writeBatch(db);
+
   for (const date of dates) {
     const notifyRef = doc(db, 'users', userId, 'notifyLogs', date);
-    batch.update(notifyRef, {
-      taskIds: arrayRemove(taskId),
-    });
+    const snap = await getDoc(notifyRef); // ✅ 追加：存在チェック
+    if (snap.exists()) {
+      // 存在する場合のみ arrayRemove を適用
+      batch.update(notifyRef, {
+        taskIds: arrayRemove(taskId),
+      });
+    } else {
+      // ドキュメントが無い日はスキップ（何もしない）
+      // console.debug(`notifyLogs/${date} は存在しないため削除スキップ`);
+    }
   }
+
   await batch.commit();
 };
+
 
 
 
