@@ -328,128 +328,134 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     resetCompletedTasks().catch(console.error);
   }, []);
 
-  useEffect(() => {
-    let unsubscribe: () => void;
+useEffect(() => {
+  let unsubscribe: () => void;
 
-    const fetchTasks = async () => {
-      if (!uid) return;
+  const fetchTasks = async () => {
+    // uidがまだ取得中(null)なら何もしない
+    if (uid === null) return;
 
-      const pairsSnap = await getDocs(
-        query(
-          collection(db, 'pairs'),
-          where('userIds', 'array-contains', uid),
-          where('status', '==', 'confirmed')
-        )
+    // 未ログインなら即ローディング解除
+    if (!uid) {
+      setIsLoading(false);
+      return;
+    }
+
+    const pairsSnap = await getDocs(
+      query(
+        collection(db, 'pairs'),
+        where('userIds', 'array-contains', uid),
+        where('status', '==', 'confirmed')
+      )
+    );
+
+    const partnerUids = new Set<string>();
+    partnerUids.add(uid);
+
+    pairsSnap.forEach(doc => {
+      const data = doc.data();
+      if (Array.isArray(data.userIds)) {
+        data.userIds.forEach((id: string) => {
+          partnerUids.add(id);
+        });
+      }
+    });
+
+    const ids = Array.from(partnerUids);
+
+    if (ids.length === 0) {
+      console.warn('userIds が空のため、Firestore クエリをスキップします');
+      setIsLoading(false);
+      return;
+    }
+
+    const q = query(collection(db, 'tasks'), where('userIds', 'array-contains-any', ids));
+
+    unsubscribe = onSnapshot(q, async (snapshot) => {
+      const rawTasks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
+        mapFirestoreDocToTask(doc)
       );
 
-      const partnerUids = new Set<string>();
-      partnerUids.add(uid);
+      const updates: Promise<void>[] = [];
+      for (const task of rawTasks) {
+        if (task.completedAt != null) {
+          let completedDate: Date | null = null;
 
-      pairsSnap.forEach(doc => {
-        const data = doc.data();
-        if (Array.isArray(data.userIds)) {
-          data.userIds.forEach((id: string) => {
-            partnerUids.add(id);
-          });
-        }
-      });
-
-      const ids = Array.from(partnerUids);
-
-      if (ids.length === 0) {
-        console.warn('userIds が空のため、Firestore クエリをスキップします');
-        return;
-      }
-
-      // const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
-      const q = query(collection(db, 'tasks'), where('userIds', 'array-contains-any', ids));
-
-
-      unsubscribe = onSnapshot(q, async (snapshot) => {
-        const rawTasks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
-          mapFirestoreDocToTask(doc)
-        );
-        const updates: Promise<void>[] = [];
-        for (const task of rawTasks) {
-          if (task.completedAt != null) {
-            let completedDate: Date | null = null;
-
-            if (typeof task.completedAt === 'string') {
-              try {
-                completedDate = parseISO(task.completedAt);
-              } catch {
-                console.warn('parseISO失敗:', task.completedAt);
-              }
-            } else if (task.completedAt instanceof Timestamp) {
-              completedDate = task.completedAt.toDate();
-            } else if (
-              task.completedAt &&
-              typeof task.completedAt === 'object' &&
-              'toDate' in task.completedAt &&
-              typeof (task.completedAt as Timestamp).toDate === 'function'
-            ) {
-              completedDate = (task.completedAt as Timestamp).toDate();
-            } else {
-              console.warn('不明な completedAt の型:', task.completedAt);
+          if (typeof task.completedAt === 'string') {
+            try {
+              completedDate = parseISO(task.completedAt);
+            } catch {
+              console.warn('parseISO失敗:', task.completedAt);
             }
-
-            if (completedDate !== null && !isToday(completedDate) && task.period !== 'その他') {
-              const taskRef = doc(db, 'tasks', task.id);
-
-              // ✅ ドキュメントの存在確認を追加
-              const taskSnap = await getDoc(taskRef);
-              if (!taskSnap.exists()) {
-                console.warn(`スキップ: タスクが存在しません（${task.id}）`);
-                continue;
-              }
-
-              updates.push(
-                updateDoc(taskRef, {
-                  done: false,
-                  skipped: false,
-                  completedAt: null,
-                  completedBy: '',
-                })
-              );
-
-              task.done = false;
-              task.skipped = false;
-              task.completedAt = null;
-              task.completedBy = '';
-            }
-          }
-        }
-
-
-        await Promise.all(updates);
-
-        const grouped: Record<Period, Task[]> = {
-          毎日: [],
-          週次: [],
-          その他: [],
-        };
-
-        for (const task of rawTasks) {
-          if (task.period === '毎日' || task.period === '週次' || task.period === 'その他') {
-            grouped[task.period].push(task);
+          } else if (task.completedAt instanceof Timestamp) {
+            completedDate = task.completedAt.toDate();
+          } else if (
+            task.completedAt &&
+            typeof task.completedAt === 'object' &&
+            'toDate' in task.completedAt &&
+            typeof (task.completedAt as Timestamp).toDate === 'function'
+          ) {
+            completedDate = (task.completedAt as Timestamp).toDate();
           } else {
-            console.warn('無効な period 値:', task.period, task);
+            console.warn('不明な completedAt の型:', task.completedAt);
+          }
+
+          if (completedDate !== null && !isToday(completedDate) && task.period !== 'その他') {
+            const taskRef = doc(db, 'tasks', task.id);
+
+            const taskSnap = await getDoc(taskRef);
+            if (!taskSnap.exists()) {
+              console.warn(`スキップ: タスクが存在しません（${task.id}）`);
+              continue;
+            }
+
+            updates.push(
+              updateDoc(taskRef, {
+                done: false,
+                skipped: false,
+                completedAt: null,
+                completedBy: '',
+              })
+            );
+
+            task.done = false;
+            task.skipped = false;
+            task.completedAt = null;
+            task.completedBy = '';
           }
         }
-
-        setTasksState(grouped);
-        setIsLoading(false);
-      });
-    };
-
-    fetchTasks().catch(console.error);
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
       }
-    };
-  }, []);
+
+      await Promise.all(updates);
+
+      const grouped: Record<Period, Task[]> = {
+        毎日: [],
+        週次: [],
+        その他: [],
+      };
+
+      for (const task of rawTasks) {
+        if (task.period === '毎日' || task.period === '週次' || task.period === 'その他') {
+          grouped[task.period].push(task);
+        } else {
+          console.warn('無効な period 値:', task.period, task);
+        }
+      }
+
+      setTasksState(grouped);
+      setIsLoading(false); // 初回取得時に解除
+    });
+  };
+
+  fetchTasks().catch(console.error);
+
+  return () => {
+    if (unsubscribe) {
+      unsubscribe();
+    }
+  };
+}, [uid]); // uidを依存配列に追加
+
 
   useEffect(() => {
     setSearchTerm(initialSearch);
