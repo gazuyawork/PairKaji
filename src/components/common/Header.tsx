@@ -1,6 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import {
   MoreVertical,
@@ -15,6 +15,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
+import { motion } from 'framer-motion'; // ▼ 追加
 
 type HeaderProps = {
   title: string;
@@ -30,20 +31,24 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
     <header className="fixed top-0 left-0 right-0 z-50 bg-white h-16 flex items-center justify-center shadow-sm">
       <div className="flex items-center gap-2 ml-4">
         {/* 戻るボタン */}
-        {(pathname === '/profile' || pathname === '/contact' || pathname === '/task_manage' || pathname === '/delete-account') && (
-          <button
+        {(pathname === '/profile' ||
+          pathname === '/contact' ||
+          pathname === '/task_manage' ||
+          pathname === '/delete-account') && (
+          <motion.button
+            whileTap={{ scale: 0.9 }} // ▼ 押した時に縮小
             onClick={() => {
               if (pathname === '/task_manage') {
-                router.push('/main?fromTaskManage=true'); // ← クエリ付きで遷移！
+                router.push('/main?fromTaskManage=true');
                 return;
               }
               router.push('/main');
             }}
-            className="text-[#5E5E5E]"
+            className="text-[#5E5E5E] active:translate-y-[1px]"
             aria-label="戻る"
           >
             <ArrowLeft size={24} />
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -67,13 +72,13 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
 
       {showMenu && (
         <>
-          {/* 背景オーバーレイ（クリックでメニューを閉じる） */}
+          {/* 背景オーバーレイ */}
           <div
             className="fixed inset-0 z-10"
             onClick={() => setShowMenu(false)}
           />
 
-          {/* ポップアップメニュー本体 */}
+          {/* ポップアップメニュー */}
           <div className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-40 z-20">
             <ul className="divide-y divide-gray-200">
               <li
