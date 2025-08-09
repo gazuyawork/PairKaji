@@ -18,7 +18,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
@@ -31,7 +31,7 @@ import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 import { useUserUid } from '@/hooks/useUserUid';
 
 export default function TodoView() {
-  const { selectedTaskName, setSelectedTaskName } = useView();
+  const { selectedTaskName, setSelectedTaskName, index } = useView();
   const [filterText, setFilterText] = useState('');
 
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
@@ -43,8 +43,9 @@ export default function TodoView() {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
-  const { index } = useView();
   const { isPremium, isChecking } = usePremiumStatus();
+  const uid = useUserUid();
+
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
     setNoteModalTodo(todo);
@@ -55,21 +56,19 @@ export default function TodoView() {
     setNoteModalTask(null);
     setNoteModalTodo(null);
   };
-  const uid = useUserUid();
-  const currentUserId = auth.currentUser?.uid;
 
   const taskNameOptions = useMemo(() => {
     const names = tasks
       .filter(task =>
         !task.visible && (
-          task.userId === currentUserId ||        // 自分のタスク
-          task.private !== true                   // 共有タスク
+          task.userId === uid ||        // 自分のタスク
+          task.private !== true         // 共有タスク
         )
       )
       .map(task => task.name)
       .filter(Boolean);
     return Array.from(new Set(names));
-  }, [tasks, currentUserId]);
+  }, [tasks, uid]);
 
   // TodoViewコンポーネント内に追加
   const selectBoxRef = useRef<HTMLDivElement | null>(null);
@@ -92,16 +91,21 @@ export default function TodoView() {
   }, [isOpen]);
 
   useEffect(() => {
-    const fetchTasks = async () => {
+    if (!uid) return;
 
-      if (!uid) return;
+    let unsubscribe: (() => void) | null = null;
+    let isMounted = true;
 
+    (async () => {
       const pairsSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+        query(
+          collection(db, 'pairs'),
+          where('userIds', 'array-contains', uid),
+          where('status', '==', 'confirmed')
+        )
       );
 
-      const userIds = new Set<string>();
-      userIds.add(uid);
+      const userIds = new Set<string>([uid]);
       pairsSnap.forEach(doc => {
         const data = doc.data();
         if (Array.isArray(data.userIds)) {
@@ -109,8 +113,12 @@ export default function TodoView() {
         }
       });
 
-      const q = query(collection(db, 'tasks'), where('userId', 'in', Array.from(userIds)));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Firestore の 'in' クエリは最大10要素
+      const ids = Array.from(userIds).slice(0, 10);
+
+      const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!isMounted) return;
         const newTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
           const data = doc.data() as Omit<TodoOnlyTask, 'id'>;
           return {
@@ -122,11 +130,12 @@ export default function TodoView() {
 
         setTasks(newTasks);
       });
+    })().catch(console.error);
 
-      return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
     };
-
-    fetchTasks().catch(console.error);
   }, [uid]);
 
   useEffect(() => {
@@ -149,7 +158,6 @@ export default function TodoView() {
     }
   }, [selectedTaskName, setSelectedTaskName, tasks]);
 
-
   useEffect(() => {
     if (selectedGroupId && !tasks.some(task => task.id === selectedGroupId)) {
       setSelectedGroupId(null);
@@ -158,9 +166,7 @@ export default function TodoView() {
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
-
       <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-40">
-
         {/* ✅ indexが2（TodoView）である場合のみ表示 */}
         {index === 2 && noteModalTask && noteModalTodo && (
           <TodoNoteModal
@@ -171,7 +177,6 @@ export default function TodoView() {
             taskId={noteModalTask.id}
           />
         )}
-
 
         {/* 🔁 Stickyラッパーでセレクトとフィルタをまとめて固定 */}
         <div className="sticky top-0 z-[999] w-full bg-transparent">
@@ -240,7 +245,7 @@ export default function TodoView() {
               task.visible &&
               (!selectedGroupId || task.id === selectedGroupId) &&
               (filterText.trim() === '' || task.name.includes(filterText)) &&
-              (task.userId === currentUserId || task.private !== true) // 自分のタスクまたは共有タスク
+              (task.userId === uid || task.private !== true) // 自分のタスクまたは共有タスク
             );
 
           if (filteredTasks.length === 0) {
@@ -254,21 +259,17 @@ export default function TodoView() {
           return filteredTasks.map(task => (
             <div key={task.id} className="mx-auto w-full max-w-xl">
               <TodoTaskCard
-                key={task.id}
                 task={task}
                 tab={activeTabs[task.id] ?? 'undone'}
                 setTab={(tab) =>
                   setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
                 }
-
                 onOpenNote={(text) => {
                   const todo = task.todos.find(t => t.text === text);
                   if (todo) {
                     openNoteModal(task, todo);
                   }
                 }}
-
-
                 onAddTodo={async (todoId, text) => {
                   const newTodos = [...task.todos, { id: todoId, text, done: false }];
                   await updateDoc(doc(db, 'tasks', task.id), {
@@ -276,8 +277,6 @@ export default function TodoView() {
                     updatedAt: serverTimestamp(),
                   });
                 }}
-
-
                 onChangeTodo={(todoId, value) => {
                   const updated = tasks.map(t =>
                     t.id === task.id
@@ -291,7 +290,6 @@ export default function TodoView() {
                   );
                   setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
                 }}
-
                 onToggleDone={async (todoId) => {
                   const updatedTodos = task.todos.map(todo =>
                     todo.id === todoId ? { ...todo, done: !todo.done } : todo
@@ -301,7 +299,6 @@ export default function TodoView() {
                     updatedAt: serverTimestamp(),
                   });
                 }}
-
                 onBlurTodo={async (todoId, text) => {
                   const updatedTask = tasks.find(t => t.id === task.id);
                   if (!updatedTask) return;
@@ -315,8 +312,6 @@ export default function TodoView() {
                     todos: newTodos,
                   });
                 }}
-
-
                 onDeleteTodo={async (todoId) => {
                   const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
                   await updateDoc(doc(db, 'tasks', task.id), {
@@ -339,7 +334,6 @@ export default function TodoView() {
         })()}
         {/* ✅ 広告カード（画面の末尾） */}
         {!isChecking && !isPremium && <AdCard_03 />}
-
       </main>
     </div>
   );
