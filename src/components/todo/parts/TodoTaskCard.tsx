@@ -9,6 +9,16 @@ import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import type { Variants } from 'framer-motion';
+
+// コンポーネント外に退避（毎レンダー新規生成を回避）
+const SHAKE_VARIANTS: Variants = {
+  shake: {
+    x: [0, -6, 6, -4, 4, -2, 2, 0],
+    transition: { duration: 0.4 },
+  },
+};
+
 
 interface Props {
   task: TodoOnlyTask;
@@ -41,17 +51,28 @@ export default function TodoTaskCard({
 }: Props) {
   const router = useRouter();
   const todos = useMemo(() => task?.todos ?? [], [task?.todos]);
+
   const [isComposing, setIsComposing] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
-  const undoneCount = todos.filter(todo => !todo.done).length;
-  const doneCount = todos.filter(todo => todo.done).length;
+
+  // カウントをメモ化
+  const { undoneCount, doneCount } = useMemo(() => {
+    let undone = 0;
+    let done = 0;
+    for (const t of todos) {
+      if (t.done) done++; else undone++;
+    }
+    return { undoneCount: undone, doneCount: done };
+  }, [todos]);
+
   const filteredTodos = useMemo(
     () => (tab === 'done' ? todos.filter(todo => todo.done) : todos.filter(todo => !todo.done)),
     [todos, tab]
   );
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
@@ -71,7 +92,8 @@ export default function TodoTaskCard({
     if (!el) return;
 
     const handleScroll = () => {
-      const ratio = el.scrollTop / (el.scrollHeight - el.clientHeight);
+      const denom = el.scrollHeight - el.clientHeight || 1;
+      const ratio = el.scrollTop / denom;
       setScrollRatio(Math.min(1, Math.max(0, ratio)));
     };
 
@@ -124,7 +146,7 @@ export default function TodoTaskCard({
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleteAnimating, setIsDeleteAnimating] = useState(false);
-  const deleteTimeout = useRef<NodeJS.Timeout | null>(null);
+  const deleteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDeleteClick = () => {
     if (isDeleteAnimating) return;
@@ -137,23 +159,28 @@ export default function TodoTaskCard({
         setIsDeleteAnimating(false);
       }, 400);
 
+      if (deleteTimeout.current) clearTimeout(deleteTimeout.current);
       deleteTimeout.current = setTimeout(() => {
         setConfirmDelete(false);
       }, 2000);
     } else {
-      if (deleteTimeout.current) clearTimeout(deleteTimeout.current);
+      if (deleteTimeout.current) {
+        clearTimeout(deleteTimeout.current);
+        deleteTimeout.current = null;
+      }
       setConfirmDelete(false);
       onDeleteTask();
     }
   };
 
   const [confirmTodoDeletes, setConfirmTodoDeletes] = useState<Record<string, boolean>>({});
-  const todoDeleteTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+  const todoDeleteTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleTodoDeleteClick = (todoId: string) => {
     if (confirmTodoDeletes[todoId]) {
-      if (todoDeleteTimeouts.current[todoId]) {
-        clearTimeout(todoDeleteTimeouts.current[todoId]);
+      const t = todoDeleteTimeouts.current[todoId];
+      if (t) {
+        clearTimeout(t);
         delete todoDeleteTimeouts.current[todoId];
       }
       setConfirmTodoDeletes(prev => ({ ...prev, [todoId]: false }));
@@ -168,12 +195,19 @@ export default function TodoTaskCard({
     }
   };
 
-  const shakeVariants = {
-    shake: {
-      x: [0, -6, 6, -4, 4, -2, 2, 0],
-      transition: { duration: 0.4 },
-    },
-  };
+  // アンマウント時に全タイマーをクリア
+  useEffect(() => {
+    return () => {
+      if (deleteTimeout.current) {
+        clearTimeout(deleteTimeout.current);
+        deleteTimeout.current = null;
+      }
+      Object.values(todoDeleteTimeouts.current).forEach(clearTimeout);
+      todoDeleteTimeouts.current = {};
+    };
+  }, []);
+
+  const shakeTapAnimation = { scale: 0.98 };
 
   return (
     <div className="relative mb-2.5">
@@ -229,16 +263,16 @@ export default function TodoTaskCard({
           <motion.button
             onClick={handleDeleteClick}
             animate={isDeleteAnimating ? 'shake' : undefined}
-            variants={shakeVariants}
+            variants={SHAKE_VARIANTS}
             className={clsx(
               'text-2xl font-bold pr-1',
               confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
             )}
             type="button"
+            whileTap={shakeTapAnimation}
           >
             ×
           </motion.button>
-
         </div>
       </div>
 
@@ -251,27 +285,22 @@ export default function TodoTaskCard({
           {filteredTodos.map(todo => (
             <div key={todo.id} className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-
                 <motion.div
-                  key={animateTriggerMap[todo.id] ?? 0} // ✅ アニメーション強制発火用のキー
+                  key={animateTriggerMap[todo.id] ?? 0} // アニメーション強制発火用のキー
                   className="cursor-pointer"
                   onClick={() => {
-                    // ✅ アニメーションのトリガーを更新（keyが変わることで再描画）
-                    setAnimateTriggerMap(prev => ({
-                      ...prev,
-                      [todo.id]: (prev[todo.id] ?? 0) + 1,
-                    }));
-
-                    // ✅ 表示状態だけ先に更新（Circle ↔ CheckCircle）
+                    // 表示状態だけ先に更新（Circle ↔ CheckCircle）
                     setLocalDoneMap(prev => ({
                       ...prev,
                       [todo.id]: !prev[todo.id],
                     }));
-
-                    // ✅ 実際のステータス切り替えはアニメ後に実行
-                    setTimeout(() => {
-                      onToggleDone(todo.id);
-                    }, 600); // duration と合わせる
+                    // アニメーションのトリガーを更新
+                    setAnimateTriggerMap(prev => ({
+                      ...prev,
+                      [todo.id]: (prev[todo.id] ?? 0) + 1,
+                    }));
+                    // 実際のステータス切り替えはアニメ後に実行
+                    setTimeout(() => onToggleDone(todo.id), 600);
                   }}
                   initial={{ rotate: 0 }}
                   animate={{ rotate: 360 }}
@@ -307,7 +336,13 @@ export default function TodoTaskCard({
                       return;
                     }
 
-                    setEditingErrors(prev => ({ ...prev, [todo.id]: '' }));
+                    // エラーを削除
+                    setEditingErrors(prev => {
+                      const next = { ...prev };
+                      delete next[todo.id];
+                      return next;
+                    });
+
                     onChangeTodo(todo.id, newText);
                     onBlurTodo(todo.id, newText);
                   }}
@@ -350,7 +385,7 @@ export default function TodoTaskCard({
                   type="button"
                   onClick={() => handleTodoDeleteClick(todo.id)}
                   animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
-                  variants={shakeVariants}
+                  variants={SHAKE_VARIANTS}
                 >
                   <Trash2
                     size={22}
@@ -360,10 +395,12 @@ export default function TodoTaskCard({
                     )}
                   />
                 </motion.button>
-
               </div>
+
               {editingErrors[todo.id] && (
-                <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">{editingErrors[todo.id]}</div>
+                <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
+                  {editingErrors[todo.id]}
+                </div>
               )}
             </div>
           ))}
@@ -393,16 +430,9 @@ export default function TodoTaskCard({
               className="w-[75%] border-b bg-transparent outline-none border-gray-300 h-8 text-black"
               placeholder="TODOを入力してEnter"
             />
-
-            {/* {isScrollable && (
-              <div className="absolute right-3 animate-pulse">
-                <div className="w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
-                  <ChevronsDown className="text-white" size={16} />
-                </div>
-              </div>
-            )} */}
           </div>
         )}
+
         {inputError && (
           <div className="bg-red-400 text-white text-xs mt-1 ml-2 px-2 py-1 rounded-md">{inputError}</div>
         )}
