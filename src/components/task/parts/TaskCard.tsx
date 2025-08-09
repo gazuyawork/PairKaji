@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2 } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import clsx from 'clsx';
@@ -25,7 +25,7 @@ const dayBorderClassMap: Record<string, string> = {
   '6': 'border-amber-200',
 };
 
-const dayBaseClass = 'bg-gray-600'; // 常に背景はダークグレー系で統一
+const dayBaseClass = 'bg-gray-600';
 
 const dayKanjiToNumber: Record<string, string> = {
   '日': '0',
@@ -54,49 +54,61 @@ type Props = {
   isPairConfirmed: boolean;
   isPrivate: boolean;
   onLongPress?: (x: number, y: number) => void;
-    deletingTaskId: string | null;
-  onSwipeLeft: (taskId: string) => void
+  deletingTaskId: string | null;
+  onSwipeLeft: (taskId: string) => void;
 };
 
 export default function TaskCard({
-  task, period, onToggleDone, onDelete,
-  userList, isPairConfirmed, onEdit, onSwipeLeft, deletingTaskId
+  task,
+  period,
+  onToggleDone,
+  onDelete,
+  userList,
+  isPairConfirmed,
+  onEdit,
+  onSwipeLeft,
+  deletingTaskId,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
+
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [animateTrigger, setAnimateTrigger] = useState(0);
-  const assignedUserId = task.users?.[0];
-  const assignedUser = userList.find(u => u.id === assignedUserId);
-  const profileImage = assignedUser?.imageUrl ?? '/images/default.png';
-  const profileName = assignedUser?.name ?? '未設定';
   const [showActions, setShowActions] = useState(false);
-  const [showActionButtons, setShowActionButtons] = useState(true); // 3ボタン表示制御
-  // const [isFlagged, setIsFlagged] = useState(task.flagged ?? false);
+  const [showActionButtons, setShowActionButtons] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [onConfirmCallback, setOnConfirmCallback] = useState<(() => void) | null>(null);
+  const pendingConfirmResolver = useRef<((ok: boolean) => void) | null>(null);
   const [localDone, setLocalDone] = useState(task.done);
-
-
-  
 
   useEffect(() => {
     setLocalDone(task.done);
   }, [task.done]);
 
+  const { profileImage, profileName } = useMemo(() => {
+    const assignedUserId = task.users?.[0];
+    const assignedUser = userList.find((u) => u.id === assignedUserId);
+    return {
+      profileImage: assignedUser?.imageUrl ?? '/images/default.png',
+      profileName: assignedUser?.name ?? '未設定',
+    };
+  }, [task.users, userList]);
+
+  const sortedDays = useMemo(() => {
+    if (!task.daysOfWeek) return [];
+    const order = ['0', '1', '2', '3', '4', '5', '6'];
+    return [...task.daysOfWeek].sort(
+      (a, b) => order.indexOf(dayKanjiToNumber[a]) - order.indexOf(dayKanjiToNumber[b])
+    );
+  }, [task.daysOfWeek]);
 
   const toggleFlag = async () => {
     if (task.done) return;
-
     try {
       const newFlag = !task.flagged;
-      setTimeout(() => {
-        setShowActionButtons(false);
-      }, 500);
+      setTimeout(() => setShowActionButtons(false), 500);
 
       const taskRef = doc(db, 'tasks', task.id);
       const taskSnap = await getDoc(taskRef);
-
       if (!taskSnap.exists()) {
         console.warn('該当タスクが存在しません');
         return;
@@ -111,25 +123,26 @@ export default function TaskCard({
     }
   };
 
-const swipeable = useSwipeable({
-  onSwipedLeft: () => {
-    setSwipeDirection('left');
-    setShowActions(false); // ✅ 編集フラグと同時表示を防ぐ
-    onSwipeLeft(task.id); // ✅ 親に通知して削除対象IDをセット
-  },
-  onSwipedRight: () => {
-    setSwipeDirection('right');
-    setShowActions(false); // ✅ 編集/フラグを同時に消す
-  },
-  trackTouch: true,
-});
-
+  const swipeable = useSwipeable({
+    onSwipedLeft: () => {
+      setSwipeDirection('left');
+      setShowActions(false);
+      onSwipeLeft(task.id);
+    },
+    onSwipedRight: () => {
+      setSwipeDirection('right');
+      setShowActions(false);
+    },
+    trackTouch: true,
+  });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+      if (!cardRef.current) return;
+      if (!cardRef.current.contains(e.target as Node)) {
         setSwipeDirection(null);
         setShowActions(false);
+        setShowActionButtons(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -138,29 +151,22 @@ const swipeable = useSwipeable({
 
   const handleClick = () => {
     if (showActions) return;
-
-    setAnimateTrigger(prev => prev + 1);
-    setLocalDone(true); // 仮で表示上「完了」にする
-
+    setAnimateTrigger((prev) => prev + 1);
+    setLocalDone(true);
     setTimeout(() => {
-      onToggleDone(period, task.id); // 実際の状態更新は後で
-    }, 300); // アニメーションと同じ時間
+      onToggleDone(period, task.id);
+    }, 300);
   };
 
-
   const handleDelete = () => {
-    // Promiseでユーザー選択を待つ
     new Promise<boolean>((resolve) => {
-      setOnConfirmCallback(() => () => resolve(true));
+      pendingConfirmResolver.current = resolve;
       setConfirmOpen(true);
-    }).then((confirmed) => {
-      if (confirmed) {
-        onDelete(period, task.id);
-      }
+    }).then((ok) => {
+      if (ok) onDelete(period, task.id);
       setSwipeDirection(null);
     });
   };
-
 
   const handleTodoClick = () => {
     setSelectedTaskName(task.name);
@@ -168,13 +174,9 @@ const swipeable = useSwipeable({
   };
 
   useEffect(() => {
-    if (showActions) {
-      const timeout = setTimeout(() => {
-        setShowActions(false);
-      }, 5000); // 5秒後に非表示
-
-      return () => clearTimeout(timeout); // クリーンアップ
-    }
+    if (!showActions) return;
+    const timeout = setTimeout(() => setShowActions(false), 5000);
+    return () => clearTimeout(timeout);
   }, [showActions]);
 
   return (
@@ -182,13 +184,7 @@ const swipeable = useSwipeable({
       {swipeDirection === 'left' && deletingTaskId === task.id && !showActions && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-8 h-8 flex items-center justify-center 
-                      rounded-md 
-                      bg-gradient-to-b from-red-300 to-red-600 
-                      shadow-md ring-1 ring-white/30
-                      ring-2 ring-white
-                      active:translate-y-[1px] 
-                      transition-transform"
+            className="w-8 h-8 flex items-center justify-center rounded-md bg-gradient-to-b from-red-300 to-red-600 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
@@ -202,11 +198,7 @@ const swipeable = useSwipeable({
       {swipeDirection === 'right' && task.visible && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-14 h-8 text-xs font-bold text-white rounded-md 
-                      bg-gradient-to-b from-blue-300 to-blue-500 
-                      shadow-md ring-1 ring-white/30
-                      ring-2 ring-white 
-                      active:translate-y-[1px] transition-transform"
+            className="w-14 h-8 text-xs font-bold text-white rounded-md bg-gradient-to-b from-blue-300 to-blue-500 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
             onClick={handleTodoClick}
           >
             <span className="[text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]">TODO</span>
@@ -218,36 +210,29 @@ const swipeable = useSwipeable({
       {showActions && showActionButtons && swipeDirection === null && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
-            {/* 編集ボタン（爽やかな青） */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
               }}
-              className="w-12 h-12 rounded-full 
-                  bg-gradient-to-b from-green-300 to-green-600 
-                  shadow ring-1 ring-green-300 ring-offset-1 
-                  flex items-center justify-center 
-                  text-white active:translate-y-0.5 
-                  transition-all duration-150"
+              className="w-12 h-12 rounded-full bg-gradient-to-b from-green-300 to-green-600 shadow ring-1 ring-green-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
             >
               <Pencil className="w-5 h-5" />
             </button>
 
-            {/* フラグボタン（トグル対応） */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 toggleFlag();
               }}
-              disabled={task.done} // 完了タスクならボタン無効化
+              disabled={task.done}
               className={clsx(
                 'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white transition-all duration-150',
                 task.done
-                  ? 'bg-gray-300 opacity-30 cursor-not-allowed' // 完了状態用スタイル
+                  ? 'bg-gray-300 opacity-30 cursor-not-allowed'
                   : task.flagged
-                    ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
-                    : 'bg-gray-300 ring-1 ring-gray-300 text-white'
+                  ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
+                  : 'bg-gray-300 ring-1 ring-gray-300 text-white'
               )}
             >
               <Flag className="w-5 h-5" />
@@ -280,17 +265,7 @@ const swipeable = useSwipeable({
           </div>
         )}
 
-        {/* Privateバッジ（右上） */}
-        {/* {task.private && (
-          <div
-            className="absolute top-0 right-0 w-[30px] h-[30px] bg-gradient-to-bl bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white text-[12px] font-bold flex items-center justify-center z-10 shadow-inner ring-1 ring-white/40"
-            style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
-          >
-            <span className="translate-y-[-6px] translate-x-[5px]">P</span>
-          </div>
-        )} */}
-
-        {/* 左側：チェックボックス・名前・曜日 */}
+        {/* 左側：チェック・名前・曜日 */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <button
             onClick={(e) => {
@@ -300,7 +275,7 @@ const swipeable = useSwipeable({
             className="focus:outline-none"
           >
             <div className="relative w-6 h-6">
-              {localDone && (
+              {localDone ? (
                 <motion.div
                   key={animateTrigger}
                   className="absolute top-0 left-0 w-full h-full"
@@ -310,52 +285,43 @@ const swipeable = useSwipeable({
                 >
                   <CheckCircle className="text-yellow-500 w-6 h-6" />
                 </motion.div>
+              ) : (
+                <Circle className="text-gray-400 w-6 h-6" />
               )}
-              {!localDone && <Circle className="text-gray-400 w-6 h-6" />}
             </div>
           </button>
 
           {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
 
           <div className="w-[100%] min-w-0">
-            <span className="text-[#5E5E5E] font-medium font-sans truncate block">
-              {task.name}
-            </span>
+            <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
           </div>
 
-          {/* 曜日表示（残り50%領域内） */}
-          {task.daysOfWeek && (
+          {sortedDays.length > 0 && (
             <div
               className={clsx(
                 'grid gap-x-[10px] gap-y-0 w-[52px] pr-1',
-                task.daysOfWeek.length === 1 ? 'grid-cols-1 place-items-end' : 'grid-cols-2'
+                sortedDays.length === 1 ? 'grid-cols-1 place-items-end' : 'grid-cols-2'
               )}
             >
-              {[...task.daysOfWeek]
-                .sort(
-                  (a, b) =>
-                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[a]) -
-                    ['0', '1', '2', '3', '4', '5', '6'].indexOf(dayKanjiToNumber[b])
-                )
-                .map((d, i) => (
-                  <div
-                    key={i}
-                    className={clsx(
-                      'w-5.5 h-5.5 aspect-square rounded-full text-white text-[10px] flex items-center justify-center flex-shrink-0 border-2',
-                      dayBaseClass,
-                      dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
-                    )}
-                  >
-                    {d}
-                  </div>
-                ))}
+              {sortedDays.map((d, i) => (
+                <div
+                  key={i}
+                  className={clsx(
+                    'w-5.5 h-5.5 aspect-square rounded-full text-white text-[10px] flex items-center justify-center flex-shrink-0 border-2',
+                    dayBaseClass,
+                    dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+                  )}
+                >
+                  {d}
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         {/* 右側：日時・ポイント・画像 */}
         <div className="flex items-center gap-1">
-          {/* 日時（曜日・日付・時間を1つのカラムで） */}
           {(task.dates?.[0] || task.time) && (
             <div className="flex flex-col items-center text-xs w-[32px]">
               <div className="text-gray-600 inline-block text-center leading-tight">
@@ -388,8 +354,6 @@ const swipeable = useSwipeable({
             </div>
           )}
 
-
-          {/* ポイント + 担当者 or プライベートバッジ or ダミー余白 */}
           {task.private && isPairConfirmed ? (
             <div className="flex items-center justify-center w-[90px] h-[38px]">
               <span className="font-pacifico text-sm px-2 py-[2px] tracking-wider bg-gradient-to-r from-green-500 to-green-800 text-transparent bg-clip-text">
@@ -398,12 +362,10 @@ const swipeable = useSwipeable({
             </div>
           ) : !task.private ? (
             <div className="flex items-center gap-2 w-[90px]">
-              {/* ポイント */}
               <p className="text-[#5E5E5E] font-sans min-w-[46px] text-right">
                 {task.point} <span className="text-xs">pt</span>
               </p>
 
-              {/* 担当者アイコン */}
               {isPairConfirmed && (
                 <Image
                   src={profileImage || '/images/default.png'}
@@ -416,32 +378,28 @@ const swipeable = useSwipeable({
               )}
             </div>
           ) : (
-            // パートナーがいない状態の余白調整
             <div className="w-[20px] h-[30px]" />
           )}
-
         </div>
       </motion.div>
-
 
       <ConfirmModal
         isOpen={confirmOpen}
         title=""
-        message={
-          <div className="text-xl font-semibold">このタスクを削除しますか？</div>
-        }
+        message={<div className="text-xl font-semibold">このタスクを削除しますか？</div>}
         onConfirm={() => {
           setConfirmOpen(false);
-          onConfirmCallback?.(); // resolve(true)
+          pendingConfirmResolver.current?.(true);
+          pendingConfirmResolver.current = null;
         }}
         onCancel={() => {
           setConfirmOpen(false);
+          pendingConfirmResolver.current?.(false);
+          pendingConfirmResolver.current = null;
         }}
         confirmLabel="削除する"
         cancelLabel="キャンセル"
       />
-
     </div>
-
   );
 }
