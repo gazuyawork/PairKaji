@@ -1,6 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -76,22 +76,24 @@ export default function ForgotPasswordPage() {
         )}
 
         {!sent && (
-        <button
-          type="submit"
-          className="w-full mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#FBBF24] hover:bg-[#FACC15] border border-[#AAAAAA] font-sans text-[16px]"
-        >
-          パスワードリセットメールを送信
-        </button>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            type="submit"
+            className="w-full mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#FBBF24] hover:bg-[#FACC15] border border-[#AAAAAA] font-sans text-[16px] active:translate-y-[1px]"
+          >
+            パスワードリセットメールを送信
+          </motion.button>
         )}
       </form>
 
       <div className="w-full max-w-[320px] mt-2">
-        <button
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={() => router.push('/login')}
-          className="w-full p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px] text-[#5E5E5E]"
+          className="w-full p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px] text-[#5E5E5E] active:translate-y-[1px]"
         >
           ログイン画面へ戻る
-        </button>
+        </motion.button>
       </div>
     </motion.div>
   );

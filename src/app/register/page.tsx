@@ -1,6 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,8 +10,7 @@ import { motion } from 'framer-motion';
 import { FirebaseError } from 'firebase/app';
 import { auth } from '@/lib/firebase';
 import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // すでにある場合は重複不要
-
+import { db } from '@/lib/firebase';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -20,6 +19,7 @@ export default function RegisterPage() {
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+
   const handleRegister = async () => {
     setEmailError('');
     setPasswordError('');
@@ -48,11 +48,11 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // ✅ Firestore に users ドキュメントを初期作成
+      // Firestore に users ドキュメントを初期作成
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email ?? '',
         createdAt: serverTimestamp(),
-        sharedTasksCleaned: true, // ← ここで初期状態を保存
+        sharedTasksCleaned: true,
       });
 
       await sendEmailVerification(user);
@@ -65,7 +65,6 @@ export default function RegisterPage() {
       }
     }
   };
-
 
   return (
     <motion.div
@@ -107,19 +106,21 @@ export default function RegisterPage() {
         </div>
         {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>}
 
-        <button
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={handleRegister}
-          className="w-full mt-[20px] mb-[5px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-full mt-[20px] mb-[5px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px] active:translate-y-[1px]"
         >
           登録する
-        </button>
+        </motion.button>
 
-        <button
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={() => router.push('/login')}
-          className="w-full mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px]"
+          className="w-full mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px] active:translate-y-[1px]"
         >
           ログイン画面へ戻る
-        </button>
+        </motion.button>
       </div>
     </motion.div>
   );
