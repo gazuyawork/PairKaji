@@ -1,6 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,9 +21,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async () => {
+    setIsLoading(true);
     try {
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
@@ -34,10 +36,12 @@ export default function LoginPage() {
       } else {
         alert('予期せぬエラーが発生しました');
       }
+      setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
+    setIsLoading(true);
     try {
       await setPersistence(auth, browserLocalPersistence);
       const provider = new GoogleAuthProvider();
@@ -49,12 +53,13 @@ export default function LoginPage() {
       } else {
         alert('予期せぬエラーが発生しました');
       }
+      setIsLoading(false);
     }
   };
 
   return (
     <motion.div
-      className="min-h-screen flex flex-col items-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-4 py-12"
+      className="relative min-h-screen flex flex-col items-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-4 py-12"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.7 }}
@@ -70,6 +75,7 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="test@gmail.com"
+          disabled={isLoading}
         />
 
         <label className="text-[#5E5E5E] text-[18px] font-sans">パスワード</label>
@@ -80,22 +86,27 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••"
+            disabled={isLoading}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute top-1/2 right-2 -translate-y-1/2 text-gray-500"
+            disabled={isLoading}
+            aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
           >
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
         </div>
 
-        <button
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={handleLogin}
-          className="w-full mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]"
+          disabled={isLoading}
+          className="w-full mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px] disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
         >
           ログインする
-        </button>
+        </motion.button>
 
         <Link href="/forgot-password">
           <p className="text-xs text-center text-[#5E5E5E] mt-2 underline font-sans">
@@ -105,20 +116,38 @@ export default function LoginPage() {
 
         <hr className="w-full border-t border-[#AAAAAA] opacity-30 my-5" />
 
-        <button
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={handleGoogleLogin}
-          className="w-full mb-[5px] p-[10px] text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]"
+          disabled={isLoading}
+          className="w-full mb-[5px] p-[10px] text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px] disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
         >
           Googleでログイン
-        </button>
+        </motion.button>
 
-        <button
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={() => router.push('/register')}
-          className="w-full mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px]"
+          disabled={isLoading}
+          className="w-full mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px] disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
         >
           初めての方はこちら
-        </button>
+        </motion.button>
       </div>
+
+      {isLoading && (
+        <div
+          className="absolute inset-0 bg-white/70 flex items-center justify-center z-50"
+          role="status"
+          aria-label="認証処理中"
+        >
+          <motion.div
+            className="w-12 h-12 border-4 border-[#5E8BC7] border-t-transparent rounded-full"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }
