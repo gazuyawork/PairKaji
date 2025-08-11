@@ -1,3 +1,4 @@
+// src/components/task/parts/EditTaskModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +10,6 @@ import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 import { createPortal } from 'react-dom';
 import BaseModal from '../../common/modals/BaseModal';
 import { Eraser } from 'lucide-react';
-
 
 type UserInfo = {
   id: string;
@@ -26,6 +26,81 @@ type Props = {
   isPairConfirmed: boolean;
   existingTasks: Task[];
 };
+
+// ▼▼▼ 追加：画像URL解決関数（imageUrl が無い場合に photoURL 等も探索） ▼▼▼
+// ▼▼▼ 置き換え後：キーの中身を文字列で全出力＋ネスト/別名キーも探索 ▼▼▼
+const resolveUserImageSrc = (user: any): string => {
+  // 1) まずはデバッグ：各キーの中身を「文字列」として出す（コンソールで展開不要）
+  const show = (v: any) => (v === undefined || v === null ? String(v) : String(v));
+  try {
+    console.group(`[EditTaskModal] Checking image keys for userId: ${user?.id}`);
+    console.log('imageUrl:', show(user?.imageUrl));
+    console.log('photoURL:', show(user?.photoURL));
+    console.log('photoUrl:', show(user?.photoUrl));
+    console.log('profileImageUrl:', show(user?.profileImageUrl));
+    console.log('avatarUrl:', show(user?.avatarUrl));
+    console.log('icon:', show(user?.icon));
+    console.log('avatar:', show(user?.avatar));
+    console.log('picture:', show(user?.picture));
+    console.log('photo:', show(user?.photo));
+    // よくあるネスト
+    console.log('profile.imageUrl:', show(user?.profile?.imageUrl));
+    console.log('profile.photoURL:', show(user?.profile?.photoURL));
+    console.log('profile.avatarUrl:', show(user?.profile?.avatarUrl));
+    // よくある別名
+    console.log('pictureUrl:', show(user?.pictureUrl));
+    console.log('pictureURL:', show(user?.pictureURL));
+    console.log('photo_url:', show(user?.photo_url));
+    console.groupEnd();
+  } catch {
+    // stringify 保険（循環があると失敗するので try-catch）
+    console.log('[EditTaskModal] raw user (stringified):', (() => {
+      try { return JSON.stringify(user); } catch { return '[unstringifiable]'; }
+    })());
+  }
+
+  // 2) 取り得るキーを網羅的にチェック（上にあるものほど優先）
+  const candidates: Array<string | undefined> = [
+    user?.imageUrl,
+    user?.photoURL,
+    user?.photoUrl,
+    user?.profileImageUrl,
+    user?.avatarUrl,
+    user?.pictureUrl,
+    user?.pictureURL,
+    user?.photo_url,
+    user?.icon,
+    user?.avatar,
+    user?.picture,
+    user?.photo,
+    // ネスト
+    user?.profile?.imageUrl,
+    user?.profile?.photoURL,
+    user?.profile?.avatarUrl,
+  ];
+
+  // 最初に「truthy」な値を採用（空文字はスキップ）
+  let src = candidates.find((v) => typeof v === 'string' && v.trim().length > 0) || '';
+
+  // 3) もし Storage パス等（http(s)でない）だった場合のメモ
+  //    ここは同期関数なので変換できません。親側で getDownloadURL してから渡してください。
+  if (src && !/^https?:\/\//.test(src) && !src.startsWith('/')) {
+    console.warn('[EditTaskModal] Non-HTTP image path detected. Convert with getDownloadURL before passing:', { userId: user?.id, src });
+    // http でない＆先頭が / でもない → 画像は解決できないので一旦フォールバック
+    src = '';
+  }
+
+  if (!src) {
+    console.warn('[EditTaskModal] imageUrl missing, fallback to default.png', {
+      userId: user?.id,
+    });
+  }
+
+  return src || '/images/default.png';
+};
+// ▲▲▲ 置き換えここまで ▲▲▲
+
+
 
 export default function EditTaskModal({
   isOpen,
@@ -46,8 +121,10 @@ export default function EditTaskModal({
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
-
   const [isIOS, setIsIOS] = useState(false);
+
+  // [LOG] ログ出力用プレフィックス
+  const LOG = '[EditTaskModal]';
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -60,8 +137,6 @@ export default function EditTaskModal({
       setIsIOS(isIOSDevice);
     }
   }, []);
-
-
 
   useEffect(() => {
     if (shouldClose) {
@@ -108,6 +183,53 @@ export default function EditTaskModal({
     return () => clearTimeout(timer);
   }, [isOpen, task, isPairConfirmed]);
 
+  // [LOG] モーダルOpen時の初期データを一括ログ
+  useEffect(() => {
+    if (!isOpen) return;
+    console.groupCollapsed(`${LOG} open`);
+    console.log(`${LOG} task.id:`, task?.id);
+    console.log(`${LOG} task.users:`, task?.users);
+    console.log(`${LOG} task.period:`, task?.period);
+    console.log(`${LOG} isPairConfirmed:`, isPairConfirmed);
+    console.log(`${LOG} users length:`, users?.length ?? 0);
+    try {
+      console.table(
+        (users || []).map(u => ({
+          id: u.id,
+          name: u.name,
+          imageUrl: u.imageUrl,
+          imageUrlType: typeof u.imageUrl,
+          hasImageUrl: !!u.imageUrl,
+        }))
+      );
+    } catch {
+      console.log(`${LOG} users(raw):`, users);
+    }
+    // ▼ 追加：どのキーにURLが入っているかも記録
+    (users || []).forEach(u => {
+      console.log('[EditTaskModal] user image keys', {
+        id: u.id,
+        imageUrl: (u as any).imageUrl,
+        photoURL: (u as any).photoURL,
+        photoUrl: (u as any).photoUrl,
+        profileImageUrl: (u as any).profileImageUrl,
+        avatarUrl: (u as any).avatarUrl,
+      });
+    });
+    console.groupEnd();
+  }, [isOpen, task, users, isPairConfirmed]);
+
+  // [LOG] editedTask の更新監視
+  useEffect(() => {
+    if (!editedTask) return;
+    console.groupCollapsed(`${LOG} editedTask updated`);
+    console.log(`${LOG} editedTask.id:`, editedTask.id);
+    console.log(`${LOG} editedTask.users:`, editedTask.users);
+    console.log(`${LOG} editedTask.period:`, editedTask.period);
+    console.log(`${LOG} editedTask.dates/time:`, editedTask.dates, editedTask.time);
+    console.groupEnd();
+  }, [editedTask]);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -123,9 +245,12 @@ export default function EditTaskModal({
     setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
+  // [LOG] 担当者トグル時のログ追加
   const toggleUser = (userId: string) => {
     if (!editedTask) return;
-    update('users', editedTask.users[0] === userId ? [] : [userId]);
+    const next = editedTask.users[0] === userId ? [] : [userId];
+    console.log(`${LOG} toggleUser`, { clicked: userId, before: editedTask.users, after: next });
+    update('users', next);
   };
 
   const toggleDay = (day: string) => {
@@ -145,7 +270,6 @@ export default function EditTaskModal({
       return;
     }
 
-    // 🔸 重複チェック（IDが異なる同名タスクが存在する場合）
     // 🔸 重複チェック（IDが異なる同名タスクが存在し、かつユーザーが重複している場合）
     const isDuplicate = existingTasks.some(
       (t) =>
@@ -221,7 +345,6 @@ export default function EditTaskModal({
 
                 setNameError(isDuplicate ? 'すでに登録済みです。' : null);
               }}
-
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
             />
           </div>
@@ -239,6 +362,9 @@ export default function EditTaskModal({
             value={editedTask.period}
             onChange={(e) => {
               const newPeriod = e.target.value as Period;
+              // [LOG] period 変更ログ
+              console.log(`${LOG} period changed:`, { from: editedTask?.period, to: newPeriod });
+
               setEditedTask((prev) => {
                 if (!prev) return prev;
                 const updated = { ...prev, period: newPeriod };
@@ -273,10 +399,11 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                    ? 'bg-[#5E5E5E] text-white'
-                    : 'bg-gray-200 text-gray-600'
-                    }`}
+                  className={`w-7 h-7 rounded-full text-xs font-bold ${
+                    editedTask.daysOfWeek.includes(day)
+                      ? 'bg-[#5E5E5E] text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}
                 >
                   {day}
                 </button>
@@ -341,7 +468,6 @@ export default function EditTaskModal({
                 <Eraser size={18} />
               </button>
             )}
-
           </div>
         )}
 
@@ -372,22 +498,53 @@ export default function EditTaskModal({
                 <div className="flex gap-2">
                   {users.map((user) => {
                     const isSelected = editedTask.users[0] === user.id;
+
+                    // ▼ 修正：imageUrl だけでなく複数キーを探索して画像URLを決定
+                    const imgSrc = resolveUserImageSrc(user);
+
+                    // [LOG] 各ユーザー描画時に状態を出力
+                    console.debug(`${LOG} render user`, {
+                      userId: user.id,
+                      name: user.name,
+                      imgSrc,
+                      hasImageUrl: !!(user as any).imageUrl,
+                      selected: isSelected,
+                    });
+
                     return (
                       <button
                         key={user.id}
                         type="button"
                         onClick={() => toggleUser(user.id)}
-                        className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${
+                          isSelected
                             ? 'border-[#FFCB7D] opacity-100'
                             : 'border-gray-300 opacity-30'
-                          }`}
+                        }`}
+                        title={`${user.name} | ${imgSrc}`}
                       >
                         <Image
-                          src={user.imageUrl || '/images/default.png'}
+                          src={imgSrc}
                           alt={user.name}
                           width={48}
                           height={48}
                           className="object-cover w-full h-full"
+                          // [LOG] 読み込み成功時/失敗時のログ
+                          onLoadingComplete={() => {
+                            console.info(`${LOG} image loaded`, {
+                              userId: user.id,
+                              src: imgSrc,
+                            });
+                          }}
+                          onError={(e) => {
+                            const target = e?.currentTarget as HTMLImageElement | undefined;
+                            console.error(`${LOG} image load error`, {
+                              userId: user.id,
+                              srcTried: imgSrc,
+                              naturalWidth: target?.naturalWidth,
+                              naturalHeight: target?.naturalHeight,
+                            });
+                          }}
                         />
                       </button>
                     );
@@ -404,12 +561,14 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isPrivate}
                 onClick={() => setIsPrivate(!isPrivate)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
-                  }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                  isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : ''
-                    }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                    isPrivate ? 'translate-x-6' : ''
+                  }`}
                 />
               </button>
             </div>

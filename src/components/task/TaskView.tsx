@@ -394,13 +394,25 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [editTargetTask, onModalOpenChange]);
 
   // ユーザーアイコン情報（メモ化）
-  const userList = useMemo(
-    () => [
-      { id: uid ?? '', name: 'あなた', imageUrl: profileImage },
-      { id: partnerUserId ?? '', name: 'パートナー', imageUrl: partnerImage },
-    ],
-    [uid, partnerUserId, profileImage, partnerImage]
-  );
+const userList = useMemo(() => {
+  const normalizeImage = (url?: string) => {
+    if (!url || url.trim() === '') {
+      return '/images/default.png';
+    }
+    // Storageパスや相対パスは、とりあえずデフォルトにする（非同期変換は別処理で）
+    if (url.startsWith('gs://') || (!url.startsWith('http') && !url.startsWith('/'))) {
+      console.warn('Storageパス検出: 事前にgetDownloadURLで変換してください', url);
+      return '/images/default.png';
+    }
+    return url;
+  };
+
+  return [
+    { id: uid ?? '', name: 'あなた', imageUrl: normalizeImage(profileImage) },
+    { id: partnerUserId ?? '', name: 'パートナー', imageUrl: normalizeImage(partnerImage) },
+  ];
+}, [uid, partnerUserId, profileImage, partnerImage]);
+
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
