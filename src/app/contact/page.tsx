@@ -87,11 +87,11 @@ export default function ContactPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Contact" />
-      <main className="flex-1 px-4 py-6">
+      <main className="flex-1 px-4 py-8">
         {submitted ? (
           <div className="text-center mt-20 space-y-4">
             <p className="text-lg font-bold text-[#5E5E5E]">お問い合わせを送信しました。</p>
-            <p className="text-sm text-gray-500">ご入力いただいた内容は確認後、必要に応じてご連絡いたします。</p>
+            <p className="text-sm text-gray-500">お問い合わせありがとうございます。<br />ご入力いただいた内容は確認後、必要に応じてご連絡いたします。</p>
             <button
               onClick={() => router.push('/main')}
               className="mt-6 bg-[#FFCB7D] text-white font-bold py-2 px-6 rounded-xl shadow-md hover:opacity-90"
@@ -101,6 +101,11 @@ export default function ContactPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-6">
+                    {/* お問い合わせ案内メッセージ */}
+        <div className="max-w-md mx-2 mb-6 text-sm text-gray-600">
+          当フォームでは、アプリに関するお問い合わせやご要望も受け付けております。
+          ご質問や改善のご提案など、ぜひお気軽にお送りください。
+        </div>
             <div>
               <label className="block text-gray-600 mb-1">メールアドレス</label>
               <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 bg-white">
@@ -138,6 +143,12 @@ export default function ContactPage() {
             >
               送信する
             </button>
+
+            {/* 返信に関する注意文 */}
+            <p className="mt-3 mx-2 text-xs text-gray-500 leading-relaxed　max-w-md">
+              ※お問い合わせ内容は確認後、必要に応じてご返信いたします。<br />
+              ご返信が必要な場合は、通常 <span className="font-semibold text-gray-600">3営業日以内</span> にメールにてご連絡いたします。
+            </p>
           </form>
         )}
       </main>

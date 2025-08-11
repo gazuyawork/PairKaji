@@ -304,8 +304,6 @@ export default function ProfilePage() {
     }
   };
 
-
-
   const handleCancelInvite = async () => {
     if (!pairDocId || typeof pairDocId !== 'string' || pairDocId.trim() === '') {
       toast.error('ペア情報が取得できません');
@@ -412,7 +410,7 @@ export default function ProfilePage() {
               <div className="flex justify-center">
                 <button
                   onClick={handleCancelPlan}
-                  className="mt-4 bg-red-100 text-red-600 font-semibold py-2 px-4 rounded hover:bg-red-200 transition text-sm"
+                  className="mt-4 text-gray-400 py-2 px-4 rounded transition text-xs underline decoration-gray-400"
                 >
                   プランをFreeに戻す
                 </button>
@@ -424,7 +422,7 @@ export default function ProfilePage() {
 
 
             <div className="text-center mt-auto">
-              <Link href="/delete-account" className="text-xs text-gray-400 hover:underline">
+              <Link href="/delete-account" className="text-xs text-gray-400 hover:underline underline decoration-gray-400">
                 アカウントを削除する
               </Link>
             </div>
