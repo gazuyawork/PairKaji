@@ -3,10 +3,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { createPortal } from 'react-dom';
 import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, Info } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
@@ -70,37 +68,9 @@ export default function TodoNoteModal({
   const { animatedDifference, animationComplete: diffAnimationComplete } =
     useUnitPriceDifferenceAnimation(totalDifference);
 
-  // ★ 追加：スクロールヒント表示制御
-  const [showScrollHint, setShowScrollHint] = useState(false);
-  const [showScrollUpHint, setShowScrollUpHint] = useState(false);
-
-  // ★ 追加：スクロール可能か＆最下部かを判定
-  const updateScrollHint = useCallback((el: HTMLTextAreaElement) => {
-    const canScroll = el.scrollHeight > el.clientHeight + 1;
-    const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-    const notAtTop = el.scrollTop > 1;
-    // 下方向ヒント（まだ下に余りがある）
-    setShowScrollHint(canScroll && notAtBottom);
-    // 上方向ヒント（上へ戻れる位置にいる）
-    setShowScrollUpHint(canScroll && notAtTop);
-  }, []);
-
-  // ★ 追加：スクロール時に更新
-  const handleTextareaScroll = useCallback(
-    (e: React.UIEvent<HTMLTextAreaElement>) => {
-      updateScrollHint(e.currentTarget);
-    },
-    [updateScrollHint]
-  );
-
-
   useEffect(() => {
     const parsed = parseFloat(comparePrice);
-    if (!isNaN(parsed) && parsed > 0) {
-      setSaveLabel('この価格で更新する');
-    } else {
-      setSaveLabel('保存');
-    }
+    setSaveLabel(!isNaN(parsed) && parsed > 0 ? 'この価格で更新する' : '保存');
   }, [comparePrice]);
 
   useEffect(() => {
@@ -138,31 +108,18 @@ export default function TodoNoteModal({
     setMounted(true);
   }, []);
 
-  // 高さ自動調整
+  // 高さ自動調整（テキストエリア自身は最大高を持ち、超えたら内部スクロール）
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
     if (!el) return;
-
     el.style.height = 'auto';
-    const maxPx = Math.floor(
-      (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100)
-    );
     const desired = el.scrollHeight;
-
-    if (maxPx > 0) {
-      const finalHeight = Math.min(desired, maxPx);
-      el.style.height = `${finalHeight}px`;
-      el.style.maxHeight = `${maxPx}px`;
-    } else {
-      el.style.height = `${desired}px`;
-    }
-    // ★ iOS 安定化：常にスクロール許可＋慣性スクロール
+    el.style.height = `${desired}px`;
+    el.style.maxHeight = `calc(${MAX_TEXTAREA_VH}vh)`; // ★ 上限
     el.style.overflowY = 'auto';
     (el.style as any).webkitOverflowScrolling = 'touch';
-    updateScrollHint(el);
-  }, [updateScrollHint]);
+  }, []);
 
-  // レイアウトが安定したタイミングで確実に再計測（2フレーム確保）
   const scheduleResize = useCallback(() => {
     requestAnimationFrame(() => {
       resizeTextarea();
@@ -170,23 +127,19 @@ export default function TodoNoteModal({
     });
   }, [resizeTextarea]);
 
-  // ref のコールバック：DOMに張られた瞬間にリサイズ
   const setMemoEl = useCallback((el: HTMLTextAreaElement | null) => {
     memoRef.current = el;
     if (el) scheduleResize();
   }, [scheduleResize]);
 
-  // モーダルを開いた直後
   useLayoutEffect(() => {
     if (isOpen) scheduleResize();
   }, [isOpen, scheduleResize]);
 
-  // 初期ロード完了直後（Firestoreからmemoが入ったあと）
   useLayoutEffect(() => {
     if (!initialLoad) scheduleResize();
   }, [initialLoad, scheduleResize]);
 
-  // memoが変わったら再計測
   useLayoutEffect(() => {
     scheduleResize();
   }, [memo, scheduleResize]);
@@ -239,109 +192,82 @@ export default function TodoNoteModal({
 
   if (!mounted || initialLoad) return null;
 
-  return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 bg-white/80 flex items-center justify-center z-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+  return (
+    <BaseModal
+      isOpen={isOpen}
+      isSaving={isSaving}
+      saveComplete={saveComplete}
+      onClose={onClose}
+      onSaveClick={handleSave}
+      saveLabel={saveLabel}
+    >
+      <h1 className="text-2xl font-bold text-gray-800 ml-2">{todoText}</h1>
+
+      {/* ▼ BaseModal 内の単一スクロール領域にそのまま載る想定。ここに余計な overflow は付けない */}
+      <div className="pr-2">
+        <textarea
+          ref={setMemoEl}
+          value={memo}
+          rows={1}
+          placeholder="備考を入力"
+          onChange={(e) => setMemo(e.target.value)}
+          onInput={resizeTextarea}
+          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-3 ml-2 pb-1"
+        />
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => {
+            const next = !showDetails;
+            setShowDetails(next);
+            if (!next) setCompareMode(false);
+          }}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
         >
-          <BaseModal
-            isOpen={isOpen}
-            isSaving={isSaving}
-            saveComplete={saveComplete}
-            onClose={onClose}
-            onSaveClick={handleSave}
-            saveLabel={saveLabel}
+          <Info size={16} />
+          {showDetails ? '詳細を閉じる' : '詳細を追加'}
+        </button>
+
+        {showDetails && !isNaN(numericPrice) && numericPrice > 0 && (
+          <button
+            onClick={() => setCompareMode(!compareMode)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
           >
-            <h1 className="text-2xl font-bold text-gray-800 ml-2">{todoText}</h1>
+            <CheckCircle size={16} />
+            {compareMode ? '差額確認をやめる' : '差額確認'}
+          </button>
+        )}
+      </div>
 
-            {/* ★ 追加：相対レイアウトのラッパー */}
-            <div className="relative">
-              <textarea
-                data-scrollable="true"
-                ref={setMemoEl}
-                value={memo}
-                rows={1}
-                placeholder="備考を入力"
-                onChange={(e) => setMemo(e.target.value)}
-                onInput={resizeTextarea}
-                onScroll={handleTextareaScroll}  // ★ 追加：スクロールでヒント更新
-                className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pr-10 pb-1 overflow-y-auto overscroll-contain touch-pan-y"
-                style={{ WebkitOverflowScrolling: 'touch' }}
-              />
-              {/* ★ 追加：スクロール可能なときだけ右下に点滅アイコン */}
-              {showScrollHint && (
-                <div className="pointer-events-none absolute bottom-5 right-2 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-                  <ChevronDown size={16} className="text-white" />
-                </div>
-              )}
-              {/* ★ 追加：上方向にスクロールできるときだけ右上に点滅アイコン */}
-              {showScrollUpHint && (
-                <div className="pointer-events-none absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-                  <ChevronUp size={16} className="text-white" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between mb-4">
-              <button
-                onClick={() => {
-                  const next = !showDetails;
-                  setShowDetails(next);
-                  if (!next) setCompareMode(false);
-                }}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
-              >
-                <Info size={16} />
-                {showDetails ? '詳細を閉じる' : '詳細を追加'}
-              </button>
-
-              {showDetails && !isNaN(numericPrice) && numericPrice > 0 && (
-                <button
-                  onClick={() => setCompareMode(!compareMode)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
-                >
-                  <CheckCircle size={16} />
-                  {compareMode ? '差額確認をやめる' : '差額確認'}
-                </button>
-              )}
-            </div>
-
-            {compareMode ? (
-              <ComparePriceTable
-                price={price}
-                quantity={quantity}
-                comparePrice={comparePrice}
-                compareQuantity={compareQuantity}
-                unit={unit}
-                animatedDifference={animatedDifference}
-                unitPriceDiff={unitPriceDiff}
-                compareDisplayUnit={compareDisplayUnit}
-                onChangeComparePrice={setComparePrice}
-                onChangeCompareQuantity={setCompareQuantity}
-                showDiff={totalDifference !== null}
-                animationComplete={diffAnimationComplete}
-              />
-            ) : (
-              showDetails && (
-                <DetailInputFields
-                  price={price}
-                  quantity={quantity}
-                  unit={unit}
-                  onChangePrice={setPrice}
-                  onChangeQuantity={setQuantity}
-                  onChangeUnit={setUnit}
-                  currentUnitPrice={currentUnitPrice}
-                />
-              )
-            )}
-          </BaseModal>
-        </motion.div>
+      {compareMode ? (
+        <ComparePriceTable
+          price={price}
+          quantity={quantity}
+          comparePrice={comparePrice}
+          compareQuantity={compareQuantity}
+          unit={unit}
+          animatedDifference={animatedDifference}
+          unitPriceDiff={unitPriceDiff}
+          compareDisplayUnit={compareDisplayUnit}
+          onChangeComparePrice={setComparePrice}
+          onChangeCompareQuantity={setCompareQuantity}
+          showDiff={totalDifference !== null}
+          animationComplete={diffAnimationComplete}
+        />
+      ) : (
+        showDetails && (
+          <DetailInputFields
+            price={price}
+            quantity={quantity}
+            unit={unit}
+            onChangePrice={setPrice}
+            onChangeQuantity={setQuantity}
+            onChangeUnit={setUnit}
+            currentUnitPrice={currentUnitPrice}
+          />
+        )
       )}
-    </AnimatePresence>,
-    document.body
+    </BaseModal>
   );
 }

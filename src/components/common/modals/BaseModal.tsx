@@ -39,7 +39,7 @@ export default function BaseModal({
     typeof navigator !== 'undefined' &&
     /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
 
-  // ✅ 完了マーク表示後に onCompleteAnimation を呼ぶ
+  // 完了マーク表示後のコールバック
   useEffect(() => {
     if (saveComplete) {
       const timer = setTimeout(() => {
@@ -49,17 +49,20 @@ export default function BaseModal({
     }
   }, [saveComplete, onCompleteAnimation]);
 
-  // ✅ モーダル表示中のスクロール制御
-  //   - 非iOS: body を overflow hidden
-  //   - iOS: body は触らず、下の overlay の touchmove 抑止で背景を止める
+  // 背景スクロール制御
   useEffect(() => {
     if (!isOpen) {
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
       return;
     }
     if (!isIOS) {
       document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
+      document.documentElement.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+      };
     }
     return () => { document.body.style.overflow = ''; };
   }, [isOpen, isIOS]);
@@ -70,7 +73,7 @@ export default function BaseModal({
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  // ★ iOS向け: overlay上のスクロールは止めるが、data-scrollable="true" は除外
+  // ★ iOS: overlay 上はスクロール不可、ただし内部の data-scrollable は許可
   useEffect(() => {
     if (!isOpen || !overlayRef.current) return;
     const el = overlayRef.current;
@@ -78,11 +81,9 @@ export default function BaseModal({
     const onTouchMove = (e: TouchEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && target.closest('[data-scrollable="true"]')) {
-        // textarea 等、内部スクロール要素は許可
-        return;
+        return; // 内部スクロールは許可
       }
-      // 背景や非スクロール領域はスクロールさせない
-      e.preventDefault();
+      e.preventDefault(); // 背景スクロール抑止
     };
 
     el.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -95,18 +96,20 @@ export default function BaseModal({
     <div className="fixed inset-0 z-[9999] flex justify-center items-center px-2">
       {/* 背景オーバーレイ */}
       <div
-        ref={overlayRef} // ★ 追加：iOS用の touchmove 抑止を付与
+        ref={overlayRef}
         className="absolute inset-0 bg-white/80"
         onClick={onClose}
       />
 
-      {/* モーダル本体 */}
+      {/* モーダル本体：高さ制限＋縦は内部領域のみスクロール */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh]"
-        style={{ transform: 'none' }} // 念のため transform を明示的に無効化
+        role="dialog"
+        aria-modal="true"
+        className="relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-x-hidden flex flex-col"
+        style={{ transform: 'none' }}
       >
         {(isSaving || saveComplete) && (
           <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
@@ -131,29 +134,37 @@ export default function BaseModal({
           </div>
         )}
 
-        <div className="space-y-6">
+        {/* ▼▼▼ ここを唯一のスクロール領域にする ▼▼▼ */}
+        <div
+          data-scrollable="true"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1"
+          style={{ WebkitOverflowScrolling: 'touch' as any }}
+        >
           {children}
-          <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-            <button
-              onClick={onSaveClick}
-              className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
-                ${saveDisabled || isSaving || saveComplete
-                  ? 'bg-gray-300 text-white cursor-not-allowed'
-                  : 'bg-[#FFCB7D] text-white'}
-              `}
-              disabled={isSaving || saveComplete || saveDisabled}
-            >
-              {saveLabel}
-            </button>
+        </div>
+        {/* ▲▲▲ スクロールはこの領域に一本化 ▲▲▲ */}
 
-            <button
-              onClick={onClose}
-              className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
-              disabled={isSaving || saveComplete}
-            >
-              キャンセル
-            </button>
-          </div>
+        {/* フッターボタン（固定） */}
+        <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+          <button
+            onClick={onSaveClick}
+            className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
+              ${saveDisabled || isSaving || saveComplete
+                ? 'bg-gray-300 text-white cursor-not-allowed'
+                : 'bg-[#FFCB7D] text-white'}
+            `}
+            disabled={isSaving || saveComplete || saveDisabled}
+          >
+            {saveLabel}
+          </button>
+
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+            disabled={isSaving || saveComplete}
+          >
+            キャンセル
+          </button>
         </div>
       </motion.div>
     </div>,
