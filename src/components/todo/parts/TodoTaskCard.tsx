@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { CheckCircle, Circle, Trash2, Plus, Notebook, ChevronDown } from 'lucide-react';
+import { CheckCircle, Circle, Trash2, Plus, Notebook, ChevronDown, ChevronUp } from 'lucide-react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -57,7 +57,8 @@ export default function TodoTaskCard({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
-  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [showScrollDownHint, setShowScrollDownHint] = useState(false);
+  const [showScrollUpHint, setShowScrollUpHint] = useState(false);
 
   // カウントをメモ化
   const { undoneCount, doneCount } = useMemo(() => {
@@ -98,7 +99,11 @@ export default function TodoTaskCard({
       setScrollRatio(Math.min(1, Math.max(0, ratio)));
       const canScroll = el.scrollHeight > el.clientHeight + 1;
       const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-      setShowScrollHint(canScroll && notAtBottom);
+      const notAtTop = el.scrollTop > 1;
+      // 下方向ヒント：まだ下に余りがある
+      setShowScrollDownHint(canScroll && notAtBottom);
+      // 上方向ヒント：すでに少し下がっている（=上へ戻れる）
+      setShowScrollUpHint(canScroll && notAtTop);
     };
 
     const checkScrollable = () => {
@@ -108,7 +113,8 @@ export default function TodoTaskCard({
         handleScroll(); // ratio と hint を同時更新
       } else {
         setScrollRatio(0);
-        setShowScrollHint(false);
+        setShowScrollDownHint(false);
+        setShowScrollUpHint(false);
       }
     };
 
@@ -286,7 +292,7 @@ export default function TodoTaskCard({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="max-h-[40vh] overflow-y-scroll space-y-4 pr-10"  // ★ pr-10 でアイコン分の余白
+            className="max-h-[40vh] overflow-y-scroll space-y-4 pr-10 pt-6"  // ★ pr-10 でアイコン分の余白
           >
             {filteredTodos.length === 0 && tab === 'done' && (
               <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
@@ -416,14 +422,20 @@ export default function TodoTaskCard({
             ))}
           </div>
           {/* ★ 追加：スクロール必要時のみ右下に点滅アイコンを表示 */}
-          {showScrollHint && (
+          {showScrollDownHint && (
             <div className="pointer-events-none absolute bottom-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
               <ChevronDown size={16} className="text-white" />
             </div>
           )}
+          {/* ★ 追加：上方向にスクロールできる時だけ右上に点滅アイコン */}
+          {showScrollUpHint && (
+            <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronUp size={16} className="text-white" />
+            </div>
+          )}
         </div>
 
-        {tab === 'undone' && (
+        {showScrollDownHint && (
           <div className="flex items-center gap-2 mt-4 relative">
             <Plus className="text-[#FFCB7D]" />
 

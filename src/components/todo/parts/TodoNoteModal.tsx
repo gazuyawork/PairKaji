@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { CheckCircle, Info, ChevronDown } from 'lucide-react';
+import { CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
@@ -72,12 +72,17 @@ export default function TodoNoteModal({
 
   // ★ 追加：スクロールヒント表示制御
   const [showScrollHint, setShowScrollHint] = useState(false);
+  const [showScrollUpHint, setShowScrollUpHint] = useState(false);
 
   // ★ 追加：スクロール可能か＆最下部かを判定
   const updateScrollHint = useCallback((el: HTMLTextAreaElement) => {
     const canScroll = el.scrollHeight > el.clientHeight + 1;
     const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    const notAtTop = el.scrollTop > 1;
+    // 下方向ヒント（まだ下に余りがある）
     setShowScrollHint(canScroll && notAtBottom);
+    // 上方向ヒント（上へ戻れる位置にいる）
+    setShowScrollUpHint(canScroll && notAtTop);
   }, []);
 
   // ★ 追加：スクロール時に更新
@@ -147,10 +152,17 @@ export default function TodoNoteModal({
     if (maxPx > 0) {
       const finalHeight = Math.min(desired, maxPx);
       el.style.height = `${finalHeight}px`;
+      // ★ iOSでの内部スクロール安定化：
+      //   - maxHeight を明示
+      //   - overflowY は「必要な時は auto / 不要なら hidden」
+      //   - 慣性スクロール：-webkit-overflow-scrolling: touch
+      el.style.maxHeight = `${maxPx}px`;
       el.style.overflowY = desired > maxPx ? 'auto' : 'hidden';
+      (el.style as any).webkitOverflowScrolling = 'touch';
     } else {
       el.style.height = `${desired}px`;
       el.style.overflowY = 'hidden';
+      (el.style as any).webkitOverflowScrolling = 'touch';
     }
     updateScrollHint(el);
   }, [updateScrollHint]);
@@ -261,12 +273,19 @@ export default function TodoNoteModal({
                 onChange={(e) => setMemo(e.target.value)}
                 onInput={resizeTextarea}
                 onScroll={handleTextareaScroll}  // ★ 追加：スクロールでヒント更新
-                className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pr-10 pb-1" // ★ 追加：右側に余白
+                className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pr-10 pb-1 overflow-y-auto overscroll-contain" // ★ iOSでの内部スクロール
+                style={{ WebkitOverflowScrolling: 'touch' }}
               />
               {/* ★ 追加：スクロール可能なときだけ右下に点滅アイコン */}
               {showScrollHint && (
                 <div className="pointer-events-none absolute bottom-5 right-2 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
                   <ChevronDown size={16} className="text-white" />
+                </div>
+              )}
+              {/* ★ 追加：上方向にスクロールできるときだけ右上に点滅アイコン */}
+              {showScrollUpHint && (
+                <div className="pointer-events-none absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+                  <ChevronUp size={16} className="text-white" />
                 </div>
               )}
             </div>
