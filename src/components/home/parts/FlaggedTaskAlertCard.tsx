@@ -60,16 +60,16 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="mb-3 relative"
     >
-      {isNew && (
-        <div className="absolute top-0 left-0 z-50 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-br-xl shadow">
-          New
-        </div>
-      )}
 
       <div
         className="relative mx-auto w-full max-w-xl bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 cursor-pointer hover:shadow-lg transition overflow-hidden"
         onClick={handleClick}
-      >
+        >
+        {isNew && (
+          <div className="absolute top-0 left-0 z-50 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-br-xl shadow">
+            New
+          </div>
+        )}
         <div className="flex items-center gap-4">
           <Flag className="text-red-500 w-6 h-6 flex-shrink-0" />
           <div className="flex-1">
