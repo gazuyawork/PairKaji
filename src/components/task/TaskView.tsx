@@ -74,6 +74,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(false);
+  const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
 
   // URL クエリの flagged=true を初期反映
   useEffect(() => {
@@ -394,24 +395,24 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [editTargetTask, onModalOpenChange]);
 
   // ユーザーアイコン情報（メモ化）
-const userList = useMemo(() => {
-  const normalizeImage = (url?: string) => {
-    if (!url || url.trim() === '') {
-      return '/images/default.png';
-    }
-    // Storageパスや相対パスは、とりあえずデフォルトにする（非同期変換は別処理で）
-    if (url.startsWith('gs://') || (!url.startsWith('http') && !url.startsWith('/'))) {
-      console.warn('Storageパス検出: 事前にgetDownloadURLで変換してください', url);
-      return '/images/default.png';
-    }
-    return url;
-  };
+  const userList = useMemo(() => {
+    const normalizeImage = (url?: string) => {
+      if (!url || url.trim() === '') {
+        return '/images/default.png';
+      }
+      // Storageパスや相対パスは、とりあえずデフォルトにする（非同期変換は別処理で）
+      if (url.startsWith('gs://') || (!url.startsWith('http') && !url.startsWith('/'))) {
+        console.warn('Storageパス検出: 事前にgetDownloadURLで変換してください', url);
+        return '/images/default.png';
+      }
+      return url;
+    };
 
-  return [
-    { id: uid ?? '', name: 'あなた', imageUrl: normalizeImage(profileImage) },
-    { id: partnerUserId ?? '', name: 'パートナー', imageUrl: normalizeImage(partnerImage) },
-  ];
-}, [uid, partnerUserId, profileImage, partnerImage]);
+    return [
+      { id: uid ?? '', name: 'あなた', imageUrl: normalizeImage(profileImage) },
+      { id: partnerUserId ?? '', name: 'パートナー', imageUrl: normalizeImage(partnerImage) },
+    ];
+  }, [uid, partnerUserId, profileImage, partnerImage]);
 
 
   return (
@@ -484,7 +485,7 @@ const userList = useMemo(() => {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
             <div className="sticky top-0 bg-transparent mb-2 z-999">
               <div className="w-full max-w-xl m-auto p-2 backdrop-blur-md rounded-lg">
-                {showSearchBox && (
+                {isSearchVisible && (
                   <div className="mb-3">
                     <SearchBox value={searchTerm} onChange={setSearchTerm} />
                   </div>
@@ -492,16 +493,15 @@ const userList = useMemo(() => {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center pr-2 border-r border-gray-300">
                     <motion.button
-                      onClick={() => setShowSearchBox((prev) => !prev)}
+                      onClick={() => setShowSearchBox((prev) => (searchTerm.trim() ? true : !prev))}
                       whileTap={{ scale: 1.2 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
                       className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
-                          ${
-                            showSearchBox
-                              ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                              : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'
-                          }
-                          `}
+      ${isSearchVisible
+                          ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
+                          : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'
+                        }
+       `}
                       title="検索"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -515,11 +515,10 @@ const userList = useMemo(() => {
                       <button
                         onClick={() => setPrivateFilter((prev) => !prev)}
                         className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
-                            ${
-                              privateFilter
-                                ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
-                                : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'
-                            }`}
+                            ${privateFilter
+                            ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
+                            : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'
+                          }`}
                         title="プライベートタスク"
                       >
                         P
@@ -545,7 +544,8 @@ const userList = useMemo(() => {
                     />
                   </div>
 
-                  {(periodFilter || personFilter || todayFilter || privateFilter || showSearchBox || flaggedFilter || searchTerm) && (
+
+                  {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
                     <motion.button
                       onClick={() => {
                         setPeriodFilter(null);
@@ -632,11 +632,10 @@ const userList = useMemo(() => {
                               : '完了タスクを非表示中（クリックで表示）'
                           }
                           className={`p-1 mr-3 rounded-full border transition-all duration-300
-                              ${
-                                showCompletedMap[period]
-                                  ? 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
-                                  : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'
-                              }`}
+                              ${showCompletedMap[period]
+                              ? 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
+                              : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'
+                            }`}
                         >
                           {showCompletedMap[period] ? (
                             <Lightbulb size={20} className="fill-yellow-500" />
