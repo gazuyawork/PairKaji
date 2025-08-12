@@ -1,8 +1,9 @@
+// src/components/common/modals/BaseModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -33,6 +34,11 @@ export default function BaseModal({
 }: BaseModalProps) {
   const [mounted, setMounted] = useState(false);
 
+  // ★ iOS判定（iPadOS含む）
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
+
   // ✅ 完了マーク表示後に onCompleteAnimation を呼ぶ
   useEffect(() => {
     if (saveComplete) {
@@ -43,21 +49,45 @@ export default function BaseModal({
     }
   }, [saveComplete, onCompleteAnimation]);
 
-  // ✅ モーダル表示中は body スクロールを禁止
+  // ✅ モーダル表示中のスクロール制御
+  //   - 非iOS: body を overflow hidden
+  //   - iOS: body は触らず、下の overlay の touchmove 抑止で背景を止める
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
+    if (!isOpen) {
       document.body.style.overflow = '';
+      return;
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
+    if (!isIOS) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen, isIOS]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+
+  // ★ iOS向け: overlay上のスクロールは止めるが、data-scrollable="true" は除外
+  useEffect(() => {
+    if (!isOpen || !overlayRef.current) return;
+    const el = overlayRef.current;
+
+    const onTouchMove = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('[data-scrollable="true"]')) {
+        // textarea 等、内部スクロール要素は許可
+        return;
+      }
+      // 背景や非スクロール領域はスクロールさせない
+      e.preventDefault();
+    };
+
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onTouchMove);
+  }, [isOpen]);
 
   if (!mounted || !isOpen) return null;
 
@@ -65,6 +95,7 @@ export default function BaseModal({
     <div className="fixed inset-0 z-[9999] flex justify-center items-center px-2">
       {/* 背景オーバーレイ */}
       <div
+        ref={overlayRef} // ★ 追加：iOS用の touchmove 抑止を付与
         className="absolute inset-0 bg-white/80"
         onClick={onClose}
       />
@@ -75,7 +106,7 @@ export default function BaseModal({
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
         className="relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh]"
-        style={{ transform: 'none' }}
+        style={{ transform: 'none' }} // 念のため transform を明示的に無効化
       >
         {(isSaving || saveComplete) && (
           <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
