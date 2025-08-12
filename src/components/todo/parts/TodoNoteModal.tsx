@@ -152,18 +152,13 @@ export default function TodoNoteModal({
     if (maxPx > 0) {
       const finalHeight = Math.min(desired, maxPx);
       el.style.height = `${finalHeight}px`;
-      // ★ iOSでの内部スクロール安定化：
-      //   - maxHeight を明示
-      //   - overflowY は「必要な時は auto / 不要なら hidden」
-      //   - 慣性スクロール：-webkit-overflow-scrolling: touch
       el.style.maxHeight = `${maxPx}px`;
-      el.style.overflowY = desired > maxPx ? 'auto' : 'hidden';
-      (el.style as any).webkitOverflowScrolling = 'touch';
     } else {
       el.style.height = `${desired}px`;
-      el.style.overflowY = 'hidden';
-      (el.style as any).webkitOverflowScrolling = 'touch';
     }
+    // ★ iOS 安定化：常にスクロール許可＋慣性スクロール
+    el.style.overflowY = 'auto';
+    (el.style as any).webkitOverflowScrolling = 'touch';
     updateScrollHint(el);
   }, [updateScrollHint]);
 
@@ -266,6 +261,7 @@ export default function TodoNoteModal({
             {/* ★ 追加：相対レイアウトのラッパー */}
             <div className="relative">
               <textarea
+                data-scrollable="true"
                 ref={setMemoEl}
                 value={memo}
                 rows={1}
@@ -273,7 +269,7 @@ export default function TodoNoteModal({
                 onChange={(e) => setMemo(e.target.value)}
                 onInput={resizeTextarea}
                 onScroll={handleTextareaScroll}  // ★ 追加：スクロールでヒント更新
-                className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pr-10 pb-1 overflow-y-auto overscroll-contain" // ★ iOSでの内部スクロール
+                className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pr-10 pb-1 overflow-y-auto overscroll-contain touch-pan-y"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               />
               {/* ★ 追加：スクロール可能なときだけ右下に点滅アイコン */}
