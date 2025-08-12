@@ -2,9 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { CheckCircle, Circle, Trash2, Plus, Notebook } from 'lucide-react';
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
+import { CheckCircle, Circle, Trash2, Plus, Notebook, ChevronDown } from 'lucide-react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -57,6 +57,7 @@ export default function TodoTaskCard({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
+  const [showScrollHint, setShowScrollHint] = useState(false);
 
   // カウントをメモ化
   const { undoneCount, doneCount } = useMemo(() => {
@@ -95,15 +96,19 @@ export default function TodoTaskCard({
       const denom = el.scrollHeight - el.clientHeight || 1;
       const ratio = el.scrollTop / denom;
       setScrollRatio(Math.min(1, Math.max(0, ratio)));
+      const canScroll = el.scrollHeight > el.clientHeight + 1;
+      const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+      setShowScrollHint(canScroll && notAtBottom);
     };
 
     const checkScrollable = () => {
-      if (el.scrollHeight > el.clientHeight) {
-        setIsScrollable(true);
-        handleScroll();
+      const canScroll = el.scrollHeight > el.clientHeight + 1;
+      setIsScrollable(canScroll);
+      if (canScroll) {
+        handleScroll(); // ratio と hint を同時更新
       } else {
-        setIsScrollable(false);
         setScrollRatio(0);
+        setShowScrollHint(false);
       }
     };
 
@@ -277,133 +282,145 @@ export default function TodoTaskCard({
       </div>
 
       <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-4 space-y-2 min-h-20">
-        <div ref={scrollRef} className="max-h-[40vh] overflow-y-scroll space-y-4 pr-4">
-          {filteredTodos.length === 0 && tab === 'done' && (
-            <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
-          )}
+        {/* ★ 追加：相対レイアウトのラッパー（ヒントを右下に重ねる） */}
+        <div className="relative">
+          <div
+            ref={scrollRef}
+            className="max-h-[40vh] overflow-y-scroll space-y-4 pr-10"  // ★ pr-10 でアイコン分の余白
+          >
+            {filteredTodos.length === 0 && tab === 'done' && (
+              <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
+            )}
 
-          {filteredTodos.map(todo => (
-            <div key={todo.id} className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <motion.div
-                  key={animateTriggerMap[todo.id] ?? 0} // アニメーション強制発火用のキー
-                  className="cursor-pointer"
-                  onClick={() => {
-                    // 表示状態だけ先に更新（Circle ↔ CheckCircle）
-                    setLocalDoneMap(prev => ({
-                      ...prev,
-                      [todo.id]: !prev[todo.id],
-                    }));
-                    // アニメーションのトリガーを更新
-                    setAnimateTriggerMap(prev => ({
-                      ...prev,
-                      [todo.id]: (prev[todo.id] ?? 0) + 1,
-                    }));
-                    // 実際のステータス切り替えはアニメ後に実行
-                    setTimeout(() => onToggleDone(todo.id), 600);
-                  }}
-                  initial={{ rotate: 0 }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-                >
-                  {localDoneMap[todo.id] ? (
-                    <CheckCircle className="text-yellow-500" />
-                  ) : (
-                    <Circle className="text-gray-400" />
-                  )}
-                </motion.div>
-
-                <input
-                  type="text"
-                  defaultValue={todo.text}
-                  onBlur={(e) => {
-                    const newText = e.target.value.trim();
-                    if (!newText) return;
-
-                    const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
-                    if (isDuplicate) {
-                      setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
-                      const inputEl = todoRefs.current[todo.id];
-                      if (inputEl) inputEl.value = todo.text;
-                      return;
-                    }
-
-                    const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
-                    if (matchDone) {
-                      setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
-                      const inputEl = todoRefs.current[todo.id];
-                      if (inputEl) inputEl.value = todo.text;
-                      return;
-                    }
-
-                    // エラーを削除
-                    setEditingErrors(prev => {
-                      const next = { ...prev };
-                      delete next[todo.id];
-                      return next;
-                    });
-
-                    onChangeTodo(todo.id, newText);
-                    onBlurTodo(todo.id, newText);
-                  }}
-                  onCompositionStart={() => setIsComposing(true)}
-                  onCompositionEnd={() => setIsComposing(false)}
-                  ref={(el) => {
-                    if (el) {
-                      todoRefs.current[todo.id] = el;
-                      if (focusedTodoId === todo.id) el.focus();
-                    }
-                  }}
-                  className={clsx(
-                    'flex-1 border-b bg-transparent outline-none border-gray-200',
-                    'h-8',
-                    todo.done ? 'text-gray-400 line-through' : 'text-black'
-                  )}
-                  placeholder="TODOを入力"
-                />
-
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.85, rotate: -10 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                  className={clsx(
-                    'mr-1 active:scale-90',
-                    (
-                      (typeof todo.memo === 'string' && todo.memo.trim() !== '') ||
-                      (typeof todo.price === 'number' && todo.price !== 0) ||
-                      (typeof todo.quantity === 'number' && todo.quantity !== 0)
-                    )
-                      ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
-                      : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
-                  )}
-                  onClick={() => onOpenNote(todo.text)}
-                >
-                  <Notebook size={22} />
-                </motion.button>
-
-                <motion.button
-                  type="button"
-                  onClick={() => handleTodoDeleteClick(todo.id)}
-                  animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
-                  variants={SHAKE_VARIANTS}
-                >
-                  <Trash2
-                    size={22}
-                    className={clsx(
-                      'hover:text-red-500',
-                      confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
+            {filteredTodos.map(todo => (
+              <div key={todo.id} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <motion.div
+                    key={animateTriggerMap[todo.id] ?? 0} // アニメーション強制発火用のキー
+                    className="cursor-pointer"
+                    onClick={() => {
+                      // 表示状態だけ先に更新（Circle ↔ CheckCircle）
+                      setLocalDoneMap(prev => ({
+                        ...prev,
+                        [todo.id]: !prev[todo.id],
+                      }));
+                      // アニメーションのトリガーを更新
+                      setAnimateTriggerMap(prev => ({
+                        ...prev,
+                        [todo.id]: (prev[todo.id] ?? 0) + 1,
+                      }));
+                      // 実際のステータス切り替えはアニメ後に実行
+                      setTimeout(() => onToggleDone(todo.id), 600);
+                    }}
+                    initial={{ rotate: 0 }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  >
+                    {localDoneMap[todo.id] ? (
+                      <CheckCircle className="text-yellow-500" />
+                    ) : (
+                      <Circle className="text-gray-400" />
                     )}
-                  />
-                </motion.button>
-              </div>
+                  </motion.div>
 
-              {editingErrors[todo.id] && (
-                <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
-                  {editingErrors[todo.id]}
+                  <input
+                    type="text"
+                    defaultValue={todo.text}
+                    onBlur={(e) => {
+                      const newText = e.target.value.trim();
+                      if (!newText) return;
+
+                      const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
+                      if (isDuplicate) {
+                        setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
+                        const inputEl = todoRefs.current[todo.id];
+                        if (inputEl) inputEl.value = todo.text;
+                        return;
+                      }
+
+                      const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
+                      if (matchDone) {
+                        setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
+                        const inputEl = todoRefs.current[todo.id];
+                        if (inputEl) inputEl.value = todo.text;
+                        return;
+                      }
+
+                      // エラーを削除
+                      setEditingErrors(prev => {
+                        const next = { ...prev };
+                        delete next[todo.id];
+                        return next;
+                      });
+
+                      onChangeTodo(todo.id, newText);
+                      onBlurTodo(todo.id, newText);
+                    }}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={() => setIsComposing(false)}
+                    ref={(el) => {
+                      if (el) {
+                        todoRefs.current[todo.id] = el;
+                        if (focusedTodoId === todo.id) el.focus();
+                      }
+                    }}
+                    className={clsx(
+                      'flex-1 border-b bg-transparent outline-none border-gray-200',
+                      'h-8',
+                      todo.done ? 'text-gray-400 line-through' : 'text-black'
+                    )}
+                    placeholder="TODOを入力"
+                  />
+
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.85, rotate: -10 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                    className={clsx(
+                      'mr-1 active:scale-90',
+                      (
+                        (typeof todo.memo === 'string' && todo.memo.trim() !== '') ||
+                        (typeof todo.price === 'number' && todo.price !== 0) ||
+                        (typeof todo.quantity === 'number' && todo.quantity !== 0)
+                      )
+                        ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
+                        : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
+                    )}
+                    onClick={() => onOpenNote(todo.text)}
+                  >
+                    <Notebook size={22} />
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={() => handleTodoDeleteClick(todo.id)}
+                    animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
+                    variants={SHAKE_VARIANTS}
+                  >
+                    <Trash2
+                      size={22}
+                      className={clsx(
+                        'hover:text-red-500',
+                        confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
+                      )}
+                    />
+                  </motion.button>
                 </div>
-              )}
+
+                {editingErrors[todo.id] && (
+                  <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
+                    {editingErrors[todo.id]}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {/* ★ 追加：スクロール必要時のみ右下に点滅アイコンを表示 */}
+          {showScrollHint && (
+            <div className="pointer-events-none absolute bottom-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronDown size={16} className="text-white" />
             </div>
-          ))}
+          )}
         </div>
 
         {tab === 'undone' && (

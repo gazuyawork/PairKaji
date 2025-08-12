@@ -1,11 +1,12 @@
+// src/components/todo/parts/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { useEffect, useState, useRef } from 'react';
-import { CheckCircle, Info } from 'lucide-react';
+import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
+import { CheckCircle, Info, ChevronDown } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
@@ -13,6 +14,9 @@ import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceA
 import ComparePriceTable from '@/components/todo/parts/ComparePriceTable';
 import DetailInputFields from '@/components/todo/parts/DetailInputFields';
 import BaseModal from '../../common/modals/BaseModal';
+
+// 最大高さ（画面高の50%）
+const MAX_TEXTAREA_VH = 50;
 
 interface TodoNoteModalProps {
   isOpen: boolean;
@@ -40,7 +44,7 @@ export default function TodoNoteModal({
   const [showDetails, setShowDetails] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [saveLabel, setSaveLabel] = useState('保存');
-  const memoRef = useRef<HTMLTextAreaElement>(null);
+  const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
 
@@ -65,6 +69,25 @@ export default function TodoNoteModal({
 
   const { animatedDifference, animationComplete: diffAnimationComplete } =
     useUnitPriceDifferenceAnimation(totalDifference);
+
+  // ★ 追加：スクロールヒント表示制御
+  const [showScrollHint, setShowScrollHint] = useState(false);
+
+  // ★ 追加：スクロール可能か＆最下部かを判定
+  const updateScrollHint = useCallback((el: HTMLTextAreaElement) => {
+    const canScroll = el.scrollHeight > el.clientHeight + 1;
+    const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    setShowScrollHint(canScroll && notAtBottom);
+  }, []);
+
+  // ★ 追加：スクロール時に更新
+  const handleTextareaScroll = useCallback(
+    (e: React.UIEvent<HTMLTextAreaElement>) => {
+      updateScrollHint(e.currentTarget);
+    },
+    [updateScrollHint]
+  );
+
 
   useEffect(() => {
     const parsed = parseFloat(comparePrice);
@@ -104,18 +127,62 @@ export default function TodoNoteModal({
       }
     };
     fetchTodoData();
-}, [taskId, todoId, compareQuantity]);
+  }, [taskId, todoId, compareQuantity]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (memoRef.current) {
-      memoRef.current.style.height = 'auto';
-      memoRef.current.style.height = memoRef.current.scrollHeight + 'px';
+  // 高さ自動調整
+  const resizeTextarea = useCallback(() => {
+    const el = memoRef.current;
+    if (!el) return;
+
+    el.style.height = 'auto';
+    const maxPx = Math.floor(
+      (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100)
+    );
+    const desired = el.scrollHeight;
+
+    if (maxPx > 0) {
+      const finalHeight = Math.min(desired, maxPx);
+      el.style.height = `${finalHeight}px`;
+      el.style.overflowY = desired > maxPx ? 'auto' : 'hidden';
+    } else {
+      el.style.height = `${desired}px`;
+      el.style.overflowY = 'hidden';
     }
-  }, [memo]);
+    updateScrollHint(el);
+  }, [updateScrollHint]);
+
+  // レイアウトが安定したタイミングで確実に再計測（2フレーム確保）
+  const scheduleResize = useCallback(() => {
+    requestAnimationFrame(() => {
+      resizeTextarea();
+      requestAnimationFrame(resizeTextarea);
+    });
+  }, [resizeTextarea]);
+
+  // ref のコールバック：DOMに張られた瞬間にリサイズ
+  const setMemoEl = useCallback((el: HTMLTextAreaElement | null) => {
+    memoRef.current = el;
+    if (el) scheduleResize();
+  }, [scheduleResize]);
+
+  // モーダルを開いた直後
+  useLayoutEffect(() => {
+    if (isOpen) scheduleResize();
+  }, [isOpen, scheduleResize]);
+
+  // 初期ロード完了直後（Firestoreからmemoが入ったあと）
+  useLayoutEffect(() => {
+    if (!initialLoad) scheduleResize();
+  }, [initialLoad, scheduleResize]);
+
+  // memoが変わったら再計測
+  useLayoutEffect(() => {
+    scheduleResize();
+  }, [memo, scheduleResize]);
 
   const handleSave = async () => {
     const user = auth.currentUser;
@@ -184,19 +251,25 @@ export default function TodoNoteModal({
           >
             <h1 className="text-2xl font-bold text-gray-800 ml-2">{todoText}</h1>
 
-            <textarea
-              ref={memoRef}
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              onInput={(e) => {
-                const target = e.currentTarget;
-                target.style.height = 'auto';
-                target.style.height = target.scrollHeight + 'px';
-              }}
-              placeholder="備考を入力"
-              rows={1}
-              className="w-full overflow-hidden border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-4 ml-2"
-            />
+            {/* ★ 追加：相対レイアウトのラッパー */}
+            <div className="relative">
+              <textarea
+                ref={setMemoEl}
+                value={memo}
+                rows={1}
+                placeholder="備考を入力"
+                onChange={(e) => setMemo(e.target.value)}
+                onInput={resizeTextarea}
+                onScroll={handleTextareaScroll}  // ★ 追加：スクロールでヒント更新
+                className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pr-10 pb-1" // ★ 追加：右側に余白
+              />
+              {/* ★ 追加：スクロール可能なときだけ右下に点滅アイコン */}
+              {showScrollHint && (
+                <div className="pointer-events-none absolute bottom-5 right-2 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+                  <ChevronDown size={16} className="text-white" />
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center justify-between mb-4">
               <button
