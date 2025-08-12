@@ -94,7 +94,7 @@ export default function PartnerSettings({
                 <button
                   onClick={onRemovePair}
                   disabled={isRemoving}
-                  className={`text-red-500 ${isRemoving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`ml-auto text-red-500 ${isRemoving ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {isRemoving ? '処理中...' : <X size={24} />}
                 </button>
