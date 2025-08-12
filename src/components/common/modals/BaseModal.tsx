@@ -71,10 +71,11 @@ export default function BaseModal({
 
       {/* モーダル本体 */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-y-auto"
+        className="relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-y-auto overscroll-contain"
+        style={{ transform: 'none' }} // 念のため transform を明示的に無効化
       >
         {(isSaving || saveComplete) && (
           <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
