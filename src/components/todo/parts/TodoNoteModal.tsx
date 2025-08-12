@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { CheckCircle, Info } from 'lucide-react';
+import { CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
@@ -13,7 +13,7 @@ import ComparePriceTable from '@/components/todo/parts/ComparePriceTable';
 import DetailInputFields from '@/components/todo/parts/DetailInputFields';
 import BaseModal from '../../common/modals/BaseModal';
 
-// 最大高さ（画面高の50%）
+// 表示上限: 画面高の 50%（vh基準）
 const MAX_TEXTAREA_VH = 50;
 
 interface TodoNoteModalProps {
@@ -31,6 +31,11 @@ export default function TodoNoteModal({
   todoId,
   taskId,
 }: TodoNoteModalProps) {
+  // iOS判定（スクロールガイドの表示条件にのみ使用）
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
+
   const [mounted, setMounted] = useState(false);
   const [memo, setMemo] = useState('');
   const [price, setPrice] = useState('');
@@ -42,10 +47,28 @@ export default function TodoNoteModal({
   const [showDetails, setShowDetails] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [saveLabel, setSaveLabel] = useState('保存');
-  const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
 
+  const memoRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // ── スクロールガイド（維持） ─────────────────────────────
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [showScrollUpHint, setShowScrollUpHint] = useState(false);
+
+  const updateHints = useCallback(() => {
+    const el = memoRef.current;
+    if (!el) return;
+    const canScroll = el.scrollHeight > el.clientHeight + 1;
+    const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    const notAtTop = el.scrollTop > 1;
+    setShowScrollHint(canScroll && notAtBottom);
+    setShowScrollUpHint(canScroll && notAtTop);
+  }, []);
+
+  const onTextareaScroll = useCallback(() => updateHints(), [updateHints]);
+
+  // ── 単価系の計算 ──────────────────────────────────────────
   const numericPrice = parseFloat(price);
   const numericQuantity = parseFloat(quantity);
   const numericComparePrice = parseFloat(comparePrice);
@@ -68,11 +91,17 @@ export default function TodoNoteModal({
   const { animatedDifference, animationComplete: diffAnimationComplete } =
     useUnitPriceDifferenceAnimation(totalDifference);
 
+  // ── ラベル等 ──────────────────────────────────────────────
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const parsed = parseFloat(comparePrice);
     setSaveLabel(!isNaN(parsed) && parsed > 0 ? 'この価格で更新する' : '保存');
   }, [comparePrice]);
 
+  // ── Firestore 初期データ取得 ─────────────────────────────
   useEffect(() => {
     const fetchTodoData = async () => {
       if (!taskId || !todoId) return;
@@ -95,59 +124,79 @@ export default function TodoNoteModal({
             }
           }
         }
-      } catch (error) {
-        console.error('初期データの取得に失敗:', error);
+      } catch (e) {
+        console.error('初期データの取得に失敗:', e);
       } finally {
         setInitialLoad(false);
+        // 初回のヒント計算は描画後
+        setTimeout(updateHints, 0);
       }
     };
     fetchTodoData();
-  }, [taskId, todoId, compareQuantity]);
+  }, [taskId, todoId, compareQuantity, updateHints]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // 高さ自動調整（テキストエリア自身は最大高を持ち、超えたら内部スクロール）
+  // ── テキストエリアの自動リサイズ（内容に応じて拡大 / 上限でスクロール） ──
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
     if (!el) return;
-    el.style.height = 'auto';
-    const desired = el.scrollHeight;
-    el.style.height = `${desired}px`;
-    el.style.maxHeight = `calc(${MAX_TEXTAREA_VH}vh)`; // ★ 上限
-    el.style.overflowY = 'auto';
-    (el.style as any).webkitOverflowScrolling = 'touch';
-  }, []);
 
-  const scheduleResize = useCallback(() => {
+    // 50vh を px に換算（横回転等も考慮して毎回算出）
+    const maxHeightPx = (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
+
+    // 一旦リセットして内容に応じた scrollHeight を測る
+    el.style.height = 'auto';
+    el.style.maxHeight = `${maxHeightPx}px`;
+    (el.style as any).webkitOverflowScrolling = 'touch';
+
+    // 内容に合わせて伸ばす。ただし上限を超えたら固定してスクロール
+    if (el.scrollHeight > maxHeightPx) {
+      el.style.height = `${maxHeightPx}px`;
+      el.style.overflowY = 'auto';
+    } else {
+      el.style.height = `${el.scrollHeight}px`;
+      el.style.overflowY = 'hidden';
+    }
+
+    updateHints();
+  }, [updateHints]);
+
+  // 開いた直後・初期ロード後・内容変化時にリサイズ
+  useLayoutEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => {
+        resizeTextarea();
+        requestAnimationFrame(resizeTextarea);
+      });
+    }
+  }, [isOpen, resizeTextarea]);
+
+  useLayoutEffect(() => {
+    if (!initialLoad) {
+      requestAnimationFrame(() => {
+        resizeTextarea();
+        requestAnimationFrame(resizeTextarea);
+      });
+    }
+  }, [initialLoad, resizeTextarea]);
+
+  useLayoutEffect(() => {
     requestAnimationFrame(() => {
       resizeTextarea();
       requestAnimationFrame(resizeTextarea);
     });
+  }, [memo, resizeTextarea]);
+
+  // 端末回転やリサイズに追従（上限 50vh が変わるため）
+  useEffect(() => {
+    const onResize = () => resizeTextarea();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, [resizeTextarea]);
 
-  const setMemoEl = useCallback((el: HTMLTextAreaElement | null) => {
-    memoRef.current = el;
-    if (el) scheduleResize();
-  }, [scheduleResize]);
-
-  useLayoutEffect(() => {
-    if (isOpen) scheduleResize();
-  }, [isOpen, scheduleResize]);
-
-  useLayoutEffect(() => {
-    if (!initialLoad) scheduleResize();
-  }, [initialLoad, scheduleResize]);
-
-  useLayoutEffect(() => {
-    scheduleResize();
-  }, [memo, scheduleResize]);
-
+  // ── 保存処理 ────────────────────────────────────────────
   const handleSave = async () => {
     const user = auth.currentUser;
     if (!user) return;
-
     setIsSaving(true);
 
     const appliedPrice = numericComparePrice > 0 ? numericComparePrice : numericPrice;
@@ -203,17 +252,30 @@ export default function TodoNoteModal({
     >
       <h1 className="text-2xl font-bold text-gray-800 ml-2">{todoText}</h1>
 
-      {/* ▼ BaseModal 内の単一スクロール領域にそのまま載る想定。ここに余計な overflow は付けない */}
-      <div className="pr-2">
+      {/* textarea 自体が唯一のスクロール領域（内容に応じて拡大、上限 50vh でスクロール） */}
+      <div className="relative pr-8">
         <textarea
-          ref={setMemoEl}
+          ref={memoRef}
+          data-scrollable="true"                 // iOSでスクロール許可（BaseModal側の例外対象）
+          onScroll={onTextareaScroll}           // ガイド表示更新
           value={memo}
           rows={1}
           placeholder="備考を入力"
           onChange={(e) => setMemo(e.target.value)}
-          onInput={resizeTextarea}
-          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-3 ml-2 pb-1"
+          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1"
         />
+
+        {/* スクロールガイド（維持） */}
+        {isIOS && showScrollHint && (
+          <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+            <ChevronDown size={16} className="text-white" />
+          </div>
+        )}
+        {isIOS && showScrollUpHint && (
+          <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+            <ChevronUp size={16} className="text-white" />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between mb-4">

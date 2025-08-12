@@ -292,7 +292,7 @@ export default function TodoTaskCard({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="max-h-[40vh] overflow-y-scroll space-y-4 pr-10 pt-6"  // ★ pr-10 でアイコン分の余白
+            className="max-h-[40vh] overflow-y-scroll space-y-4 pr-10 pt-2"  // ★ pr-10 でアイコン分の余白
           >
             {filteredTodos.length === 0 && tab === 'done' && (
               <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
