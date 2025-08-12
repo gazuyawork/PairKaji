@@ -65,7 +65,7 @@ export default function BaseModal({
     <div className="fixed inset-0 z-[9999] flex justify-center items-center px-2">
       {/* 背景オーバーレイ */}
       <div
-        className="absolute inset-0 bg-white/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-white/80"
         onClick={onClose}
       />
 
