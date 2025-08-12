@@ -19,7 +19,6 @@ const SHAKE_VARIANTS: Variants = {
   },
 };
 
-
 interface Props {
   task: TodoOnlyTask;
   tab: 'undone' | 'done';
@@ -80,6 +79,49 @@ export default function TodoTaskCard({
   const [isScrollable, setIsScrollable] = useState(false);
   const [localDoneMap, setLocalDoneMap] = useState<Record<string, boolean>>({});
   const [animateTriggerMap, setAnimateTriggerMap] = useState<Record<string, number>>({});
+
+  // --- 追加: マウス用ドラッグスクロール状態 ---
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startScrollTopRef = useRef(0);
+  const [dragging, setDragging] = useState(false);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // マウスのみドラッグスクロールを有効化（タッチはネイティブに任せる）
+    if (e.pointerType !== 'mouse') return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    isDraggingRef.current = true;
+    setDragging(true);
+    startYRef.current = e.clientY;
+    startScrollTopRef.current = el.scrollTop;
+
+    el.setPointerCapture?.(e.pointerId);
+    // ドラッグ開始時のテキスト選択抑止
+    e.preventDefault();
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const deltaY = e.clientY - startYRef.current;
+    el.scrollTop = startScrollTopRef.current - deltaY;
+
+    // ドラッグ中の不要な選択を抑止
+    e.preventDefault();
+  };
+
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    const el = scrollRef.current;
+    isDraggingRef.current = false;
+    setDragging(false);
+    el?.releasePointerCapture?.(e.pointerId);
+  };
+  // --- 追加ここまで ---
 
   useEffect(() => {
     const newMap: Record<string, boolean> = {};
@@ -292,7 +334,17 @@ export default function TodoTaskCard({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="max-h-[40vh] overflow-y-scroll space-y-4 pr-10 pt-2"  // ★ pr-10 でアイコン分の余白
+            className={clsx(
+              "max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-10 pt-2",
+              dragging ? "cursor-grabbing select-none" : "cursor-grab"
+            )}
+            // タッチはネイティブスクロール、マウスはドラッグスクロール
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            // 親（スワイプ等）にイベントが抜けるのを抑止
+            onTouchMove={(e) => e.stopPropagation()}
           >
             {filteredTodos.length === 0 && tab === 'done' && (
               <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>

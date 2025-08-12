@@ -1,4 +1,3 @@
-// src/components/todo/parts/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -74,7 +73,7 @@ export default function TodoNoteModal({
   const numericComparePrice = parseFloat(comparePrice);
   const numericCompareQuantity = parseFloat(compareQuantity);
   const isCompareQuantityMissing = !numericCompareQuantity || numericCompareQuantity <= 0;
-  const compareDisplayUnit = isCompareQuantityMissing ? '個' : unit;
+  // const compareDisplayUnit = isCompareQuantityMissing ? '個' : unit;
   const safeCompareQuantity = isCompareQuantityMissing ? 1 : numericCompareQuantity;
   const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
   const currentUnitPrice =
@@ -199,6 +198,11 @@ export default function TodoNoteModal({
     if (!user) return;
     setIsSaving(true);
 
+    const numericPrice = parseFloat(price);
+    const numericQuantity = parseFloat(quantity);
+    const numericComparePrice = parseFloat(comparePrice);
+    const numericCompareQuantity = parseFloat(compareQuantity);
+
     const appliedPrice = numericComparePrice > 0 ? numericComparePrice : numericPrice;
     const appliedQuantity =
       numericComparePrice > 0
@@ -207,6 +211,19 @@ export default function TodoNoteModal({
           ? numericQuantity
           : 1;
     const appliedUnit = numericQuantity > 0 ? unit : '個';
+
+    const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
+    const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
+    const currentUnitPrice =
+      numericPrice > 0 && safeQuantity > 0 ? numericPrice / safeQuantity : null;
+    const compareUnitPrice =
+      numericComparePrice > 0 ? numericComparePrice / safeCompareQuantity : null;
+    const unitPriceDiff =
+      compareUnitPrice !== null && currentUnitPrice !== null
+        ? compareUnitPrice - currentUnitPrice
+        : null;
+    const totalDifference =
+      unitPriceDiff !== null ? unitPriceDiff * safeCompareQuantity : null;
 
     try {
       await updateTodoInTask(taskId, todoId, {
@@ -256,16 +273,18 @@ export default function TodoNoteModal({
       <div className="relative pr-8">
         <textarea
           ref={memoRef}
-          data-scrollable="true"                 // iOSでスクロール許可（BaseModal側の例外対象）
+          data-scrollable="true"                 // ← BaseModal の iOS touchmove 抑止を回避する許可フラグ
           onScroll={onTextareaScroll}           // ガイド表示更新
           value={memo}
           rows={1}
           placeholder="備考を入力"
           onChange={(e) => setMemo(e.target.value)}
-          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1"
+          onTouchMove={(e) => e.stopPropagation()} // 上位のジェスチャに奪われないように
+          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1
+                     touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
         />
 
-        {/* スクロールガイド（維持） */}
+        {/* スクロールガイド（iOS時のみ） */}
         {isIOS && showScrollHint && (
           <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
             <ChevronDown size={16} className="text-white" />
@@ -291,7 +310,7 @@ export default function TodoNoteModal({
           {showDetails ? '詳細を閉じる' : '詳細を追加'}
         </button>
 
-        {showDetails && !isNaN(numericPrice) && numericPrice > 0 && (
+        {showDetails && !isNaN(parseFloat(price)) && parseFloat(price) > 0 && (
           <button
             onClick={() => setCompareMode(!compareMode)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
@@ -310,11 +329,39 @@ export default function TodoNoteModal({
           compareQuantity={compareQuantity}
           unit={unit}
           animatedDifference={animatedDifference}
-          unitPriceDiff={unitPriceDiff}
-          compareDisplayUnit={compareDisplayUnit}
+          unitPriceDiff={
+            (() => {
+              const np = parseFloat(price);
+              const nq = parseFloat(quantity);
+              const ncp = parseFloat(comparePrice);
+              const ncq = parseFloat(compareQuantity) > 0 ? parseFloat(compareQuantity) : 1;
+              const cup = np > 0 && (nq > 0 ? nq : 1) > 0 ? np / (nq > 0 ? nq : 1) : null;
+              const cmp = ncp > 0 ? ncp / ncq : null;
+              return cmp !== null && cup !== null ? cmp - cup : null;
+            })()
+          }
+          compareDisplayUnit={
+            (() => {
+              const ncq = parseFloat(compareQuantity);
+              return !ncq || ncq <= 0 ? '個' : unit;
+            })()
+          }
           onChangeComparePrice={setComparePrice}
           onChangeCompareQuantity={setCompareQuantity}
-          showDiff={totalDifference !== null}
+          showDiff={
+            (() => {
+              const ncp = parseFloat(comparePrice);
+              const ncq = parseFloat(compareQuantity);
+              const np = parseFloat(price);
+              const nq = parseFloat(quantity);
+              const sq = nq > 0 ? nq : 1;
+              const cup = np > 0 && sq > 0 ? np / sq : null;
+              const scq = ncq > 0 ? ncq : 1;
+              const cmp = ncp > 0 ? ncp / scq : null;
+              const diff = cmp !== null && cup !== null ? cmp - cup : null;
+              return diff !== null;
+            })()
+          }
           animationComplete={diffAnimationComplete}
         />
       ) : (
@@ -326,7 +373,14 @@ export default function TodoNoteModal({
             onChangePrice={setPrice}
             onChangeQuantity={setQuantity}
             onChangeUnit={setUnit}
-            currentUnitPrice={currentUnitPrice}
+            currentUnitPrice={
+              (() => {
+                const np = parseFloat(price);
+                const nq = parseFloat(quantity);
+                const sq = nq > 0 ? nq : 1;
+                return np > 0 && sq > 0 ? np / sq : null;
+              })()
+            }
           />
         )
       )}
