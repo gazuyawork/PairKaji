@@ -91,7 +91,10 @@ const nextConfig = {
   reactStrictMode: true,
 
   images: {
-    domains: ['firebasestorage.googleapis.com'],
+    domains: [
+      'firebasestorage.googleapis.com',
+      'profile.line-scdn.net',
+    ],
   },
 
   // ❌ 削除: App Router はデフォルト有効なので不要

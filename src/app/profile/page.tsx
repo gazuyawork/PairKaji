@@ -53,7 +53,11 @@ export default function ProfilePage() {
   const [isRemoving, setIsRemoving] = useState(false);
   const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
-  const [plan, setPlan] = useState<string>(''); // 🔽 plan 状態追加
+  const [plan, setPlan] = useState<string>(''); // プラン
+  // ▼ LINE連携用の状態（Firestore users/{uid} 由来）
+  const [lineLinked, setLineLinked] = useState<boolean>(false);
+  const [lineDisplayName, setLineDisplayName] = useState<string | null>(null);
+  const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
 
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
@@ -62,13 +66,11 @@ export default function ProfilePage() {
       return;
     }
 
-    setNameUpdateStatus('loading'); // ローディング状態に
+    setNameUpdateStatus('loading');
 
     try {
       await saveUserNameToFirestore(user.uid, name);
       setNameUpdateStatus('success');
-
-      // ✅ 数秒後にアイドル状態に戻す
       setTimeout(() => {
         setNameUpdateStatus('idle');
       }, 1500);
@@ -106,13 +108,18 @@ export default function ProfilePage() {
           setName(data.name || user.email?.split('@')[0] || '');
 
           if (data.plan) {
-            setPlan(data.plan); // 🔽 ここを追加！
+            setPlan(data.plan);
           }
 
           if (data.imageUrl) {
             setProfileImage(data.imageUrl);
             localStorage.setItem('profileImage', data.imageUrl);
           }
+
+          // ▼ LINE連携フィールドを反映
+          setLineLinked(Boolean(data.lineLinked));
+          setLineDisplayName(data.lineDisplayName ?? null);
+          setLinePictureUrl(data.linePictureUrl ?? null);
 
         } else {
           await createUserProfile(user.uid, user.email?.split('@')[0] || '');
@@ -163,7 +170,6 @@ export default function ProfilePage() {
           } else {
             setPendingApproval(null);
           }
-
         }
       } catch (err) {
         handleFirestoreError(err);
@@ -175,13 +181,13 @@ export default function ProfilePage() {
 
     fetchProfile();
 
-    // 🔥 onSnapshotはfetchProfile内で取得したuserではなく、再度取得する
+    // ▼ リアルタイム購読（pairs）
     const user = auth.currentUser;
     if (!user) return;
 
     const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid));
 
-    const unsubscribe = onSnapshot(
+    const unsubscribePairs = onSnapshot(
       q,
       (snapshot) => {
         if (!snapshot.empty) {
@@ -196,11 +202,9 @@ export default function ProfilePage() {
             setPartnerImage(pair.partnerImageUrl);
             localStorage.setItem('partnerImage', pair.partnerImageUrl);
           } else {
-            setPartnerImage(null); // 🔥 忘れずに null を代入
+            setPartnerImage(null);
             localStorage.removeItem('partnerImage');
           }
-
-
         } else {
           setInviteCode('');
           setPartnerEmail('');
@@ -215,8 +219,32 @@ export default function ProfilePage() {
       }
     );
 
+    // ▼ リアルタイム購読（users/{uid}：LINE連携・画像・プランなど）
+    const unsubscribeUser = onSnapshot(
+      doc(db, 'users', user.uid),
+      (snap) => {
+        const data = snap.data();
+        if (!data) return;
+
+        if (typeof data.plan === 'string') setPlan(data.plan);
+
+        if (typeof data.imageUrl === 'string') {
+          setProfileImage(data.imageUrl);
+          localStorage.setItem('profileImage', data.imageUrl);
+        }
+
+        setLineLinked(Boolean(data.lineLinked));
+        setLineDisplayName(data.lineDisplayName ?? null);
+        setLinePictureUrl(data.linePictureUrl ?? null);
+      },
+      (error) => {
+        handleFirestoreError(error);
+      }
+    );
+
     return () => {
-      unsubscribe();
+      unsubscribePairs();
+      unsubscribeUser();
     };
   }, []);
 
@@ -254,7 +282,7 @@ export default function ProfilePage() {
       // Firestoreのペア情報を更新
       await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
 
-      // 👇 この処理を追加（両ユーザーの sharedTasksCleaned を false に更新）
+      // 👇 両ユーザーの sharedTasksCleaned を false に更新
       const userRef = doc(db, 'users', user.uid);
       const partnerRef = doc(db, 'users', pendingApproval.inviterUid);
       await Promise.all([
@@ -269,8 +297,6 @@ export default function ProfilePage() {
       handleFirestoreError(_err);
     }
   };
-
-
 
   // パートナー解除時の処理
   const handleRemovePair = async () => {
@@ -287,7 +313,7 @@ export default function ProfilePage() {
     const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。');
     if (!confirmed) return;
 
-    setIsRemoving(true); // 🟡 ローディング開始
+    setIsRemoving(true);
     try {
       await removePair(pairDocId);
       // await splitSharedTasksOnPairRemoval(user.uid, partnerId);
@@ -300,7 +326,7 @@ export default function ProfilePage() {
     } catch (_err: unknown) {
       handleFirestoreError(_err);
     } finally {
-      setIsRemoving(false); // 🔵 ローディング終了
+      setIsRemoving(false);
     }
   };
 
@@ -349,8 +375,8 @@ export default function ProfilePage() {
 
     try {
       await updateDoc(doc(db, 'users', user.uid), {
-        plan: 'free', // プランをFreeに戻す
-        lineLinked: false, // LINE連携を解除
+        plan: 'free',
+        lineLinked: false,
       });
       toast.success('プランをFreeに戻しました');
       setPlan('free');
@@ -360,13 +386,10 @@ export default function ProfilePage() {
     }
   };
 
-
   return (
     <div className="fixed flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
-
       <Header title="Profile" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
-
         {isLoading ? (
           <div className="flex items-center justify-center w-full h-[60vh]">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -374,6 +397,10 @@ export default function ProfilePage() {
         ) : (
           <>
             <ProfileCard
+              // ▼ ここを修正：Auth user ではなく Firestore の値を渡す
+              isLineLinked={lineLinked}
+              lineDisplayName={lineDisplayName}
+              linePictureUrl={linePictureUrl}
               profileImage={profileImage}
               setProfileImage={setProfileImage}
               name={name}
@@ -386,6 +413,7 @@ export default function ProfilePage() {
               isLoading={isLoading}
               nameUpdateStatus={nameUpdateStatus}
             />
+
             <PartnerSettings
               isLoading={isLoading}
               isPairLoading={isPairLoading}
@@ -417,10 +445,6 @@ export default function ProfilePage() {
               </div>
             )}
 
-
-
-
-
             <div className="text-center mt-auto">
               <Link href="/delete-account" className="text-xs text-gray-400 hover:underline underline decoration-gray-400">
                 アカウントを削除する
@@ -428,9 +452,8 @@ export default function ProfilePage() {
             </div>
           </>
         )}
-
-
       </main>
+
       <EmailEditModal
         open={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
