@@ -59,6 +59,9 @@ export default function TodoTaskCard({
   const [showScrollDownHint, setShowScrollDownHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
 
+  // 追加可能か（未処理タブのみ可）
+  const canAdd = tab === 'undone';
+
   // カウントをメモ化
   const { undoneCount, doneCount } = useMemo(() => {
     let undone = 0;
@@ -170,6 +173,8 @@ export default function TodoTaskCard({
   }, [filteredTodos.length]);
 
   const handleAdd = () => {
+    if (!canAdd) return; // 念のためガード
+
     const trimmed = newTodoText.trim();
     if (!trimmed) return;
 
@@ -329,13 +334,14 @@ export default function TodoTaskCard({
         </div>
       </div>
 
-      <div className="bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-4 space-y-2 min-h-20">
-        {/* ★ 追加：相対レイアウトのラッパー（ヒントを右下に重ねる） */}
+      {/* 本体カード（相対位置） */}
+      <div className="relative bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-12 space-y-2 min-h-20">
+        {/* スクロール領域（下部に固定入力が重ならないように余白を確保：pb-20） */}
         <div className="relative">
           <div
             ref={scrollRef}
             className={clsx(
-              "max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-10 pt-2",
+              "max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1",
               dragging ? "cursor-grabbing select-none" : "cursor-grab"
             )}
             // タッチはネイティブスクロール、マウスはドラッグスクロール
@@ -473,13 +479,13 @@ export default function TodoTaskCard({
               </div>
             ))}
           </div>
-          {/* ★ 追加：スクロール必要時のみ右下に点滅アイコンを表示 */}
+
+          {/* スクロール必要時のヒント */}
           {showScrollDownHint && (
             <div className="pointer-events-none absolute bottom-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
               <ChevronDown size={16} className="text-white" />
             </div>
           )}
-          {/* ★ 追加：上方向にスクロールできる時だけ右上に点滅アイコン */}
           {showScrollUpHint && (
             <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
               <ChevronUp size={16} className="text-white" />
@@ -487,10 +493,10 @@ export default function TodoTaskCard({
           )}
         </div>
 
-        {showScrollDownHint && (
-          <div className="flex items-center gap-2 mt-4 relative">
-            <Plus className="text-[#FFCB7D]" />
-
+        {/* 追加入力エリア：カード下部に完全固定（未処理のみ有効） */}
+        <div className="absolute left-4 right-4 bottom-3">
+          <div className="flex items-center gap-2 bg-white">
+            <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
             <input
               ref={inputRef}
               type="text"
@@ -500,23 +506,32 @@ export default function TodoTaskCard({
                 setInputError(null);
               }}
               onKeyDown={(e) => {
+                if (!canAdd) return;
                 if (e.key === 'Enter' && !isComposing) {
                   e.preventDefault();
                   handleAdd();
                 }
               }}
-              onBlur={handleAdd}
+              onBlur={() => {
+                if (!canAdd) return;
+                handleAdd();
+              }}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
-              className="w-[75%] border-b bg-transparent outline-none border-gray-300 h-8 text-black"
-              placeholder="TODOを入力してEnter"
+              disabled={!canAdd}
+              aria-disabled={!canAdd}
+              className={clsx(
+                'w-[75%] border-b bg-transparent outline-none h-8',
+                canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed'
+              )}
+              placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
             />
           </div>
-        )}
 
-        {inputError && (
-          <div className="bg-red-400 text-white text-xs mt-1 ml-2 px-2 py-1 rounded-md">{inputError}</div>
-        )}
+          {inputError && (
+            <div className="bg-red-400 text-white text-xs mt-1 ml-6 px-2 py-1 rounded-md">{inputError}</div>
+          )}
+        </div>
       </div>
     </div>
   );
