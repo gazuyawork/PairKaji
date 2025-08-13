@@ -121,21 +121,31 @@ export default function EditTaskModal({
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [isIOS, setIsIOS] = useState(false);
+
+  // ✅ 置換：iOS Safari(WebKit) のみ true にする厳密判定（PCでは false）
+  const [isIOSMobileSafari, setIsIOSMobileSafari] = useState(false);
 
   // [LOG] ログ出力用プレフィックス
   const LOG = '[EditTaskModal]';
 
+  // ✅ 置換後の端末判定
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const ua = window.navigator.userAgent || '';
-      const platform = window.navigator.platform || '';
-      const isIOSDevice =
-        /iPhone|iPod/.test(ua) ||
-        (platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS判定
+    if (typeof window === 'undefined') return;
+    const ua = navigator.userAgent || '';
+    const vendor = navigator.vendor || '';
+    const platform = navigator.platform || '';
+    const touchPoints = (navigator as any).maxTouchPoints || 0;
 
-      setIsIOS(isIOSDevice);
-    }
+    // iOS / iPadOS 判定
+    const isiOSFamily =
+      /iPhone|iPad|iPod/.test(ua) ||
+      (platform === 'MacIntel' && touchPoints > 1); // iPadOS (デスクトップSafariと区別)
+
+    // モバイルSafari(WebKit)のみを許容（iOS版Chrome/Firefox/Edgeは除外）
+    const isWebKitVendor = /Apple/.test(vendor);
+    const isNotOtherIOSBrowsers = !/CriOS|FxiOS|EdgiOS/.test(ua);
+
+    setIsIOSMobileSafari(isiOSFamily && isWebKitVendor && isNotOtherIOSBrowsers);
   }, []);
 
   useEffect(() => {
@@ -420,7 +430,7 @@ export default function EditTaskModal({
 
             {/* 📅 日付入力 */}
             <div className="relative w-[40%]">
-              {isIOS && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
+              {isIOSMobileSafari && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
                 <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
                   yyyy-mm-dd
                 </span>
@@ -438,7 +448,7 @@ export default function EditTaskModal({
 
             {/* ⏰ 時刻入力 */}
             <div className="relative w-[30%]">
-              {isIOS && (!editedTask.time || editedTask.time === '') && (
+              {isIOSMobileSafari && (!editedTask.time || editedTask.time === '') && (
                 <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
                   --:--
                 </span>
