@@ -387,7 +387,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="fixed flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
+    <div className="flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Profile" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         {isLoading ? (
