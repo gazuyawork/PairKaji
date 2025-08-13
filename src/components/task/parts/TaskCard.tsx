@@ -213,16 +213,6 @@ export default function TaskCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onEdit();
-              }}
-              className="w-12 h-12 rounded-full bg-gradient-to-b from-green-300 to-green-600 shadow ring-1 ring-green-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
-            >
-              <Pencil className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
                 toggleFlag();
               }}
               disabled={task.done}
@@ -237,6 +227,16 @@ export default function TaskCard({
             >
               <Flag className="w-5 h-5" />
             </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="w-12 h-12 rounded-full bg-gradient-to-b from-green-300 to-green-600 shadow ring-1 ring-green-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
+            >
+              <Pencil className="w-5 h-5" />
+            </button>
+
           </div>
         </div>
       )}

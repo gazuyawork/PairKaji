@@ -1,4 +1,3 @@
-// functions/src/index.ts
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import { format } from 'date-fns';
@@ -10,6 +9,38 @@ const db = admin.firestore();
 // ✅ Firebase Secret（CLI: firebase functions:secrets:set LINE_CHANNEL_ACCESS_TOKEN）
 const LINE_CHANNEL_ACCESS_TOKEN = defineSecret('LINE_CHANNEL_ACCESS_TOKEN');
 
+/** 待機ヘルパー（5分後の再送に使用） */
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** LINE Push API 実行（成功:true / 失敗:false を返す） */
+async function pushToLine(lineUserId: string, flexMessage: any): Promise<boolean> {
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN.value()}`,
+      },
+      body: JSON.stringify({
+        to: lineUserId,
+        messages: [flexMessage],
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(
+        `[ERROR] LINE通知失敗: status=${res.status} ${res.statusText} body=${body}`
+      );
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[EXCEPTION] LINE通知 送信時例外', e);
+    return false;
+  }
+}
+
 /**
  * 毎朝8時(JST)に、以下をLINE通知する:
  * - 当日の未完了タスク（dates に今日を含む）
@@ -18,12 +49,16 @@ const LINE_CHANNEL_ACCESS_TOKEN = defineSecret('LINE_CHANNEL_ACCESS_TOKEN');
  *
  * Firestore の制約により、クエリ内で array-contains を複数併用しない設計に変更。
  * → userIds の array-contains と done==false のみで取得し、残りはメモリで判定。
+ *
+ * ★ 要件対応:
+ *   初回送信で失敗したユーザーのみ、5分後に「1度だけ」再送。
  */
 export const sendDailyTaskReminder = onSchedule(
   {
     schedule: '0 8 * * *', // 毎日 08:00 (JST)
     timeZone: 'Asia/Tokyo',
     secrets: [LINE_CHANNEL_ACCESS_TOKEN],
+    timeoutSeconds: 540, // 5分待機+処理のため余裕を確保
   },
   async () => {
     console.log('✅ sendDailyTaskReminder 実行開始');
@@ -41,6 +76,14 @@ export const sendDailyTaskReminder = onSchedule(
       .get();
 
     console.log(`[INFO] 対象ユーザー数: ${usersSnap.size}`);
+
+    type FailedItem = {
+      userId: string;
+      lineUserId: string;
+      flexMessage: any;
+      count: number; // 通知対象件数（ログ用）
+    };
+    const failed: FailedItem[] = [];
 
     for (const userDoc of usersSnap.docs) {
       const user = userDoc.data();
@@ -107,7 +150,8 @@ export const sendDailyTaskReminder = onSchedule(
         const lines: string[] = [];
 
         if (todayTasks.length > 0) {
-          lines.push('【今日のタスク】');
+          lines.push(''); // 改行
+          lines.push('【日付指定のタスク】');
           for (const t of todayTasks) lines.push(`・${t.name}`);
           lines.push(''); // 改行
         }
@@ -125,35 +169,80 @@ export const sendDailyTaskReminder = onSchedule(
           lines.push('');
         }
 
-        const messageText =
-          `📋 今日のタスク（${format(nowJST, 'M月d日（eee）', { locale: ja })}）\n\n` +
-          `${lines.join('\n')}\n` +
-          `👉 アプリを開く\nhttps://pair-kaji.vercel.app/`;
+        const headerText = `📋 今日のタスク（${format(nowJST, 'M月d日（eee）', { locale: ja })}）`;
+        const bodyText = lines.join('\n') || '（該当なし）';
+        const noteText = '\nℹ️ 『毎日』に設定しているタスクや『日付指定』のないタスクは通知されません。';
 
-        // Node.js 20+: グローバル fetch を使用（node-fetch は不要）
-        const res = await fetch('https://api.line.me/v2/bot/message/push', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN.value()}`,
+        const flexMessage = {
+          type: 'flex',
+          altText: headerText, // 通知プレビュー用
+          contents: {
+            type: 'bubble',
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              backgroundColor: '#ffffffff',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'text',
+                  text: headerText,
+                  weight: 'bold',
+                  size: 'md',
+                  wrap: true,
+                },
+                {
+                  type: 'text',
+                  text: bodyText,
+                  size: 'sm', // 本文は小さめ
+                  wrap: true,
+                },
+                {
+                  type: 'separator',
+                  margin: 'md',
+                },
+                {
+                  type: 'text',
+                  text: noteText,
+                  size: 'xs', // 小さめの注記
+                  color: '#888888',
+                  wrap: true,
+                  margin: 'xs',
+                },
+              ],
+            },
           },
-          body: JSON.stringify({
-            to: lineUserId,
-            messages: [{ type: 'text', text: messageText }],
-          }),
-        });
+        };
 
-        if (!res.ok) {
-          const errorText = await res.text().catch(() => '');
-          console.error(
-            `[ERROR] LINE通知失敗: user=${userId} status=${res.status} ${res.statusText} body=${errorText}`
-          );
+        // 送信 → 失敗したら後でまとめて再送
+        const ok = await pushToLine(lineUserId, flexMessage);
+        if (!ok) {
+          failed.push({ userId, lineUserId, flexMessage, count: notifyTasks.length });
         } else {
           console.log(`[LINE通知] 送信成功: user=${userId}, 件数=${notifyTasks.length}`);
         }
       } catch (err) {
         console.error(`[EXCEPTION] user=${userId} 処理中に例外`, err);
+        // （flexMessage 生成前に落ちる可能性があるため、この場では再送キューには積まずログのみ）
       }
+    }
+
+    // 5分後に1回だけ再送（初回送信失敗ユーザーのみ）
+    if (failed.length > 0) {
+      console.warn(`[RETRY] 初回送信失敗ユーザー=${failed.length} → 5分後に再試行します`);
+      await sleep(5 * 60 * 1000); // 5分待機
+
+      let retrySuccess = 0;
+      for (const item of failed) {
+        const ok = await pushToLine(item.lineUserId, item.flexMessage);
+        if (ok) {
+          retrySuccess++;
+          console.log(`[RETRY] 再送成功: user=${item.userId}, 件数=${item.count}`);
+        } else {
+          console.error(`[RETRY] 再送失敗: user=${item.userId}（本日分はこれ以上再送しません）`);
+        }
+      }
+      console.log(`[RETRY] 再送結果: 成功=${retrySuccess} / 対象=${failed.length}`);
     }
 
     console.log('✅ sendDailyTaskReminder 完了');
