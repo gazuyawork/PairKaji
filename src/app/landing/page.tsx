@@ -51,7 +51,7 @@ export default function LandingPage() {
 
           <div className="relative w-full max-w-3xl aspect-[16/9] rounded-2xl overflow-hidden shadow">
             <Image
-              src="/landing-sampl.png" // public/landing-sample.png を参照
+              src="/landing-sample.png" // public/landing-sample.png を参照
               alt="アプリのスクリーンショット"
               fill
               className="object-cover"
