@@ -45,7 +45,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="ja"
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
-      <body className="font-sans bg-white text-gray-800 h-full antialiase overflow-hidden">
+      <body className="font-sans bg-white text-gray-800 h-full antialiase">
+      {/* <body className="font-sans bg-white text-gray-800 h-full antialiase overflow-hidden"></body> */}
         {/* ▼▼ 追記②：AdSense ローダ（全ページで一度だけ読み込み） ▼▼ */}
         <Script
           id="adsense-loader"

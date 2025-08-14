@@ -43,7 +43,7 @@ export default function LandingPage() {
           <div className="w-full mt-6">
             {/* ▼ slot は管理画面で作成後の「実ID」に置き換えてください */}
             <AdsenseAd
-              slot="ca-pub-5428928410579937"
+              slot="1234567890"
               testMode
               style={{ display: 'block', minHeight: 160 }}
             />
@@ -51,7 +51,7 @@ export default function LandingPage() {
 
           <div className="relative w-full max-w-3xl aspect-[16/9] rounded-2xl overflow-hidden shadow">
             <Image
-              src="/landing-sample.png" // public/landing-sample.png を参照
+              src="/landing-sampl.png" // public/landing-sample.png を参照
               alt="アプリのスクリーンショット"
               fill
               className="object-cover"
@@ -91,7 +91,7 @@ export default function LandingPage() {
       <section className="mx-auto max-w-5xl px-4 pb-16">
         <div className="my-8">
           <AdsenseAd
-            slot="ca-pub-5428928410579937"
+            slot="1234567890"
             testMode
             style={{ display: 'block', minHeight: 160 }}
           />
