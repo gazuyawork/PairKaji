@@ -64,9 +64,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingConfirmResolver = useRef<((value: boolean) => void) | null>(null);
   const [showCompletedMap, setShowCompletedMap] = useState<Record<Period, boolean>>({
-    毎日: true,
-    週次: true,
-    その他: true,
+    毎日: false,
+    週次: false,
+    その他: false,
   });
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
