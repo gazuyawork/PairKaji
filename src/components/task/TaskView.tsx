@@ -650,7 +650,14 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       {list
                         .slice()
                         .sort((a, b) => {
+                          // ① フラグ付きタスクを優先的に上に表示
+                          if (a.flagged && !b.flagged) return -1;
+                          if (!a.flagged && b.flagged) return 1;
+
+                          // ② 未完了タスクを優先
                           if (a.done !== b.done) return a.done ? 1 : -1;
+
+                          // ③ 作成日時が新しい順
                           const getTimestampValue = (value: any): number => {
                             if (!value) return 0;
                             if (value instanceof Date) return value.getTime();
@@ -662,6 +669,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           const bTime = getTimestampValue(b.createdAt);
                           return bTime - aTime;
                         })
+
                         .filter((t) => showCompletedMap[period] || !t.done)
                         .map((task, idx) => (
                           <TaskCard
