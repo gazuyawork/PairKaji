@@ -44,7 +44,7 @@ export default function LandingPage() {
             {/* ▼ slot は管理画面で作成後の「実ID」に置き換えてください */}
             <AdsenseAd
               slot="9059633104"
-              testMode
+              testMode={true} // 審査中は true に
               style={{ display: 'block', minHeight: 160 }}
             />
           </div>
@@ -92,7 +92,7 @@ export default function LandingPage() {
         <div className="my-8">
           <AdsenseAd
             slot="9059633104"
-            testMode
+            testMode={true} // 審査中は true に
             style={{ display: 'block', minHeight: 160 }}
           />
         </div>
