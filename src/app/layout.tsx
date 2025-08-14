@@ -1,6 +1,7 @@
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import ClientLayout from './ClientLayout';
+import Script from 'next/script';
 
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
@@ -45,6 +46,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
       <body className="font-sans bg-white text-gray-800 h-full antialiase overflow-hidden">
+        {/* ▼▼ 追記②：AdSense ローダ（全ページで一度だけ読み込み） ▼▼ */}
+        <Script
+          id="adsense-loader"
+          async
+          strategy="afterInteractive"
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+        />
+        {/* ▲▲ 追記ここまで ▲▲ */}
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
