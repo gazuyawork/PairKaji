@@ -91,10 +91,10 @@ export default function LandingPage() {
           <div className="relative">
             <div className="flex gap-4 overflow-x-auto px-1 py-3 snap-x snap-mandatory scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {[
-                { src: '/screenshots/home.png', alt: 'ホーム画面' },
-                { src: '/screenshots/task.png', alt: 'タスク画面' },
-                { src: '/screenshots/todo.png', alt: 'Todo画面' },
-                { src: '/screenshots/extra.png', alt: 'その他画面' },
+                { src: '/screenshots/home_01.png', alt: 'ホーム画面' },
+                { src: '/screenshots/task_01.png', alt: 'タスク画面' },
+                { src: '/screenshots/todo_01.png', alt: 'Todo画面' },
+                { src: '/screenshots/extra_01.png', alt: 'その他画面' },
               ].map((img) => (
                 <div key={img.src} className="snap-center flex-none w-[240px]">
                   <div className="relative w-[240px] h-[510px] rounded-xl border border-gray-200 shadow bg-white overflow-hidden hover:translate-y-[-2px] transition-transform">
