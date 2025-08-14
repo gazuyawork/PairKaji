@@ -1,9 +1,8 @@
-'use client';
+// src/app/layout.tsx
 
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import ClientLayout from './ClientLayout';
-import Script from 'next/script';
 
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
@@ -48,14 +47,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
       <body className="font-sans bg-white text-gray-800 h-full antialiased">
-        {/* ✅ AdSenseのスクリプト（広告表示用） */}
-        <Script
-          id="adsense-loader"
-          async
-          strategy="afterInteractive"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5428928410579937"
-          crossOrigin="anonymous"
-        />
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
