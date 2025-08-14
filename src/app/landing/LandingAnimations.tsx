@@ -5,8 +5,9 @@ import Script from 'next/script';
 export default function LandingAnimations() {
   return (
     <>
-      {/* アニメーション用スタイル（styled-jsx は Client でのみ使用） */}
+      {/* アニメーション用スタイル（Client側で注入） */}
       <style jsx global>{`
+        /* ロゴ：左から順に跳ねる */
         @keyframes logo-bounce {
           0%   { transform: translateY(0) scale(1);   opacity: 0; }
           40%  { transform: translateY(-12px) scale(1.03); opacity: 1; }
@@ -17,7 +18,7 @@ export default function LandingAnimations() {
           animation: logo-bounce 0.7s ease-out both;
         }
 
-        /* スクロール時のリビール */
+        /* セクションのリビール（共通） */
         [data-animate] {
           opacity: 0;
           transform: translateY(18px) scale(0.995);
@@ -36,14 +37,14 @@ export default function LandingAnimations() {
           will-change: transform;
         }
 
-        /* スクロールを少し滑らかに */
+        /* スクロールを滑らかに */
         html { scroll-behavior: smooth; }
       `}</style>
 
-      {/* IntersectionObserver + パララックス（afterInteractive） */}
+      {/* IntersectionObserver + パララックス */}
       <Script id="landing-animations" strategy="afterInteractive">
         {`
-          // IntersectionObserverで[data-animate]要素に.is-inviewを付与
+          // セクション単位でのリビール
           (function () {
             const els = Array.from(document.querySelectorAll('[data-animate]'));
             if (!('IntersectionObserver' in window) || els.length === 0) {
@@ -61,7 +62,7 @@ export default function LandingAnimations() {
             els.forEach((el) => io.observe(el));
           })();
 
-          // 軽いパララックス効果（ヒーロー下の画像）
+          // 軽いパララックス（ヒーロー下の画像）
           (function () {
             const p = document.querySelector('.parallax');
             if (!p) return;
