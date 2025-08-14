@@ -43,7 +43,7 @@ export default function LandingPage() {
           <div className="w-full mt-6">
             {/* ▼ slot は管理画面で作成後の「実ID」に置き換えてください */}
             <AdsenseAd
-              slot="1234567890"
+              slot="9059633104"
               testMode
               style={{ display: 'block', minHeight: 160 }}
             />
@@ -91,7 +91,7 @@ export default function LandingPage() {
       <section className="mx-auto max-w-5xl px-4 pb-16">
         <div className="my-8">
           <AdsenseAd
-            slot="1234567890"
+            slot="9059633104"
             testMode
             style={{ display: 'block', minHeight: 160 }}
           />
