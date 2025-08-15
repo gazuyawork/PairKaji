@@ -72,7 +72,7 @@ export default function LandingPage() {
         <div className="pointer-events-none absolute -top-24 right-10 h-52 w-52 rounded-full bg-blue-200/40 blur-3xl" />
 
         <div className="relative mx-auto max-w-5xl px-4 pt-14 pb-12 text-center">
-          <h2 className="text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight">
+          <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight">
             <span className={`${pacifico.className} tracking-wider`}>PairKaji</span> とは？
           </h2>
           <p className="text-gray-600 text-[15px] md:text-[17px] leading-relaxed max-w-2xl mx-auto mt-4">
@@ -100,7 +100,7 @@ export default function LandingPage() {
       {/* ③ スマホ縦長カルーセル + スクリーンショット（現在色 #FFF7EE） */}
       <section className="bg-[#FFF7EE]" data-animate="reveal-up">
         <div className="mx-auto max-w-5xl px-4 py-12">
-          <h2 className="text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6">
+          <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6">
             アプリ画面イメージ
           </h2>
 
@@ -156,7 +156,7 @@ export default function LandingPage() {
 
       {/* ④ Features（生成り #FFFBF2） */}
       <section className="bg-[#FFFBF2]" data-animate="reveal-up">
-        <h2 className="text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6 pt-8">
+        <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6 pt-8">
           なにができる？
         </h2>
         <div className="mx-auto max-w-5xl px-4 py-4 grid md:grid-cols-3 gap-6">
@@ -191,7 +191,7 @@ export default function LandingPage() {
       {/* ⑤ FAQ（現在色 #FFF7EE） */}
       <section className="bg-[#FFF7EE]" data-animate="reveal-up">
         <div className="mx-auto max-w-3xl px-4 py-12">
-          <h2 className="text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6">
+          <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6">
             よくあるご質問
           </h2>
           <div className="space-y-3">

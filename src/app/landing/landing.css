@@ -58,3 +58,22 @@ details[open] summary::after {
 @media (min-width: 768px) {
   .logo-medallion { width: 84px; height: 84px; }
 }
+
+/* ===== 波打つように色が変化するテキスト ===== */
+.text-wave {
+  background: linear-gradient(
+    270deg,
+    #303030,
+    #494949
+  );
+  background-size: 800% 800%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textWave 8s ease infinite;
+}
+
+@keyframes textWave {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
