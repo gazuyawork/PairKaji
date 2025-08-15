@@ -5,19 +5,14 @@ import { useEffect, useRef } from 'react';
 
 declare global {
   interface Window {
-    // 存在はするが型不明として宣言（直後の push に対し @ts-expect-error を有効化するため）
     adsbygoogle?: unknown;
   }
 }
 
 type Props = {
-  /** AdSenseの広告ユニット（slot）ID。例: "1234567890"（管理画面の実IDに置換） */
   slot: string;
-  /** サイズ指定（審査時は block & auto 推奨） */
   style?: React.CSSProperties;
-  /** レスポンシブ設定（auto推奨） */
   format?: 'auto' | 'horizontal' | 'vertical' | 'rectangle';
-  /** テスト広告モード（本番前は true 推奨 / 審査中に便利） */
   testMode?: boolean;
 };
 
@@ -27,25 +22,42 @@ export default function AdsenseAd({
   format = 'auto',
   testMode = false,
 }: Props) {
-  const client = process.env.NEXT_PUBLIC_ADSENSE_CLIENT; // 例: "ca-pub-xxxxxxxxxxxxxxxx"
+  const client = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
   const isReady = Boolean(client && slot);
+
+  // ▼ 変更①: ref で対象の <ins> を特定
+  const insRef = useRef<HTMLModElement | null>(null);
+
+  // 既存: StrictMode の二重実行対策
   const pushedRef = useRef(false);
 
   useEffect(() => {
     try {
       if (!isReady) return;
-      if (pushedRef.current) return; // StrictModeの二重実行対策
+
+      // ▼ 変更②: 自分の <ins> が未初期化か確認
+      const isThisInsInitialized =
+        insRef.current?.getAttribute('data-adsbygoogle-status') === 'done';
+      if (isThisInsInitialized) return;
+
+      // ▼ 変更③: ドキュメント全体にも「未初期化の adsbygoogle 枠」があるか確認
+      //   これが無い状態で push すると、質問にある TagError が必ず出ます。
+      const hasUninitializedAny =
+        !!document.querySelector('ins.adsbygoogle:not([data-adsbygoogle-status="done"])');
+      if (!hasUninitializedAny) return;
+
+      // 既存: 同一マウント中の多重 push ガード
+      if (pushedRef.current) return;
       pushedRef.current = true;
-      // @ts-expect-error: Google AdSense runtime pushes into window.adsbygoogle which lacks TS types in this project
+
+      // @ts-expect-error: provided by AdSense runtime
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch (e) {
-      // ブロッカー等で失敗しても致命ではない
       // eslint-disable-next-line no-console
       console.debug('AdSense push error (non-fatal):', e);
     }
   }, [isReady]);
 
-  // client/slot 未設定時は枠だけ表示（原因切り分け・空白防止）
   if (!isReady) {
     return (
       <div
@@ -66,14 +78,15 @@ export default function AdsenseAd({
 
   return (
     <ins
+      ref={insRef}
       className="adsbygoogle"
       style={style}
       data-ad-client={client}
       data-ad-slot={slot}
       data-ad-format={format}
       data-full-width-responsive="true"
-      // テスト広告の有効/無効を属性で切替（Reactは data-* を素直に通します）
       data-adtest={testMode ? 'on' : undefined}
+      key={`${slot}-${testMode ? 'test' : 'prod'}`}
     />
   );
 }

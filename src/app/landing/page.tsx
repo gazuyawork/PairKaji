@@ -134,26 +134,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-
-
-      {/* ② Hero（生成り #FFFBF2） */}
-      <section className="relative overflow-hidden bg-[#FFFBF2]" data-animate="reveal-up">
-        <div className="relative mx-auto max-w-5xl px-4 pt-4 pb-4 text-center">
-          {/* 審査用の広告枠（ファーストビュー直下） */}
-          <div className="w-full mt-8">
-            <div className="soft-card rounded-2xl border border-gray-200/70 p-3">
-              {/* ▼ slot は管理画面で作成後の「実ID」に置き換えてください */}
-              <AdsenseAd
-                slot="9059633104"
-                testMode={true}
-                style={{ display: 'block', minHeight: 160 }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-
       {/* ④ Features（生成り #FFFBF2） */}
       <section className="bg-[#FFFBF2]" data-animate="reveal-up">
         <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6 pt-8">
@@ -238,15 +218,6 @@ export default function LandingPage() {
               </Link>
             </div>
           </div>
-
-          {/* セクション下の広告枠（テキストの近接を避け余白確保） */}
-          <div className="my-8">
-            <AdsenseAd
-              slot="9059633104"
-              testMode={true}
-              style={{ display: 'block', minHeight: 160 }}
-            />
-          </div>
         </div>
       </section>
 
@@ -261,6 +232,24 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ② Hero（生成り #FFFBF2） */}
+      <section className="relative overflow-hidden bg-[#FFFBF2]" data-animate="reveal-up">
+        <div className="relative mx-auto max-w-5xl px-4 pt-4 pb-4 text-center">
+          {/* 審査用の広告枠（ファーストビュー直下） */}
+          <div className="w-full mt-8">
+            <div className="soft-card rounded-2xl border border-gray-200/70 p-3">
+              {/* ▼ slot は管理画面で作成後の「実ID」に置き換えてください */}
+              <AdsenseAd
+                slot="9059633104"
+                testMode={true}
+                style={{ display: 'block', minHeight: 160 }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       {/* ⑧ Footer（白） */}
       <footer className="bg-white border-t border-gray-200" data-animate="reveal-up">
