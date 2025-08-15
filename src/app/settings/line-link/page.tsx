@@ -167,13 +167,35 @@ export default function LineLinkPage() {
 
           <h1 className="text-xl font-bold text-gray-800 mb-2">LINEと連携する</h1>
 
-          <div className="bg-yellow-50 text-yellow-800 border border-yellow-300 rounded-md text-sm p-3 mb-4 w-full text-left">
+          <div className="bg-yellow-50 text-red-700 border border-yellow-300 rounded-md text-sm p-3 mb-4 w-full text-left">
             ※ LINE通知のご利用には、<strong>月額300円のプレミアムプラン</strong>への加入が必要です。
-            <br />
-            無料プランではLINE通知をご利用いただけません。
+
+            {/* （既存）プラン詳細のトグル */}
+            <button
+              onClick={() => setShowDetails((prev) => !prev)}
+              className="mt-4 text-sm text-sky-600 underline hover:text-sky-800 flex items-center gap-1"
+            >
+              <Info className="w-4 h-4" />
+              プレミアムプランの詳細を見る
+            </button>
+
+            {showDetails && (
+              <div className="mt-4 w-full text-sm text-gray-700 bg-gray-50 p-4 rounded-md border border-gray-200 text-left">
+                <p className="font-semibold mb-2">プレミアムプラン（300円/月）でできること：</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>タスクのリマインダーをLINEで受信</li>
+                  <li>アプリ内の広告が完全に非表示に</li>
+                </ul>
+                <p className="mt-3 text-xs text-gray-500">
+                  ※ プランはいつでも解約可能です。キャンセル後も契約期間中はご利用いただけます。
+                </p>
+              </div>
+            )}
           </div>
 
+
           {/* 連携ボタン（自己診断→案内／フォールバック） */}
+
           <button
             onClick={handleLineLogin}
             disabled={loading}
@@ -193,31 +215,12 @@ export default function LineLinkPage() {
               <ExternalLink className="w-4 h-4" />
             </button>
             <p className="mt-2 text-xs text-gray-500">
-              まだトークが表示されていない場合は、まず友だち追加を行ってください。初回の通知送信でトークが自動作成されます。
+              <strong>友だち追加を行った後にLINE連携を実施してください。</strong>
+              <br/>
+              <span className='text-red-700'>※友達追加をおこなわない場合、通知が届きません。</span>
             </p>
           </div>
 
-          {/* （既存）プラン詳細のトグル */}
-          <button
-            onClick={() => setShowDetails((prev) => !prev)}
-            className="mt-4 text-sm text-sky-600 underline hover:text-sky-800 flex items-center gap-1"
-          >
-            <Info className="w-4 h-4" />
-            プレミアムプランの詳細を見る
-          </button>
-
-          {showDetails && (
-            <div className="mt-4 w-full text-sm text-gray-700 bg-gray-50 p-4 rounded-md border border-gray-200 text-left">
-              <p className="font-semibold mb-2">プレミアムプラン（300円/月）でできること：</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>タスクのリマインダーをLINEで受信</li>
-                <li>アプリ内の広告が完全に非表示に</li>
-              </ul>
-              <p className="mt-3 text-xs text-gray-500">
-                ※ プランはいつでも解約可能です。キャンセル後も契約期間中はご利用いただけます。
-              </p>
-            </div>
-          )}
 
           {/* ★ 追加: 押下時の案内／エラーを表示（UI は軽量） */}
           {info && (
@@ -231,9 +234,9 @@ export default function LineLinkPage() {
             </div>
           )}
 
-          <p className="text-xs text-gray-400 mt-4">
+          {/* <p className="text-xs text-gray-400 mt-4">
             LINEログイン後、通知許可を求められます。
-          </p>
+          </p> */}
         </div>
       </div>
     </div>
