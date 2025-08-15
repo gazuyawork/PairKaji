@@ -46,6 +46,7 @@ export default function StickyCTA({
   return (
     <div
       className="
+        pl-5
         fixed inset-x-0 bottom-0 z-[60]
         backdrop-blur bg-white/90 md:bg-blue-600/95 md:text-white
         border-t border-gray-200 md:border-blue-500/40
