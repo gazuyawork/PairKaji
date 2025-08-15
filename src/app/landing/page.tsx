@@ -1,20 +1,13 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import AdsenseAd from '@/components/ads/AdsenseAd';
 import { Pacifico } from 'next/font/google';
 import LandingAnimations from './LandingAnimations';
 import './landing.css';
-
-export const metadata = {
-  title: 'PairKaji | 家事を2人で分担するアプリ',
-  description:
-    'PairKajiは、家事を2人で分担・見える化するためのタスク管理アプリです。タスクの進捗共有、ポイント付与、TODO管理がカンタンに。',
-  robots: { index: true, follow: true },
-  // ▼ 追加：OG画像（SNSでの見え方向上）
-  openGraph: {
-    images: ['/images/default.png'],
-  },
-};
+import { useState } from 'react';
+import { Crown, User, Users, ListChecks, Zap, Clock, Share2, History } from 'lucide-react';
 
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400' });
 
@@ -134,39 +127,84 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ④ Features（生成り #FFFBF2） */}
+
+// ④ Features（生成り #FFFBF2）— 段階的開示 & アイコン付きカード
       <section className="bg-[#FFFBF2]" data-animate="reveal-up">
         <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6 pt-8">
           なにができる？
         </h2>
-        <div className="mx-auto max-w-5xl px-4 py-4 grid md:grid-cols-3 gap-6">
-          {[
-            { title: 'プレミアムで快適に', desc: 'LINE通知に対応し、広告も非表示。よりスムーズな家事シェアを。', badge: 'Premium' },
-            { title: 'ひとりでも使える', desc: '個人のタスク管理にも最適。後からパートナー追加も可能です。' },
-            { title: 'タスクを共同管理', desc: '誰が・いつ・何をやるかを共有。見落としゼロでスムーズ。' },
-            { title: 'TODOもサクッと', desc: '買い物リストや細かなメモもひとつに集約。リアルタイム反映。' },
-            { title: 'ポイントで見える化', desc: 'がんばりをポイント化。あとから振り返れて、公平に分担。' },
-            { title: 'リアルタイム同期', desc: 'Firestore連携で変更は即時に反映。二人の画面がずれません。' },
-            { title: 'ペア設定＆共有', desc: '招待コードでペアを承認。タスク・TODO・ポイントを双方向に共有。' },
-            { title: 'ポイント履歴', desc: '週次で頑張りを見える化。振り返りやすく、モチベ維持に最適。' },
-          ].map((f) => (
-            <div
-              key={f.title}
-              className="rounded-2xl soft-card border border-gray-200/70 p-6 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-semibold text-[17px] tracking-tight">{f.title}</h3>
-                {'badge' in f && (f as any).badge ? (
-                  <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white">
-                    {(f as any).badge}
-                  </span>
-                ) : null}
+
+        {/* ▼ 追加：段階的開示の状態 */}
+        {/* ヒーローの直後に来る情報は“軽く”見せる */}
+        {(() => {
+          const features = [
+            { title: 'プレミアムで快適に', desc: 'LINE通知／広告非表示。集中できる管理体験。', icon: Crown, badge: 'Premium' },
+            { title: 'ひとりでも使える', desc: '個人管理からスタート。後からペア追加もOK。', icon: User },
+            { title: 'タスクを共同管理', desc: '誰が・いつ・何をやるか共有して見落としゼロ。', icon: Users },
+            { title: 'TODOもサクッと', desc: '買い物リストやメモもひとまとめに。', icon: ListChecks },
+            { title: 'ポイントで見える化', desc: 'がんばりをポイント化。あとから公平に振り返り。', icon: Zap },
+            { title: 'リアルタイム同期', desc: '変更は即時反映。ふたりの画面がズレない。', icon: Clock },
+            { title: 'ペア設定＆共有', desc: '招待コードで承認。タスク/ポイントを相互編集。', icon: Share2 },
+            { title: 'ポイント履歴', desc: '週次で推移を可視化。モチベ維持に最適。', icon: History },
+          ];
+
+          // 初期表示数
+          const INITIAL = 4;
+          // useStateは上部 import 済み
+          const [expanded, setExpanded] = useState(false);
+          const visible = expanded ? features : features.slice(0, INITIAL);
+
+          return (
+            <div className="mx-auto max-w-5xl px-4 pb-2">
+              {/* カードグリッド：行間を取りつつ、情報量に圧迫感を出さない */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+                {visible.map((f) => {
+                  const Icon = f.icon;
+                  return (
+                    <div
+                      key={f.title}
+                      className="group rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0 rounded-xl border border-gray-200 p-2">
+                          <Icon size={18} className="opacity-80" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-[16px] tracking-tight">{f.title}</h3>
+                            {f.badge ? (
+                              <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                                {f.badge}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-gray-600 leading-relaxed text-[14px] mt-1">
+                            {f.desc}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-gray-600 leading-relaxed text-[15px]">{f.desc}</p>
+
+              {/* “さらに見る/閉じる” トグル：視線の負担を抑えて必要な時だけ増やす */}
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  className="mt-6 inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white/80 px-5 py-2 text-sm shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                >
+                  {expanded ? '閉じる' : `さらに見る（+${features.length - INITIAL}）`}
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </section>
+
+
+
 
       {/* ⑤ FAQ（現在色 #FFF7EE） */}
       <section className="bg-[#FFF7EE]" data-animate="reveal-up">

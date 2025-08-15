@@ -17,9 +17,18 @@ const pacifico = Pacifico({
   variable: '--font-pacifico',
 });
 
+// 変更後（置換）
 export const metadata = {
-  title: 'PairKaji',
-  description: '家事を2人で分担するアプリ',
+  // LP側の値を反映
+  title: 'PairKaji | 家事を2人で分担するアプリ',
+  description:
+    'PairKajiは、家事を2人で分担・見える化するためのタスク管理アプリです。タスクの進捗共有、ポイント付与、TODO管理がカンタンに。',
+  robots: { index: true, follow: true },
+  openGraph: {
+    images: ['/images/default.png'],
+  },
+
+  // 既存の全体設定は維持
   manifest: '/manifest.json',
   icons: {
     icon: '/icons/icon-192.png',
@@ -32,6 +41,7 @@ export const metadata = {
     statusBarStyle: 'default',
   },
 };
+
 
 export const viewport = {
   themeColor: '#ffffff',
