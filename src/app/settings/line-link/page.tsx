@@ -4,15 +4,16 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageCircle, Info, ArrowLeft } from 'lucide-react';
+import { MessageCircle, Info, ArrowLeft, ExternalLink } from 'lucide-react';
 
 /* =========================================
    ★ 変更点サマリ
+   - 追加: 友だち追加導線（ボタン/説明）を常設
+   - 追加: addFriendUrl 取得のヘルパー & 導線ボタンの onClick
    - 追加: LineStatus 型 / loading, info, error の状態（押下時の案内用）
    - 追加: createState / buildLoginUrl（安全なログインURL生成・env対応）
    - 追加: preflight（/api/line/status があれば参照、なければ即フォールバック）
-   - 変更: handleLineLogin を差し替え（自己診断→案内／フォールバック）
-   - 追加: メッセージ表示（info / error）
+   - 変更: handleLineLogin（自己診断→案内／フォールバック、友だち未追加時に導線起動）
    ========================================= */
 
 type LineStatus = {
@@ -31,11 +32,21 @@ export default function LineLinkPage() {
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [cachedStatus, setCachedStatus] = useState<LineStatus | null>(null); // 友だち追加導線のURLに利用
 
   // （既存）ページ表示時に先頭へ
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // ★ 追加: 友だち追加URL（env 優先）
+  const getAddFriendUrl = (fallback?: string) => {
+    return (
+      fallback ||
+      process.env.NEXT_PUBLIC_LINE_ADD_FRIEND_URL || // 例: https://lin.ee/xxxxxx
+      ''
+    );
+  };
 
   // ★ 追加: CSRF対策の state を発行
   const createState = () => {
@@ -65,7 +76,9 @@ export default function LineLinkPage() {
     try {
       const res = await fetch('/api/line/status', { cache: 'no-store' });
       if (!res.ok) return null; // API 未実装や 404 の場合はフォールバック
-      return (await res.json()) as LineStatus;
+      const json = (await res.json()) as LineStatus;
+      setCachedStatus(json);
+      return json;
     } catch {
       return null; // ネットワーク等の失敗もフォールバック対象
     }
@@ -101,9 +114,14 @@ export default function LineLinkPage() {
       }
 
       if (status.linked && !status.friend) {
-        // 友だち追加がまだ → 追加導線を提示
-        if (status.addFriendUrl) window.open(status.addFriendUrl, '_blank');
-        setInfo('友だち追加が必要です。追加後に、もう一度「LINEで連携する」を押してください。');
+        // 友だち追加がまだ → 追加導線を即時提示＆起動
+        const url = getAddFriendUrl(status.addFriendUrl);
+        if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+          setInfo('友だち追加が必要です。追加後に、もう一度「LINEで連携する」を押してください。');
+        } else {
+          setInfo('友だち追加が必要です。公式アカウントの追加URLが未設定のため、管理者にご連絡ください。');
+        }
         return;
       }
 
@@ -114,7 +132,22 @@ export default function LineLinkPage() {
     }
   };
 
-  // （既存 UI はそのまま、ボタンの onClick のみ差し替え）
+  // ★ 追加: 友だち追加ボタン（常時導線）
+  const handleAddFriend = () => {
+    const urlFromStatus = cachedStatus?.addFriendUrl;
+    const url = getAddFriendUrl(urlFromStatus);
+    setInfo('');
+    setError('');
+
+    if (!url) {
+      setError('友だち追加URLが未設定です。管理者にご連絡ください。');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setInfo('友だち追加が完了したら、このページに戻って「LINEで連携する」を押してください。');
+  };
+
+  // （既存 UI はそのまま、導線を追加）
   return (
     <div className="min-h-screen bg-[#f9fcff] flex items-center justify-center px-4 py-12 relative">
       {/* 戻るボタン（既存） */}
@@ -140,7 +173,7 @@ export default function LineLinkPage() {
             無料プランではLINE通知をご利用いただけません。
           </div>
 
-          {/* ★ 変更: onClick を handleLineLogin に差し替え＆ローディング制御を追加 */}
+          {/* 連携ボタン（自己診断→案内／フォールバック） */}
           <button
             onClick={handleLineLogin}
             disabled={loading}
@@ -149,6 +182,20 @@ export default function LineLinkPage() {
           >
             {loading ? '確認中…' : 'LINEで連携する'}
           </button>
+
+          {/* ★ 追加: 友だち追加導線（常設） */}
+          <div className="mt-3 w-full">
+            <button
+              onClick={handleAddFriend}
+              className="w-full border border-emerald-200 text-emerald-700 py-2 rounded-md hover:bg-emerald-50 flex items-center justify-center gap-2"
+            >
+              公式アカウントを友だち追加
+              <ExternalLink className="w-4 h-4" />
+            </button>
+            <p className="mt-2 text-xs text-gray-500">
+              まだトークが表示されていない場合は、まず友だち追加を行ってください。初回の通知送信でトークが自動作成されます。
+            </p>
+          </div>
 
           {/* （既存）プラン詳細のトグル */}
           <button
