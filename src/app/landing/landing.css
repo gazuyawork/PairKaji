@@ -1,0 +1,60 @@
+/* --- ソフトなグリッド背景（薄め） -------------------------------- */
+.bg-grid-soft {
+  background-image:
+    linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* --- マスク（左右フェード）: WebKit対応 -------------------------- */
+.mask-fade-x {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+/* --- ガラス系カード ----------------------------------------------- */
+.soft-card {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* --- FAQ: summaryの矢印（details[open]で回転） -------------------- */
+summary::marker { content: ""; }
+summary::after {
+  content: "";
+  display: inline-block;
+  margin-left: 8px;
+  width: 10px; height: 10px;
+  border-right: 2px solid #4b5563; /* gray-700 */
+  border-bottom: 2px solid #4b5563;
+  transform: rotate(-45deg);
+  transition: transform .2s ease;
+}
+details[open] summary::after {
+  transform: rotate(45deg);
+}
+
+/* --- スクロールバーを極力消す（横スクロールギャラリー） ---------- */
+.hide-scroll::-webkit-scrollbar { display: none; }
+.hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* --- 追加：ロゴメダリオン ---------------------------------------- */
+.logo-medallion {
+  width: 72px;
+  height: 72px;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.35); /* slate-300-ish */
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 4px 18px rgba(2, 6, 23, 0.06),     /* soft drop */
+    inset 0 1px 0 rgba(255, 255, 255, .6); /* top highlight */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+}
+
+@media (min-width: 768px) {
+  .logo-medallion { width: 84px; height: 84px; }
+}
