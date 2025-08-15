@@ -15,7 +15,23 @@ export default function LandingAnimations() {
           100% { transform: translateY(0) scale(1); }
         }
         .logo-bounce {
-          animation: logo-bounce 0.7s ease-out both;
+          animation: logo-bounce 4.5s ease-out both;
+        }
+
+        /* サブタイトル部分 */
+        .fade-in-delay {
+          opacity: 0;
+          animation: fadeIn 1s ease-in forwards;
+          animation-delay: 2s; /* 2秒後に開始 */
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
 
         /* セクションのリビール（共通） */

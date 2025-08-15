@@ -45,7 +45,7 @@ export default function LandingPage() {
 
         <header className="text-center py-20 select-none relative">
           <h1
-            className={`${pacifico.className} text-[56px] md:text-[84px] leading-[0.9] tracking-tight text-[#555] inline-block mt-5`}
+            className={`${pacifico.className} text-[56px] md:text-[84px] leading-[0.9] tracking-tight text-[#555] inline-block mt-5 tracking-wide`}
             aria-label="PairKaji"
           >
             {logo.map((ch, i) => (
@@ -58,7 +58,7 @@ export default function LandingPage() {
               </span>
             ))}
           </h1>
-          <p className="text-[16px] md:text-base text-gray-700 mt-6 md:mt-8">
+          <p className="fade-in-delay text-[16px] md:text-base text-gray-700 mt-6 md:mt-8">
             家事を<span className="text-blue-600">ふたりで</span>、わかちあう。
           </p>
         </header>
@@ -191,9 +191,9 @@ export default function LandingPage() {
       {/* ⑤ FAQ（現在色 #FFF7EE） */}
       <section className="bg-[#FFF7EE]" data-animate="reveal-up">
         <div className="mx-auto max-w-3xl px-4 py-12">
-        <h2 className="text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6">
-          よくあるご質問
-        </h2>
+          <h2 className="text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6">
+            よくあるご質問
+          </h2>
           <div className="space-y-3">
             <details className="group rounded-xl bg-white border border-gray-200 p-4 shadow-sm open:shadow-md transition-shadow">
               <summary className="cursor-pointer font-medium text-gray-800 list-none select-none">個人でも使えますか？</summary>

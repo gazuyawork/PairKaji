@@ -10,6 +10,7 @@ import {
   Loader2,
   CheckCircle,
   ArrowLeft,
+  Info,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from 'firebase/auth';
@@ -79,7 +80,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
           />
 
           {/* ポップアップメニュー */}
-          <div className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-40 z-20">
+          <div className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-42 z-20">
             <ul className="divide-y divide-gray-200">
               <li
                 className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
@@ -100,6 +101,16 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
               >
                 <Mail size={16} />
                 お問い合わせ
+              </li>
+                            <li
+                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                onClick={() => {
+                  setShowMenu(false);
+                  router.push('/landing');
+                }}
+              >
+                <Info size={16} />
+                PairKahi とは？
               </li>
               <li
                 className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
