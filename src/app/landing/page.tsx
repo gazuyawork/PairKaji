@@ -7,7 +7,7 @@ import { Pacifico } from 'next/font/google';
 import LandingAnimations from './LandingAnimations';
 import './landing.css';
 import { useState } from 'react';
-import { Crown, User, Users, ListChecks, Zap, Clock, Share2, History } from 'lucide-react';
+import { Crown, User, Users, ListChecks, Zap, Clock, Share2, History, ChevronDown, HelpCircle } from 'lucide-react';
 import StickyCTA from '@/components/common/StickyCTA';
 
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400' });
@@ -15,18 +15,90 @@ const pacifico = Pacifico({ subsets: ['latin'], weight: '400' });
 export default function LandingPage() {
   const logo = 'PairKaji'.split('');
   const [featExpanded, setFeatExpanded] = useState(false);
+  const [openFeature, setOpenFeature] = useState<string | null>(null);
+  const [openFaq, setOpenFaq] = useState<string | null>(null);
 
   /** 表示する機能一覧（アイコン付き） */
   const features = [
-    { title: 'プレミアムで快適に', desc: 'LINE通知／広告非表示。集中できる管理体験。', icon: Crown, badge: 'Premium' },
+    {
+      title: 'プレミアムで快適に',
+      desc: 'LINE通知／広告非表示。集中できる管理体験。',
+      icon: Crown,
+      badge: 'Premium',
+      // ★ 追加：画像などのリッチ内容をここに
+      detail: (
+        <div className="mt-3 space-y-3">
+          <p className="text-gray-700 text-[14px] leading-relaxed">
+            プレミアムでは、LINE通知の時刻指定や頻度設定、広告非表示で集中できます。
+          </p>
+          <div className="relative w-full h-[180px] rounded-xl overflow-hidden border border-gray-200">
+            <Image src="/images/default.png" alt="プレミアム紹介" fill className="object-contain bg-white" />
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'TODOもサクッと',
+      desc: '買い物リストやメモもひとまとめに。',
+      icon: ListChecks,
+      // ★ 追加：動画例（任意、ファイルがある場合）
+      detail: (
+        <div className="mt-3 space-y-3">
+          <p className="text-gray-700 text-[14px] leading-relaxed">
+            TODOはドラッグ＆ドロップやチェック操作で素早く整理できます。
+          </p>
+          <video className="rounded-xl w-full" controls preload="metadata" poster="/videos/todo_poster.jpg">
+            <source src="/videos/todo_demo.mp4" type="video/mp4" />
+            お使いのブラウザは動画再生に対応していません。
+          </video>
+        </div>
+      ),
+    },
     { title: 'ひとりでも使える', desc: '個人管理からスタート。後からペア追加もOK。', icon: User },
     { title: 'タスクを共同管理', desc: '誰が・いつ・何をやるか共有して見落としゼロ。', icon: Users },
-    { title: 'TODOもサクッと', desc: '買い物リストやメモもひとまとめに。', icon: ListChecks },
     { title: 'ポイントで見える化', desc: 'がんばりをポイント化。あとから公平に振り返り。', icon: Zap },
     { title: 'リアルタイム同期', desc: '変更は即時反映。ふたりの画面がズレない。', icon: Clock },
     { title: 'ペア設定＆共有', desc: '招待コードで承認。タスク/ポイントを相互編集。', icon: Share2 },
     { title: 'ポイント履歴', desc: '週次で推移を可視化。モチベ維持に最適。', icon: History },
+    { title: 'メモ機能', desc: 'TODOにはメモを残せます。', icon: History },
   ] as const;
+
+  // 追加（③）：FAQの配列（必要に応じてdetailに画像/動画もOK）
+  const faqs = [
+    {
+      title: '個人でも使えますか？',
+      desc: 'はい。ひとりのタスク管理にも最適です。あとからパートナーを追加できます。',
+      icon: HelpCircle,
+      // 任意のリッチ詳細
+      detail: (
+        <div className="mt-3 space-y-3">
+          <p className="text-gray-700 text-[14px] leading-relaxed">
+            まずは「ひとり」で始めて、招待コードでペアを承認すれば共同管理に切り替えできます。
+          </p>
+          <div className="relative w-full h-[160px] rounded-xl overflow-hidden border border-gray-200">
+            <Image src="/images/default.png" alt="個人利用イメージ" fill className="object-contain bg-white" />
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'プレミアムのメリットは？',
+      desc: 'LINE通知が使え、広告が非表示になります。集中して管理したい方におすすめです。',
+      icon: HelpCircle,
+      detail: (
+        <video className="rounded-xl w-full mt-3" controls preload="metadata" poster="/videos/premium_poster.jpg">
+          <source src="/videos/premium_demo.mp4" type="video/mp4" />
+          お使いのブラウザは動画再生に対応していません。
+        </video>
+      ),
+    },
+    {
+      title: 'スマホで使いやすいですか？',
+      desc: 'モバイルファーストで設計しています。縦長スクリーンショットのギャラリーもご覧ください。',
+      icon: HelpCircle,
+    },
+  ] as const;
+
 
   const INITIAL = 4;
   const visibleFeatures = featExpanded ? features : features.slice(0, INITIAL);
@@ -79,7 +151,7 @@ export default function LandingPage() {
         {/* うっすらグリッド */}
         <div className="absolute inset-0 bg-grid-soft opacity-40" />
         {/* 飾り玉 */}
-        <div className="pointer-events-none absolute -top-24 right-10 h-52 w-52 rounded-full bg-blue-200/40 blur-3xl" />
+        {/* <div className="pointer-events-none absolute -top-24 right-10 h-52 w-52 rounded-full bg-blue-200/40 blur-3xl" /> */}
 
         <div className="relative mx-auto max-w-5xl px-4 pt-14 pb-12 text-center">
           <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight">
@@ -147,6 +219,7 @@ export default function LandingPage() {
 
       {/* ④ Features（生成り #FFFBF2）— 段階的開示 & アイコン付きカード */}
       <section className="bg-[#FFFBF2]" data-animate="reveal-up">
+        <div className="absolute inset-0 bg-grid-soft opacity-40" />
         <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6 pt-8">
           なにができる？
         </h2>
@@ -156,34 +229,62 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-4 pb-2">
           {/* カードグリッド */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+            {/* 変更後（③ 改修：クリックで開閉、desc をアコーディオン表示） */}
             {visibleFeatures.map((f) => {
               const Icon = f.icon;
+              const isOpen = openFeature === f.title;
+              const contentId = `feature-desc-${f.title}`;
+
               return (
                 <div
                   key={f.title}
-                  className="group rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
+                  className="group rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur p-3 md:p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 rounded-xl border border-gray-200 p-2">
+                  {/* ヘッダー（クリック/タップで開閉） */}
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={contentId}
+                    onClick={() => setOpenFeature((prev) => (prev === f.title ? null : f.title))}
+                    className="w-full flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                  >
+                    {/* アイコン枠：中央揃え */}
+                    <div className="shrink-0 rounded-xl border border-gray-200 p-2 flex items-center justify-center">
                       <Icon size={18} className="opacity-80" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-[16px] tracking-tight">{f.title}</h3>
-                        {'badge' in f && (f as any).badge ? (
-                          <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white">
-                            {(f as any).badge}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-gray-600 leading-relaxed text-[14px] mt-1">
-                        {f.desc}
-                      </p>
+
+                    {/* タイトル・バッジ・矢印：中央揃え */}
+                    <div className="min-w-0 flex-1 flex items-center gap-2">
+                      <h3 className="font-semibold text-[16px] tracking-tight">{f.title}</h3>
+                      {'badge' in f && (f as any).badge ? (
+                        <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white"> {(f as any).badge} </span>
+                      ) : null}
+                      <span className="ml-auto">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+                          aria-hidden="true"
+                        />
+                      </span>
                     </div>
+                  </button>
+
+                  {/* 詳細：画像/動画含む。buttonの外なので動画操作OK */}
+                  <div
+                    id={contentId}
+                    className={`overflow-hidden transition-all duration-300 ${isOpen ? 'mt-3 max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}
+                  >
+                    {/* detail があれば優先。なければ desc を表示 */}
+                    {('detail' in f && (f as any).detail) ? (
+                      (f as any).detail
+                    ) : (
+                      <p className="text-gray-700 leading-relaxed text-[14px] mt-1">{f.desc}</p>
+                    )}
                   </div>
                 </div>
               );
             })}
+
           </div>
 
           {/* “さらに見る/閉じる” トグル */}
@@ -210,29 +311,64 @@ export default function LandingPage() {
             よくあるご質問
           </h2>
           <div className="space-y-3">
-            <details className="group rounded-xl bg-white border border-gray-200 p-4 shadow-sm open:shadow-md transition-shadow">
-              <summary className="cursor-pointer font-medium text-gray-800 list-none select-none">個人でも使えますか？</summary>
-              <div className="mt-2 text-sm text-gray-700">
-                はい。ひとりのタスク管理にも最適です。あとからパートナーを追加できます。
+            <div className="mx-auto max-w-3xl">
+              <div className="grid grid-cols-1 gap-4">
+                {faqs.map((q) => {
+                  const Icon = q.icon;
+                  const isOpen = openFaq === q.title;
+                  const contentId = `faq-${q.title}`;
+
+                  return (
+                    <div
+                      key={q.title}
+                      className="group rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur p-3 md:p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
+                    >
+                      {/* ヘッダー（クリック/タップで開閉） */}
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        aria-controls={contentId}
+                        onClick={() => setOpenFaq((prev) => (prev === q.title ? null : q.title))}
+                        className="w-full flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                      >
+                        <div className="shrink-0 rounded-xl border border-gray-200 p-2 flex items-center justify-center">
+                          <Icon size={18} className="opacity-80" />
+                        </div>
+
+                        <div className="min-w-0 flex-1 flex items-center gap-2">
+                          <h3 className="font-semibold text-[16px] tracking-tight">{q.title}</h3>
+                          <span className="ml-auto">
+                            <ChevronDown
+                              size={16}
+                              className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* 詳細（desc or detail） */}
+                      <div
+                        id={contentId}
+                        className={`overflow-hidden transition-all duration-300 ${isOpen ? 'mt-3 max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}
+                      >
+                        {('detail' in q && (q as any).detail) ? (
+                          (q as any).detail
+                        ) : (
+                          <p className="text-gray-700 leading-relaxed text-[14px] mt-1">{q.desc}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </details>
-            <details className="group rounded-xl bg-white border border-gray-200 p-4 shadow-sm open:shadow-md transition-shadow">
-              <summary className="cursor-pointer font-medium text-gray-800 list-none select-none">プレミアムのメリットは？</summary>
-              <div className="mt-2 text-sm text-gray-700">
-                LINE通知が使え、広告が非表示になります。集中して管理したい方におすすめです。
-              </div>
-            </details>
-            <details className="group rounded-xl bg-white border border-gray-200 p-4 shadow-sm open:shadow-md transition-shadow">
-              <summary className="cursor-pointer font-medium text-gray-800 list-none select-none">スマホで使いやすいですか？</summary>
-              <div className="mt-2 text-sm text-gray-700">
-                モバイルファーストで設計しています。縦長スクリーンショットのギャラリーもご覧ください。
-              </div>
-            </details>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="bg-[#FFFBF2]" data-animate="reveal-up">
+        <div className="absolute inset-0 bg-grid-soft opacity-40" />
         <div className="mx-auto max-w-5xl px-4 py-12">
           <div className="rounded-2xl soft-card bg-blue-50/70 border border-blue-100 p-6 text-center">
             <h2 className="text-xl md:text-2xl font-semibold mb-2 tracking-tight">いますぐPairKajiをはじめよう</h2>
