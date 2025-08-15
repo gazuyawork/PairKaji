@@ -135,6 +135,12 @@ export default function LoginPage() {
         </motion.button>
       </div>
 
+      <Link href="/landing">
+        <p className="text-xs text-center text-[#5E5E5E] mt-6 underline font-sans">
+          PairKajiとは？
+        </p>
+      </Link>
+
       {isLoading && (
         <div
           className="absolute inset-0 bg-white/70 flex items-center justify-center z-50"

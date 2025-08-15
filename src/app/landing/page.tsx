@@ -8,11 +8,28 @@ import LandingAnimations from './LandingAnimations';
 import './landing.css';
 import { useState } from 'react';
 import { Crown, User, Users, ListChecks, Zap, Clock, Share2, History } from 'lucide-react';
+import StickyCTA from '@/components/common/StickyCTA';
 
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400' });
 
 export default function LandingPage() {
   const logo = 'PairKaji'.split('');
+  const [featExpanded, setFeatExpanded] = useState(false);
+
+  /** 表示する機能一覧（アイコン付き） */
+  const features = [
+    { title: 'プレミアムで快適に', desc: 'LINE通知／広告非表示。集中できる管理体験。', icon: Crown, badge: 'Premium' },
+    { title: 'ひとりでも使える', desc: '個人管理からスタート。後からペア追加もOK。', icon: User },
+    { title: 'タスクを共同管理', desc: '誰が・いつ・何をやるか共有して見落としゼロ。', icon: Users },
+    { title: 'TODOもサクッと', desc: '買い物リストやメモもひとまとめに。', icon: ListChecks },
+    { title: 'ポイントで見える化', desc: 'がんばりをポイント化。あとから公平に振り返り。', icon: Zap },
+    { title: 'リアルタイム同期', desc: '変更は即時反映。ふたりの画面がズレない。', icon: Clock },
+    { title: 'ペア設定＆共有', desc: '招待コードで承認。タスク/ポイントを相互編集。', icon: Share2 },
+    { title: 'ポイント履歴', desc: '週次で推移を可視化。モチベ維持に最適。', icon: History },
+  ] as const;
+
+  const INITIAL = 4;
+  const visibleFeatures = featExpanded ? features : features.slice(0, INITIAL);
 
   return (
     // main には地の色を指定せず、各セクションで交互配色
@@ -73,7 +90,7 @@ export default function LandingPage() {
             タスク、TODO、ポイント管理をスマホでもPCでもサクサク操作。
           </p>
 
-          <div className="flex justify-center gap-3 mt-7">
+          {/* <div className="flex justify-center gap-3 mt-7">
             <Link
               href="/register"
               className="rounded-2xl bg-blue-600 text-white px-5 py-3 text-sm md:text-base shadow transition hover:translate-y-[-1px] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
@@ -86,13 +103,13 @@ export default function LandingPage() {
             >
               ログイン
             </Link>
-          </div>
+          </div> */}
         </div>
       </section>
 
       {/* ③ スマホ縦長カルーセル + スクリーンショット（現在色 #FFF7EE） */}
       <section className="bg-[#FFF7EE]" data-animate="reveal-up">
-        <div className="mx-auto max-w-5xl px-4 py-12">
+        <div className="mx-auto max-w-5xl px-4 py-4">
           <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6">
             アプリ画面イメージ
           </h2>
@@ -128,7 +145,7 @@ export default function LandingPage() {
       </section>
 
 
-// ④ Features（生成り #FFFBF2）— 段階的開示 & アイコン付きカード
+      {/* ④ Features（生成り #FFFBF2）— 段階的開示 & アイコン付きカード */}
       <section className="bg-[#FFFBF2]" data-animate="reveal-up">
         <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6 pt-8">
           なにができる？
@@ -136,71 +153,51 @@ export default function LandingPage() {
 
         {/* ▼ 追加：段階的開示の状態 */}
         {/* ヒーローの直後に来る情報は“軽く”見せる */}
-        {(() => {
-          const features = [
-            { title: 'プレミアムで快適に', desc: 'LINE通知／広告非表示。集中できる管理体験。', icon: Crown, badge: 'Premium' },
-            { title: 'ひとりでも使える', desc: '個人管理からスタート。後からペア追加もOK。', icon: User },
-            { title: 'タスクを共同管理', desc: '誰が・いつ・何をやるか共有して見落としゼロ。', icon: Users },
-            { title: 'TODOもサクッと', desc: '買い物リストやメモもひとまとめに。', icon: ListChecks },
-            { title: 'ポイントで見える化', desc: 'がんばりをポイント化。あとから公平に振り返り。', icon: Zap },
-            { title: 'リアルタイム同期', desc: '変更は即時反映。ふたりの画面がズレない。', icon: Clock },
-            { title: 'ペア設定＆共有', desc: '招待コードで承認。タスク/ポイントを相互編集。', icon: Share2 },
-            { title: 'ポイント履歴', desc: '週次で推移を可視化。モチベ維持に最適。', icon: History },
-          ];
-
-          // 初期表示数
-          const INITIAL = 4;
-          // useStateは上部 import 済み
-          const [expanded, setExpanded] = useState(false);
-          const visible = expanded ? features : features.slice(0, INITIAL);
-
-          return (
-            <div className="mx-auto max-w-5xl px-4 pb-2">
-              {/* カードグリッド：行間を取りつつ、情報量に圧迫感を出さない */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-                {visible.map((f) => {
-                  const Icon = f.icon;
-                  return (
-                    <div
-                      key={f.title}
-                      className="group rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="shrink-0 rounded-xl border border-gray-200 p-2">
-                          <Icon size={18} className="opacity-80" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-[16px] tracking-tight">{f.title}</h3>
-                            {f.badge ? (
-                              <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white">
-                                {f.badge}
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="text-gray-600 leading-relaxed text-[14px] mt-1">
-                            {f.desc}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* “さらに見る/閉じる” トグル：視線の負担を抑えて必要な時だけ増やす */}
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setExpanded((v) => !v)}
-                  className="mt-6 inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white/80 px-5 py-2 text-sm shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+        <div className="mx-auto max-w-5xl px-4 pb-2">
+          {/* カードグリッド */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+            {visibleFeatures.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div
+                  key={f.title}
+                  className="group rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
                 >
-                  {expanded ? '閉じる' : `さらに見る（+${features.length - INITIAL}）`}
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 rounded-xl border border-gray-200 p-2">
+                      <Icon size={18} className="opacity-80" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-[16px] tracking-tight">{f.title}</h3>
+                        {'badge' in f && (f as any).badge ? (
+                          <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                            {(f as any).badge}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-gray-600 leading-relaxed text-[14px] mt-1">
+                        {f.desc}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* “さらに見る/閉じる” トグル */}
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setFeatExpanded((v) => !v)}
+              className="mt-6 inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white/80 px-5 py-2 text-sm shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+            >
+              {featExpanded ? '閉じる' : `さらに見る（+${features.length - INITIAL}）`}
+            </button>
+          </div>
+        </div>
+
       </section>
 
 
@@ -235,7 +232,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ⑥ CTA + 下部広告（生成り #FFFBF2） */}
       <section className="bg-[#FFFBF2]" data-animate="reveal-up">
         <div className="mx-auto max-w-5xl px-4 py-12">
           <div className="rounded-2xl soft-card bg-blue-50/70 border border-blue-100 p-6 text-center">
@@ -259,18 +255,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ⑦ Premium ミニ帯（現在色 #FFF7EE） */}
-      <section className="bg-[#FFF7EE]" data-animate="reveal-up">
-        <div className="mx-auto max-w-5xl px-4 py-10">
-          <div className="rounded-2xl bg-white border border-blue-200 p-5 shadow-sm text-center">
-            <p className="text-gray-800 text-sm md:text-base">
-              プレミアムなら <span className="font-semibold">LINE通知</span> &amp; <span className="font-semibold">広告非表示</span>。
-              <span className="ml-1">まずは無料でお試しください。</span>
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* ② Hero（生成り #FFFBF2） */}
       <section className="relative overflow-hidden bg-[#FFFBF2]" data-animate="reveal-up">
         <div className="relative mx-auto max-w-5xl px-4 pt-4 pb-4 text-center">
@@ -288,6 +272,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <StickyCTA appHref="/main" registerHref="/login" />
 
       {/* ⑧ Footer（白） */}
       <footer className="bg-white border-t border-gray-200" data-animate="reveal-up">
