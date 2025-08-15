@@ -1,3 +1,4 @@
+// src/app/landing/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -99,7 +100,6 @@ export default function LandingPage() {
     },
   ] as const;
 
-
   const INITIAL = 4;
   const visibleFeatures = featExpanded ? features : features.slice(0, INITIAL);
 
@@ -186,7 +186,7 @@ export default function LandingPage() {
             アプリ画面イメージ
           </h2>
 
-          {/* スマホ縦長カルーセル */}
+        {/* スマホ縦長カルーセル */}
           <div className="relative">
             <div className="hide-scroll mask-fade-x flex gap-4 overflow-x-auto px-1 py-3 snap-x snap-mandatory scroll-smooth">
               {[
@@ -216,10 +216,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-
       {/* ④ Features（生成り #FFFBF2）— 段階的開示 & アイコン付きカード */}
-      <section className="bg-[#FFFBF2]" data-animate="reveal-up">
-        <div className="absolute inset-0 bg-grid-soft opacity-40" />
+      {/* ★ 変更: relative を付与し、下のオーバーレイに pointer-events-none を付ける */}
+      <section className="relative bg-[#FFFBF2]" data-animate="reveal-up"> {/* ★ 変更 */}
+        <div className="pointer-events-none absolute inset-0 bg-grid-soft opacity-40" /> {/* ★ 追加 */}
         <h2 className="text-wave text-[24px] md:text-[40px] font-bold tracking-[-0.01em] leading-tight text-center mb-6 pt-8">
           なにができる？
         </h2>
@@ -298,11 +298,7 @@ export default function LandingPage() {
             </button>
           </div>
         </div>
-
       </section>
-
-
-
 
       {/* ⑤ FAQ（現在色 #FFF7EE） */}
       <section className="bg-[#FFF7EE]" data-animate="reveal-up">
@@ -367,8 +363,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="bg-[#FFFBF2]" data-animate="reveal-up">
-        <div className="absolute inset-0 bg-grid-soft opacity-40" />
+      {/* CTA ブロック（現在色 #FFFBF2） */}
+      {/* ★ 変更: relative を付与し、下のオーバーレイに pointer-events-none を付ける */}
+      <section className="relative bg-[#FFFBF2]" data-animate="reveal-up"> {/* ★ 変更 */}
+        <div className="pointer-events-none absolute inset-0 bg-grid-soft opacity-40" /> {/* ★ 追加 */}
         <div className="mx-auto max-w-5xl px-4 py-12">
           <div className="rounded-2xl soft-card bg-blue-50/70 border border-blue-100 p-6 text-center">
             <h2 className="text-xl md:text-2xl font-semibold mb-2 tracking-tight">いますぐPairKajiをはじめよう</h2>
@@ -391,7 +389,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ② Hero（生成り #FFFBF2） */}
+      {/* ⑥ 広告枠（生成り #FFFBF2） */}
       <section className="relative overflow-hidden bg-[#FFFBF2]" data-animate="reveal-up">
         <div className="relative mx-auto max-w-5xl px-4 pt-4 pb-4 text-center">
           {/* 審査用の広告枠（ファーストビュー直下） */}

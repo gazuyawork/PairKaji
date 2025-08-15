@@ -1,13 +1,89 @@
+// src/app/landing/LandingAnimations.tsx
 'use client';
 
-import Script from 'next/script';
+/* ✅ 変更: <Script> ではなく React の useEffect で初期化する */
+import { useEffect } from 'react';
 
 export default function LandingAnimations() {
+  /* ✅ 追加: マウント時に必ず初期化が走るようにする（/landing 再訪・BFCache対応） */
+  useEffect(() => {
+    // JSが有効なときだけ初期非表示ルールを適用するためのフラグ
+    document.documentElement.classList.add('js-animate');
+
+    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-animate]'));
+
+    // IntersectionObserver で可視化
+    const io = 'IntersectionObserver' in window
+      ? new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('is-inview'); // ← 既存クラス名をそのまま利用
+                io?.unobserve(entry.target);
+              }
+            });
+          },
+          { root: null, rootMargin: '0px 0px -10% 0px', threshold: 0.1 }
+        )
+      : null;
+
+    // ✅ 追加: 既に画面内にある要素は即時表示（戻り時に非表示のままを防止）
+    const vpH = window.innerHeight || document.documentElement.clientHeight || 0;
+    els.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < vpH * 0.95) {
+        el.classList.add('is-inview');
+      } else {
+        io?.observe(el);
+      }
+    });
+
+    // ✅ 追加: BFCache 復帰（iOS/Safari で発生）時も全表示にする安全弁
+    const onPageShow = (e: Event) => {
+      if (e && 'persisted' in e && e.persisted) {
+        els.forEach((el) => el.classList.add('is-inview'));
+      }
+    };
+    window.addEventListener('pageshow', onPageShow as any);
+
+    // ✅ 追加: フォールバック（300ms 後も誰も可視化されていなければ全表示）
+    const fallbackTimer = window.setTimeout(() => {
+      const anyVisible = els.some((el) => el.classList.contains('is-inview'));
+      if (!anyVisible) {
+        els.forEach((el) => el.classList.add('is-inview'));
+      }
+    }, 300);
+
+    // ✅ 追加: 軽いパララックス（存在すれば適用）
+    const p = document.querySelector<HTMLElement>('.parallax');
+    let ticking = false;
+    const onScroll = () => {
+      if (!p) return;
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(() => {
+          const y = window.scrollY || window.pageYOffset || 0;
+          p.style.transform = `translateY(${y * 0.03}px)`;
+          ticking = false;
+        });
+      }
+    };
+    if (p) window.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      window.removeEventListener('pageshow', onPageShow as any);
+      if (p) window.removeEventListener('scroll', onScroll);
+      io?.disconnect();
+      // js-animate は外さず残してOK（戻り時の初期表示維持のため）
+    };
+  }, []);
+
   return (
     <>
-      {/* アニメーション用スタイル（Client側で注入） */}
+      {/* ✅ 変更: 初期非表示は「JS有効時のみ」適用する（.js-animate） */}
       <style jsx global>{`
-        /* ロゴ：左から順に跳ねる */
+        /* ロゴ：左から順に跳ねる（現状維持） */
         @keyframes logo-bounce {
           0%   { transform: translateY(0) scale(1);   opacity: 0; }
           40%  { transform: translateY(-12px) scale(1.03); opacity: 1; }
@@ -18,30 +94,25 @@ export default function LandingAnimations() {
           animation: logo-bounce 4.5s ease-out both;
         }
 
-        /* サブタイトル部分 */
+        /* サブタイトル部分（現状維持） */
         .fade-in-delay {
           opacity: 0;
           animation: fadeIn 1s ease-in forwards;
-          animation-delay: 2s; /* 2秒後に開始 */
+          animation-delay: 2s;
         }
-
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
 
-        /* セクションのリビール（共通） */
-        [data-animate] {
+        /* ✅ 変更: data-animate の初期非表示は JS 有効時のみ（js-animate 配下に限定） */
+        .js-animate [data-animate] {
           opacity: 0;
           transform: translateY(18px) scale(0.995);
           transition: transform 600ms cubic-bezier(.22,1,.36,1), opacity 600ms ease-out;
           will-change: transform, opacity;
         }
-        [data-animate].is-inview {
+        .js-animate [data-animate].is-inview {
           opacity: 1;
           transform: translateY(0) scale(1);
         }
@@ -53,49 +124,14 @@ export default function LandingAnimations() {
           will-change: transform;
         }
 
-        /* スクロールを滑らかに */
+        /* スクロールを滑らかに（現状維持） */
         html { scroll-behavior: smooth; }
       `}</style>
 
-      {/* IntersectionObserver + パララックス */}
-      <Script id="landing-animations" strategy="afterInteractive">
-        {`
-          // セクション単位でのリビール
-          (function () {
-            const els = Array.from(document.querySelectorAll('[data-animate]'));
-            if (!('IntersectionObserver' in window) || els.length === 0) {
-              els.forEach(el => el.classList.add('is-inview'));
-              return;
-            }
-            const io = new IntersectionObserver((entries) => {
-              entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                  entry.target.classList.add('is-inview');
-                  io.unobserve(entry.target);
-                }
-              });
-            }, { root: null, rootMargin: '0px 0px -10% 0px', threshold: 0.15 });
-            els.forEach((el) => io.observe(el));
-          })();
-
-          // 軽いパララックス（ヒーロー下の画像）
-          (function () {
-            const p = document.querySelector('.parallax');
-            if (!p) return;
-            let ticking = false;
-            window.addEventListener('scroll', function () {
-              if (!ticking) {
-                window.requestAnimationFrame(function () {
-                  const y = window.scrollY || window.pageYOffset || 0;
-                  p.style.transform = 'translateY(' + (y * 0.03) + 'px)';
-                  ticking = false;
-                });
-                ticking = true;
-              }
-            }, { passive: true });
-          })();
-        `}
-      </Script>
+      {/* ✅ 削除: <Script> による実行は不要（useEffectで実行するため） */}
+      {/*
+      <Script id="landing-animations" strategy="afterInteractive"> ... </Script>
+      */}
     </>
   );
 }
