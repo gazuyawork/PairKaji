@@ -29,14 +29,14 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
     }
   };
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
+  // useEffect(() => {
 
-    if (uid) {
-      setCurrentUserId(uid);
-    }
-  }, []);
+  //   if (uid) {
+  //     setCurrentUserId(uid);
+  //   }
+  // }, []);
 
 
   useEffect(() => {
@@ -48,11 +48,14 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
     }
   }, []);
 
+  // const filteredTasks = tasks.filter(task =>
+  //   task.visible &&
+  //   (task.userId === currentUserId || task.private !== true)
+  // );
   const filteredTasks = tasks.filter(task =>
     task.visible &&
-    (task.userId === currentUserId || task.private !== true)
+    (task.userId === uid || task.private !== true)
   );
-
 
   return (
     <div className="relative py-0 mb-3 mt-[-12px] flex items-center">
