@@ -221,8 +221,8 @@ export default function TaskCard({
                 task.done
                   ? 'bg-gray-300 opacity-30 cursor-not-allowed'
                   : task.flagged
-                  ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
-                  : 'bg-gray-300 ring-1 ring-gray-300 text-white'
+                    ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
+                    : 'bg-gray-300 ring-1 ring-gray-300 text-white'
               )}
             >
               <Flag className="w-5 h-5" />
@@ -293,7 +293,43 @@ export default function TaskCard({
 
           {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
 
-          <div className="w-[100%] min-w-0">
+
+          {/* 左エリア本体：名前(1fr) + 曜日(auto) の2カラムにして衝突回避 */}
+          <div className="grid grid-cols-[1fr_auto] items-center gap-x-2 min-w-0 flex-1">
+            {/* タスク名：省略可・はみ出し防止 */}
+            <div className="min-w-0">
+              <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
+            </div>
+
+            {/* 曜日：右側に寄せ、サイズ固定しつつ折返し可能 */}
+            {sortedDays.length > 0 && (
+              <div
+                className={clsx(
+                  // 横詰まり時は2列グリッドで折返し、全体幅は最大で100px程度に制限
+                  'grid gap-x-[1px] gap-y-[2px] pr-1 justify-end content-center',
+                  'max-w-[100px]',
+                  sortedDays.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
+                )}
+              >
+                {sortedDays.map((d, i) => (
+                  <div
+                    key={i}
+                    className={clsx(
+                      'w-5.5 h-5.5 aspect-square rounded-full text-white text-[10px] flex items-center justify-center border-2',
+                      'shrink-0',
+                      dayBaseClass,
+                      dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+                    )}
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+
+          {/* <div className="w-[100%] min-w-0">
             <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
           </div>
 
@@ -317,13 +353,13 @@ export default function TaskCard({
                 </div>
               ))}
             </div>
-          )}
+          )} */}
         </div>
 
         {/* 右側：日時・ポイント・画像 */}
         <div className="flex items-center gap-1">
           {(task.dates?.[0] || task.time) && (
-            <div className="flex flex-col items-center text-xs w-[32px]">
+            <div className="flex flex-col items-center text-xs w-[32px] ml-2">
               <div className="text-gray-600 inline-block text-center leading-tight">
                 {task.dates?.[0] && (
                   <div className="flex items-center justify-center gap-1">
@@ -378,7 +414,7 @@ export default function TaskCard({
               )}
             </div>
           ) : (
-            <div className="w-[20px] h-[30px]" />
+            <div className="w-[10px] h-[30px]" />
           )}
         </div>
       </motion.div>

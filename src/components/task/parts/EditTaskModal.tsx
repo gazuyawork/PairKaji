@@ -409,11 +409,10 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-7 h-7 rounded-full text-xs font-bold ${
-                    editedTask.daysOfWeek.includes(day)
+                  className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
                       ? 'bg-[#5E5E5E] text-white'
                       : 'bg-gray-200 text-gray-600'
-                  }`}
+                    }`}
                 >
                   {day}
                 </button>
@@ -421,6 +420,48 @@ export default function EditTaskModal({
             </div>
           </div>
         )}
+
+
+        {/* ⏰ 時刻選択（週次のみ） */}
+        {editedTask.period === '週次' && (
+          <div className="flex items-center gap-2">
+            <label className="w-20 text-gray-600 shrink-0">時間：</label>
+            <div className="relative w-[40%]">
+              {/* iOS Safari のとき、未入力ならダミー表示 */}
+              {isIOSMobileSafari && (!editedTask.time || editedTask.time === '') && (
+                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
+                  --:--
+                </span>
+              )}
+              <input
+                type="time"
+                value={editedTask.time || ''}
+                onChange={(e) => {
+                  const time = e.target.value;
+                  update('time', time);
+                }}
+                className="w-[90%] border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
+              />
+            </div>
+
+            {/* ✖ クリアボタン（時刻があるときのみ表示） */}
+            {editedTask.time && (
+              <button
+                type="button"
+                onClick={() => {
+                  update('time', '');
+                }}
+                className="text-red-500"
+                title="時間をクリア"
+              >
+                <Eraser size={18} />
+              </button>
+            )}
+          </div>
+        )}
+
+
+
 
         {/* 📆 日付＆時間選択（その他のみ） */}
         {editedTask.period === 'その他' && (
@@ -526,11 +567,10 @@ export default function EditTaskModal({
                         key={user.id}
                         type="button"
                         onClick={() => toggleUser(user.id)}
-                        className={`w-12 h-12 rounded-full border overflow-hidden ${
-                          isSelected
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected
                             ? 'border-[#FFCB7D] opacity-100'
                             : 'border-gray-300 opacity-30'
-                        }`}
+                          }`}
                         title={`${user.name} | ${imgSrc}`}
                       >
                         <Image
@@ -571,14 +611,12 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isPrivate}
                 onClick={() => setIsPrivate(!isPrivate)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
-                }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isPrivate ? 'translate-x-6' : ''
-                  }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : ''
+                    }`}
                 />
               </button>
             </div>

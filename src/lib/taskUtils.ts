@@ -412,16 +412,24 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
         await removeTaskIdFromNotifyLogs(uid, taskId, originalDates);
       }
 
-      // 4) ★ 新規追加ロジック：その他 → 週次/毎日
+      // 4) ★ 期間切替：その他 → 週次/毎日
       //    - 通知再送防止のため、元 dates から削除
-      //    - 保存時は dates=[], time='' に強制上書き
-      if (isOtherToRecurring) {
+      //    - 保存時は dates=[] にする
+      //    - ★ time は「週次でも使用」するためクリアしない（新入力値を維持）
+      const isOtherToWeekly = originalPeriod !== newPeriod && newPeriod === '週次';
+      const isOtherToDaily = originalPeriod !== newPeriod && newPeriod === '毎日';
+
+      if (isOtherToWeekly || isOtherToDaily) {
         if (originalDates.length > 0 && originalTime) {
           await removeTaskIdFromNotifyLogs(uid, taskId, originalDates);
         }
         finalDates = [];
-        finalTime = '';
+
+        // 週次：time を残す（新入力値 newTimeInput をそのまま保存）
+        // 毎日：運用に合わせて残す/消すを選べます。デフォルトは「残す」方が柔軟です。
+        finalTime = newTimeInput; // ← ここが重要（以前は '' にしていた）
       }
+
 
       // 🔽 タスクの更新（dates/time は final* を保存）
       await updateDoc(taskRef, {
