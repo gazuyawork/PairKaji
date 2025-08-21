@@ -23,6 +23,18 @@ import { db, auth } from '@/lib/firebase';
 import { handleFirestoreError } from './errorUtils';
 import { arrayRemove, writeBatch } from 'firebase/firestore';
 
+/* =========================================
+ * 🔧 追加（①）：JSTのYYYY-MM-DDを取得するユーティリティ
+ *    - “毎日/週次”で dates=[] の場合の時刻変更時に、当日分の notifyLogs を安全に削除するため
+ * =======================================*/
+const getJstYmd = () =>
+  new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date()); // → "YYYY-MM-DD"
+
 /**
  * 指定されたpairIdのペアに属するuserIdsを取得する関数
  * @param pairId FirestoreのpairsドキュメントID
@@ -335,9 +347,6 @@ export const cleanObject = <T>(obj: T): T => {
 //   }
 // };
 
-
-
-
 /**
  * タスクを Firestore に保存する（新規作成または更新）。
  * - タスクが新規なら addDoc、既存なら updateDoc を使用。
@@ -364,7 +373,6 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
 
     const commonData = { ...taskData, private: isPrivate, userIds };
 
-
     if (taskId) {
       const taskRef = doc(db, 'tasks', taskId);
 
@@ -386,10 +394,6 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
       const originalPeriod = (originalData?.period ?? '') as string;
       const newPeriod = (taskData.period ?? '') as string;
 
-      // 🔽 「その他 → 週次/毎日」に切替えたら、dates と time をクリアして保存する
-      // const isOtherToRecurring =
-      //   originalPeriod !== newPeriod && (newPeriod === '週次' || newPeriod === '毎日');
-
       // この後 update 用に使う最終値（強制クリアの判定に使う）
       let finalDates: string[] = newDates;
       let finalTime: string = newTimeInput;
@@ -404,6 +408,14 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
         const intersectDates = originalDates.filter((d) => newDates.includes(d));
         if (intersectDates.length > 0) {
           await removeTaskIdFromNotifyLogs(uid, taskId, intersectDates);
+        } else {
+          /* ============================================================
+           * ✅ 追加（②）：“毎日/週次”など dates=[] の場合でも当日分を削除
+           *   - dates が空で共通日付が無いケースでも、当日(JST)の notifyLogs に入っていれば削除
+           *   - 「時刻だけ」を変更したときの再送防止のため
+           * ============================================================*/
+          const todayJst = getJstYmd(); // "YYYY-MM-DD"
+          await removeTaskIdFromNotifyLogs(uid, taskId, [todayJst]);
         }
       }
 
@@ -425,11 +437,9 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
         }
         finalDates = [];
 
-        // 週次：time を残す（新入力値 newTimeInput をそのまま保存）
-        // 毎日：運用に合わせて残す/消すを選べます。デフォルトは「残す」方が柔軟です。
-        finalTime = newTimeInput; // ← ここが重要（以前は '' にしていた）
+        // 週次・毎日：運用に合わせて残す/消すを選べますが、ここでは「残す」
+        finalTime = newTimeInput; // ← 新入力値をそのまま保持
       }
-
 
       // 🔽 タスクの更新（dates/time は final* を保存）
       await updateDoc(taskRef, {
@@ -455,7 +465,6 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
     handleFirestoreError(err);
   }
 };
-
 
 /**
  * 指定されたタスクIDの Firestore ドキュメントを削除する。
@@ -599,9 +608,6 @@ const removeTaskIdFromNotifyLogs = async (
   await batch.commit();
 };
 
-
-
-
 /**
  * タスクの完了状態を切り替える処理（完了 ↔ 未完了）
  * 完了時は `done`, `completedAt`, `completedBy` を更新し、
@@ -683,7 +689,6 @@ export const toggleTaskDoneStatus = async (
     handleFirestoreError(error);
   }
 };
-
 
 /**
  * ペアが存在しない場合に共有タスク（userIdsが2人以上）を削除する
