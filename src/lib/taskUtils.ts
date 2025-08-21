@@ -387,8 +387,8 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
       const newPeriod = (taskData.period ?? '') as string;
 
       // 🔽 「その他 → 週次/毎日」に切替えたら、dates と time をクリアして保存する
-      const isOtherToRecurring =
-        originalPeriod !== newPeriod && (newPeriod === '週次' || newPeriod === '毎日');
+      // const isOtherToRecurring =
+      //   originalPeriod !== newPeriod && (newPeriod === '週次' || newPeriod === '毎日');
 
       // この後 update 用に使う最終値（強制クリアの判定に使う）
       let finalDates: string[] = newDates;
