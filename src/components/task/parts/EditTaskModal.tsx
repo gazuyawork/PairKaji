@@ -100,8 +100,6 @@ const resolveUserImageSrc = (user: any): string => {
 };
 // ▲▲▲ 置き換えここまで ▲▲▲
 
-
-
 export default function EditTaskModal({
   isOpen,
   task,
@@ -421,9 +419,8 @@ export default function EditTaskModal({
           </div>
         )}
 
-
-        {/* ⏰ 時刻選択（週次のみ） */}
-        {editedTask.period === '週次' && (
+        {/* ⏰ 時刻選択（★★ 週次 or 毎日 に表示するよう拡張 ★★） */}
+        {(editedTask.period === '週次' || editedTask.period === '毎日') && (
           <div className="flex items-center gap-2">
             <label className="w-20 text-gray-600 shrink-0">時間：</label>
             <div className="relative w-[40%]">
@@ -459,9 +456,6 @@ export default function EditTaskModal({
             )}
           </div>
         )}
-
-
-
 
         {/* 📆 日付＆時間選択（その他のみ） */}
         {editedTask.period === 'その他' && (
