@@ -51,8 +51,8 @@ export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
     const snapshot = await getDocs(q);
     if (snapshot.empty) return [];
 
-    const doc = snapshot.docs[0]; // 最初の1件を使用
-    const data = doc.data();
+    const docSnap = snapshot.docs[0]; // 最初の1件を使用
+    const data = docSnap.data();
 
     return data.userIds ?? [];
   } catch (e) {
@@ -118,7 +118,6 @@ export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds
   }
 };
 
-
 /**
  * 同名の共有タスクがすでに存在するかを確認する関数
  * 編集時には自タスク（excludeTaskId）を除外してチェック可能
@@ -151,7 +150,6 @@ const checkDuplicateSharedTaskName = async (
   return filtered.length > 0;
 };
 
-
 /**
  * タスクの完了履歴をtaskCompletionsコレクションに追加する関数
  * @param taskId 対象タスクのID
@@ -173,13 +171,13 @@ export const addTaskCompletion = async (
 
     // taskCompletionsに履歴を追加
     await addDoc(collection(db, 'taskCompletions'), {
-      taskId,           // 対象タスクID
-      userId,           // 操作ユーザーID
+      taskId,            // 対象タスクID
+      userId,            // 操作ユーザーID
       userIds,           // 関連ユーザーID
-      taskName,         // タスク名
-      point,            // 獲得ポイント
-      person,           // 完了者表示名
-      date: todayISO,   // 完了日（文字列）
+      taskName,          // タスク名
+      point,             // 獲得ポイント
+      person,            // 完了者表示名
+      date: todayISO,    // 完了日（文字列）
       createdAt: serverTimestamp(), // Firestoreサーバー時刻
     });
   } catch (error) {
@@ -203,8 +201,8 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
         where('status', '==', 'confirmed')
       )
     );
-    pairsSnap.forEach(doc => {
-      const data = doc.data();
+    pairsSnap.forEach(docSnap => {
+      const data = docSnap.data();
       if (Array.isArray(data.userIds)) {
         userIds = data.userIds;
       }
@@ -315,8 +313,8 @@ export const cleanObject = <T>(obj: T): T => {
 //     };
 
 //     const cleanedMyCopy = cleanObject(myCopy);
-//     cleanedMyCopy.createdAt = serverTimestamp() as Timestamp;
-//     cleanedMyCopy.updatedAt = serverTimestamp() as Timestamp;
+//     cleanedMyCopy.createdAt = serverTimestamp() as any;
+//     cleanedMyCopy.updatedAt = serverTimestamp() as any;
 
 //     await addDoc(tasksRef, cleanedMyCopy);
 
@@ -341,8 +339,8 @@ export const cleanObject = <T>(obj: T): T => {
 //       private: true,
 //     };
 //     const cleanedPartnerCopy = cleanObject(partnerCopy);
-//     cleanedPartnerCopy.createdAt = serverTimestamp() as Timestamp;
-//     cleanedPartnerCopy.updatedAt = serverTimestamp() as Timestamp;
+//     cleanedPartnerCopy.createdAt = serverTimestamp() as any;
+//     cleanedPartnerCopy.updatedAt = serverTimestamp() as any;
 //     await addDoc(tasksRef, cleanedPartnerCopy);
 //   }
 // };
@@ -633,7 +631,7 @@ export const toggleTaskDoneStatus = async (
 
     // ペア情報を取得して userIds を用意
     let userIds = [userId];
-    const pairId = sessionStorage.getItem('pairId');
+    const pairId = typeof window !== 'undefined' ? sessionStorage.getItem('pairId') : null;
 
     if (pairId) {
       const pairDoc = await getDoc(doc(db, 'pairs', pairId));
@@ -682,9 +680,46 @@ export const toggleTaskDoneStatus = async (
       );
 
       const snapshot = await getDocs(q);
-      const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref));
+      const deletePromises = snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
       await Promise.all(deletePromises);
     }
+  } catch (error) {
+    handleFirestoreError(error);
+  }
+};
+
+/* =========================================
+ * ▼ 追加：ポイント加算なしのスキップ処理
+ *    - 見た目は完了（done=true）にするが、履歴・ポイントは記録しない
+ *    - skipped=true を付与
+ * =======================================*/
+/**
+ * スキップ処理：ポイント加算や taskCompletions への履歴追加を行わずに、
+ * 見た目上は完了（done=true）にする。完了者・完了時刻は記録し、flag は解除。
+ * - done: true
+ * - skipped: true
+ * - completedAt: serverTimestamp()
+ * - completedBy: userId
+ * - flagged: false
+ *
+ * @param taskId 対象タスクID
+ * @param userId 操作ユーザーUID
+ */
+export const skipTaskWithoutPoints = async (
+  taskId: string,
+  userId: string
+): Promise<void> => {
+  try {
+    const taskRef = doc(db, 'tasks', taskId);
+
+    await updateDoc(taskRef, {
+      done: true,
+      skipped: true,
+      completedAt: serverTimestamp(),
+      completedBy: userId,
+      flagged: false,
+      updatedAt: serverTimestamp(),
+    });
   } catch (error) {
     handleFirestoreError(error);
   }

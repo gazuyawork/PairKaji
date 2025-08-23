@@ -1,4 +1,3 @@
-// src/components/task/TaskView.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -36,6 +35,9 @@ import AdCard_02 from '@/components/task/parts/AdCard_02';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 import { useUserUid } from '@/hooks/useUserUid';
+
+/* ▼ 追加：スキップ（ポイント加算なし）ユーティリティ */
+import { skipTaskWithoutPoints } from '@/lib/taskUtils';
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 const INITIAL_TASK_GROUPS: Record<Period, Task[]> = { 毎日: [], 週次: [], その他: [] };
@@ -239,6 +241,25 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       target.person ?? ''
     );
   };
+
+  /* ▼ 追加：スキップ（ポイント加算なし） */
+  const handleSkip = useCallback(
+    async (taskId: string) => {
+      try {
+        if (!uid) {
+          toast.error('ログインしていません');
+          return;
+        }
+        await skipTaskWithoutPoints(taskId, uid);
+        // ローカル state は触らず、onSnapshot の購読更新で UI 反映に任せる
+        toast.success('タスクをスキップしました（ポイント加算なし）');
+      } catch (e) {
+        console.error('[handleSkip] スキップ失敗:', e);
+        toast.error('スキップに失敗しました');
+      }
+    },
+    [uid]
+  );
 
   // タスク削除
   const deleteTask = async (period: Period, id: string) => {
@@ -694,6 +715,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             onLongPress={(x, y) => setLongPressPosition({ x, y })}
                             deletingTaskId={deletingTaskId}
                             onSwipeLeft={(taskId) => setDeletingTaskId(taskId)}
+                            /* ▼ 追加：スキップ（ポイント加算なし） */
+                            onSkip={handleSkip}
                           />
                         ))}
                     </ul>

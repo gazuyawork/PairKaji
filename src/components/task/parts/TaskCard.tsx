@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2 } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2, SkipForward } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -56,6 +56,7 @@ type Props = {
   onLongPress?: (x: number, y: number) => void;
   deletingTaskId: string | null;
   onSwipeLeft: (taskId: string) => void;
+  onSkip?: (taskId: string) => void;
 };
 
 export default function TaskCard({
@@ -68,6 +69,7 @@ export default function TaskCard({
   onEdit,
   onSwipeLeft,
   deletingTaskId,
+  onSkip,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -210,6 +212,22 @@ export default function TaskCard({
       {showActions && showActionButtons && swipeDirection === null && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
+
+            {/* スキップ */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // TODO: スキップ処理（ポイント加算なし）をここに実装
+                // 例）onSkip?.(task.id) にしたい場合は Props 追加が必要
+                console.log('Skip pressed (no points)');
+                onSkip?.(task.id);
+              }}
+              className="w-12 h-12 rounded-full bg-gradient-to-b from-indigo-300 to-indigo-600 shadow ring-1 ring-indigo-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
+              title="スキップ（ポイント加算なし）"
+            >
+              <SkipForward className="w-5 h-5" />
+            </button>
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
