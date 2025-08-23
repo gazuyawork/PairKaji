@@ -183,19 +183,25 @@ export default function TaskCard({
 
   return (
     <div className="relative" ref={cardRef}>
+
       {swipeDirection === 'left' && deletingTaskId === task.id && !showActions && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-md bg-gradient-to-b from-red-300 to-red-600 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
+            className="w-8 h-8 flex items-center justify-center rounded-md bg-gradient-to-b from-indigo-300 to-indigo-600 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
             onClick={(e) => {
               e.stopPropagation();
-              handleDelete();
+              // ← 左スライドでスキップを実行（ポイントなし）
+              onSkip?.(task.id);
+              // スワイプ状態は閉じる
+              setSwipeDirection(null);
             }}
+            title="スキップ（ポイント加算なし）"
           >
-            <Trash2 className="w-5 h-5 text-white [text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]" />
+            <SkipForward className="w-5 h-5 text-white [text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]" />
           </button>
         </div>
       )}
+
 
       {swipeDirection === 'right' && task.visible && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
@@ -217,16 +223,15 @@ export default function TaskCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                // TODO: スキップ処理（ポイント加算なし）をここに実装
-                // 例）onSkip?.(task.id) にしたい場合は Props 追加が必要
-                console.log('Skip pressed (no points)');
-                onSkip?.(task.id);
+                // 既存の削除処理を呼び出す（確認モーダル→onDelete）
+                handleDelete();
               }}
-              className="w-12 h-12 rounded-full bg-gradient-to-b from-indigo-300 to-indigo-600 shadow ring-1 ring-indigo-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
-              title="スキップ（ポイント加算なし）"
+              className="w-12 h-12 rounded-full bg-gradient-to-b from-red-300 to-red-600 shadow ring-1 ring-red-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
+              title="削除"
             >
-              <SkipForward className="w-5 h-5" />
+              <Trash2 className="w-5 h-5" />
             </button>
+
 
             <button
               onClick={(e) => {
