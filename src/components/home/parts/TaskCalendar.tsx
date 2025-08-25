@@ -11,7 +11,7 @@ import { ja } from 'date-fns/locale';
 type CalendarTask = {
   id: string;
   name: string;
-  period: '毎日' | '週次' | 'その他';
+  period: '毎日' | '週次' | '不定期';
   dates?: string[];
   daysOfWeek?: string[];
 };

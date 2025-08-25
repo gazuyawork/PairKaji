@@ -1,7 +1,7 @@
 // /src/types/Task.ts
 import { Timestamp } from 'firebase/firestore';
 
-export type Period = '毎日' | '週次' | 'その他';
+export type Period = '毎日' | '週次' | '不定期';
 
 // Firestore保存用の型（DB用）
 export type FirestoreTask = {

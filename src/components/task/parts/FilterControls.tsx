@@ -94,11 +94,11 @@ export default function FilterControls({
         <div className="w-px h-6 bg-gray-300 self-center mx-1" />
 
         {/* 🗓️ 期間フィルター */}
-        {(['毎日', '週次', 'その他'] as Period[]).map(period => {
+        {(['毎日', '週次', '不定期'] as Period[]).map(period => {
           const displayMap: Record<Period, string> = {
             '毎日': '毎',
             '週次': '週',
-            'その他': '他',
+            '不定期': '不',
           };
 
           return (

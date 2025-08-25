@@ -354,7 +354,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
         await removeTaskIdFromNotifyLogs(uid, taskId, originalDates);
       }
 
-      // 4) ★ 期間切替：その他 → 週次/毎日
+      // 4) ★ 期間切替：不定期 → 週次/毎日
       const isOtherToWeekly = originalPeriod !== newPeriod && newPeriod === '週次';
       const isOtherToDaily = originalPeriod !== newPeriod && newPeriod === '毎日';
 

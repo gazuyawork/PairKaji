@@ -40,8 +40,8 @@ import { useUserUid } from '@/hooks/useUserUid';
 /* ▼ 追加：スキップ（ポイント加算なし）ユーティリティ */
 import { skipTaskWithoutPoints } from '@/lib/taskUtils';
 
-const periods: Period[] = ['毎日', '週次', 'その他'];
-const INITIAL_TASK_GROUPS: Record<Period, Task[]> = { 毎日: [], 週次: [], その他: [] };
+const periods: Period[] = ['毎日', '週次', '不定期'];
+const INITIAL_TASK_GROUPS: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
 
 /* =========================================================
  * ★★★ 追加：並び替え用ユーティリティ（日時/時間の抽出・比較）★★★
@@ -168,7 +168,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [showCompletedMap, setShowCompletedMap] = useState<Record<Period, boolean>>({
     毎日: false,
     週次: false,
-    その他: false,
+    不定期: false,
   });
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
@@ -300,7 +300,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       if (!Array.isArray(task.daysOfWeek)) return false;
       return task.daysOfWeek.includes(todayDayKanji);
     }
-    if (task.period === 'その他') {
+    if (task.period === '不定期') {
       if (!Array.isArray(task.dates)) return false;
       return task.dates.includes(todayStr);
     }
@@ -433,7 +433,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           mapFirestoreDocToTask(d)
         );
 
-        // completedAt の日付越え戻し（その他以外）
+        // completedAt の日付越え戻し（不定期以外）
         const updates: Promise<void>[] = [];
         for (const task of rawTasks) {
           if (task.completedAt != null) {
@@ -458,7 +458,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               console.warn('不明な completedAt の型:', task.completedAt);
             }
 
-            if (completedDate !== null && !isToday(completedDate) && task.period !== 'その他') {
+            if (completedDate !== null && !isToday(completedDate) && task.period !== '不定期') {
               const taskRef = doc(db, 'tasks', task.id);
 
               const taskSnap = await getDoc(taskRef);
@@ -486,9 +486,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
         await Promise.all(updates);
 
-        const grouped: Record<Period, Task[]> = { 毎日: [], 週次: [], その他: [] };
+        const grouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
         for (const t of rawTasks) {
-          if (t.period === '毎日' || t.period === '週次' || t.period === 'その他') {
+          if (t.period === '毎日' || t.period === '週次' || t.period === '不定期') {
             grouped[t.period].push(t);
           } else {
             console.warn('無効な period 値:', t.period, t);
@@ -738,11 +738,23 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 return (
                   <div key={period} className="mx-auto w-full max-w-xl">
                     <div className="flex items-center justify-between mt-4 mb-2 px-2">
-                      <h2 className="text-lg font-bold text-[#5E5E5E] font-sans">
-                        {period}（
-                        {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
-                        ）
-                      </h2>
+<h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
+  <span
+    className={`inline-block rounded-full px-3 py-1 text-sm text-white 
+      ${remaining === 0 
+        ? 'bg-gradient-to-b from-[#b0b0b0] to-[#8c8c8c] shadow-md shadow-black/20'
+        : 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] shadow-md shadow-black/20'} 
+      shadow-inner`}
+  >
+    {period}
+  </span>
+  <span className="text-sm text-gray-600">
+    {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
+  </span>
+</h2>
+
+
+
 
 
                       {list.some((t) => t.done) && (
