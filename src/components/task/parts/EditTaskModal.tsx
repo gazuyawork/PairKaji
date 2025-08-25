@@ -9,7 +9,10 @@ import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 import { createPortal } from 'react-dom';
 import BaseModal from '../../common/modals/BaseModal';
-import { Eraser } from 'lucide-react';
+import { Eraser, ChevronDown, ChevronUp } from 'lucide-react';
+
+// ★ 追加：備考textareaの最大高さ（画面高さの50%）
+const MAX_TEXTAREA_VH = 50;
 
 type UserInfo = {
   id: string;
@@ -126,6 +129,55 @@ export default function EditTaskModal({
   // [LOG] ログ出力用プレフィックス
   const LOG = '[EditTaskModal]';
 
+  // ===== 備考（note）エリア用：ref / ヒントフラグ / リサイズ関数 =====
+  // ★ 追加：備考用のref（textarea）
+  const memoRef = useRef<HTMLTextAreaElement | null>(null);
+  // ★ 追加：スクロールヒント表示フラグ
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [showScrollUpHint, setShowScrollUpHint] = useState(false);
+  // ★ 追加：iOS判定（TodoNoteModalに合わせ、iOS時のみヒントを出す）
+  const isIOS = isIOSMobileSafari;
+
+  // ★ 追加：スクロールヒント更新ロジック
+  const updateHints = () => {
+    const el = memoRef.current;
+    if (!el) return;
+    const canScroll = el.scrollHeight > el.clientHeight + 1;
+    const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    const notAtTop = el.scrollTop > 1;
+    setShowScrollHint(canScroll && notAtBottom);
+    setShowScrollUpHint(canScroll && notAtTop);
+  };
+
+  // ★ 追加：textarea の onScroll ハンドラ
+  const onTextareaScroll = () => updateHints();
+
+  // ★ 追加：textarea の自動リサイズ（内容に応じて拡大、上限 50vh でスクロール）
+  const resizeTextarea = () => {
+    const el = memoRef.current;
+    if (!el) return;
+
+    const maxHeightPx =
+      (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
+
+    // 一旦リセットして高さ測定
+    el.style.height = 'auto';
+    el.style.maxHeight = `${maxHeightPx}px`;
+    (el.style as any).webkitOverflowScrolling = 'touch';
+
+    // 内容に合わせて伸ばす。ただし上限超過時は固定してスクロール可能に
+    if (el.scrollHeight > maxHeightPx) {
+      el.style.height = `${maxHeightPx}px`;
+      el.style.overflowY = 'auto';
+    } else {
+      el.style.height = `${el.scrollHeight}px`;
+      el.style.overflowY = 'hidden';
+    }
+
+    updateHints();
+  };
+  // ===== ここまで 備考（note）エリア用 =====
+
   // ✅ 置換後の端末判定
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -167,6 +219,8 @@ export default function EditTaskModal({
       dates: task.dates ?? [],
       users: task.users ?? [],
       period: task.period ?? task.period,
+      // ★ 追加：備考（note）未定義なら空文字
+      ...(typeof (task as any)?.note === 'string' ? { note: (task as any).note } : { note: '' }),
     });
 
     // プライベートフラグ設定
@@ -249,6 +303,33 @@ export default function EditTaskModal({
     };
   }, [isOpen]);
 
+  // ★ 追加：モーダル表示時に備考textareaを初期リサイズ
+  useEffect(() => {
+    if (!isOpen) return;
+    requestAnimationFrame(() => {
+      resizeTextarea();
+      requestAnimationFrame(resizeTextarea);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // ★ 追加：備考の変更時にリサイズ
+  useEffect(() => {
+    if (!editedTask) return;
+    requestAnimationFrame(() => {
+      resizeTextarea();
+      requestAnimationFrame(resizeTextarea);
+    });
+  }, [editedTask?.note]);
+
+  // ★ 追加：端末回転/ウィンドウリサイズに追従
+  useEffect(() => {
+    const onResize = () => resizeTextarea();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const update = <K extends keyof Task>(key: K, value: Task[K]) => {
     setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
@@ -293,13 +374,13 @@ export default function EditTaskModal({
 
     // 🔄 正常時：保存処理
     const transformed = {
-      ...editedTask,
+      ...editedTask, // ← note（備考）も含まれる
       daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
       private: isPrivate,
     };
 
     setIsSaving(true);
-    onSave(transformed);
+    onSave(transformed as Task); // 型安全のためキャスト（Taskにnote未追加でもビルドOK）
 
     // タイマー初期化と完了表示
     if (closeTimerRef.current) {
@@ -616,6 +697,44 @@ export default function EditTaskModal({
             </div>
           </>
         )}
+
+        {/* ★ 差し替え：📝 備考（任意）  ※保存ボタン（BaseModalのフッター）直前に表示 */}
+        <div className="relative pr-8">
+          <div className="flex items-start">
+            <label className="w-20 text-gray-600 shrink-0 mt-0">備考：</label>
+
+            <textarea
+              ref={memoRef}
+              data-scrollable="true"                 // ← BaseModal側のtouchmove抑止を回避する許可フラグ
+              onScroll={onTextareaScroll}           // スクロールヒント更新
+              value={(editedTask as any).note ?? ''}
+              rows={1}
+              placeholder="備考を入力"
+              onChange={(e) =>
+                setEditedTask((prev) =>
+                  prev ? ({ ...prev, note: e.target.value } as Task) : prev
+                )
+              }
+              onTouchMove={(e) => e.stopPropagation()} // 上位のジェスチャに奪われないように
+              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1
+                         touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+            />
+          </div>
+
+          {/* スクロールガイド（iOS時のみ） */}
+          {isIOS && showScrollHint && (
+            <div className="pointer-events-none absolute bottom-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronDown size={16} className="text-white" />
+            </div>
+          )}
+          {isIOS && showScrollUpHint && (
+            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronUp size={16} className="text-white" />
+            </div>
+          )}
+        </div>
+        {/* ★ 差し替えここまで */}
+
       </div>
     </BaseModal>,
     document.body
