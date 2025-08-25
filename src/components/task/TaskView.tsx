@@ -1,3 +1,4 @@
+// src/components/views/TaskView.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -41,6 +42,105 @@ import { skipTaskWithoutPoints } from '@/lib/taskUtils';
 
 const periods: Period[] = ['毎日', '週次', 'その他'];
 const INITIAL_TASK_GROUPS: Record<Period, Task[]> = { 毎日: [], 週次: [], その他: [] };
+
+/* =========================================================
+ * ★★★ 追加：並び替え用ユーティリティ（日時/時間の抽出・比較）★★★
+ * - 日付あり（dates[] / scheduledAt / datetime） → 最も早い日時の昇順
+ * - 時間のみ（time / scheduledTime / timeString）→ その日の早い時間順
+ * - どちらも無し → 最後に登録順（createdAt の新しい順）で比較
+ * =======================================================*/
+
+// "HH:mm" → 分に変換（例: "09:30" → 570）。不正は null。
+const parseTimeToMinutes = (s?: unknown): number | null => {
+  if (typeof s !== 'string') return null;
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (Number.isNaN(h) || Number.isNaN(min)) return null;
+  return h * 60 + min;
+};
+
+// Firestore Timestamp / Date / ISO文字列 / number(ms) をミリ秒へ。なければ 0。
+const toMillis = (v: any): number => {
+  if (!v) return 0;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? 0 : t;
+  }
+  if (typeof v.toDate === 'function') {
+    try {
+      return v.toDate().getTime();
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+};
+
+// タスクから比較に用いる日時情報を抽出
+const getComparableDateTimeMs = (
+  task: any
+): { hasDate: boolean; hasTimeOnly: boolean; ms: number | null } => {
+  const today = new Date();
+  const todayY = today.getFullYear();
+  const todayM = today.getMonth();
+  const todayD = today.getDate();
+
+  // 候補①：単一日時フィールド（Timestamp/Date/ISO/number）
+  const explicitDateMsCandidates: number[] = [];
+  const scheduledAtMs = toMillis(task?.scheduledAt);
+  const datetimeMs = toMillis(task?.datetime);
+  if (scheduledAtMs) explicitDateMsCandidates.push(scheduledAtMs);
+  if (datetimeMs) explicitDateMsCandidates.push(datetimeMs);
+
+  // 候補②：配列日付（"YYYY-MM-DD"）
+  const dates: string[] = Array.isArray(task?.dates) ? task.dates : [];
+
+  // 時刻："HH:mm"
+  const timeStr = task?.time ?? task?.scheduledTime ?? task?.timeString ?? null;
+  const timeMin = parseTimeToMinutes(timeStr);
+
+  for (const d of dates) {
+    const baseMs = Date.parse(d);
+    if (!Number.isNaN(baseMs)) {
+      const base = new Date(baseMs);
+      const composed = new Date(
+        base.getFullYear(),
+        base.getMonth(),
+        base.getDate(),
+        timeMin != null ? Math.floor(timeMin / 60) : 0,
+        timeMin != null ? timeMin % 60 : 0,
+        0,
+        0
+      ).getTime();
+      explicitDateMsCandidates.push(composed);
+    }
+  }
+
+  if (explicitDateMsCandidates.length > 0) {
+    explicitDateMsCandidates.sort((a, b) => a - b);
+    return { hasDate: true, hasTimeOnly: false, ms: explicitDateMsCandidates[0] };
+  }
+
+  // 日付が無く時間のみ存在
+  if (timeMin != null) {
+    const ms = new Date(
+      todayY,
+      todayM,
+      todayD,
+      Math.floor(timeMin / 60),
+      timeMin % 60,
+      0,
+      0
+    ).getTime();
+    return { hasDate: false, hasTimeOnly: true, ms };
+  }
+
+  return { hasDate: false, hasTimeOnly: false, ms: null };
+};
 
 type Props = {
   initialSearch?: string;
@@ -435,7 +535,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     ];
   }, [uid, partnerUserId, profileImage, partnerImage]);
 
-
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
       {editTargetTask && (
@@ -565,7 +664,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     />
                   </div>
 
-
                   {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
                     <motion.button
                       onClick={() => {
@@ -671,24 +769,60 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       {list
                         .slice()
                         .sort((a, b) => {
-                          // ① フラグ付きタスクを優先的に上に表示
+                          // ① フラグ付きタスクを優先
                           if (a.flagged && !b.flagged) return -1;
                           if (!a.flagged && b.flagged) return 1;
 
                           // ② 未完了タスクを優先
                           if (a.done !== b.done) return a.done ? 1 : -1;
 
-                          // ③ 作成日時が新しい順
-                          const getTimestampValue = (value: any): number => {
-                            if (!value) return 0;
-                            if (value instanceof Date) return value.getTime();
-                            if (typeof value === 'string') return new Date(value).getTime();
-                            if (typeof (value as any).toDate === 'function') return (value as any).toDate().getTime();
-                            return 0;
-                          };
-                          const aTime = getTimestampValue(a.createdAt);
-                          const bTime = getTimestampValue(b.createdAt);
-                          return bTime - aTime;
+                          // ③ 日時/時間による優先ソート
+                          const aKey = getComparableDateTimeMs(a);
+                          const bKey = getComparableDateTimeMs(b);
+
+                          // 3-1. 明示的な日付あり同士 → 昇順
+                          if (aKey.hasDate && bKey.hasDate) {
+                            return (aKey.ms! - bKey.ms!);
+                          }
+                          // 3-2. 片方のみ日付あり → 日付ありを優先
+                          if (aKey.hasDate !== bKey.hasDate) {
+                            return aKey.hasDate ? -1 : 1;
+                          }
+
+                          // 3-3. 日付なしだが「時間だけ」あり同士 → 早い時間順
+                          if (aKey.hasTimeOnly && bKey.hasTimeOnly) {
+                            return (aKey.ms! - bKey.ms!);
+                          }
+                          // 3-4. 片方のみ「時間だけ」あり → そちらを優先
+                          if (aKey.hasTimeOnly !== bKey.hasTimeOnly) {
+                            return aKey.hasTimeOnly ? -1 : 1;
+                          }
+
+                          // ④ 最後は登録順（createdAt の新しい順）で比較
+                          // const getTimestampValue = (value: any): number => {
+                          //   if (!value) return 0;
+                          //   if (value instanceof Date) return value.getTime();
+                          //   if (typeof value === 'string') {
+                          //     const t = Date.parse(value);
+                          //     return Number.isNaN(t) ? 0 : t;
+                          //   }
+                          //   if (typeof value === 'number') return value;
+                          //   if (typeof (value as any).toDate === 'function') {
+                          //     try {
+                          //       return (value as any).toDate().getTime();
+                          //     } catch {
+                          //       return 0;
+                          //     }
+                          //   }
+                          //   return 0;
+                          // };
+                          // const aTime = getTimestampValue(a.createdAt);
+                          // const bTime = getTimestampValue(b.createdAt);
+                          // return bTime - aTime;
+
+                          // 名前順
+                          return a.name.localeCompare(b.name);
+
                         })
 
                         .filter((t) => showCompletedMap[period] || !t.done)
