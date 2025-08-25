@@ -13,6 +13,8 @@ import { Eraser, ChevronDown, ChevronUp } from 'lucide-react';
 
 // 備考textareaの最大高さ（画面高さの50%）
 const MAX_TEXTAREA_VH = 50;
+// ★ 追加：備考の最大文字数
+const NOTE_MAX = 500;
 
 // Task に note?: string をローカルに許可
 type TaskWithNote = Task & { note?: string };
@@ -112,6 +114,8 @@ export default function EditTaskModal({
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  // ★ 追加：備考エラー
+  const [noteError, setNoteError] = useState<string | null>(null);
 
   // iOS Safari(WebKit) のみ true
   const [isIOSMobileSafari, setIsIOSMobileSafari] = useState(false);
@@ -180,6 +184,7 @@ export default function EditTaskModal({
 
     setIsSaving(false);
     setSaveComplete(false);
+    setNoteError(null); // ★ 追加：初期化
 
     saveRequestIdRef.current += 1;
     if (closeTimerRef.current) {
@@ -335,6 +340,15 @@ export default function EditTaskModal({
   const handleSave = () => {
     if (!editedTask) return;
 
+    // ★ 備考の長さチェック（保存時）
+    const noteLen = (editedTask.note ?? '').length;
+    if (noteLen > NOTE_MAX) {
+      setNoteError('500文字以内で入力してください。');
+      return;
+    } else {
+      setNoteError(null);
+    }
+
     if (!editedTask.name || editedTask.name.trim() === '') {
       setNameError('タスク名を入力してください');
       return;
@@ -353,7 +367,7 @@ export default function EditTaskModal({
     }
 
     const transformed = {
-      ...editedTask, // note も含まれる
+      ...editedTask, // note も含まれる（500超過は保存不可にしている）
       daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
       private: isPrivate,
     };
@@ -387,7 +401,8 @@ export default function EditTaskModal({
       onClose={onClose}
       onSaveClick={handleSave}
       disableCloseAnimation={true}
-      saveDisabled={!!nameError}
+      // ★ 保存ボタン無効化条件に noteError を追加
+      saveDisabled={!!nameError || !!noteError}
     >
       <div className="space-y-6">
 
@@ -665,9 +680,9 @@ export default function EditTaskModal({
           </>
         )}
 
-        {/* 📝 備考（任意） ※保存ボタン直前。ラベルと入力は縦中央で揃える */}
+        {/* 📝 備考（任意） */}
         <div className="relative pr-8">
-          <div className="flex items-center">
+          <div className="flex items-top">
             <label className="w-20 text-gray-600 shrink-0">備考：</label>
 
             <textarea
@@ -677,14 +692,34 @@ export default function EditTaskModal({
               value={editedTask.note ?? ''}
               rows={1}
               placeholder="備考を入力"
-              onChange={(e) =>
-                setEditedTask((prev) => (prev ? { ...prev, note: e.target.value } : prev))
-              }
+              // maxLength は付けない：保存時にバリデーション
+              onChange={(e) => {
+                const next = e.target.value;
+                // 入力中もエラー表示を更新
+                if (next.length > NOTE_MAX) {
+                  setNoteError('500文字以内で入力してください。');
+                } else {
+                  setNoteError(null);
+                }
+                setEditedTask((prev) => (prev ? { ...prev, note: next } : prev));
+              }}
               onTouchMove={(e) => e.stopPropagation()}
               className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-0 ml-2 pb-0
                          touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
             />
           </div>
+
+          {/* 文字数カウンター */}
+          <div className="mt-1 pr-1 flex justify-end">
+            <span className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'} text-xs`}>
+              {(editedTask.note?.length ?? 0)}/{NOTE_MAX}
+            </span>
+          </div>
+
+          {/* 備考エラー（他と同じ位置・スタイル） */}
+          {noteError && (
+            <p className="text-xs text-red-500 ml-20 mt-1">{noteError}</p>
+          )}
 
           {/* スクロールガイド（iOS時のみ） */}
           {isIOS && showScrollHint && (
