@@ -739,8 +739,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   <div key={period} className="mx-auto w-full max-w-xl">
                     <div className="flex items-center justify-between mt-4 mb-2 px-2">
                       <h2 className="text-lg font-bold text-[#5E5E5E] font-sans">
-                        {period}（残り {remaining} 件）
+                        {period}（
+                        {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
+                        ）
                       </h2>
+
 
                       {list.some((t) => t.done) && (
                         <button
