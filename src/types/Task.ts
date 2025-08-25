@@ -55,6 +55,7 @@ export type Task = {
   flagged?: boolean;
   createdAt?: Date | Timestamp | string | null;
   time?: string;
+  note?: string;
 };
 
 

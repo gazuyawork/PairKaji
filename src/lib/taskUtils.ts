@@ -88,15 +88,17 @@ export const buildFirestoreTaskData = (
     daysOfWeek: convertedDaysOfWeek,
     dates: task.dates ?? [],
     time: task.time ?? '',
-    isTodo: task.isTodo ?? false,
-    done: task.done ?? false,
-    skipped: task.skipped ?? false,
-    groupId: task.groupId ?? null,
-    completedAt: task.completedAt ?? null,
-    completedBy: task.completedBy ?? '',
-    visible: task.visible ?? false,
+    isTodo: (task as any).isTodo ?? false,
+    done: (task as any).done ?? false,
+    skipped: (task as any).skipped ?? false,
+    groupId: (task as any).groupId ?? null,
+    completedAt: (task as any).completedAt ?? null,
+    completedBy: (task as any).completedBy ?? '',
+    visible: (task as any).visible ?? false,
     todos: [],
-  };
+    // ★ 追加：備考（UIの note を Firestore に保存）
+    note: (task as any).note ?? '',
+  } as unknown as FirestoreTask;
 };
 
 /**
@@ -226,10 +228,12 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
       daysOfWeek: task.daysOfWeek,
       users: task.users,
       period: task.period,
-      private: task.private ?? false, // ✅ ← 追加
+      private: task.private ?? false,
       userIds,
       userId: uid,
       time: task.time ?? '',
+      // ★ 追加：備考
+      note: (task as any).note ?? '',
     };
 
     await saveTaskToFirestore(task.id, taskData);
@@ -240,8 +244,7 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
 };
 
 /**
- * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、
- * 各ユーザーごとに単独タスクとして再登録する。
+ * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、各ユーザーごとに単独タスクとして再登録する。
  * - userId + name が一致する既存タスクがある場合は削除してから登録
  * - userId フィールドも正しく設定する
  */
@@ -271,81 +274,6 @@ export const cleanObject = <T>(obj: T): T => {
 };
 
 /**
- * ペア解除時に、共有されていたタスクを自分用・パートナー用に分離し、
- * 各ユーザーごとに単独タスクとして再登録する。
- */
-// export const splitSharedTasksOnPairRemoval = async (
-//   userId: string,
-//   partnerId: string
-// ): Promise<void> => {
-//   const tasksRef = collection(db, 'tasks');
-//   const sharedTasksQuery = query(
-//     tasksRef,
-//     where('userIds', 'array-contains', userId)
-//   );
-//   const snapshot = await getDocs(sharedTasksQuery);
-//   const sharedTasks = snapshot.docs.filter((docSnap) => {
-//     const data = docSnap.data() as FirestoreTask;
-//     return Array.isArray(data.userIds) && data.userIds.includes(partnerId);
-//   });
-
-//   for (const docSnap of sharedTasks) {
-//     const original = docSnap.data() as FirestoreTask;
-//     const myTaskQuery = query(
-//       tasksRef,
-//       where('name', '==', original.name),
-//       where('userId', '==', userId)
-//     );
-//     const myTaskSnapshot = await getDocs(myTaskQuery);
-//     for (const existing of myTaskSnapshot.docs) {
-//       await deleteDoc(doc(db, 'tasks', existing.id));
-//     }
-
-//     const rest = { ...original } as Record<string, unknown>;
-//     delete rest.users;
-
-//     const myCopy: FirestoreTask = {
-//       ...rest,
-//       userId,
-//       userIds: [userId],
-//       point: typeof original.point === 'string' ? Number(original.point) : original.point ?? 0,
-//       private: true,
-//     };
-
-//     const cleanedMyCopy = cleanObject(myCopy);
-//     cleanedMyCopy.createdAt = serverTimestamp() as any;
-//     cleanedMyCopy.updatedAt = serverTimestamp() as any;
-
-//     await addDoc(tasksRef, cleanedMyCopy);
-
-//     const partnerTaskQuery = query(
-//       tasksRef,
-//       where('name', '==', original.name),
-//       where('userId', '==', partnerId)
-//     );
-//     const partnerTaskSnapshot = await getDocs(partnerTaskQuery);
-//     for (const existing of partnerTaskSnapshot.docs) {
-//       await deleteDoc(doc(db, 'tasks', existing.id));
-//     }
-
-//     const partnerRest = { ...original } as Record<string, unknown>;
-//     delete partnerRest.users;
-
-//     const partnerCopy: FirestoreTask = {
-//       ...partnerRest,
-//       userId: partnerId,
-//       userIds: [partnerId],
-//       point: typeof original.point === 'string' ? Number(original.point) : original.point,
-//       private: true,
-//     };
-//     const cleanedPartnerCopy = cleanObject(partnerCopy);
-//     cleanedPartnerCopy.createdAt = serverTimestamp() as any;
-//     cleanedPartnerCopy.updatedAt = serverTimestamp() as any;
-//     await addDoc(tasksRef, cleanedPartnerCopy);
-//   }
-// };
-
-/**
  * タスクを Firestore に保存する（新規作成または更新）。
  * - タスクが新規なら addDoc、既存なら updateDoc を使用。
  * - userIds はログインユーザーのみ、もしくはペア共有の場合は全員を含める。
@@ -369,7 +297,13 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
       }
     }
 
-    const commonData = { ...taskData, private: isPrivate, userIds };
+    // ★ note を含めたまま持ち回す（undefined を避けるための正規化）
+    const commonData = {
+      ...taskData,
+      private: isPrivate,
+      userIds,
+      note: typeof taskData.note === 'string' ? taskData.note : '',
+    };
 
     if (taskId) {
       const taskRef = doc(db, 'tasks', taskId);
@@ -409,8 +343,6 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
         } else {
           /* ============================================================
            * ✅ 追加（②）：“毎日/週次”など dates=[] の場合でも当日分を削除
-           *   - dates が空で共通日付が無いケースでも、当日(JST)の notifyLogs に入っていれば削除
-           *   - 「時刻だけ」を変更したときの再送防止のため
            * ============================================================*/
           const todayJst = getJstYmd(); // "YYYY-MM-DD"
           await removeTaskIdFromNotifyLogs(uid, taskId, [todayJst]);
@@ -423,9 +355,6 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
       }
 
       // 4) ★ 期間切替：その他 → 週次/毎日
-      //    - 通知再送防止のため、元 dates から削除
-      //    - 保存時は dates=[] にする
-      //    - ★ time は「週次でも使用」するためクリアしない（新入力値を維持）
       const isOtherToWeekly = originalPeriod !== newPeriod && newPeriod === '週次';
       const isOtherToDaily = originalPeriod !== newPeriod && newPeriod === '毎日';
 
@@ -434,9 +363,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
           await removeTaskIdFromNotifyLogs(uid, taskId, originalDates);
         }
         finalDates = [];
-
-        // 週次・毎日：運用に合わせて残す/消すを選べますが、ここでは「残す」
-        finalTime = newTimeInput; // ← 新入力値をそのまま保持
+        finalTime = newTimeInput; // 新入力値をそのまま保持
       }
 
       // 🔽 タスクの更新（dates/time は final* を保存）
@@ -449,7 +376,7 @@ export const saveTaskToFirestore = async (taskId: string | null, taskData: any):
       });
 
     } else {
-      // 🔽 新規タスク作成（notifyLogs は対象外なのでこのままでOK）
+      // 🔽 新規タスク作成
       await addDoc(collection(db, 'tasks'), {
         ...commonData,
         userId: uid,
@@ -599,7 +526,6 @@ const removeTaskIdFromNotifyLogs = async (
       });
     } else {
       // ドキュメントが無い日はスキップ（何もしない）
-      // console.debug(`notifyLogs/${date} は存在しないため削除スキップ`);
     }
   }
 
@@ -762,7 +688,7 @@ export const removeOrphanSharedTasksIfPairMissing = async (): Promise<void> => {
       const taskData = taskDoc.data();
       const userIds = Array.isArray(taskData.userIds) ? taskData.userIds : [];
 
-      if (userIds.length > 1) {
+    if (userIds.length > 1) {
         deletePromises.push(deleteDoc(doc(db, 'tasks', taskDoc.id)));
       }
     });

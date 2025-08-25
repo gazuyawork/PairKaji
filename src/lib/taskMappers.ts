@@ -30,7 +30,10 @@ export const mapFirestoreDocToTask = (doc: QueryDocumentSnapshot<FirestoreTask>)
     userIds: data.userIds ?? [],
     time: data.time ?? '',
 
-    // ✅ 追加：FirestoreのTimestampをDateに変換
+    // ✅ 追加：備考（note）を必ず文字列で詰める
+    note: typeof data.note === 'string' ? data.note : '',
+
+    // ✅ Timestamp → Date 変換（既存）
     createdAt: data.createdAt?.toDate?.() ?? null,
   };
 };
