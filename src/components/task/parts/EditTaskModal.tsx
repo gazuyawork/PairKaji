@@ -11,8 +11,11 @@ import { createPortal } from 'react-dom';
 import BaseModal from '../../common/modals/BaseModal';
 import { Eraser, ChevronDown, ChevronUp } from 'lucide-react';
 
-// ★ 追加：備考textareaの最大高さ（画面高さの50%）
+// 備考textareaの最大高さ（画面高さの50%）
 const MAX_TEXTAREA_VH = 50;
+
+// Task に note?: string をローカルに許可
+type TaskWithNote = Task & { note?: string };
 
 type UserInfo = {
   id: string;
@@ -30,10 +33,8 @@ type Props = {
   existingTasks: Task[];
 };
 
-// ▼▼▼ 追加：画像URL解決関数（imageUrl が無い場合に photoURL 等も探索） ▼▼▼
-// ▼▼▼ 置き換え後：キーの中身を文字列で全出力＋ネスト/別名キーも探索 ▼▼▼
+// ▼▼▼ 画像URL解決関数（imageUrl が無い場合に photoURL 等も探索） ▼▼▼
 const resolveUserImageSrc = (user: any): string => {
-  // 1) まずはデバッグ：各キーの中身を「文字列」として出す（コンソールで展開不要）
   const show = (v: any) => (v === undefined || v === null ? String(v) : String(v));
   try {
     console.group(`[EditTaskModal] Checking image keys for userId: ${user?.id}`);
@@ -46,23 +47,19 @@ const resolveUserImageSrc = (user: any): string => {
     console.log('avatar:', show(user?.avatar));
     console.log('picture:', show(user?.picture));
     console.log('photo:', show(user?.photo));
-    // よくあるネスト
     console.log('profile.imageUrl:', show(user?.profile?.imageUrl));
     console.log('profile.photoURL:', show(user?.profile?.photoURL));
     console.log('profile.avatarUrl:', show(user?.profile?.avatarUrl));
-    // よくある別名
     console.log('pictureUrl:', show(user?.pictureUrl));
     console.log('pictureURL:', show(user?.pictureURL));
     console.log('photo_url:', show(user?.photo_url));
     console.groupEnd();
   } catch {
-    // stringify 保険（循環があると失敗するので try-catch）
     console.log('[EditTaskModal] raw user (stringified):', (() => {
       try { return JSON.stringify(user); } catch { return '[unstringifiable]'; }
     })());
   }
 
-  // 2) 取り得るキーを網羅的にチェック（上にあるものほど優先）
   const candidates: Array<string | undefined> = [
     user?.imageUrl,
     user?.photoURL,
@@ -76,32 +73,25 @@ const resolveUserImageSrc = (user: any): string => {
     user?.avatar,
     user?.picture,
     user?.photo,
-    // ネスト
     user?.profile?.imageUrl,
     user?.profile?.photoURL,
     user?.profile?.avatarUrl,
   ];
 
-  // 最初に「truthy」な値を採用（空文字はスキップ）
   let src = candidates.find((v) => typeof v === 'string' && v.trim().length > 0) || '';
 
-  // 3) もし Storage パス等（http(s)でない）だった場合のメモ
-  //    ここは同期関数なので変換できません。親側で getDownloadURL してから渡してください。
   if (src && !/^https?:\/\//.test(src) && !src.startsWith('/')) {
     console.warn('[EditTaskModal] Non-HTTP image path detected. Convert with getDownloadURL before passing:', { userId: user?.id, src });
-    // http でない＆先頭が / でもない → 画像は解決できないので一旦フォールバック
     src = '';
   }
 
   if (!src) {
-    console.warn('[EditTaskModal] imageUrl missing, fallback to default.png', {
-      userId: user?.id,
-    });
+    console.warn('[EditTaskModal] imageUrl missing, fallback to default.png', { userId: user?.id });
   }
 
   return src || '/images/default.png';
 };
-// ▲▲▲ 置き換えここまで ▲▲▲
+// ▲▲▲ 画像URL解決関数ここまで ▲▲▲
 
 export default function EditTaskModal({
   isOpen,
@@ -112,7 +102,7 @@ export default function EditTaskModal({
   isPairConfirmed,
   existingTasks,
 }: Props) {
-  const [editedTask, setEditedTask] = useState<Task | null>(null);
+  const [editedTask, setEditedTask] = useState<TaskWithNote | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
@@ -123,62 +113,21 @@ export default function EditTaskModal({
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  // ✅ 置換：iOS Safari(WebKit) のみ true にする厳密判定（PCでは false）
+  // iOS Safari(WebKit) のみ true
   const [isIOSMobileSafari, setIsIOSMobileSafari] = useState(false);
 
-  // [LOG] ログ出力用プレフィックス
-  const LOG = '[EditTaskModal]';
+  // ポータル先をクライアントマウント後に設定（SSRでdocument参照を避ける）
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
-  // ===== 備考（note）エリア用：ref / ヒントフラグ / リサイズ関数 =====
-  // ★ 追加：備考用のref（textarea）
+  // 備考（note）エリア用
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
-  // ★ 追加：スクロールヒント表示フラグ
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
-  // ★ 追加：iOS判定（TodoNoteModalに合わせ、iOS時のみヒントを出す）
   const isIOS = isIOSMobileSafari;
 
-  // ★ 追加：スクロールヒント更新ロジック
-  const updateHints = () => {
-    const el = memoRef.current;
-    if (!el) return;
-    const canScroll = el.scrollHeight > el.clientHeight + 1;
-    const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-    const notAtTop = el.scrollTop > 1;
-    setShowScrollHint(canScroll && notAtBottom);
-    setShowScrollUpHint(canScroll && notAtTop);
-  };
+  const LOG = '[EditTaskModal]';
 
-  // ★ 追加：textarea の onScroll ハンドラ
-  const onTextareaScroll = () => updateHints();
-
-  // ★ 追加：textarea の自動リサイズ（内容に応じて拡大、上限 50vh でスクロール）
-  const resizeTextarea = () => {
-    const el = memoRef.current;
-    if (!el) return;
-
-    const maxHeightPx =
-      (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
-
-    // 一旦リセットして高さ測定
-    el.style.height = 'auto';
-    el.style.maxHeight = `${maxHeightPx}px`;
-    (el.style as any).webkitOverflowScrolling = 'touch';
-
-    // 内容に合わせて伸ばす。ただし上限超過時は固定してスクロール可能に
-    if (el.scrollHeight > maxHeightPx) {
-      el.style.height = `${maxHeightPx}px`;
-      el.style.overflowY = 'auto';
-    } else {
-      el.style.height = `${el.scrollHeight}px`;
-      el.style.overflowY = 'hidden';
-    }
-
-    updateHints();
-  };
-  // ===== ここまで 備考（note）エリア用 =====
-
-  // ✅ 置換後の端末判定
+  // 端末判定
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const ua = navigator.userAgent || '';
@@ -186,22 +135,27 @@ export default function EditTaskModal({
     const platform = navigator.platform || '';
     const touchPoints = (navigator as any).maxTouchPoints || 0;
 
-    // iOS / iPadOS 判定
     const isiOSFamily =
       /iPhone|iPad|iPod/.test(ua) ||
-      (platform === 'MacIntel' && touchPoints > 1); // iPadOS (デスクトップSafariと区別)
+      (platform === 'MacIntel' && touchPoints > 1);
 
-    // モバイルSafari(WebKit)のみを許容（iOS版Chrome/Firefox/Edgeは除外）
     const isWebKitVendor = /Apple/.test(vendor);
     const isNotOtherIOSBrowsers = !/CriOS|FxiOS|EdgiOS/.test(ua);
 
     setIsIOSMobileSafari(isiOSFamily && isWebKitVendor && isNotOtherIOSBrowsers);
   }, []);
 
+  // portalTarget をマウント後に設定
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
+
   useEffect(() => {
     if (shouldClose) {
       onClose();
-      setShouldClose(false); // 再表示時の影響を防ぐ
+      setShouldClose(false);
     }
   }, [shouldClose, onClose]);
 
@@ -219,25 +173,20 @@ export default function EditTaskModal({
       dates: task.dates ?? [],
       users: task.users ?? [],
       period: task.period ?? task.period,
-      // ★ 追加：備考（note）未定義なら空文字
-      ...(typeof (task as any)?.note === 'string' ? { note: (task as any).note } : { note: '' }),
+      note: (task as any)?.note ?? '',
     });
 
-    // プライベートフラグ設定
     setIsPrivate(task.private ?? !isPairConfirmed);
 
-    // 保存状態の初期化
     setIsSaving(false);
     setSaveComplete(false);
 
-    // タイマー・リクエスト初期化
     saveRequestIdRef.current += 1;
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
 
-    // フォーカス
     const timer = setTimeout(() => {
       nameInputRef.current?.focus();
     }, 50);
@@ -245,7 +194,7 @@ export default function EditTaskModal({
     return () => clearTimeout(timer);
   }, [isOpen, task, isPairConfirmed]);
 
-  // [LOG] モーダルOpen時の初期データを一括ログ
+  // 初期データログ
   useEffect(() => {
     if (!isOpen) return;
     console.groupCollapsed(`${LOG} open`);
@@ -267,7 +216,6 @@ export default function EditTaskModal({
     } catch {
       console.log(`${LOG} users(raw):`, users);
     }
-    // ▼ 追加：どのキーにURLが入っているかも記録
     (users || []).forEach(u => {
       console.log('[EditTaskModal] user image keys', {
         id: u.id,
@@ -281,7 +229,7 @@ export default function EditTaskModal({
     console.groupEnd();
   }, [isOpen, task, users, isPairConfirmed]);
 
-  // [LOG] editedTask の更新監視
+  // editedTask 更新ログ
   useEffect(() => {
     if (!editedTask) return;
     console.groupCollapsed(`${LOG} editedTask updated`);
@@ -292,6 +240,7 @@ export default function EditTaskModal({
     console.groupEnd();
   }, [editedTask]);
 
+  // body スクロール制御
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -303,17 +252,52 @@ export default function EditTaskModal({
     };
   }, [isOpen]);
 
-  // ★ 追加：モーダル表示時に備考textareaを初期リサイズ
+  // スクロールヒント更新
+  const updateHints = () => {
+    const el = memoRef.current;
+    if (!el) return;
+    const canScroll = el.scrollHeight > el.clientHeight + 1;
+    const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    const notAtTop = el.scrollTop > 1;
+    setShowScrollHint(canScroll && notAtBottom);
+    setShowScrollUpHint(canScroll && notAtTop);
+  };
+
+  const onTextareaScroll = () => updateHints();
+
+  // 備考テキストエリアの自動リサイズ
+  const resizeTextarea = () => {
+    const el = memoRef.current;
+    if (!el) return;
+
+    const maxHeightPx =
+      (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
+
+    el.style.height = 'auto';
+    el.style.maxHeight = `${maxHeightPx}px`;
+    (el.style as any).webkitOverflowScrolling = 'touch';
+
+    if (el.scrollHeight > maxHeightPx) {
+      el.style.height = `${maxHeightPx}px`;
+      el.style.overflowY = 'auto';
+    } else {
+      el.style.height = `${el.scrollHeight}px`;
+      el.style.overflowY = 'hidden';
+    }
+
+    updateHints();
+  };
+
+  // モーダル表示時に備考textareaを初期リサイズ
   useEffect(() => {
     if (!isOpen) return;
     requestAnimationFrame(() => {
       resizeTextarea();
       requestAnimationFrame(resizeTextarea);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // ★ 追加：備考の変更時にリサイズ
+  // 備考の変更時にリサイズ
   useEffect(() => {
     if (!editedTask) return;
     requestAnimationFrame(() => {
@@ -322,19 +306,17 @@ export default function EditTaskModal({
     });
   }, [editedTask?.note]);
 
-  // ★ 追加：端末回転/ウィンドウリサイズに追従
+  // 端末回転/ウィンドウリサイズに追従
   useEffect(() => {
     const onResize = () => resizeTextarea();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const update = <K extends keyof Task>(key: K, value: Task[K]) => {
+  const update = <K extends keyof TaskWithNote>(key: K, value: TaskWithNote[K]) => {
     setEditedTask((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
-  // [LOG] 担当者トグル時のログ追加
   const toggleUser = (userId: string) => {
     if (!editedTask) return;
     const next = editedTask.users[0] === userId ? [] : [userId];
@@ -353,13 +335,11 @@ export default function EditTaskModal({
   const handleSave = () => {
     if (!editedTask) return;
 
-    // 🔸 空チェック（trimして空かどうか）
     if (!editedTask.name || editedTask.name.trim() === '') {
       setNameError('タスク名を入力してください');
       return;
     }
 
-    // 🔸 重複チェック（IDが異なる同名タスクが存在し、かつユーザーが重複している場合）
     const isDuplicate = existingTasks.some(
       (t) =>
         t.name === editedTask.name &&
@@ -372,17 +352,15 @@ export default function EditTaskModal({
       return;
     }
 
-    // 🔄 正常時：保存処理
     const transformed = {
-      ...editedTask, // ← note（備考）も含まれる
+      ...editedTask, // note も含まれる
       daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
       private: isPrivate,
     };
 
     setIsSaving(true);
-    onSave(transformed as Task); // 型安全のためキャスト（Taskにnote未追加でもビルドOK）
+    onSave(transformed as Task); // Task に note が無くても OK
 
-    // タイマー初期化と完了表示
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
@@ -399,7 +377,7 @@ export default function EditTaskModal({
     }, 300);
   };
 
-  if (!mounted || !isOpen || !editedTask) return null;
+  if (!mounted || !isOpen || !editedTask || !portalTarget) return null;
 
   return createPortal(
     <BaseModal
@@ -438,7 +416,7 @@ export default function EditTaskModal({
             />
           </div>
 
-          {/* 🔻 エラーメッセージは下に */}
+          {/* 🔻 エラーメッセージ */}
           {nameError && (
             <p className="text-xs text-red-500 ml-20 mt-1">{nameError}</p>
           )}
@@ -451,7 +429,6 @@ export default function EditTaskModal({
             value={editedTask.period}
             onChange={(e) => {
               const newPeriod = e.target.value as Period;
-              // [LOG] period 変更ログ
               console.log(`${LOG} period changed:`, { from: editedTask?.period, to: newPeriod });
 
               setEditedTask((prev) => {
@@ -500,12 +477,11 @@ export default function EditTaskModal({
           </div>
         )}
 
-        {/* ⏰ 時刻選択（★★ 週次 or 毎日 に表示するよう拡張 ★★） */}
+        {/* ⏰ 時刻選択（週次 or 毎日） */}
         {(editedTask.period === '週次' || editedTask.period === '毎日') && (
           <div className="flex items-center gap-2">
             <label className="w-20 text-gray-600 shrink-0">時間：</label>
             <div className="relative w-[40%]">
-              {/* iOS Safari のとき、未入力ならダミー表示 */}
               {isIOSMobileSafari && (!editedTask.time || editedTask.time === '') && (
                 <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
                   --:--
@@ -522,7 +498,6 @@ export default function EditTaskModal({
               />
             </div>
 
-            {/* ✖ クリアボタン（時刻があるときのみ表示） */}
             {editedTask.time && (
               <button
                 type="button"
@@ -538,13 +513,11 @@ export default function EditTaskModal({
           </div>
         )}
 
-        {/* 📆 日付＆時間選択（その他のみ） */}
+        {/* 📆 日付＆時間選択（その他） */}
         {editedTask.period === 'その他' && (
           <div className="flex items-center gap-2">
-            {/* 🏷 項目名 */}
             <label className="w-20 text-gray-600 shrink-0">日付：</label>
 
-            {/* 📅 日付入力 */}
             <div className="relative w-[40%]">
               {isIOSMobileSafari && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
                 <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
@@ -562,7 +535,6 @@ export default function EditTaskModal({
               />
             </div>
 
-            {/* ⏰ 時刻入力 */}
             <div className="relative w-[30%]">
               {isIOSMobileSafari && (!editedTask.time || editedTask.time === '') && (
                 <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
@@ -580,7 +552,6 @@ export default function EditTaskModal({
               />
             </div>
 
-            {/* ✖ クリアボタン */}
             {(editedTask.dates[0] || editedTask.time) && (
               <button
                 type="button"
@@ -624,11 +595,8 @@ export default function EditTaskModal({
                 <div className="flex gap-2">
                   {users.map((user) => {
                     const isSelected = editedTask.users[0] === user.id;
-
-                    // ▼ 修正：imageUrl だけでなく複数キーを探索して画像URLを決定
                     const imgSrc = resolveUserImageSrc(user);
 
-                    // [LOG] 各ユーザー描画時に状態を出力
                     console.debug(`${LOG} render user`, {
                       userId: user.id,
                       name: user.name,
@@ -654,7 +622,6 @@ export default function EditTaskModal({
                           width={48}
                           height={48}
                           className="object-cover w-full h-full"
-                          // [LOG] 読み込み成功時/失敗時のログ
                           onLoadingComplete={() => {
                             console.info(`${LOG} image loaded`, {
                               userId: user.id,
@@ -698,25 +665,23 @@ export default function EditTaskModal({
           </>
         )}
 
-        {/* ★ 差し替え：📝 備考（任意）  ※保存ボタン（BaseModalのフッター）直前に表示 */}
+        {/* 📝 備考（任意） ※保存ボタン直前。ラベルと入力は縦中央で揃える */}
         <div className="relative pr-8">
-          <div className="flex items-start">
-            <label className="w-20 text-gray-600 shrink-0 mt-0">備考：</label>
+          <div className="flex items-center">
+            <label className="w-20 text-gray-600 shrink-0">備考：</label>
 
             <textarea
               ref={memoRef}
-              data-scrollable="true"                 // ← BaseModal側のtouchmove抑止を回避する許可フラグ
-              onScroll={onTextareaScroll}           // スクロールヒント更新
-              value={(editedTask as any).note ?? ''}
+              data-scrollable="true"
+              onScroll={onTextareaScroll}
+              value={editedTask.note ?? ''}
               rows={1}
               placeholder="備考を入力"
               onChange={(e) =>
-                setEditedTask((prev) =>
-                  prev ? ({ ...prev, note: e.target.value } as Task) : prev
-                )
+                setEditedTask((prev) => (prev ? { ...prev, note: e.target.value } : prev))
               }
-              onTouchMove={(e) => e.stopPropagation()} // 上位のジェスチャに奪われないように
-              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1
+              onTouchMove={(e) => e.stopPropagation()}
+              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-0 ml-2 pb-0
                          touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
             />
           </div>
@@ -733,10 +698,9 @@ export default function EditTaskModal({
             </div>
           )}
         </div>
-        {/* ★ 差し替えここまで */}
 
       </div>
     </BaseModal>,
-    document.body
+    portalTarget
   );
 }
