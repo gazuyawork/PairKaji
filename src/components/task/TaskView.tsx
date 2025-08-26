@@ -738,24 +738,20 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 return (
                   <div key={period} className="mx-auto w-full max-w-xl">
                     <div className="flex items-center justify-between mt-4 mb-2 px-2">
-<h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
-  <span
-    className={`inline-block rounded-full px-3 py-1 text-sm text-white 
-      ${remaining === 0 
-        ? 'bg-gradient-to-b from-[#b0b0b0] to-[#8c8c8c] shadow-md shadow-black/20'
-        : 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] shadow-md shadow-black/20'} 
+                      <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
+                        <span
+                          className={`inline-block rounded-full px-3 py-1 text-sm text-white 
+      ${remaining === 0
+                              ? 'bg-gradient-to-b from-[#b0b0b0] to-[#8c8c8c] shadow-md shadow-black/20'
+                              : 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] shadow-md shadow-black/20'} 
       shadow-inner`}
-  >
-    {period}
-  </span>
-  <span className="text-sm text-gray-600">
-    {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
-  </span>
-</h2>
-
-
-
-
+                        >
+                          {period}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
+                        </span>
+                      </h2>
 
                       {list.some((t) => t.done) && (
                         <button

@@ -2,8 +2,8 @@
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import ClientLayout from './ClientLayout';
-// ★追加
 import Script from 'next/script';
+import type { Metadata, Viewport } from 'next';
 
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
@@ -17,8 +17,14 @@ const pacifico = Pacifico({
   variable: '--font-pacifico',
 });
 
+// ★追加: APPのベースURL（OG/Twitter画像の絶対URL解決に使用）
+const appUrl = process.env.APP_URL || 'http://localhost:3000';
+
 // 変更後（置換）
-export const metadata = {
+export const metadata: Metadata = {
+  // ★追加: metadataBase（警告の解消ポイント）
+  metadataBase: new URL(appUrl),
+
   // LP側の値を反映
   title: 'PairKaji | 家事を2人で分担するアプリ',
   description:
@@ -42,14 +48,13 @@ export const metadata = {
   },
 };
 
-
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: '#ffffff',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: 'no',
+  maximumScale: 1, // ← これで user-scalable=no 相当になる
 };
+
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -58,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
       <body className="font-sans bg-white text-gray-800 h-full antialiased">
-        {/* ★追加: AdSenseローダーはアプリ全体で1回だけ読み込む */}
+        {/* AdSenseローダーはアプリ全体で1回だけ読み込む */}
         <Script
           id="adsbygoogle-loader"
           async
