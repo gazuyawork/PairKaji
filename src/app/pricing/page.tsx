@@ -7,10 +7,9 @@ import Header from '@/components/common/Header';
 
 export default function PricingPage() {
     return (
-        <div className="min-h-screen bg-gray-50 py-10 px-4 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-12">
+        <div className="min-h-screen bg-gray-50 py-10 px-4 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-12 overflow-y-auto">
             <Header title="Subscription" />
 
-            {/* <div className="min-h-screen bg-gray-50 py-10 px-4"> */}
             <div className="mx-auto max-w-3xl text-center">
                 <p className="text-gray-600 mb-5">
                     PairKajiをもっと便利に。あなたのライフスタイルに合わせた料金プランをご用意しました。
@@ -49,7 +48,6 @@ export default function PricingPage() {
                     >
                         🌟 Liteに申し込む
                     </Link>
-
                 </div>
 
                 {/* Premium プラン */}
@@ -70,7 +68,6 @@ export default function PricingPage() {
                     >
                         ✨ Premiumに申し込む
                     </Link>
-
                 </div>
             </div>
 
