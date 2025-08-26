@@ -26,7 +26,7 @@ import GroupSelector from '@/components/todo/parts/GroupSelector';
 import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
-import AdCard_03 from '@/components/todo/parts/AdCard_03';
+import AdCard from '@/components/home/parts/AdCard';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 import { useUserUid } from '@/hooks/useUserUid';
 
@@ -333,7 +333,7 @@ export default function TodoView() {
           ));
         })()}
         {/* ✅ 広告カード（画面の末尾） */}
-        {!isChecking && !isPremium && <AdCard_03 />}
+        {!isChecking && !isPremium && <AdCard />}
       </main>
     </div>
   );

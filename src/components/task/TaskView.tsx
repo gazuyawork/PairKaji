@@ -32,7 +32,7 @@ import { motion } from 'framer-motion';
 import { X, Lightbulb, LightbulbOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
-import AdCard_02 from '@/components/task/parts/AdCard_02';
+import AdCard from '@/components/home/parts/AdCard';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 import { useUserUid } from '@/hooks/useUserUid';
@@ -875,7 +875,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             })()}
           </motion.div>
         )}
-        {!isChecking && !isPremium && <AdCard_02 />}
+        {!isChecking && !isPremium && <AdCard />}
       </main>
     </div>
   );
