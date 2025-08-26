@@ -278,7 +278,7 @@ export default function TodoTaskCard({
 
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
         <h2
-          className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[40%] cursor-pointer hover:underline"
+          className="font-bold text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[55%] cursor-pointer hover:underline"
           onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
         >
           {task.name}
