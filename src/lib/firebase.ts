@@ -16,8 +16,8 @@ import {
 } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
-import { setLogLevel } from 'firebase/firestore';
-setLogLevel('debug');
+// import { setLogLevel } from 'firebase/firestore';
+// setLogLevel('debug');
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,

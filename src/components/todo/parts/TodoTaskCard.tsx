@@ -293,7 +293,7 @@ export default function TodoTaskCard({
                   onClick={() => setTab(type as 'undone' | 'done')}
                   className={clsx(
                     'relative pl-5 py-1 text-sm font-bold border border-gray-300',
-                    'rounded-t-md w-24 flex items-center justify-center',
+                    'rounded-t-md w-16 flex items-center justify-center',
                     type === tab
                       ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
                       : 'bg-gray-100 text-gray-400 z-0'
@@ -312,8 +312,8 @@ export default function TodoTaskCard({
                   >
                     {count}
                   </span>
-
-                  {type === 'undone' ? '未処理' : '完了'}
+                  {/* {type === 'undone' ? '未処理' : '完了'} */}
+                  {type === 'undone' ? '未' : '済'}
                 </button>
               );
             })}
