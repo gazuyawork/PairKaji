@@ -52,16 +52,46 @@ export default function PricingPage() {
 
                 {/* Premium プラン */}
                 <div className="rounded-2xl border border-indigo-300 bg-white p-6 shadow-md flex flex-col">
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-3 mb-1">
                         <h2 className="text-xl font-semibold text-gray-800">Premiumプラン</h2>
                         <p className="text-sm text-gray-500">300円 / 月</p>
                     </div>
 
-                    <ul className="flex-1 space-y-2 text-sm text-gray-700 mb-6">
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 基本機能</li>
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 広告なし</li>
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> LINE通知機能</li>
+                    <p className="text-xs text-gray-500 mb-4">
+                        ※ パートナーとご利用される場合でも、2人で 300円 / 月 でご利用いただけます。
+                    </p>
+
+                    <ul className="flex-1 space-y-2 text-sm text-gray-700 mb-2">
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> 基本機能
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> 広告なし
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500 mt-1" />LINE通知機能
+                        </li>
                     </ul>
+                    <ul className="border border-gray-300 rounded-lg p-4 bg-yellow-50 space-y-2 ml-0 mb-6 text-sm ">
+                        <li className="flex items-start gap-2">
+                            <span className="shrink-0">①</span>
+                            <span className="flex-1">
+                                毎朝8時に当日のタスク一覧が通知されます。
+                            </span>
+                        </li>
+
+                        <li className="flex items-start gap-2">
+                            <span className="shrink-0">②</span>
+                            <span className="flex-1">
+                                当日のタスクで、時間指定がある場合は30分前に通知されます。
+                            </span>
+                        </li>
+
+                        <li className="flex items-center gap-2 text-xs text-gray-600">
+                            ※ ① の通知には頻度を毎日に設定しているのタスクは含まれません。
+                        </li>
+                    </ul>
+
                     <Link
                         href="/subscribe/premium"
                         className="rounded-md bg-gradient-to-r from-[#2c3e50] to-[#000000] px-6 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition duration-300 hover:from-[#3a506b] hover:to-[#1a1a1a] hover:shadow-xl text-center"
