@@ -494,7 +494,7 @@ export default function EditTaskModal({
 
         {/* ⏰ 時刻選択（週次 or 毎日） */}
         {(editedTask.period === '週次' || editedTask.period === '毎日') && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">時間：</label>
             <div className="relative w-[40%]">
               {isIOSMobileSafari && (!editedTask.time || editedTask.time === '') && (
@@ -704,7 +704,7 @@ export default function EditTaskModal({
                 setEditedTask((prev) => (prev ? { ...prev, note: next } : prev));
               }}
               onTouchMove={(e) => e.stopPropagation()}
-              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-0 ml-2 pb-0
+              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-0 ml-0 pb-0
                          touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
             />
           </div>
