@@ -5,6 +5,13 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+// --- プラン種別 ---
+// free: 広告表示
+// lite: 広告非表示のみ
+// premium: 広告非表示 + （アプリ全体で）LINE通知が利用可能（このコンポーネントでは非表示のみ対応）
+export type Plan = 'free' | 'lite' | 'premium';
 
 const RAKUTEN_WIDGET_HTML_RAW = process.env.NEXT_PUBLIC_RAKUTEN_WIDGET_HTML || '';
 const RAKUTEN_WIDGET_HTML_B64 = process.env.NEXT_PUBLIC_RAKUTEN_WIDGET_HTML_B64 || '';
@@ -15,27 +22,41 @@ function Card({
   title,
   children,
   badge,
+  onClose,
+  showClose,
 }: {
   title: string;
   children: ReactNode;
   badge?: string;
+  onClose?: () => void;
+  showClose?: boolean;
 }) {
   return (
-    <div className="w-full h-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="relative w-full h-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      {/* × ボタン（free のときのみ表示。押してもカードは閉じず、課金導線へ） */}
+      {showClose && onClose && (
+        <button
+          type="button"
+          aria-label="広告を閉じる"
+          onClick={onClose}
+          className="absolute text-xs right-2 top-3 inline-flex h-7 w-26 items-center justify-center rounded-full bg-red-400 text-white hover:bg-red-600"
+        >
+          PRを非表示にする
+        </button>
+      )}
+
+
       {/* ロゴ左端、PRバッジ右端 */}
-      <div className="mb-2 flex items-center justify-between">
+      {/* <div className="mb-2 flex items-center justify-between">
         <img
           src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg"
           alt="楽天ロゴ"
-          style={{
-            maxHeight: '27px',
-            width: 'auto',
-          }}
+          style={{ maxHeight: '27px', width: 'auto' }}
         />
         {badge ? (
           <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{badge}</span>
         ) : null}
-      </div>
+      </div> */}
 
       {/* タイトル */}
       <h3 className="mb-3 text-base font-semibold text-gray-800">{title}</h3>
@@ -45,21 +66,34 @@ function Card({
       </p>
 
       {children}
-
     </div>
   );
 }
 
-export default function AdCard() {
+/**
+ * AdCard
+ * - plan が 'lite' | 'premium' の場合は広告を描画しない（無料のみ表示）
+ * - × ボタンは「課金ページへの案内のみ」。カード自体は閉じない
+ * - plan は親から渡してください（例: <AdCard plan={user.plan} />）
+ */
+export default function AdCard({ plan = 'free' }: { plan?: Plan }) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // lite / premium は広告を常時非表示（このコンポーネントは何も描画しない）
+  if (plan === 'lite' || plan === 'premium') {
+    return null;
+  }
 
   const [isLocal, setIsLocal] = useState(false);
   useEffect(() => {
     try {
       const host = window.location.hostname;
       setIsLocal(host === 'localhost' || host === '127.0.0.1');
-    } catch { }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const rakutenFallbackUrl = useMemo(() => {
@@ -119,18 +153,12 @@ export default function AdCard() {
   [style*="width:248px"], [style*="width: 248px"] { width:auto !important; }
   img[alt*="Rakuten"], img[alt*="楽天"],
   .rakuten-logo, .rk-logo, [class*="rakuten-logo"], [id*="rakuten-logo"] {
-    display:block !important;
-    float:none !important;
-    position:static !important;
-    margin:0 0 8px !important;
-    max-width:100% !important;
-    height:auto !important;
-    z-index:auto !important;
+    display:block !important; float:none !important; position:static !important;
+    margin:0 0 8px !important; max-width:100% !important; height:auto !important; z-index:auto !important;
   }
   [style*="float:right"], [style*="float: right"],
   [style*="position:absolute"], [style*="position: absolute"]{
-    float:none !important;
-    position:static !important;
+    float:none !important; position:static !important;
   }
   @media (max-width: 520px){
     table, tbody, tr, td, div{max-width:100% !important;}
@@ -166,6 +194,16 @@ export default function AdCard() {
 </body></html>`;
   }, [rakutenSingleHtml]);
 
+  // ×ボタン押下時：カードは閉じず、課金ページへ誘導のみ
+  const handleClickClose = () => {
+    const go = window.confirm(
+      '広告を非表示にするには「Lite」または「Premium」プランのご利用が必要です。\n今すぐ料金プランをご確認しますか？'
+    );
+    if (go) {
+      router.push('/pricing?ref=ad_x');
+    }
+  };
+
   return (
     <section className="mt-4">
       <div className="mx-auto w-full max-w-xl px-2">
@@ -174,8 +212,8 @@ export default function AdCard() {
         </p>
 
         <div className="grid grid-cols-1 items-stretch gap-3 sm:gap-4">
-          {/* 楽天アフィリエイトカード */}
-          <Card title="おすすめ商品を楽天で探す" badge="PR">
+          {/* 楽天アフィリエイトカード（free のみ表示） */}
+          <Card title="おすすめ商品を楽天で探す" badge="PR" onClose={handleClickClose} showClose>
             {mounted && singleSrcDoc && !/<script/i.test(rakutenSingleHtml) ? (
               <div className="space-y-3">
                 <p className="text-sm text-gray-600">
@@ -202,7 +240,9 @@ export default function AdCard() {
                         140
                       );
                       setIframeHeight(h);
-                    } catch { }
+                    } catch {
+                      // ignore
+                    }
                   }}
                 />
               </div>
