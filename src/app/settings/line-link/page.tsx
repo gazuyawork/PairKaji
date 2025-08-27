@@ -1,45 +1,75 @@
+// src/app/settings/line-link/page.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageCircle, Info, ArrowLeft, ExternalLink } from 'lucide-react';
+import {
+  MessageCircle,
+  ArrowLeft,
+  ExternalLink,
+  CheckCircle,
+  XCircle,
+  Link2,
+  BellRing,
+} from 'lucide-react';
 
 /* =========================================
-   ★ 変更点サマリ
-   - 追加: 友だち追加導線（ボタン/説明）を常設
-   - 追加: addFriendUrl 取得のヘルパー & 導線ボタンの onClick
-   - 追加: LineStatus 型 / loading, info, error の状態（押下時の案内用）
-   - 追加: createState / buildLoginUrl（安全なログインURL生成・env対応）
-   - 追加: preflight（/api/line/status があれば参照、なければ即フォールバック）
-   - 変更: handleLineLogin（自己診断→案内／フォールバック、友だち未追加時に導線起動）
+   画面目的：LINE通知の設定・連携（ウィザード形式）
+   - 友だち追加導線（ボタン/説明）を常設
+   - addFriendUrl 取得のヘルパー & 導線ボタンの onClick
+   - LineStatus 型 / loading, info, error の状態
+   - createState / buildLoginUrl（CSRF対策・安全なログインURL生成・env対応）
+   - preflight（/api/line/status があれば参照、なければフォールバック）
+   - handleLineLogin（自己診断→案内／フォールバック、友だち未追加時は追加導線を提示）
+   - 3ステップのウィザード（①友だち追加 → ②LINE連携 → ③テスト通知）
    ========================================= */
 
 type LineStatus = {
   channelConfigured: boolean; // Messaging API チャンネル設定済みか
   linked: boolean;            // アプリユーザーと LINE ユーザーIDの紐付け済みか
   friend: boolean;            // 公式アカウントを友だち追加済みか
-  premium: boolean;           // プレミアムプラン有効か
+  premium: boolean;           // （参考）プレミアムプラン有効か ※画面では未使用
   addFriendUrl?: string;      // 友だち追加URL（任意）
 };
 
 export default function LineLinkPage() {
-  const [showDetails, setShowDetails] = useState(false);
   const router = useRouter();
 
-  // ★ 追加: 押下時の状態と案内
+  // 押下時の状態と案内
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [cachedStatus, setCachedStatus] = useState<LineStatus | null>(null); // 友だち追加導線のURLに利用
 
-  // （既存）ページ表示時に先頭へ
+  // ウィザード制御
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  // APIがない時のフォールバック用（自己完了チェック）
+  const [manualFriendChecked, setManualFriendChecked] = useState(false);
+  const [manualLinkedChecked, setManualLinkedChecked] = useState(false);
+
+  // ステータスに基づく達成判定（APIがあれば優先）
+  const friendOk = (cachedStatus?.friend ?? false) || (!cachedStatus && manualFriendChecked);
+  const linkedOk = (cachedStatus?.linked ?? false) || (!cachedStatus && manualLinkedChecked);
+
+  // ページ表示時に先頭へ & 初期診断
   useEffect(() => {
     window.scrollTo(0, 0);
+    (async () => {
+      const s = await preflight();
+      if (s) {
+        if (!s.friend) setCurrentStep(1);
+        else if (!s.linked) setCurrentStep(2);
+        else setCurrentStep(3);
+      } else {
+        setCurrentStep(1);
+      }
+    })();
   }, []);
 
-  // ★ 追加: 友だち追加URL（env 優先）
+  // 友だち追加URL（env 優先）
   const getAddFriendUrl = (fallback?: string) => {
     return (
       fallback ||
@@ -48,7 +78,7 @@ export default function LineLinkPage() {
     );
   };
 
-  // ★ 追加: CSRF対策の state を発行
+  // CSRF対策の state を発行
   const createState = () => {
     const s = crypto.getRandomValues(new Uint32Array(4)).join('-');
     try {
@@ -59,9 +89,9 @@ export default function LineLinkPage() {
     return s;
   };
 
-  // ★ 追加: 安全なログインURL生成（env があれば優先、無ければ従来値でフォールバック）
+  // 安全なログインURL生成（env があれば優先、無ければ従来値でフォールバック）
   const buildLoginUrl = () => {
-    const clientId = process.env.NEXT_PUBLIC_LINE_CLIENT_ID || '2007877129'; // ← 従来値を温存
+    const clientId = process.env.NEXT_PUBLIC_LINE_CLIENT_ID || '2007877129'; // 既存値を温存
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pair-kaji.vercel.app';
     const redirectUri = encodeURIComponent(`${baseUrl}/settings/line-link/callback`);
     const scope = encodeURIComponent('profile openid');
@@ -69,7 +99,7 @@ export default function LineLinkPage() {
     return `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&scope=${scope}`;
   };
 
-  // ★ 追加: 事前診断（/api/line/status が無い or 失敗 → null を返してフォールバック）
+  // 事前診断（/api/line/status が無い or 失敗 → null を返してフォールバック）
   const preflight = async (): Promise<LineStatus | null> => {
     setInfo('');
     setError('');
@@ -84,7 +114,7 @@ export default function LineLinkPage() {
     }
   };
 
-  // ★ 変更: 押下時フロー（自己診断→不足があれば案内／判定できなければ従来ログインに即移行）
+  // 連携ボタン押下（自己診断→不足があれば案内／判定できなければログインへ）
   const handleLineLogin = async () => {
     setLoading(true);
     try {
@@ -96,19 +126,15 @@ export default function LineLinkPage() {
         return;
       }
 
-      // ここからは “親切ガイダンス”
+      // 親切ガイダンス
       if (!status.channelConfigured) {
         setError('LINEのMessaging API 設定が未完了です。管理者にご連絡ください。');
-        return;
-      }
-
-      if (!status.premium) {
-        setInfo('LINE通知はプレミアムプラン（月額300円）が必要です。プランを有効化してください。');
+        setCurrentStep(1);
         return;
       }
 
       if (!status.linked) {
-        // まだ未連携 → 従来通りログインへ
+        // まだ未連携 → LINEログインへ
         window.location.href = buildLoginUrl();
         return;
       }
@@ -118,21 +144,23 @@ export default function LineLinkPage() {
         const url = getAddFriendUrl(status.addFriendUrl);
         if (url) {
           window.open(url, '_blank', 'noopener,noreferrer');
-          setInfo('友だち追加が必要です。追加後に、もう一度「LINEで連携する」を押してください。');
+          setInfo('友だち追加が完了したら、このページに戻って「再チェック」を押してください。');
         } else {
           setInfo('友だち追加が必要です。公式アカウントの追加URLが未設定のため、管理者にご連絡ください。');
         }
+        setCurrentStep(1);
         return;
       }
 
-      // 連携・友だち済み → 完了案内
-      setInfo('すでにLINE連携は完了しています。通知の受信をお確かめください。');
+      // 連携・友だち済み → ステップ3へ
+      setInfo('LINE連携は完了しています。通知の受信をお確かめください。');
+      setCurrentStep(3);
     } finally {
       setLoading(false);
     }
   };
 
-  // ★ 追加: 友だち追加ボタン（常時導線）
+  // 友だち追加ボタン（常時導線）
   const handleAddFriend = () => {
     const urlFromStatus = cachedStatus?.addFriendUrl;
     const url = getAddFriendUrl(urlFromStatus);
@@ -144,13 +172,42 @@ export default function LineLinkPage() {
       return;
     }
     window.open(url, '_blank', 'noopener,noreferrer');
-    setInfo('友だち追加が完了したら、このページに戻って「LINEで連携する」を押してください。');
+    setInfo('友だち追加が完了したら、このページに戻って「再チェック」を押してください。');
   };
 
-  // （既存 UI はそのまま、導線を追加）
+  // 現在の状態を再取得してステップを自動調整
+  const refreshStatus = async () => {
+    const s = await preflight();
+    if (s) {
+      if (!s.friend) setCurrentStep(1);
+      else if (!s.linked) setCurrentStep(2);
+      else setCurrentStep(3);
+    }
+  };
+
+  // テスト通知送信（/api/line/test-notify が無い場合でも丁寧に案内）
+  const sendTestNotification = async () => {
+    setLoading(true);
+    setInfo('');
+    setError('');
+    try {
+      const res = await fetch('/api/line/test-notify', { method: 'POST' });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        setError(text || 'テスト通知の送信に失敗しました。連携状態を再チェックしてください。');
+        return;
+      }
+      setInfo('テスト通知を送信しました。LINEをご確認ください。');
+    } catch {
+      setError('ネットワークエラーのため、テスト通知を送信できませんでした。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f9fcff] flex items-center justify-center px-4 py-12 relative">
-      {/* 戻るボタン（既存） */}
+      {/* 戻るボタン */}
       <button
         onClick={() => router.back()}
         className="absolute top-4 left-4 text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"
@@ -165,64 +222,185 @@ export default function LineLinkPage() {
             <MessageCircle className="text-sky-500 w-8 h-8" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">LINEと連携する</h1>
+          <h1 className="text-xl font-bold text-gray-800 mb-1">LINE通知の設定</h1>
+          <p className="text-sm text-gray-600 mb-4">
+            下の順番どおりに進めてください。各ステップの右上が「✔」になればクリアです。
+          </p>
 
-          <div className="bg-yellow-50 text-red-700 border border-yellow-300 rounded-md text-sm p-3 mb-4 w-full text-left">
-            ※ LINE通知のご利用には、<strong>月額300円のプレミアムプラン</strong>への加入が必要です。
+          {/* ステータス（参考表示バッジ） */}
+          <div className="w-full grid grid-cols-2 gap-2 mb-4">
+            {[
+              { label: 'チャンネル設定', ok: !!cachedStatus?.channelConfigured },
+              { label: '友だち追加', ok: friendOk },
+              { label: 'LINE連携', ok: linkedOk },
+              { label: '通知テスト', ok: false }, // 送信成功でinfoに案内表示
+            ].map((b) => (
+              <div
+                key={b.label}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                  b.ok
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-gray-50 border-gray-200 text-gray-500'
+                }`}
+              >
+                {b.ok ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                {b.label}
+              </div>
+            ))}
+          </div>
 
-            {/* （既存）プラン詳細のトグル */}
-            <button
-              onClick={() => setShowDetails((prev) => !prev)}
-              className="mt-4 text-sm text-sky-600 underline hover:text-sky-800 flex items-center gap-1"
-            >
-              <Info className="w-4 h-4" />
-              プレミアムプランの詳細を見る
-            </button>
-
-            {showDetails && (
-              <div className="mt-4 w-full text-sm text-gray-700 bg-gray-50 p-4 rounded-md border border-gray-200 text-left">
-                <p className="font-semibold mb-2">プレミアムプラン（300円/月）でできること：</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>タスクのリマインダーをLINEで受信</li>
-                  <li>アプリ内の広告が完全に非表示に</li>
-                </ul>
-                <p className="mt-3 text-xs text-gray-500">
-                  ※ プランはいつでも解約可能です。キャンセル後も契約期間中はご利用いただけます。
+          {/* ====== ステップ 1：友だち追加 ====== */}
+          <div
+            className={`w-full rounded-lg border p-4 mb-3 ${
+              currentStep === 1 ? 'border-sky-300 bg-sky-50' : 'border-gray-200 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">① 公式アカウントを友だち追加</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  ボタンを押して追加ページを開き、追加完了後に「再チェック」を押してください。
                 </p>
               </div>
-            )}
+              {friendOk ? (
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <XCircle className="w-5 h-5 text-gray-400" />
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                onClick={handleAddFriend}
+                className="border border-emerald-200 text-emerald-700 px-3 py-2 rounded-md hover:bg-emerald-50 flex items-center gap-2"
+              >
+                友だち追加を開く <ExternalLink className="w-4 h-4" />
+              </button>
+              <button
+                onClick={refreshStatus}
+                className="border border-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-50"
+              >
+                再チェック
+              </button>
+
+              {/* APIが無い時のフォロー（任意チェック） */}
+              {!cachedStatus && (
+                <label className="ml-auto text-xs text-gray-600 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={manualFriendChecked}
+                    onChange={(e) => setManualFriendChecked(e.target.checked)}
+                  />
+                  追加を完了しました（API未接続のため手動）
+                </label>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <button
+                onClick={() => setCurrentStep(friendOk ? 2 : 1)}
+                disabled={!friendOk}
+                className="w-full bg-sky-600 text-white py-2 rounded-md font-semibold disabled:opacity-60"
+              >
+                次へ（LINE連携へ）
+              </button>
+            </div>
           </div>
 
-
-          {/* 連携ボタン（自己診断→案内／フォールバック） */}
-
-          <button
-            onClick={handleLineLogin}
-            disabled={loading}
-            aria-busy={loading}
-            className="w-full bg-gradient-to-r from-green-400 to-green-600 text-white py-3 rounded-lg font-bold shadow hover:opacity-90 transition-all disabled:opacity-60"
+          {/* ====== ステップ 2：LINEログイン連携 ====== */}
+          <div
+            className={`w-full rounded-lg border p-4 mb-3 ${
+              currentStep === 2 ? 'border-sky-300 bg-sky-50' : 'border-gray-200 bg-white'
+            }`}
           >
-            {loading ? '確認中…' : 'LINEで連携する'}
-          </button>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">② LINEでアカウント連携</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  LINEログインに進み、許可後このページに戻り「再チェック」を押してください。
+                </p>
+              </div>
+              {linkedOk ? (
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <XCircle className="w-5 h-5 text-gray-400" />
+              )}
+            </div>
 
-          {/* ★ 追加: 友だち追加導線（常設） */}
-          <div className="mt-3 w-full">
-            <button
-              onClick={handleAddFriend}
-              className="w-full border border-emerald-200 text-emerald-700 py-2 rounded-md hover:bg-emerald-50 flex items-center justify-center gap-2"
-            >
-              公式アカウントを友だち追加
-              <ExternalLink className="w-4 h-4" />
-            </button>
-            <p className="mt-2 text-xs text-gray-500">
-              <strong>友だち追加を行った後にLINE連携を実施してください。</strong>
-              <br/>
-              <span className='text-red-700'>※友達追加をおこなわない場合、通知が届きません。</span>
-            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                onClick={handleLineLogin}
+                disabled={loading}
+                aria-busy={loading}
+                className="bg-gradient-to-r from-green-400 to-green-600 text-white px-3 py-2 rounded-md font-semibold hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
+              >
+                <Link2 className="w-4 h-4" />
+                {loading ? '確認中…' : 'LINEで連携する'}
+              </button>
+              <button
+                onClick={refreshStatus}
+                className="border border-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-50"
+              >
+                再チェック
+              </button>
+
+              {!cachedStatus && (
+                <label className="ml-auto text-xs text-gray-600 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={manualLinkedChecked}
+                    onChange={(e) => setManualLinkedChecked(e.target.checked)}
+                  />
+                  連携を完了しました（API未接続のため手動）
+                </label>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <button
+                onClick={() => setCurrentStep(linkedOk ? 3 : 2)}
+                disabled={!linkedOk}
+                className="w-full bg-sky-600 text-white py-2 rounded-md font-semibold disabled:opacity-60"
+              >
+                次へ（テスト通知へ）
+              </button>
+            </div>
           </div>
 
+          {/* ====== ステップ 3：テスト通知 ====== */}
+          <div
+            className={`w-full rounded-lg border p-4 ${
+              currentStep === 3 ? 'border-sky-300 bg-sky-50' : 'border-gray-200 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">③ テスト通知を送信</p>
+                <p className="text-xs text-gray-600 mt-1">テスト通知を送って受信できれば設定完了です。</p>
+              </div>
+              <BellRing className="w-5 h-5 text-sky-600" />
+            </div>
 
-          {/* ★ 追加: 押下時の案内／エラーを表示（UI は軽量） */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                onClick={sendTestNotification}
+                disabled={loading || !friendOk || !linkedOk}
+                aria-busy={loading}
+                className="bg-sky-600 text-white px-3 py-2 rounded-md font-semibold hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
+              >
+                <BellRing className="w-4 h-4" />
+                テスト通知を送る
+              </button>
+              <button
+                onClick={refreshStatus}
+                className="border border-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-50"
+              >
+                再チェック
+              </button>
+            </div>
+          </div>
+
+          {/* メッセージ */}
           {info && (
             <div className="mt-4 w-full text-sm text-green-700 bg-green-50 p-3 rounded border border-green-200 text-left">
               {info}
@@ -233,10 +411,6 @@ export default function LineLinkPage() {
               {error}
             </div>
           )}
-
-          {/* <p className="text-xs text-gray-400 mt-4">
-            LINEログイン後、通知許可を求められます。
-          </p> */}
         </div>
       </div>
     </div>
