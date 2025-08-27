@@ -1,3 +1,4 @@
+// src/app/profile/page.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,10 @@ export default function ProfilePage() {
   const [lineLinked, setLineLinked] = useState<boolean>(false);
   const [lineDisplayName, setLineDisplayName] = useState<string | null>(null);
   const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
+
+  // ★ 追加：Stripe カスタマーポータル用状態
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+  const [isPortalOpening, setIsPortalOpening] = useState(false);
 
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
@@ -120,7 +125,6 @@ export default function ProfilePage() {
           setLineLinked(Boolean(data.lineLinked));
           setLineDisplayName(data.lineDisplayName ?? null);
           setLinePictureUrl(data.linePictureUrl ?? null);
-
         } else {
           await createUserProfile(user.uid, user.email?.split('@')[0] || '');
           setName(user.email?.split('@')[0] || '');
@@ -236,6 +240,13 @@ export default function ProfilePage() {
         setLineLinked(Boolean(data.lineLinked));
         setLineDisplayName(data.lineDisplayName ?? null);
         setLinePictureUrl(data.linePictureUrl ?? null);
+
+        // ★ 追加：Stripe カスタマーIDの反映
+        if (typeof (data as any).stripeCustomerId === 'string' && (data as any).stripeCustomerId.trim() !== '') {
+          setStripeCustomerId((data as any).stripeCustomerId as string);
+        } else {
+          setStripeCustomerId(null);
+        }
       },
       (error) => {
         handleFirestoreError(error);
@@ -386,6 +397,35 @@ export default function ProfilePage() {
     }
   };
 
+  // ★ 追加：Stripe カスタマーポータルを開く
+  const handleOpenStripePortal = async () => {
+    if (!stripeCustomerId) {
+      toast.error('決済情報が見つかりません。決済完了後にお試しください。');
+      return;
+    }
+    try {
+      setIsPortalOpening(true);
+      const res = await fetch('/api/billing/create-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: stripeCustomerId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.url) {
+        console.error('[create-portal] failed:', data);
+        toast.error('ポータルの作成に失敗しました。しばらくしてからお試しください。');
+        return;
+      }
+      // Stripe がホストするカスタマーポータルへ遷移
+      window.location.href = data.url as string;
+    } catch (err) {
+      console.error('[create-portal] error:', err);
+      toast.error('ポータルの作成に失敗しました。');
+    } finally {
+      setIsPortalOpening(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Profile" />
@@ -435,12 +475,22 @@ export default function ProfilePage() {
             <LineLinkCard />
 
             {plan !== 'free' && (
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-2">
+                {/* ★ 変更：Stripe カスタマーポータルへ遷移 */}
+                <button
+                  onClick={handleOpenStripePortal}
+                  disabled={isPortalOpening}
+                  className="mt-4 text-indigo-600 py-2 px-4 rounded transition text-xs underline decoration-indigo-600 disabled:opacity-60"
+                >
+                  {isPortalOpening ? '開いています…' : 'サブスクリプションを管理（ポータル）'}
+                </button>
+
+                {/* 任意：開発・緊急用の Free 戻しを温存したい場合 */}
                 <button
                   onClick={handleCancelPlan}
-                  className="mt-4 text-gray-400 py-2 px-4 rounded transition text-xs underline decoration-gray-400"
+                  className="text-gray-400 py-2 px-4 rounded transition text-[11px] underline decoration-gray-400"
                 >
-                  プランをFreeに戻す
+                  （開発用）強制的にFreeに戻す
                 </button>
               </div>
             )}

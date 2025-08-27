@@ -24,7 +24,7 @@ export default function SuccessClient() {
   }, [countdown, next, router]);
 
   return (
-    <div className="min-h-screen bg-gray-50 bg-gradient-to-b from-[#fffaf1] to-[#e8ffe4] mt-12">
+    <div className="min-h-screen bg-gray-50 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-12">
       <Header title="Subscription" />
       <div className="max-w-xl mx-auto px-4 py-10">
         <div className="rounded-2xl border border-green-200 bg-white shadow-sm p-6">
