@@ -5,7 +5,8 @@ export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2, SkipForward } from 'lucide-react';
+// ★ 変更: Infoに加えてXアイコンを追加し、Info色はオレンジに寄せる用途で利用
+import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2, SkipForward, Info, X } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -14,6 +15,9 @@ import { useView } from '@/context/ViewContext';
 import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
+// 変更（★ 追加）
+import { createPortal } from 'react-dom';
+
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
@@ -42,6 +46,9 @@ type UserInfo = {
   name: string;
   imageUrl: string;
 };
+
+// 備考noteをローカルで許容
+type TaskWithNote = Task & { note?: string };
 
 type Props = {
   task: Task;
@@ -81,6 +88,9 @@ export default function TaskCard({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingConfirmResolver = useRef<((ok: boolean) => void) | null>(null);
   const [localDone, setLocalDone] = useState(task.done);
+
+  // ★ 変更: 備考モーダル開閉
+  const [showNote, setShowNote] = useState(false);
 
   useEffect(() => {
     setLocalDone(task.done);
@@ -190,9 +200,7 @@ export default function TaskCard({
             className="w-8 h-8 flex items-center justify-center rounded-md bg-gradient-to-b from-indigo-300 to-indigo-600 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
             onClick={(e) => {
               e.stopPropagation();
-              // ← 左スライドでスキップを実行（ポイントなし）
               onSkip?.(task.id);
-              // スワイプ状態は閉じる
               setSwipeDirection(null);
             }}
             title="スキップ（ポイント加算なし）"
@@ -201,7 +209,6 @@ export default function TaskCard({
           </button>
         </div>
       )}
-
 
       {swipeDirection === 'right' && task.visible && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
@@ -219,11 +226,10 @@ export default function TaskCard({
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
 
-            {/* スキップ */}
+            {/* 削除 */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                // 既存の削除処理を呼び出す（確認モーダル→onDelete）
                 handleDelete();
               }}
               className="w-12 h-12 rounded-full bg-gradient-to-b from-red-300 to-red-600 shadow ring-1 ring-red-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
@@ -232,7 +238,7 @@ export default function TaskCard({
               <Trash2 className="w-5 h-5" />
             </button>
 
-
+            {/* フラグ */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -247,15 +253,19 @@ export default function TaskCard({
                     ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
                     : 'bg-gray-300 ring-1 ring-gray-300 text-white'
               )}
+              title="重要マーク"
             >
               <Flag className="w-5 h-5" />
             </button>
+
+            {/* 編集 */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
               }}
               className="w-12 h-12 rounded-full bg-gradient-to-b from-green-300 to-green-600 shadow ring-1 ring-green-300 ring-offset-1 flex items-center justify-center text-white active:translate-y-0.5 transition-all duration-150"
+              title="編集"
             >
               <Pencil className="w-5 h-5" />
             </button>
@@ -316,19 +326,37 @@ export default function TaskCard({
 
           {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
 
-
-          {/* 左エリア本体：名前(1fr) + 曜日(auto) の2カラムにして衝突回避 */}
+          {/* 左エリア本体：名前(1fr) + 曜日(auto) */}
           <div className="grid grid-cols-[1fr_auto] items-center gap-x-2 min-w-0 flex-1">
-            {/* タスク名：省略可・はみ出し防止 */}
-            <div className="min-w-0">
+            {/* タスク名＋備考アイコン */}
+            <div className="min-w-0 flex items-center gap-1">
               <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
+
+              {/* ★ 変更: インフォアイコンをオレンジ化＆クリックでモーダル */}
+              {(() => {
+                const noteText = (task as TaskWithNote).note?.trim();
+                if (!noteText) return null;
+                return (
+                  <button
+                    type="button"
+                    aria-label="備考を表示"
+                    title="備考を表示"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowNote(true);
+                    }}
+                    className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  >
+                    <Info className="w-4 h-4 text-orange-500" />
+                  </button>
+                );
+              })()}
             </div>
 
-            {/* 曜日：右側に寄せ、サイズ固定しつつ折返し可能 */}
+            {/* 曜日 */}
             {sortedDays.length > 0 && (
               <div
                 className={clsx(
-                  // 横詰まり時は2列グリッドで折返し、全体幅は最大で100px程度に制限
                   'grid gap-x-[1px] gap-y-[2px] pr-1 justify-end content-center',
                   'max-w-[100px]',
                   sortedDays.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
@@ -350,33 +378,6 @@ export default function TaskCard({
               </div>
             )}
           </div>
-
-
-          {/* <div className="w-[100%] min-w-0">
-            <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
-          </div>
-
-          {sortedDays.length > 0 && (
-            <div
-              className={clsx(
-                'grid gap-x-[10px] gap-y-0 w-[52px] pr-1',
-                sortedDays.length === 1 ? 'grid-cols-1 place-items-end' : 'grid-cols-2'
-              )}
-            >
-              {sortedDays.map((d, i) => (
-                <div
-                  key={i}
-                  className={clsx(
-                    'w-5.5 h-5.5 aspect-square rounded-full text-white text-[10px] flex items-center justify-center flex-shrink-0 border-2',
-                    dayBaseClass,
-                    dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
-                  )}
-                >
-                  {d}
-                </div>
-              ))}
-            </div>
-          )} */}
         </div>
 
         {/* 右側：日時・ポイント・画像 */}
@@ -441,6 +442,59 @@ export default function TaskCard({
           )}
         </div>
       </motion.div>
+
+      {/* ★ 変更: 備考モーダル */}
+      {/* ★ 追加：備考モーダルを body 直下へポータル */}
+      {showNote &&
+        typeof window !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10000] flex items-center justify-center"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNote(false);
+            }}
+          >
+            {/* 背景：白の透過 */}
+            <div className="absolute inset-0 bg-white/80" />
+
+            {/* ダイアログ本体 */}
+            <div
+              className="relative z-[10001] w-[min(92vw,520px)] max-h-[70vh] rounded-2xl bg-white shadow-xl ring-1 ring-black/5 p-5 overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label="タスク備考"
+            >
+              <div className="flex items-start gap-3 mb-3">
+                {/* インフォアイコン：オレンジ */}
+                <Info className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
+                <h3 className="text-base font-semibold text-gray-800">備考</h3>
+
+                {/* 右上 × ボタン */}
+                <button
+                  type="button"
+                  aria-label="閉じる"
+                  title="閉じる"
+                  className="ml-auto -mt-1 p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNote(false);
+                  }}
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              <div className="whitespace-pre-wrap break-words text-[15px] leading-6 text-gray-700">
+                {(task as Task & { note?: string }).note?.trim() || ''}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      }
+
 
       <ConfirmModal
         isOpen={confirmOpen}
