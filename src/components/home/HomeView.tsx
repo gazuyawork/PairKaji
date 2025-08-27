@@ -249,7 +249,7 @@ export default function HomeView() {
               )}
             /> */}
 
-            {!isLineLinked && <LineLinkCard />}
+            {!isLoading && !isChecking && plan === 'premium' && !isLineLinked && <LineLinkCard />}
 
             {/* ▼ 変更：プレミアム以外のときに広告表示 */}
             {!isLoading && !isChecking && plan === 'free' && <AdCard />}

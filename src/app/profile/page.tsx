@@ -453,7 +453,6 @@ export default function ProfilePage() {
               isLoading={isLoading}
               nameUpdateStatus={nameUpdateStatus}
             />
-
             <PartnerSettings
               isLoading={isLoading}
               isPairLoading={isPairLoading}
@@ -472,7 +471,7 @@ export default function ProfilePage() {
               isRemoving={isRemoving}
             />
 
-            <LineLinkCard />
+            {plan === 'premium' && !lineLinked && <LineLinkCard />}
 
             {plan !== 'free' && (
               <div className="flex flex-col items-center gap-2">
@@ -485,7 +484,6 @@ export default function ProfilePage() {
                   {isPortalOpening ? '開いています…' : 'サブスクリプションを管理（ポータル）'}
                 </button>
 
-                {/* 任意：開発・緊急用の Free 戻しを温存したい場合 */}
                 <button
                   onClick={handleCancelPlan}
                   className="text-gray-400 py-2 px-4 rounded transition text-[11px] underline decoration-gray-400"
@@ -494,6 +492,7 @@ export default function ProfilePage() {
                 </button>
               </div>
             )}
+
 
             <div className="text-center mt-auto">
               <Link href="/delete-account" className="text-xs text-gray-400 hover:underline underline decoration-gray-400">
