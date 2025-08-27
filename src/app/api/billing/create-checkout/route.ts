@@ -20,15 +20,22 @@ type CreateCheckoutBody = {
 
 export async function POST(req: NextRequest) {
   try {
-    // ★ リクエストボディの型を明示
-    const { plan, next, uid } = (await req.json()) as CreateCheckoutBody;
+    const body = (await req.json().catch(() => null)) as CreateCheckoutBody | null;
 
-    // ① バリデーション
+    // ★ ログ追加：届いた内容と型を確認（Vercel の Function Logs で見られます）
+    console.log('[create-checkout] received body:', body);
+
+    const plan = body?.plan;
+    const next = body?.next;
+    const uid = typeof body?.uid === 'string' ? body?.uid : undefined;
+
     if (!plan || !['lite', 'premium'].includes(plan)) {
       return NextResponse.json({ error: 'invalid plan' }, { status: 400 });
     }
-    if (!uid || typeof uid !== 'string') {
-      return NextResponse.json({ error: 'missing uid' }, { status: 400 });
+
+    // ★ 緩和：uid が無くても通す（当面の回避）
+    if (!uid) {
+      console.warn('[create-checkout] uid is missing. proceeding without uid (metadata only)');
     }
 
     // ② 環境変数から Price を解決（ビルド時 throw はしない）
@@ -62,16 +69,21 @@ export async function POST(req: NextRequest) {
     const cancelUrl = joinUrl(origin, '/subscribe/cancel');
 
     // ④ Hosted Checkout セッションを作成
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
+    const base = {
+      mode: 'subscription' as const,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      // ★ Webhook 側で uid を使って Firestore を更新するために埋め込む
-      client_reference_id: uid,
-      metadata: { uid, plan },
       allow_promotion_codes: true,
-    });
+    };
+
+    // ★ uid があれば入れる。なければ plan だけを入れる（後で追跡しやすいように）
+    const session = await stripe.checkout.sessions.create(
+      uid
+        ? { ...base, client_reference_id: uid, metadata: { uid, plan } }
+        : { ...base,               /* client_reference_id なし */ metadata: { plan } }
+    );
+
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (e: any) {

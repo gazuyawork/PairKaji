@@ -60,10 +60,11 @@ export default function SubscribeConfirm({ plan }: Props) {
     }
     try {
       setLoading(true);
+       console.log('checkout uid:', uid); // ★ 送信直前に確認
       const res = await fetch('/api/billing/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: meta.apiPlan, next }),
+        body: JSON.stringify({ plan: meta.apiPlan, next, uid }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -151,7 +152,7 @@ export default function SubscribeConfirm({ plan }: Props) {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
               onClick={handleCheckout}
-              disabled={loading}
+              disabled={loading || !uid}  // ★ uid が確定するまで押せない
               className="rounded-md px-6 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition duration-300"
               style={{
                 backgroundImage: `linear-gradient(90deg, ${meta.gradientFrom}, ${meta.gradientTo})`,

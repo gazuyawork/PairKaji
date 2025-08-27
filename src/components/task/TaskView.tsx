@@ -34,7 +34,7 @@ import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import AdCard from '@/components/home/parts/AdCard';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
-import { usePremiumStatus } from '@/hooks/usePremiumStatus';
+import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 
 /* ▼ 追加：スキップ（ポイント加算なし）ユーティリティ */
@@ -151,7 +151,7 @@ type Props = {
 export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
   const uid = useUserUid();
   const { profileImage, partnerImage } = useProfileImages();
-  const { isPremium, isChecking } = usePremiumStatus();
+  const { plan, isChecking } = useUserPlan();
   const searchParams = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -871,7 +871,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             })()}
           </motion.div>
         )}
-        {!isChecking && !isPremium && <AdCard />}
+        {!isLoading && !isChecking && plan === 'free' && <AdCard />}
       </main>
     </div>
   );

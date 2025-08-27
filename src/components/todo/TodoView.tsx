@@ -27,7 +27,7 @@ import { useView } from '@/context/ViewContext';
 import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard from '@/components/home/parts/AdCard';
-import { usePremiumStatus } from '@/hooks/usePremiumStatus';
+import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 
 export default function TodoView() {
@@ -43,8 +43,11 @@ export default function TodoView() {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
-  const { isPremium, isChecking } = usePremiumStatus();
+  const { plan, isChecking } = useUserPlan();
   const uid = useUserUid();
+
+  // ★ 追加: ローディング状態
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
@@ -91,7 +94,15 @@ export default function TodoView() {
   }, [isOpen]);
 
   useEffect(() => {
-    if (!uid) return;
+    // ★ 追加: uidが未取得の間はローディング扱いにしない（広告の点滅防止のため取得完了までtrueのままでもOK）
+    if (!uid) {
+      setTasks([]);
+      setIsLoading(false);
+      return;
+    }
+
+    // データ取得開始時はローディングON
+    setIsLoading(true);
 
     let unsubscribe: (() => void) | null = null;
     let isMounted = true;
@@ -129,8 +140,17 @@ export default function TodoView() {
         });
 
         setTasks(newTasks);
+        // 初回スナップショット受信でローディングOFF
+        setIsLoading(false);
+      }, (err) => {
+        console.error('tasks onSnapshot error:', err);
+        // エラー時もローディングOFFにして画面を進める
+        setIsLoading(false);
       });
-    })().catch(console.error);
+    })().catch((err) => {
+      console.error('tasks load error:', err);
+      setIsLoading(false);
+    });
 
     return () => {
       isMounted = false;
@@ -333,7 +353,7 @@ export default function TodoView() {
           ));
         })()}
         {/* ✅ 広告カード（画面の末尾） */}
-        {!isChecking && !isPremium && <AdCard />}
+        {!isLoading && !isChecking && plan === 'free' && <AdCard />}
       </main>
     </div>
   );

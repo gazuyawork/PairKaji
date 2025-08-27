@@ -17,7 +17,8 @@ import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 // import { isToday } from 'date-fns';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
-import { usePremiumStatus } from '@/hooks/usePremiumStatus';
+// ▼ 変更：usePremiumStatus を廃止し、useUserPlan を使用
+import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 
 export default function HomeView() {
@@ -31,7 +32,10 @@ export default function HomeView() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isWeeklyPointsHidden, setIsWeeklyPointsHidden] = useState(false);
   const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
-  const { isPremium, isChecking } = usePremiumStatus();
+
+  // ▼ 変更：isPremium / isChecking → plan / isChecking
+  const { plan, isChecking } = useUserPlan();
+
   const uid = useUserUid();
   const handleCloseOverlay = () => {
     localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
@@ -41,7 +45,6 @@ export default function HomeView() {
   const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
 
   useEffect(() => {
-
     if (!uid) return;
     const userRef = doc(db, 'users', uid);
 
@@ -55,12 +58,10 @@ export default function HomeView() {
     return () => unsubscribe();
   }, [uid]);
 
-
   useEffect(() => {
     const stored = localStorage.getItem(WEEKLY_POINTS_HIDE_KEY);
     setIsWeeklyPointsHidden(stored === 'true');
   }, []);
-
 
   useEffect(() => {
     if (!uid) return;
@@ -91,15 +92,12 @@ export default function HomeView() {
     };
   }, [uid]);
 
-
   useEffect(() => {
     if (hasPairConfirmed) {
       localStorage.removeItem(WEEKLY_POINTS_HIDE_KEY);
       setIsWeeklyPointsHidden(false);
     }
   }, [hasPairConfirmed]);
-
-
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -119,7 +117,6 @@ export default function HomeView() {
   }, []);
 
   useEffect(() => {
-  
     if (!uid) return;
 
     const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
@@ -136,7 +133,6 @@ export default function HomeView() {
   }, [uid]);
 
   useEffect(() => {
-  
     if (!uid) return;
 
     const q = query(
@@ -255,9 +251,8 @@ export default function HomeView() {
 
             {!isLineLinked && <LineLinkCard />}
 
-
-            {!isLoading && !isChecking && !isPremium && <AdCard />}
-
+            {/* ▼ 変更：プレミアム以外のときに広告表示 */}
+            {!isLoading && !isChecking && plan === 'free' && <AdCard />}
           </motion.div>
         </main>
       </div>
