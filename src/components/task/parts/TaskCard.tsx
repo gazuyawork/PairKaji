@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 // ★ 変更: Infoに加えてXアイコンを追加し、Info色はオレンジに寄せる用途で利用
-import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2, SkipForward, Info, X } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2, SkipForward, Info, X, SquareUser } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -324,7 +324,7 @@ export default function TaskCard({
             </div>
           </button>
 
-          {task.flagged && <Flag className="text-red-500 w-6 h-6 ml-0" />}
+          {task.flagged && <Flag className="text-red-500 w-5 h-5 ml-0" />}
 
           {/* 左エリア本体：名前(1fr) + 曜日(auto) */}
           <div className="grid grid-cols-[1fr_auto] items-center gap-x-2 min-w-0 flex-1">
@@ -347,7 +347,7 @@ export default function TaskCard({
                     }}
                     className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
                   >
-                    <Info className="w-4 h-4 text-orange-500" />
+                    <Info className="w-5 h-5 text-blue-500" />
                   </button>
                 );
               })()}
@@ -415,10 +415,8 @@ export default function TaskCard({
           )}
 
           {task.private && isPairConfirmed ? (
-            <div className="flex items-center justify-center w-[90px] h-[38px]">
-              <span className="font-pacifico text-sm px-2 py-[2px] tracking-wider bg-gradient-to-r from-green-500 to-green-800 text-transparent bg-clip-text">
-                Private
-              </span>
+            <div className="flex items-center justify-center ml-2 w-[35px] h-[37px]">
+                <SquareUser className="w-6 h-6 text-green-600" />
             </div>
           ) : !task.private ? (
             <div className="flex items-center gap-2 w-[90px]">
@@ -468,7 +466,7 @@ export default function TaskCard({
             >
               <div className="flex items-start gap-3 mb-3">
                 {/* インフォアイコン：オレンジ */}
-                <Info className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
+                <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
                 <h3 className="text-base font-semibold text-gray-800">備考</h3>
 
                 {/* 右上 × ボタン */}
