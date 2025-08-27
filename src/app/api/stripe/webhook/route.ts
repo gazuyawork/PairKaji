@@ -5,8 +5,62 @@ import { stripe } from '@/lib/billing/stripe';
 import { getAdminDb } from '@/lib/server/firebaseAdmin';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic'; // キャッシュ無効化（保険）
+export const dynamic = 'force-dynamic'; // 念のためキャッシュ無効
 
+// ------------------------------
+// ヘルパー
+// ------------------------------
+/**
+ * Firestore の users コレクションから customerId で uid を逆引き
+ */
+async function findUidByCustomerId(customerId: string): Promise<string | null> {
+  try {
+    const db = await getAdminDb();
+    const snap = await db
+      .collection('users')
+      .where('stripeCustomerId', '==', customerId)
+      .limit(1)
+      .get();
+    if (snap.empty) return null;
+    return snap.docs[0].id;
+  } catch (e) {
+    console.error('[webhook] findUidByCustomerId error:', e);
+    return null;
+  }
+}
+
+// 置き換え対象：resolvePlanByPriceId を下記に差し替え
+// ※ Stripe.Price を受け取って ID/金額/通貨/間隔 を総合判定します。
+function resolvePlanByPrice(price?: Stripe.Price | null): 'lite' | 'premium' | 'free' {
+  if (!price) return 'free';
+
+  const id = price.id;
+  const amt = price.unit_amount ?? null;      // 例: 100, 300（JPYの最小単位=円）
+  const cur = price.currency;                 // 'jpy' など
+  const interval = price.recurring?.interval; // 'month' など
+
+  // 1) まずは Price ID で厳密一致
+  if (id === process.env.STRIPE_PRICE_LITE) return 'lite';
+  if (id === process.env.STRIPE_PRICE_PREMIUM) return 'premium';
+
+  // 2) 月額・JPY なら金額でフォールバック（100=Lite, 300=Premium）
+  if (interval === 'month' && cur === 'jpy' && typeof amt === 'number') {
+    if (amt === 100) return 'lite';
+    if (amt === 300) return 'premium';
+  }
+
+  console.warn('[webhook] price did not match by id nor amount', {
+    got: { id, amt, cur, interval },
+    L: process.env.STRIPE_PRICE_LITE,
+    P: process.env.STRIPE_PRICE_PREMIUM,
+  });
+  return 'free';
+}
+
+
+// ------------------------------
+// Webhook エンドポイント
+// ------------------------------
 export async function POST(req: NextRequest) {
   const sig = req.headers.get('stripe-signature');
   const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -15,7 +69,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'missing signature or secret' }, { status: 400 });
   }
 
-  // ⚠️ 検証は「生ボディ」で行う
+  // ⚠️ 署名検証は「生ボディ」で行う
   const rawBody = await req.text();
 
   let event: Stripe.Event;
@@ -27,17 +81,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    console.log('[webhook] event:', event.type);
+
     switch (event.type) {
-      // ✅ Checkout 完了：users/{uid} に stripeCustomerId + plan を保存
+      // ------------------------------------------
+      // 初回購入完了：users/{uid} に保存＆subscription に uid を付与
+      // ------------------------------------------
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        // create-checkout で埋め込み済み（前段で対応済み）
         const uid =
           (session.client_reference_id as string | null) ||
           (session.metadata?.uid as string | undefined);
 
-        const customerId = session.customer as string | null;       // "cus_***"
+        const customerId = session.customer as string | null; // "cus_***"
         const subscriptionId = session.subscription as string | null; // "sub_***"
 
         if (!uid || !customerId) {
@@ -45,16 +102,25 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        // line_items の price.id でどのプランかを判定
+        // line_items の price.id で plan 判定
         const full = await stripe.checkout.sessions.retrieve(session.id, {
           expand: ['line_items.data.price'],
         });
-        const priceId = full.line_items?.data?.[0]?.price?.id ?? null;
+        const price = full.line_items?.data?.[0]?.price as Stripe.Price | undefined;
+        const plan = resolvePlanByPrice(price ?? null);
 
-        let plan: 'lite' | 'premium' | 'free' = 'free';
-        if (priceId === process.env.STRIPE_PRICE_LITE) plan = 'lite';
-        if (priceId === process.env.STRIPE_PRICE_PREMIUM) plan = 'premium';
+        // 以後の subscription.* イベントで uid を辿れるよう、subscription に uid をメタデータ付与
+        if (subscriptionId) {
+          try {
+            await stripe.subscriptions.update(subscriptionId, {
+              metadata: { uid },
+            });
+          } catch (e) {
+            console.warn('[webhook] failed to attach uid to subscription metadata:', e);
+          }
+        }
 
+        // Firestore 反映
         const db = await getAdminDb();
         await db.collection('users').doc(uid).set(
           {
@@ -70,41 +136,64 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      // ✅ 以降は任意（プラン変更/解約の自動反映）
+      // ------------------------------------------
+      // プラン変更（アップ/ダウングレード）・状態変化
+      // ------------------------------------------
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription;
 
-        // メタデータに uid を入れていない場合は、必要なら customer → users を逆引き実装
-        const uid = (sub.metadata?.uid as string | undefined) ?? null;
+        const customerId = sub.customer as string; // "cus_***"
+        const uidMeta = sub.metadata?.uid as string | undefined;
+        // metadata に無ければ Firestore から逆引き
+        const uid = uidMeta ?? (await findUidByCustomerId(customerId));
+
+        console.log('[webhook] subscription event', {
+          type: event.type,
+          subId: sub.id,
+          customerId,
+          uidMeta,
+          uidResolved: uid,
+          currentPriceId: sub.items.data[0]?.price?.id ?? null,
+          status: sub.status,
+        });
+
         if (!uid) {
-          // 必要になれば、customerId から users を検索して解決する処理を追加
-          console.warn('[webhook] subscription event without uid metadata');
+          console.warn('[webhook] subscription event: uid not found', { customerId, subId: sub.id });
           break;
         }
 
-        const status = sub.status; // 'active' | 'canceled' | 'past_due' 等
-        const currentPriceId = sub.items.data[0]?.price?.id ?? null;
+        // 一度でも uid を解決できたら、以後のために subscription に保存しておく
+        if (!uidMeta) {
+          try {
+            await stripe.subscriptions.update(sub.id, { metadata: { uid } });
+          } catch (e) {
+            console.warn('[webhook] failed to backfill uid into subscription metadata:', e);
+          }
+        }
 
-        let plan: 'lite' | 'premium' | 'free' = 'free';
-        if (currentPriceId === process.env.STRIPE_PRICE_LITE) plan = 'lite';
-        if (currentPriceId === process.env.STRIPE_PRICE_PREMIUM) plan = 'premium';
+        const price = sub.items.data[0]?.price as Stripe.Price | undefined;
+        const plan =
+          event.type === 'customer.subscription.deleted'
+            ? 'free'
+            : resolvePlanByPrice(price ?? null);
 
         const db = await getAdminDb();
         await db.collection('users').doc(uid).set(
           {
             plan,
-            subscriptionStatus: status,
+            subscriptionStatus: sub.status, // 'active' | 'canceled' | 'past_due' など
             subscriptionId: sub.id,
             updatedAt: new Date(),
           },
           { merge: true }
         );
+
         break;
       }
 
       default:
-        // 他イベントは必要になったら対応
+        // 必要に応じて他イベントを追加
         break;
     }
 
