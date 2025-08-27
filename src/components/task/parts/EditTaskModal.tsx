@@ -131,6 +131,13 @@ export default function EditTaskModal({
 
   const LOG = '[EditTaskModal]';
 
+  // src/components/task/parts/EditTaskModal.tsx
+  // ★ 追加：真偽値を厳密に正規化（"true" / 1 のみ true、"false" / 0 / undefined / null は false）
+  const toStrictBool = (v: unknown): boolean => {
+    return v === true || v === 'true' || v === 1 || v === '1';
+  };
+
+
   // 端末判定
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -178,6 +185,8 @@ export default function EditTaskModal({
       users: task.users ?? [],
       period: task.period ?? task.period,
       note: (task as any)?.note ?? '',
+      // ★★ 追加：TODO表示（Firestore: tasks.visible）。未定義なら false で初期化
+      visible: task?.id ? toStrictBool((task as any)?.visible) : false,
     });
 
     setIsPrivate(task.private ?? !isPairConfirmed);
@@ -207,6 +216,7 @@ export default function EditTaskModal({
     console.log(`${LOG} task.users:`, task?.users);
     console.log(`${LOG} task.period:`, task?.period);
     console.log(`${LOG} isPairConfirmed:`, isPairConfirmed);
+    console.log(`${LOG} task.visible:`, (task as any)?.visible);
     console.log(`${LOG} users length:`, users?.length ?? 0);
     try {
       console.table(
@@ -241,6 +251,7 @@ export default function EditTaskModal({
     console.log(`${LOG} editedTask.id:`, editedTask.id);
     console.log(`${LOG} editedTask.users:`, editedTask.users);
     console.log(`${LOG} editedTask.period:`, editedTask.period);
+    console.log(`${LOG} editedTask.visible:`, (editedTask as any)?.visible);
     console.log(`${LOG} editedTask.dates/time:`, editedTask.dates, editedTask.time);
     console.groupEnd();
   }, [editedTask]);
@@ -367,13 +378,13 @@ export default function EditTaskModal({
     }
 
     const transformed = {
-      ...editedTask, // note も含まれる（500超過は保存不可にしている）
+      ...editedTask, // note / visible も含まれる（500超過は保存不可にしている）
       daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
       private: isPrivate,
     };
 
     setIsSaving(true);
-    onSave(transformed as Task); // Task に note が無くても OK
+    onSave(transformed as Task); // Task に note が無くても OK（保存側で無視される想定）
 
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
@@ -481,8 +492,8 @@ export default function EditTaskModal({
                   type="button"
                   onClick={() => toggleDay(day)}
                   className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                      ? 'bg-[#5E5E5E] text-white'
-                      : 'bg-gray-200 text-gray-600'
+                    ? 'bg-[#5E5E5E] text-white'
+                    : 'bg-gray-200 text-gray-600'
                     }`}
                 >
                   {day}
@@ -626,8 +637,8 @@ export default function EditTaskModal({
                         type="button"
                         onClick={() => toggleUser(user.id)}
                         className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected
-                            ? 'border-[#FFCB7D] opacity-100'
-                            : 'border-gray-300 opacity-30'
+                          ? 'border-[#FFCB7D] opacity-100'
+                          : 'border-gray-300 opacity-30'
                           }`}
                         title={`${user.name} | ${imgSrc}`}
                       >
@@ -679,6 +690,32 @@ export default function EditTaskModal({
             </div>
           </>
         )}
+
+        {/* // src/components/task/parts/EditTaskModal.tsx
+// ▼▼▼ TODO表示トグルのレンダリング部分を修正 ▼▼▼ */}
+        {/* ✅ TODO表示トグル（Firestore: tasks.visible） */}
+        {(() => {
+          const isVisible = toStrictBool((editedTask as any)?.visible); // ← 厳密判定
+          return (
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-sm text-gray-600">TODO表示：</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isVisible}
+                onClick={() => update('visible', !isVisible)} // ← 厳密判定で反転
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isVisible ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isVisible ? 'translate-x-6' : ''
+                    }`}
+                />
+              </button>
+            </div>
+          );
+        })()}
+
 
         {/* 📝 備考（任意） */}
         <div className="relative pr-8">
