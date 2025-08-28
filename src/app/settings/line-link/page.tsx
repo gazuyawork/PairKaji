@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // ✅ 変更: useSearchParams を削除
 import {
   MessageCircle,
   ArrowLeft,
@@ -23,7 +23,8 @@ import {
    - createState / buildLoginUrl（CSRF対策・安全なログインURL生成・env対応）
    - preflight（/api/line/status があれば参照、なければフォールバック）
    - handleLineLogin（自己診断→案内／フォールバック、友だち未追加時は追加導線を提示）
-   - 3ステップのウィザード（①友だち追加 → ②LINE連携 → ③テスト通知）
+   - 3ステップのウィザード（①友だち追加 → ②LINE連携 → ③テスト通知[任意の再送]）
+   - ★ 方針変更：テスト通知の「初回送信」はコールバック画面で自動実行
    ========================================= */
 
 type LineStatus = {
@@ -68,6 +69,9 @@ export default function LineLinkPage() {
       }
     })();
   }, []);
+
+  // ✅ 削除: callback からの ?step=3&test=ok を処理する useEffect（今回は不要）
+  // useEffect(() => { ... }, [searchParams]);
 
   // 友だち追加URL（env 優先）
   const getAddFriendUrl = (fallback?: string) => {
@@ -134,7 +138,7 @@ export default function LineLinkPage() {
       }
 
       if (!status.linked) {
-        // まだ未連携 → LINEログインへ
+        // まだ未連携 → LINEログインへ（※連携完了画面でテスト通知が自動送信されます）
         window.location.href = buildLoginUrl();
         return;
       }
@@ -152,8 +156,8 @@ export default function LineLinkPage() {
         return;
       }
 
-      // 連携・友だち済み → ステップ3へ
-      setInfo('LINE連携は完了しています。通知の受信をお確かめください。');
+      // 連携・友だち済み → ステップ3へ（この画面では再送ボタンを案内）
+      setInfo('LINE連携は完了しています。必要に応じてテスト通知の再送ができます。');
       setCurrentStep(3);
     } finally {
       setLoading(false);
@@ -185,7 +189,7 @@ export default function LineLinkPage() {
     }
   };
 
-  // テスト通知送信（/api/line/test-notify が無い場合でも丁寧に案内）
+  // テスト通知送信（手動トリガー用：この画面では再送の役割）
   const sendTestNotification = async () => {
     setLoading(true);
     setInfo('');
@@ -233,7 +237,7 @@ export default function LineLinkPage() {
               // { label: 'チャンネル設定', ok: !!cachedStatus?.channelConfigured },
               { label: '友だち追加', ok: friendOk },
               { label: 'LINE連携', ok: linkedOk },
-              { label: '通知テスト', ok: false }, // 送信成功でinfoに案内表示
+              { label: '通知テスト', ok: false }, // 初回送信はコールバック画面で自動、ここは任意の再送
             ].map((b) => (
               <div
                 key={b.label}
@@ -317,7 +321,8 @@ export default function LineLinkPage() {
               <div>
                 <p className="text-sm font-semibold text-gray-800">② LINEでアカウント連携</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  LINEログインに進み、許可後このページに戻り「再チェック」を押してください。
+                  LINEログインに進んで連携を完了してください。
+                  連携後は<strong>コールバック画面で自動的にテスト通知が送信</strong>されます。
                 </p>
               </div>
               {linkedOk ? (
@@ -367,7 +372,7 @@ export default function LineLinkPage() {
             </div>
           </div>
 
-          {/* ====== ステップ 3：テスト通知 ====== */}
+          {/* ====== ステップ 3：テスト通知（任意の再送） ====== */}
           <div
             className={`w-full rounded-lg border p-4 ${
               currentStep === 3 ? 'border-sky-300 bg-sky-50' : 'border-gray-200 bg-white'
@@ -375,8 +380,11 @@ export default function LineLinkPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-800">③ テスト通知を送信</p>
-                <p className="text-xs text-gray-600 mt-1">テスト通知を送って受信できれば設定完了です。</p>
+                <p className="text-sm font-semibold text-gray-800">③ テスト通知（任意の再送）</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  初回のテスト通知は<strong>連携完了画面</strong>で自動送信済みです。
+                  この画面では必要に応じて<strong>再送</strong>ができます。
+                </p>
               </div>
               <BellRing className="w-5 h-5 text-sky-600" />
             </div>
@@ -389,7 +397,7 @@ export default function LineLinkPage() {
                 className="bg-sky-600 text-white px-3 py-2 rounded-md font-semibold hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
               >
                 <BellRing className="w-4 h-4" />
-                テスト通知を送る
+                テスト通知を再送する
               </button>
               <button
                 onClick={refreshStatus}

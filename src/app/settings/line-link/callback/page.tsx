@@ -1,17 +1,62 @@
+// src/app/settings/line-link/callback/page.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { BellRing, CheckCircle, ExternalLink, Home } from 'lucide-react';
+
+/* =========================================
+   追加: テスト通知送信ヘルパー（Step3の中身）
+   - /api/line/test-notify を叩いて送信
+   ========================================= */
+async function sendTestNotification(): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch('/api/line/test-notify', { method: 'POST' });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, message: text || 'テスト通知の送信に失敗しました。' };
+    }
+    return { ok: true, message: 'テスト通知を送信しました。LINEをご確認ください。' };
+  } catch {
+    return { ok: false, message: 'ネットワークエラーのため、テスト通知を送れませんでした。' };
+  }
+}
 
 function LineLinkHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // 連携処理の状態
   const [status, setStatus] = useState<'loading' | 'success' | string>('loading');
+
+  // Step3（テスト通知）の表示・状態
+  const [sending, setSending] = useState(false);
+  const [testInfo, setTestInfo] = useState<string>('');
+  const [testError, setTestError] = useState<string>('');
+  const [autoSent, setAutoSent] = useState(false);
+  const autoSendOnceRef = useRef(false); // 自動送信の二重実行防止
+
+  // 「この画面でStep3まで完結させる」ため、成功時はここでテスト通知を実行
+  const handleSendTest = async () => {
+    setSending(true);
+    setTestInfo('');
+    setTestError('');
+    try {
+      const r = await sendTestNotification();
+      if (r.ok) {
+        setTestInfo(r.message);
+      } else {
+        setTestError(r.message);
+      }
+    } finally {
+      setSending(false);
+    }
+  };
 
   useEffect(() => {
     console.log('[LINE連携] useEffect開始');
@@ -43,6 +88,7 @@ function LineLinkHandler() {
       }
 
       try {
+        // ※本番運用では環境変数に移行してください
         const redirectUri = 'https://pair-kaji.vercel.app/settings/line-link/callback';
         const clientId = '2007877129';
         const clientSecret = '712e1a48c57ba2fc875b50305653b35d';
@@ -113,15 +159,20 @@ function LineLinkHandler() {
 
         try {
           const userRef = doc(db, 'users', user.uid);
-          await setDoc(userRef, {
-            lineUserId: profileData.userId,
-            lineDisplayName: profileData.displayName || '',
-            linePictureUrl: profileData.pictureUrl || '',
-            lineLinked: true,
-            plan: 'premium',
-            premiumType: 'none',
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
+          await setDoc(
+            userRef,
+            {
+              lineUserId: profileData.userId,
+              lineDisplayName: profileData.displayName || '',
+              linePictureUrl: profileData.pictureUrl || '',
+              lineLinked: true,
+              // 既存挙動温存（必要に応じてビジネスロジックで変更）
+              plan: 'premium',
+              premiumType: 'none',
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
           console.log('[LINE連携] Firestore書き込み成功');
         } catch (firestoreError) {
           console.error('[LINE連携] Firestore 書き込み失敗:', firestoreError);
@@ -129,11 +180,28 @@ function LineLinkHandler() {
           return;
         }
 
-        console.log('[LINE連携] 全処理成功');
+        // ===== ここから Step3（本画面で完結） =====
+        console.log('[LINE連携] 全処理成功。Step3(テスト通知)をこの画面で実行します。');
         setStatus('success');
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
+
+        // 連携成功直後の自動送信（1回だけ）
+        if (!autoSendOnceRef.current) {
+          autoSendOnceRef.current = true;
+          setAutoSent(true);
+          setSending(true);
+          setTestInfo('');
+          setTestError('');
+          try {
+            const r = await sendTestNotification();
+            if (r.ok) {
+              setTestInfo(r.message);
+            } else {
+              setTestError(r.message);
+            }
+          } finally {
+            setSending(false);
+          }
+        }
       } catch (error) {
         console.error('[LINE連携] 予期せぬエラー:', error);
         setStatus('[予期せぬエラー] ' + String(error));
@@ -147,18 +215,89 @@ function LineLinkHandler() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4">
-      <div className="text-center max-w-[90vw]">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4 py-10">
+      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        {/* ヘッダ */}
+        <div className="flex items-center gap-2 mb-4">
+          <BellRing className="w-6 h-6 text-sky-600" />
+          <h1 className="text-lg font-bold text-gray-800">LINE連携 完了 & テスト通知（Step3）</h1>
+        </div>
+
+        {/* 連携処理の状態メッセージ */}
         {status === 'loading' && (
-          <p className="text-gray-600 text-lg">LINE連携を処理中です...</p>
-        )}
-        {status === 'success' && (
-          <p className="text-green-600 text-lg font-semibold">LINE連携が完了しました！</p>
+          <p className="text-gray-600">LINE連携を処理中です...</p>
         )}
         {typeof status === 'string' && status !== 'loading' && status !== 'success' && (
-          <p className="text-red-500 text-sm whitespace-pre-wrap break-words">
+          <div className="text-red-600 text-sm whitespace-pre-wrap break-words">
             エラー: {status}
-          </p>
+          </div>
+        )}
+
+        {/* 成功時：この画面内でStep3 UIを表示 */}
+        {status === 'success' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md p-3">
+              <CheckCircle className="w-5 h-5" />
+              <span className="text-sm font-medium">LINE連携が完了しました！ 引き続きテスト通知を送信します。</span>
+            </div>
+
+            {/* Step3 セクション */}
+            <div className="rounded-lg border border-sky-200 bg-sky-50 p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">③ テスト通知を送信</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    この画面でテスト通知を送ります。受信できれば設定完了です。
+                  </p>
+                </div>
+                <BellRing className="w-5 h-5 text-sky-600" />
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={handleSendTest}
+                  disabled={sending}
+                  aria-busy={sending}
+                  className="bg-sky-600 text-white px-3 py-2 rounded-md font-semibold hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
+                >
+                  <BellRing className="w-4 h-4" />
+                  {sending ? '送信中…' : (autoSent ? 'もう一度送る' : 'テスト通知を送る')}
+                </button>
+
+                <button
+                  onClick={() => router.push('/')}
+                  className="border border-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Home className="w-4 h-4" />
+                  ホームに戻る
+                </button>
+              </div>
+
+              {/* 送信結果の表示 */}
+              {testInfo && (
+                <div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-3">
+                  {testInfo}
+                </div>
+              )}
+              {testError && (
+                <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">
+                  {testError}
+                </div>
+              )}
+
+              {/* 補足説明 */}
+              <div className="mt-3 text-[12px] text-gray-500">
+                もし受信できない場合は、LINEの友だち追加・通知許可をご確認ください。
+                必要に応じて設定画面から再チェックも行えます。{' '}
+                <a
+                  href="/settings/line-link"
+                  className="inline-flex items-center gap-1 text-sky-600 hover:underline"
+                >
+                  設定画面を開く <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
