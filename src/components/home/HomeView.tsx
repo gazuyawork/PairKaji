@@ -170,6 +170,8 @@ export default function HomeView() {
             transition={{ duration: 0.4 }}
             className="space-y-1.5"
           >
+            {!isLoading && !isChecking && plan === 'premium' && !isLineLinked && <LineLinkCard />}
+            
             {!isLoading && hasPairInvite && (
               <PairInviteCard mode="invite-received" />
             )}
@@ -248,8 +250,6 @@ export default function HomeView() {
                   )
               )}
             /> */}
-
-            {!isLoading && !isChecking && plan === 'premium' && !isLineLinked && <LineLinkCard />}
 
             {/* ▼ 変更：プレミアム以外のときに広告表示 */}
             {!isLoading && !isChecking && plan === 'free' && <AdCard />}
