@@ -29,7 +29,7 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { X, Lightbulb, LightbulbOff } from 'lucide-react';
+import { X, Lightbulb, LightbulbOff, SquareUser  } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import AdCard from '@/components/home/parts/AdCard';
@@ -641,7 +641,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           }`}
                         title="プライベートタスク"
                       >
-                        P
+                        <SquareUser />
                       </button>
                     </div>
                   )}

@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 // ★ 変更: Infoに加えてXアイコンを追加し、Info色はオレンジに寄せる用途で利用
-import { CheckCircle, Circle, Calendar, Pencil, Flag, Trash2, SkipForward, Info, X, SquareUser } from 'lucide-react';
+// ★ 追加: Clock アイコンをインポート（時間の前に表示）
+import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, SkipForward, Info, X, SquareUser } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -17,7 +18,6 @@ import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 // 変更（★ 追加）
 import { createPortal } from 'react-dom';
-
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
@@ -112,6 +112,16 @@ export default function TaskCard({
       (a, b) => order.indexOf(dayKanjiToNumber[a]) - order.indexOf(dayKanjiToNumber[b])
     );
   }, [task.daysOfWeek]);
+
+  // ★ 追加: 日付/時間の表示用フォーマッタ
+  const dateStr = useMemo(() => {
+    const d = task.dates?.[0];
+    if (!d) return '';
+    // YYYY-MM-DD -> MM/DD
+    return d.replace(/-/g, '/').slice(5);
+  }, [task.dates]);
+
+  const timeStr = task.time || '';
 
   const toggleFlag = async () => {
     if (task.done) return;
@@ -298,8 +308,9 @@ export default function TaskCard({
           </div>
         )}
 
-        {/* 左側：チェック・名前・曜日 */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        {/* 左側：チェック・2行表示（1行目=名前、2行目=日時+曜日） */}
+        <div className="flex items-center gap-3 ml-2 min-w-0 flex-1">
+          {/* チェック */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -324,15 +335,73 @@ export default function TaskCard({
             </div>
           </button>
 
-          {task.flagged && <Flag className="text-red-500 w-5 h-5 ml-0" />}
+          {/* 本体（2行） */}
+          <div className="min-w-0 flex-1">
+            {/* 1行目：タスク名 + フラグ */}
+            <div className="flex items-center gap-1 min-w-0">
+              {task.flagged && <Flag className="text-red-500 w-4 h-4 shrink-0" />}
+              <span className="text-[#5E5E5E] font-bold font-sans truncate">{task.name}</span>
+              {/* ★ 削除: 以前ここにあった備考Infoアイコンは右側（ポイント左）へ移動 */}
+            </div>
 
-          {/* 左エリア本体：名前(1fr) + 曜日(auto) */}
-          <div className="grid grid-cols-[1fr_auto] items-center gap-x-2 min-w-0 flex-1">
-            {/* タスク名＋備考アイコン */}
-            <div className="min-w-0 flex items-center gap-1">
-              <span className="text-[#5E5E5E] font-medium font-sans truncate block">{task.name}</span>
+            {/* 2行目：日付（📅） + 時刻（🕒） + 曜日 */}
+            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
+              {(dateStr || timeStr) && (
+                <div className="flex items-center gap-2">
+                  {/* ★ 変更: 日付の前にカレンダーアイコンを常に表示（dateStrがある時） */}
+                  {dateStr && (
+                    <span className="inline-flex items-center gap-1 leading-none">
+                      <Calendar size={12} className="text-gray-600" />
+                      <span className="leading-none">{dateStr}</span>
+                    </span>
+                  )}
+                  {/* ★ 追加: 時間の前に時計アイコンを表示（timeStrがある時） */}
+                  {timeStr && (
+                    <span className="inline-flex items-center gap-1 leading-none">
+                      <Clock size={12} className="text-gray-600" />
+                      <span className="leading-none">{timeStr}</span>
+                    </span>
+                  )}
+                </div>
+              )}
 
-              {/* ★ 変更: インフォアイコンをオレンジ化＆クリックでモーダル */}
+              {sortedDays.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {/* 区切り点（日時がある時のみ） */}
+                  {(dateStr || timeStr) && <span className="text-gray-300">•</span>}
+
+                  {/* 曜日ピル（小さめ） */}
+                  <div className="flex items-center gap-[2px]">
+                    {sortedDays.map((d, i) => (
+                      <div
+                        key={i}
+                        className={clsx(
+                          'w-5 h-5 rounded-full text-white text-[10px] flex items-center justify-center border-2',
+                          'shrink-0 leading-none',
+                          dayBaseClass,
+                          dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+                        )}
+                        title={`${d}曜`}
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 右側：ポイント・画像（日時と曜日は左へ移動） */}
+        <div className="flex items-center gap-1">
+          {task.private && isPairConfirmed ? (
+            <div className="flex items-center justify-center ml-2 w-[35px] h-[37px]">
+              <SquareUser className="w-6 h-6 text-green-600" />
+            </div>
+          ) : !task.private ? (
+            // ★ 変更: 備考Infoボタンをポイントの左横に配置
+            <div className="flex items-center gap-2 w-">
               {(() => {
                 const noteText = (task as TaskWithNote).note?.trim();
                 if (!noteText) return null;
@@ -351,76 +420,8 @@ export default function TaskCard({
                   </button>
                 );
               })()}
-            </div>
 
-            {/* 曜日 */}
-            {sortedDays.length > 0 && (
-              <div
-                className={clsx(
-                  'grid gap-x-[1px] gap-y-[2px] pr-1 justify-end content-center',
-                  'max-w-[100px]',
-                  sortedDays.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
-                )}
-              >
-                {sortedDays.map((d, i) => (
-                  <div
-                    key={i}
-                    className={clsx(
-                      'w-5.5 h-5.5 aspect-square rounded-full text-white text-[10px] flex items-center justify-center border-2',
-                      'shrink-0',
-                      dayBaseClass,
-                      dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
-                    )}
-                  >
-                    {d}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 右側：日時・ポイント・画像 */}
-        <div className="flex items-center gap-1">
-          {(task.dates?.[0] || task.time) && (
-            <div className="flex flex-col items-center text-xs w-[32px] ml-2">
-              <div className="text-gray-600 inline-block text-center leading-tight">
-                {task.dates?.[0] && (
-                  <div className="flex items-center justify-center gap-1">
-                    <Calendar size={13} className="text-gray-600" />
-                    <span>{task.dates[0].replace(/-/g, '/').slice(5)}</span>
-                  </div>
-                )}
-                {task.time && (
-                  <div className="flex items-center justify-center gap-1 mt-0.5">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-[13px] h-[13px] text-gray-600"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 8v4l3 1m6-1a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <span>{task.time}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {task.private && isPairConfirmed ? (
-            <div className="flex items-center justify-center ml-2 w-[35px] h-[37px]">
-                <SquareUser className="w-6 h-6 text-green-600" />
-            </div>
-          ) : !task.private ? (
-            <div className="flex items-center gap-2 w-[90px]">
-              <p className="text-[#5E5E5E] font-sans min-w-[46px] text-right">
+              <p className="text-[#5E5E5E] font-sans min-w-[34px] text-right">
                 {task.point} <span className="text-xs">pt</span>
               </p>
 
@@ -441,7 +442,7 @@ export default function TaskCard({
         </div>
       </motion.div>
 
-      {/* ★ 変更: 備考モーダル */}
+      {/* ★ 変更: 備考モーダル（トリガー位置を右へ移したがモーダル本体は従来通り） */}
       {/* ★ 追加：備考モーダルを body 直下へポータル */}
       {showNote &&
         typeof window !== 'undefined' &&
@@ -492,7 +493,6 @@ export default function TaskCard({
           document.body
         )
       }
-
 
       <ConfirmModal
         isOpen={confirmOpen}
