@@ -230,7 +230,7 @@ export default function LineLinkPage() {
           {/* ステータス（参考表示バッジ） */}
           <div className="w-full grid grid-cols-2 gap-2 mb-4">
             {[
-              { label: 'チャンネル設定', ok: !!cachedStatus?.channelConfigured },
+              // { label: 'チャンネル設定', ok: !!cachedStatus?.channelConfigured },
               { label: '友だち追加', ok: friendOk },
               { label: 'LINE連携', ok: linkedOk },
               { label: '通知テスト', ok: false }, // 送信成功でinfoに案内表示
