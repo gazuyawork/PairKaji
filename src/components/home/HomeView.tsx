@@ -13,8 +13,8 @@ import { ChevronDown, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
-// import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
-// import { isToday } from 'date-fns';
+import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
+import { isToday } from 'date-fns';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
 // ▼ 変更：usePremiumStatus を廃止し、useUserPlan を使用
@@ -239,7 +239,7 @@ export default function HomeView() {
               )
             )}
 
-            {/* <TodayCompletedTasksCard
+            <TodayCompletedTasksCard
               tasks={tasks.filter(
                 (task) =>
                   task.completedAt &&
@@ -249,7 +249,7 @@ export default function HomeView() {
                       : task.completedAt.toDate()
                   )
               )}
-            /> */}
+            />
 
             {/* ▼ 変更：プレミアム以外のときに広告表示 */}
             {!isLoading && !isChecking && plan === 'free' && <AdCard />}

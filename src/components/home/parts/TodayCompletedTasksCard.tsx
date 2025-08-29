@@ -19,7 +19,7 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
             </div>
 
             {tasks.length > 0 ? (
-                <ul className="divide-y divide-gray-200">
+                <ul className="divide-y divide-gray-200 mx-4">
                     {tasks.map((task) => (
                         <li key={task.id} className="py-2 flex items-center justify-between">
                             <span className="text-gray-700 truncate">{task.name}</span>
