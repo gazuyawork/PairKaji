@@ -92,6 +92,9 @@ export default function TaskCard({
   // ★ 変更: 備考モーダル開閉
   const [showNote, setShowNote] = useState(false);
 
+  const noteText = (task as TaskWithNote).note?.trim();
+
+
   useEffect(() => {
     setLocalDone(task.done);
   }, [task.done]);
@@ -396,30 +399,43 @@ export default function TaskCard({
         {/* 右側：ポイント・画像（日時と曜日は左へ移動） */}
         <div className="flex items-center gap-1">
           {task.private && isPairConfirmed ? (
-            <div className="flex items-center justify-center ml-2 w-[35px] h-[37px]">
+            <div className="flex items-center gap-2 ml-2">
+              {/* ★ 追加: 備考がある時だけ Info を表示（privateでも表示） */}
+              {noteText && (
+                <button
+                  type="button"
+                  aria-label="備考を表示"
+                  title="備考を表示"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNote(true);
+                  }}
+                  className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                >
+                  <Info className="w-5 h-5 text-blue-500" />
+                </button>
+              )}
+
               <SquareUser className="w-6 h-6 text-green-600" />
             </div>
           ) : !task.private ? (
-            // ★ 変更: 備考Infoボタンをポイントの左横に配置
+            // ★ 備考Infoボタンは共通判定に統一（挙動は従来通り）
             <div className="flex items-center gap-2 w-">
-              {(() => {
-                const noteText = (task as TaskWithNote).note?.trim();
-                if (!noteText) return null;
-                return (
-                  <button
-                    type="button"
-                    aria-label="備考を表示"
-                    title="備考を表示"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowNote(true);
-                    }}
-                    className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
-                  >
-                    <Info className="w-5 h-5 text-blue-500" />
-                  </button>
-                );
-              })()}
+              {noteText && (
+                <button
+                  type="button"
+                  aria-label="備考を表示"
+                  title="備考を表示"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNote(true);
+                  }}
+                  className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                >
+                  <Info className="w-5 h-5 text-blue-500" />
+                </button>
+              )}
+
 
               <p className="text-[#5E5E5E] font-sans min-w-[34px] text-right">
                 {task.point} <span className="text-xs">pt</span>
@@ -437,8 +453,27 @@ export default function TaskCard({
               )}
             </div>
           ) : (
-            <div className="w-[10px] h-[30px]" />
+            <div className="flex items-center gap-2">
+              {/* ★ 追加: private かつ not confirmed でも備考があれば Info を表示 */}
+              {noteText && (
+                <button
+                  type="button"
+                  aria-label="備考を表示"
+                  title="備考を表示"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNote(true);
+                  }}
+                  className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                >
+                  <Info className="w-5 h-5 text-blue-500" />
+                </button>
+              )}
+
+              <div className="w-[10px] h-[30px]" />
+            </div>
           )}
+
         </div>
       </motion.div>
 
