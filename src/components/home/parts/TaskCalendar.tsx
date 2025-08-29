@@ -12,8 +12,9 @@ type CalendarTask = {
   id: string;
   name: string;
   period: '毎日' | '週次' | '不定期';
-  dates?: string[];
-  daysOfWeek?: string[];
+  dates?: string[];      // 'YYYY-MM-DD' などの ISO 文字列想定
+  daysOfWeek?: string[]; // dayNumberToName の値に一致する曜日文字列
+  done: boolean;         // ✅ 追加: 未処理判定に使用（false のみ表示）
 };
 
 type Props = {
@@ -23,7 +24,10 @@ type Props = {
 export default function TaskCalendar({ tasks }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const today = new Date();
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
+
+  // ✅ day の赤線対策：型注釈を明示
+  const days: Date[] = Array.from({ length: 7 }, (_, i) => addDays(today, i));
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isTouchScrollingRef = useRef(false);
 
@@ -54,17 +58,26 @@ export default function TaskCalendar({ tasks }: Props) {
         onTouchMove={preventScrollPropagation}
       >
         <div className="flex w-full text-xs text-center gap-2">
-          {days.map((day, idx) => {
-            const dailyTasks = tasks.filter(task => {
-              const dateMatches = task.dates?.some(dateStr =>
+          {days.map((day: Date, idx: number) => {
+            // ✅ 表示条件：
+            //  1) period が「毎日」 or dates に当日含む or 週次で曜日一致
+            //  2) かつ done === false（未処理のみ表示）
+            const dailyTasks = tasks.filter((task) => {
+              const isDaily = task.period === '毎日';
+
+              const isDateTask = task.dates?.some((dateStr) =>
                 isSameDay(parseISO(dateStr), day)
               );
 
-              const weeklyMatches =
+              const isWeeklyTask =
                 task.period === '週次' &&
-                task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
+                task.daysOfWeek?.includes(
+                  dayNumberToName[String(day.getDay())]
+                );
 
-              return dateMatches || weeklyMatches;
+              const isTargetDay = isDaily || isDateTask || isWeeklyTask;
+
+              return isTargetDay && task.done === false;
             });
 
             const hasTask = dailyTasks.length > 0;
@@ -76,15 +89,12 @@ export default function TaskCalendar({ tasks }: Props) {
               <div
                 key={idx}
                 className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor}`}
-               onClick={() =>
+                onClick={() =>
                   isSameDay(selectedDate ?? new Date(0), day)
                     ? setSelectedDate(null) // 同じ日ならトグルで閉じる
                     : setSelectedDate(day)  // 違う日なら新たに展開
                 }
-
               >
-
-
                 <div className="font-semibold text-gray-600">
                   {format(day, 'M/d (EEE)', { locale: ja })}
                 </div>
@@ -93,9 +103,11 @@ export default function TaskCalendar({ tasks }: Props) {
                   dailyTasks.map((task, i) => {
                     const isWeeklyTask =
                       task.period === '週次' &&
-                      task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
+                      task.daysOfWeek?.includes(
+                        dayNumberToName[String(day.getDay())]
+                      );
 
-                    const isDateTask = task.dates?.some(dateStr =>
+                    const isDateTask = task.dates?.some((dateStr) =>
                       isSameDay(parseISO(dateStr), day)
                     );
 
@@ -114,7 +126,6 @@ export default function TaskCalendar({ tasks }: Props) {
                         {task.name}
                       </div>
                     );
-
                   })
                 ) : (
                   <div className="text-[10px] text-gray-400 mt-2">予定なし</div>

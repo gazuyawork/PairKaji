@@ -171,7 +171,7 @@ export default function HomeView() {
             className="space-y-1.5"
           >
             {!isLoading && !isChecking && plan === 'premium' && !isLineLinked && <LineLinkCard />}
-            
+
             {!isLoading && hasPairInvite && (
               <PairInviteCard mode="invite-received" />
             )}
@@ -204,12 +204,14 @@ export default function HomeView() {
               </div>
             ) : (
               <TaskCalendar
-                tasks={tasks.map(({ id, name, period, dates, daysOfWeek }) => ({
+                tasks={tasks.map(({ id, name, period, dates, daysOfWeek, done }) => ({
                   id,
                   name,
                   period: period ?? '毎日',
                   dates,
                   daysOfWeek,
+                  // ▼ 追加：TaskCalendar に done を渡す（未処理表示に必要）
+                  done: !!done,
                 }))}
               />
             )}
