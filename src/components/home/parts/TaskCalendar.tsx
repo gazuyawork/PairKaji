@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { dayNumberToName } from '@/lib/constants';
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { ja } from 'date-fns/locale';
 
 // ✅ TaskCalendar専用型（軽量）
@@ -47,6 +47,21 @@ export default function TaskCalendar({ tasks }: Props) {
     }
   };
 
+  // ===== ▼▼ 追加：並び順制御 ▼▼ =====
+  // period の優先度（毎日→週次→不定期）
+  const periodRank: Record<CalendarTask['period'], number> = {
+    '毎日': 0,
+    '週次': 1,
+    '不定期': 2, // ご要望の「その他」はデータ上「不定期」を想定
+  };
+
+  // “かな順”で安定して並べるための日本語コレーター
+  const collator = useMemo(
+    () => new Intl.Collator('ja', { numeric: true, sensitivity: 'base' }),
+    []
+  );
+  // ===== ▲▲ 追加ここまで ▲▲ =====
+
   return (
     <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center mb-3 shadow-md border border-[#e5e5e5]">
       <h2 className="text-lg font-bold text-[#5E5E5E] mb-4">今後7日間のタスク</h2>
@@ -80,7 +95,18 @@ export default function TaskCalendar({ tasks }: Props) {
               return isTargetDay && task.done === false;
             });
 
-            const hasTask = dailyTasks.length > 0;
+            // ★ 並び替え（ご要望対応）：
+            //   1) periodRank（毎日→週次→不定期）
+            //   2) 同 period 内は “かな順”（日本語名の読み順）
+            const sortedTasks = dailyTasks
+              .slice()
+              .sort((a, b) => {
+                const pr = periodRank[a.period] - periodRank[b.period];
+                if (pr !== 0) return pr;
+                return collator.compare(a.name, b.name);
+              });
+
+            const hasTask = sortedTasks.length > 0;
             const bgColor = hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]';
 
             const isExpanded = selectedDate && isSameDay(day, selectedDate);
@@ -100,7 +126,7 @@ export default function TaskCalendar({ tasks }: Props) {
                 </div>
                 <hr className="my-1 border-gray-300 opacity-40" />
                 {hasTask ? (
-                  dailyTasks.map((task, i) => {
+                  sortedTasks.map((task, i) => {
                     const isWeeklyTask =
                       task.period === '週次' &&
                       task.daysOfWeek?.includes(
