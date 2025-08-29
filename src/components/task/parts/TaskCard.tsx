@@ -5,8 +5,6 @@ export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-// ★ 変更: Infoに加えてXアイコンを追加し、Info色はオレンジに寄せる用途で利用
-// ★ 追加: Clock アイコンをインポート（時間の前に表示）
 import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, SkipForward, Info, X, SquareUser } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
@@ -16,7 +14,6 @@ import { useView } from '@/context/ViewContext';
 import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
-// 変更（★ 追加）
 import { createPortal } from 'react-dom';
 
 const dayBorderClassMap: Record<string, string> = {
@@ -399,7 +396,7 @@ export default function TaskCard({
         {/* 右側：ポイント・画像（日時と曜日は左へ移動） */}
         <div className="flex items-center gap-1">
           {task.private && isPairConfirmed ? (
-            <div className="flex items-center gap-2 ml-2">
+            <div className="flex items-center gap-2 ml-2 mr-2">
               {/* ★ 追加: 備考がある時だけ Info を表示（privateでも表示） */}
               {noteText && (
                 <button
