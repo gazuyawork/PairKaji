@@ -603,7 +603,8 @@ export default function EditTaskModal({
               onChange={(e) => update('point', Number(e.target.value))}
               className="w-full border-b border-gray-300 outline-none pl-2"
             >
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => (
+              {/* {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => ( */}
+              {Array.from({ length: 11 }, (_, i) => i ).map((val) => (
                 <option key={val} value={val}>
                   {val} pt
                 </option>
