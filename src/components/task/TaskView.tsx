@@ -29,7 +29,7 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { X, Lightbulb, LightbulbOff, SquareUser, Calendar } from 'lucide-react';
+import { X, Lightbulb, LightbulbOff, SquareUser, Calendar, Flag } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import AdCard from '@/components/home/parts/AdCard';
@@ -879,14 +879,25 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         )}
         {!isLoading && !isChecking && plan === 'free' && <AdCard />}
       </main>
-      {/* ← ここから追記 */}
 
       {!editTargetTask && index === 1 &&
         typeof window !== 'undefined' &&
         createPortal(
-          <div className="w-full flex justify-center pointer-events-none">
-            <div className="relative w-full max-w-xl">
-              <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-[9999] pointer-events-auto mb-3 ml-4">
+          <div className="w-full pointer-events-none">
+            {/* max-w-xl の左端 + 1rem から配置（任意値 calc は _ でスペース置換） */}
+            <div
+              className="
+          fixed
+          bottom-[calc(env(safe-area-inset-bottom)+5rem)]
+          left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
+          z-[9999]
+          pointer-events-auto
+          mb-4
+        "
+            >
+              {/* 並び: 本日 /（条件）プライベート / フラグ */}
+              <div className="flex items-center gap-2">
+                {/* 本日フィルター */}
                 <motion.button
                   onClick={() => setTodayFilter((prev) => !prev)}
                   whileTap={{ scale: 1.2 }}
@@ -894,18 +905,54 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   aria-pressed={todayFilter}
                   aria-label="本日のタスクに絞り込む"
                   title="本日のタスクに絞り込む"
-                  className={`w-15 h-15 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-    ${todayFilter
+                  className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+              ${todayFilter
                       ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner ring-2 ring-white'
                       : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D] ring-2 ring-white'}
-  `}
+            `}
                 >
-                  <Calendar className={`w-10 h-10 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
+                  <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
                   <span
                     className={`absolute text-[14px] font-bold top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${todayFilter ? 'text-white' : 'text-gray-600'}`}
                   >
                     {todayDate}
                   </span>
+                </motion.button>
+
+                {/* プライベート（ペア確定時のみ表示） */}
+                {pairStatus === 'confirmed' && (
+                  <motion.button
+                    onClick={() => setPrivateFilter((prev) => !prev)}
+                    whileTap={{ scale: 1.2 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    aria-pressed={privateFilter}
+                    aria-label="プライベートタスクのみ表示"
+                    title="プライベートタスク"
+                    className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+                ${privateFilter
+                        ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[#059669] shadow-inner ring-2 ring-white'
+                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185] ring-2 ring-white'}
+              `}
+                  >
+                    <SquareUser className="w-7 h-7" />
+                  </motion.button>
+                )}
+
+                {/* フラグ */}
+                <motion.button
+                  onClick={() => setFlaggedFilter((prev) => !prev)}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  aria-pressed={flaggedFilter}
+                  aria-label="フラグ付きタスクのみ表示"
+                  title="フラグ付きタスク"
+                  className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+              ${flaggedFilter
+                      ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] border-[#f43f5e] text-white shadow-inner ring-2 ring-white'
+                      : 'bg-white border-gray-300 text-[#5E5E5E] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:border-[#fb7185] hover:text-white ring-2 ring-white'}
+            `}
+                >
+                  <Flag className="w-6 h-6" />
                 </motion.button>
               </div>
             </div>
