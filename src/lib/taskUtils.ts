@@ -739,7 +739,7 @@ export const skipTaskWithoutPoints = async (
     await updateDoc(taskRef, {
       done: true,
       skipped: true,
-      completedAt: serverTimestamp(),
+      completedAt: null,
       completedBy: userId,
       flagged: false,
       updatedAt: serverTimestamp(),
