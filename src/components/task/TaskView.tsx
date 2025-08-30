@@ -29,13 +29,15 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { X, Lightbulb, LightbulbOff, SquareUser  } from 'lucide-react';
+import { X, Lightbulb, LightbulbOff, SquareUser, Calendar } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import AdCard from '@/components/home/parts/AdCard';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
+import { createPortal } from 'react-dom';
+import { useView } from '@/context/ViewContext';
 
 /* ▼ 追加：スキップ（ポイント加算なし）ユーティリティ */
 import { skipTaskWithoutPoints } from '@/lib/taskUtils';
@@ -177,6 +179,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(false);
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
+  const todayDate = useMemo(() => new Date().getDate(), []);
+  const { index } = useView();
 
   // URL クエリの flagged=true を初期反映
   useEffect(() => {
@@ -596,7 +600,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         confirmLabel="OK"
       />
 
-      <main className="main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-60">
+      <main className="main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-57">
         {isLoading ? (
           <div className="flex items-center justify-center text-gray-400 text-sm h-200">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -683,6 +687,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       <X className="w-5 h-5" />
                     </motion.button>
                   )}
+
+
                 </div>
               </div>
             </div>
@@ -873,6 +879,41 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         )}
         {!isLoading && !isChecking && plan === 'free' && <AdCard />}
       </main>
+      {/* ← ここから追記 */}
+
+      {!editTargetTask && index === 1 &&
+        typeof window !== 'undefined' &&
+        createPortal(
+          <div className="w-full flex justify-center pointer-events-none">
+            <div className="relative w-full max-w-xl">
+              <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-[9999] pointer-events-auto mb-3 ml-4">
+                <motion.button
+                  onClick={() => setTodayFilter((prev) => !prev)}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  aria-pressed={todayFilter}
+                  aria-label="本日のタスクに絞り込む"
+                  title="本日のタスクに絞り込む"
+                  className={`w-15 h-15 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+    ${todayFilter
+                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner ring-2 ring-white'
+                      : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D] ring-2 ring-white'}
+  `}
+                >
+                  <Calendar className={`w-10 h-10 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
+                  <span
+                    className={`absolute text-[14px] font-bold top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${todayFilter ? 'text-white' : 'text-gray-600'}`}
+                  >
+                    {todayDate}
+                  </span>
+                </motion.button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      }
+
     </div>
   );
 }
