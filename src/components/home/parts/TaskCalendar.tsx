@@ -1,3 +1,4 @@
+// src/components/home/parts/TaskCalendar.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -6,6 +7,8 @@ import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { dayNumberToName } from '@/lib/constants';
 import { useRef, useState, useMemo } from 'react';
 import { ja } from 'date-fns/locale';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -47,12 +50,12 @@ export default function TaskCalendar({ tasks }: Props) {
     }
   };
 
-  // ===== ▼▼ 追加：並び順制御 ▼▼ =====
+  // ===== ▼▼ 並び順制御 ▼▼ =====
   // period の優先度（毎日→週次→不定期）
   const periodRank: Record<CalendarTask['period'], number> = {
     '毎日': 0,
     '週次': 1,
-    '不定期': 2, // ご要望の「その他」はデータ上「不定期」を想定
+    '不定期': 2,
   };
 
   // “かな順”で安定して並べるための日本語コレーター
@@ -60,7 +63,19 @@ export default function TaskCalendar({ tasks }: Props) {
     () => new Intl.Collator('ja', { numeric: true, sensitivity: 'base' }),
     []
   );
-  // ===== ▲▲ 追加ここまで ▲▲ =====
+  // ===== ▲▲ ここまで ▲▲ =====
+
+  // ▼ アニメーション設定（Framer Motion）
+  const containerVariants = {
+    collapsed: { transition: { duration: 0.18 } },
+    expanded: { transition: { duration: 0.22 } },
+  };
+
+  const itemVariants = {
+    initial: { opacity: 0, scale: 0.98, y: -4 },
+    animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.15 } },
+    exit: { opacity: 0, scale: 0.98, y: -4, transition: { duration: 0.12 } },
+  };
 
   return (
     <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center mb-3 shadow-md border border-[#e5e5e5]">
@@ -95,9 +110,9 @@ export default function TaskCalendar({ tasks }: Props) {
               return isTargetDay && task.done === false;
             });
 
-            // ★ 並び替え（ご要望対応）：
+            // ★ 並び替え：
             //   1) periodRank（毎日→週次→不定期）
-            //   2) 同 period 内は “かな順”（日本語名の読み順）
+            //   2) 同 period 内は “かな順”
             const sortedTasks = dailyTasks
               .slice()
               .sort((a, b) => {
@@ -109,54 +124,103 @@ export default function TaskCalendar({ tasks }: Props) {
             const hasTask = sortedTasks.length > 0;
             const bgColor = hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]';
 
-            const isExpanded = selectedDate && isSameDay(day, selectedDate);
+            const isExpanded =
+              !!selectedDate && isSameDay(day, selectedDate as Date);
+
+            // ▼ 5件制限 & 全件表示トグル
+            const MAX_VISIBLE = 5;
+            const visibleTasks = isExpanded
+              ? sortedTasks
+              : sortedTasks.slice(0, MAX_VISIBLE);
+            const hiddenCount = Math.max(sortedTasks.length - visibleTasks.length, 0);
 
             return (
-              <div
+              <motion.div
                 key={idx}
-                className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor}`}
+                layout
+                variants={containerVariants}
+                initial="collapsed"
+                animate={isExpanded ? 'expanded' : 'collapsed'}
+                className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
                 onClick={() =>
                   isSameDay(selectedDate ?? new Date(0), day)
                     ? setSelectedDate(null) // 同じ日ならトグルで閉じる
                     : setSelectedDate(day)  // 違う日なら新たに展開
                 }
+                role="button"
+                aria-pressed={isExpanded}
+                title={isExpanded ? '5件表示に戻す' : 'タップで全件表示'}
               >
                 <div className="font-semibold text-gray-600">
                   {format(day, 'M/d (EEE)', { locale: ja })}
                 </div>
                 <hr className="my-1 border-gray-300 opacity-40" />
-                {hasTask ? (
-                  sortedTasks.map((task, i) => {
-                    const isWeeklyTask =
-                      task.period === '週次' &&
-                      task.daysOfWeek?.includes(
-                        dayNumberToName[String(day.getDay())]
+
+                <AnimatePresence initial={false} mode="popLayout">
+                  {hasTask ? (
+                    visibleTasks.map((task) => {
+                      const isWeeklyTask =
+                        task.period === '週次' &&
+                        task.daysOfWeek?.includes(
+                          dayNumberToName[String(day.getDay())]
+                        );
+
+                      const isDateTask = task.dates?.some((dateStr) =>
+                        isSameDay(parseISO(dateStr), day)
                       );
 
-                    const isDateTask = task.dates?.some((dateStr) =>
-                      isSameDay(parseISO(dateStr), day)
-                    );
+                      return (
+                        <motion.div
+                          key={task.id}
+                          layout
+                          variants={itemVariants}
+                          initial="initial"
+                          animate="animate"
+                          exit="exit"
+                          className={`mt-1 text-[10px] rounded px-1.5 py-[3px] font-semibold border border-white/30
+                          ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
+                          ${isWeeklyTask
+                              ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
+                              : isDateTask
+                                ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
+                                : 'bg-gradient-to-b from-blue-300 to-blue-600 text-white'}
+                          `}
+                        >
+                          {task.name}
+                        </motion.div>
+                      );
+                    })
+                  ) : (
+                    <motion.div
+                      key="no-task"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="text-[10px] text-gray-400 mt-2"
+                    >
+                      予定なし
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                    return (
-                      <div
-                        key={i}
-                        className={`mt-1 text-[10px] rounded px-1.5 py-[3px] font-semibold border border-white/30
-                        ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
-                        ${isWeeklyTask
-                            ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
-                            : isDateTask
-                              ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
-                              : 'bg-gradient-to-b from-gray-100 to-gray-300 text-gray-700'}
-                        `}
-                      >
-                        {task.name}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-[10px] text-gray-400 mt-2">予定なし</div>
+                {/* ▼ “もっと見る” インジケーター（5件超かつ未展開のとき） */}
+                {!isExpanded && hiddenCount > 0 && (
+                  <motion.div
+                    layout
+                    className="mt-1 flex items-center justify-center gap-1 text-[10px] text-gray-600"
+                  >
+                    <motion.span
+                      aria-hidden
+                      animate={{ y: [0, 2, 0], opacity: [0.7, 1, 0.7] }}
+                      transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+                      className="inline-flex"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </motion.span>
+                    <span className="font-medium">他 {hiddenCount} 件 • タップで全表示</span>
+                  </motion.div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -164,10 +228,19 @@ export default function TaskCalendar({ tasks }: Props) {
 
       {/* ✅ 凡例 */}
       <div className="flex justify-center mt-4 gap-4 text-xs text-gray-600">
+        {/* 毎日 */}
+        <div className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
+          <span>毎日</span>
+        </div>
+
+        {/* 週次 */}
         <div className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full bg-gray-500 inline-block" />
           <span>週次</span>
         </div>
+
+        {/* 日付指定 */}
         <div className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full bg-orange-400 inline-block" />
           <span>日付指定</span>
