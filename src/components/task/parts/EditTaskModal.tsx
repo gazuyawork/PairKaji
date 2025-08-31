@@ -377,11 +377,15 @@ export default function EditTaskModal({
       return;
     }
 
-    const transformed = {
-      ...editedTask, // note / visible も含まれる（500超過は保存不可にしている）
-      daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
-      private: isPrivate,
-    };
+const transformed = {
+  ...editedTask,
+  // ✅ 担当者フィールドを明示的に保存
+  users: Array.isArray(editedTask.users) ? [...editedTask.users] : [],
+  userIds: Array.isArray(editedTask.users) ? [...editedTask.users] : [], // 互換用（既存の参照ロジック対策）
+
+  daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
+  private: isPrivate,
+};
 
     setIsSaving(true);
     onSave(transformed as Task); // Task に note が無くても OK（保存側で無視される想定）

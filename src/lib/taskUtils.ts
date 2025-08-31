@@ -52,15 +52,34 @@ const getJstYmd = () =>
  *    - 文字列になりがちな数値/真偽を型変換
  *    - 配列/文字列のデフォルト整形
  * =======================================*/
+// 変更箇所：normalizeTaskPayload に users を追加
+// （編集対象コードの一部のみ抜粋：変更箇所以外はそのまま）
+
+// ③ 編集 | normalizeTaskPayload に users を追加
 const normalizeTaskPayload = (raw: any, uid: string, userIds: string[]) => {
   const point =
     raw?.point === '' || raw?.point == null ? null : Number(raw.point);
   const visible =
     raw?.visible === '' || raw?.visible == null ? null : Boolean(raw.visible);
 
+  // ★ 追加: users を文字列配列に正規化（null/undefined/空文字を除去、重複除去）
+  const users: string[] = Array.isArray(raw?.users)
+    ? Array.from(
+        new Set(
+          raw.users
+            .filter((v: unknown) => typeof v === 'string')
+            .map((v: string) => v.trim())
+            .filter((v: string) => v.length > 0)
+        )
+      )
+    : [];
+
   const payload: any = {
     userId: uid,
     userIds: Array.isArray(userIds) && userIds.length ? userIds : [uid],
+
+    // ★ 追加: 担当者
+    users,
 
     name: typeof raw?.name === 'string' ? raw.name.trim() : '',
     period:
@@ -83,13 +102,13 @@ const normalizeTaskPayload = (raw: any, uid: string, userIds: string[]) => {
     private: raw?.private === true,
   };
 
-  // ❌ Firestore は undefined を許容しない → 全キーから除去
   Object.keys(payload).forEach((k) => {
     if (payload[k] === undefined) delete payload[k];
   });
 
   return payload;
 };
+
 
 /**
  * 指定されたpairIdのペアに属するuserIdsを取得する関数
@@ -124,6 +143,10 @@ export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
  * @param uid 現在のユーザーID（必ず指定）
  * @returns FirestoreTaskオブジェクト
  */
+// 変更箇所：buildFirestoreTaskData に users を追加
+// （編集対象コードの一部のみ抜粋：変更箇所以外はそのまま）
+
+// ③ 編集 | buildFirestoreTaskData に users を追加
 export const buildFirestoreTaskData = (
   task: Task | TaskManageTask,
   userIds: string[],
@@ -131,12 +154,16 @@ export const buildFirestoreTaskData = (
 ): FirestoreTask => {
   const convertedDaysOfWeek =
     task.period === '週次'
-      ? (task.daysOfWeek ?? []).map((d) => dayNameToNumber[d] ?? d) // ✅ 日本語→数値文字列変換
+      ? (task.daysOfWeek ?? []).map((d) => dayNameToNumber[d] ?? d)
       : [];
 
   return {
     userId: uid,
     userIds,
+
+    // ★ 追加: 担当者（存在すれば配列で保存）
+    users: (task as any).users ?? [],
+
     name: task.name ?? '',
     title: task.title ?? '',
     period: task.period ?? '毎日',
@@ -152,7 +179,6 @@ export const buildFirestoreTaskData = (
     completedBy: (task as any).completedBy ?? '',
     visible: (task as any).visible ?? false,
     todos: [],
-    // ★ 追加：備考（UIの note を Firestore に保存）
     note: (task as any).note ?? '',
   } as unknown as FirestoreTask;
 };
@@ -301,6 +327,7 @@ export const saveSingleTask = async (
         time: task.time,
         note: (task as any).note,
         visible: (task as any).visible,
+        users: (task as any).users,
       },
       uid,
       userIds
