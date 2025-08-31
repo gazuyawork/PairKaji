@@ -123,8 +123,8 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
             typeof data?.displayName === 'string' && data.displayName.trim()
               ? data.displayName
               : typeof data?.name === 'string' && data.name.trim()
-              ? data.name
-              : '';
+                ? data.name
+                : '';
 
           if (!cancelled) {
             setImgMap((prev) => (img ? { ...prev, [uid]: img } : prev));
@@ -132,7 +132,7 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
               setNameMap((prev) => ({ ...prev, [uid]: displayName }));
             }
           }
-        } catch (e) {
+        } catch {
           // 取得失敗時は何もしない（フォールバックでイニシャルを表示）
           // console.warn('[TodayCompletedTasksCard] profile fetch error', uid, e);
         } finally {
@@ -163,13 +163,13 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
 
             const timeLabel = task.completedAt
               ? format(
-                  typeof task.completedAt === 'string'
-                    ? new Date(task.completedAt)
-                    : (task.completedAt as any)?.toDate
+                typeof task.completedAt === 'string'
+                  ? new Date(task.completedAt)
+                  : (task.completedAt as any)?.toDate
                     ? (task.completedAt as any).toDate()
                     : new Date(task.completedAt as any),
-                  'HH:mm'
-                )
+                'HH:mm'
+              )
               : '';
 
             const imgSrc = completedUserId ? imgMap[completedUserId] : '';
@@ -187,29 +187,29 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
 
                   {completedUserId ? (
                     imgSrc ? (
-                      <Image
-                        src={imgSrc}
-                        alt={displayName || 'user'}
-                        width={24}
-                        height={24}
-                        className="rounded-full object-cover"
-                        onError={(e) => {
-                          const t = e?.currentTarget as HTMLImageElement | undefined;
-                          // 画像壊れ → 次のレンダでイニシャルに任せる（ここではログのみ）
-                          console.warn('[TodayCompletedTasksCard] icon load error', {
-                            completedUserId,
-                            imgSrc,
-                            naturalWidth: t?.naturalWidth,
-                            naturalHeight: t?.naturalHeight,
-                          });
-                          // 壊れURLをキャッシュから除去してイニシャルにフォールバック（任意）
-                          setImgMap((prev) => {
-                            const cp = { ...prev };
-                            delete cp[completedUserId];
-                            return cp;
-                          });
-                        }}
-                      />
+                      // ✅ ラッパーで正円にクリッピングし、Image は fill + object-cover
+                      <div className="relative w-6 h-6 rounded-full overflow-hidden shrink-0">
+                        <Image
+                          src={imgSrc}
+                          alt={displayName || 'user'}
+                          fill
+                          sizes="24px"
+                          className="object-cover"
+                          onError={(e) => {
+                            const t = e?.currentTarget as HTMLImageElement | undefined;
+                            console.warn('[TodayCompletedTasksCard] icon load error (keeping last good)', {
+                              completedUserId,
+                              imgSrc,
+                              naturalWidth: t?.naturalWidth,
+                              naturalHeight: t?.naturalHeight,
+                            });
+                            // ❌ キャッシュは消さない：一度表示できた画像は維持して「消えない」ようにする
+                            // 必要があれば、別途リトライ機構を足す（ここでは安定性を優先）
+                          }}
+
+                        />
+                      </div>
+
                     ) : (
                       <div
                         className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 text-xs flex items-center justify-center"

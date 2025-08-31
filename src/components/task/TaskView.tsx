@@ -650,23 +650,27 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     </div>
                   )}
 
-                  <div className="flex overflow-x-auto no-scrollbar space-x-2">
-                    <FilterControls
-                      periodFilter={periodFilter}
-                      personFilter={personFilter}
-                      onTogglePeriod={togglePeriod}
-                      onTogglePerson={togglePerson}
-                      searchTerm={searchTerm}
-                      onClearSearch={() => setSearchTerm('')}
-                      pairStatus={pairStatus}
-                      todayFilter={todayFilter}
-                      onToggleTodayFilter={() => setTodayFilter((prev) => !prev)}
-                      privateFilter={privateFilter}
-                      onTogglePrivateFilter={() => setPrivateFilter((prev) => !prev)}
-                      flaggedFilter={flaggedFilter}
-                      onToggleFlaggedFilter={() => setFlaggedFilter((prev) => !prev)}
-                    />
-                  </div>
+{/* // src/components/views/TaskView.tsx */}
+<div className="flex overflow-x-auto no-scrollbar space-x-2">
+  {/* ▼ 追加: plan が premium のときのみ FilterControls を表示。ローディング中(isChecking)は非表示 */}
+  {!isChecking && plan === 'premium' && (
+    <FilterControls
+      periodFilter={periodFilter}
+      personFilter={personFilter}
+      onTogglePeriod={togglePeriod}
+      onTogglePerson={togglePerson}
+      searchTerm={searchTerm}
+      onClearSearch={() => setSearchTerm('')}
+      pairStatus={pairStatus}
+      todayFilter={todayFilter}
+      onToggleTodayFilter={() => setTodayFilter((prev) => !prev)}
+      privateFilter={privateFilter}
+      onTogglePrivateFilter={() => setPrivateFilter((prev) => !prev)}
+      flaggedFilter={flaggedFilter}
+      onToggleFlaggedFilter={() => setFlaggedFilter((prev) => !prev)}
+    />
+  )}
+</div>
 
                   {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
                     <motion.button
