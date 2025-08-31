@@ -65,6 +65,7 @@ export default function FinishDayTask({ tasks }: Props) {
         where('userIds', 'array-contains', uid)
       );
 
+
       const unsubscribe1 = onSnapshot(q1, (snapshot1) => {
         snapshot1.docChanges().forEach(change => {
           const log = { ...(change.doc.data() as CompletionLog), __docId: change.doc.id };
@@ -111,18 +112,6 @@ export default function FinishDayTask({ tasks }: Props) {
     };
   }, [tasks, uid]);
 
-  // ✅ プライベートタスク（userIds.length === 1 のもの）は、自分以外の完了ログを非表示にする
-  const filteredLogs = logs.filter((log) => {
-    const task = tasks.find(t => t.id === log.taskId);
-    if (!task) return false;
-
-    const isPrivate = task.userIds && task.userIds.length === 1;
-    if (isPrivate) {
-      return log.userId === uid; // 自分の完了ログだけ表示
-    }
-    return true; // 共有タスクならそのまま表示
-  });
-
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-md overflow-hidden max-h-[300px]">
       <div className="bg-white p-4 shadow sticky top-0 z-10 text-center border-b">
@@ -130,11 +119,11 @@ export default function FinishDayTask({ tasks }: Props) {
       </div>
 
       <div className="overflow-y-auto pt-4">
-        {filteredLogs.length === 0 ? (
+        {logs.length === 0 ? (
           <p className="text-gray-400 mb-10 text-center pt-6">本日の履歴はありません</p>
         ) : (
           <ul className="space-y-2 text-left">
-            {filteredLogs.map((log) => (
+            {logs.map((log) => (
               <li key={log.__docId} className="flex items-center gap-4 border-b px-4 pb-2 text-[#5E5E5E]">
                 <div className="w-[100%] truncate text-ellipsis overflow-hidden whitespace-nowrap">
                   {log.taskName ?? '（タスク名なし）'}
