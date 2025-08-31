@@ -164,7 +164,8 @@ export default function TaskCalendar({ tasks }: Props) {
                 variants={containerVariants}
                 initial="collapsed"
                 animate={isExpanded ? 'expanded' : 'collapsed'}
-                className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
+                // className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
+                className={`w-2/5 sm:w-[100px] flex-shrink-0 rounded-lg p-2 min-h[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
                 onClick={() =>
                   isSameDay(selectedDate ?? new Date(0), day)
                     ? setSelectedDate(null) // 同じ日ならトグルで閉じる
@@ -206,7 +207,7 @@ export default function TaskCalendar({ tasks }: Props) {
                           initial="initial"
                           animate="animate"
                           exit="exit"
-                          className={`mt-1 text-[10px] rounded px-1.5 py-[3px] font-semibold border border-white/30
+                          className={`mt-1 text-[12px] rounded px-1.5 py-[3px] font-semibold border border-white/30
                           ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
                           ${
                             isOverdue
