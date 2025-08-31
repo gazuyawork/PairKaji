@@ -607,97 +607,102 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-            <div className="sticky top-0 bg-transparent mb-2 z-999">
-              <div className="w-full max-w-xl m-auto p-2 backdrop-blur-md rounded-lg">
-                {isSearchVisible && (
-                  <div className="mb-3">
-                    <SearchBox value={searchTerm} onChange={setSearchTerm} />
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center pr-2 border-r border-gray-300">
-                    <motion.button
-                      onClick={() => setShowSearchBox((prev) => (searchTerm.trim() ? true : !prev))}
-                      whileTap={{ scale: 1.2 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 12 }}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
-      ${isSearchVisible
-                          ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                          : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'
-                        }
-       `}
-                      title="検索"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </motion.button>
-                  </div>
+            {!isChecking && plan === 'premium' && (
+              <>
+                <div className="sticky top-0 bg-transparent mb-2 z-999">
+                  <div className="w-full max-w-xl m-auto p-2 backdrop-blur-md rounded-lg">
+                    {isSearchVisible && (
+                      <div className="mb-3">
+                        <SearchBox value={searchTerm} onChange={setSearchTerm} />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center pr-2 border-r border-gray-300">
+                        <motion.button
+                          onClick={() => setShowSearchBox((prev) => (searchTerm.trim() ? true : !prev))}
+                          whileTap={{ scale: 1.2 }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+                          className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
+                        ${isSearchVisible
+                              ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
+                              : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'
+                            }
+                        `}
+                          title="検索"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </motion.button>
+                      </div>
 
-                  {pairStatus === 'confirmed' && (
-                    <div className="flex items-center pr-2 border-r border-gray-300">
-                      <button
-                        onClick={() => setPrivateFilter((prev) => !prev)}
-                        className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
+
+                      {pairStatus === 'confirmed' && (
+                        <div className="flex items-center pr-2 border-r border-gray-300">
+                          <button
+                            onClick={() => setPrivateFilter((prev) => !prev)}
+                            className={`w-10 h-10 rounded-xl border font-bold flex items-center justify-center text-xl
                             ${privateFilter
-                            ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
-                            : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'
-                          }`}
-                        title="プライベートタスク"
-                      >
-                        <SquareUser />
-                      </button>
+                                ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white shadow-inner'
+                                : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]'
+                              }`}
+                            title="プライベートタスク"
+                          >
+                            <SquareUser />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* // src/components/views/TaskView.tsx */}
+                      <div className="flex overflow-x-auto no-scrollbar space-x-2">
+                        {/* ▼ 追加: plan が premium のときのみ FilterControls を表示。ローディング中(isChecking)は非表示 */}
+
+                        <FilterControls
+                          periodFilter={periodFilter}
+                          personFilter={personFilter}
+                          onTogglePeriod={togglePeriod}
+                          onTogglePerson={togglePerson}
+                          searchTerm={searchTerm}
+                          onClearSearch={() => setSearchTerm('')}
+                          pairStatus={pairStatus}
+                          todayFilter={todayFilter}
+                          onToggleTodayFilter={() => setTodayFilter((prev) => !prev)}
+                          privateFilter={privateFilter}
+                          onTogglePrivateFilter={() => setPrivateFilter((prev) => !prev)}
+                          flaggedFilter={flaggedFilter}
+                          onToggleFlaggedFilter={() => setFlaggedFilter((prev) => !prev)}
+                        />
+                      </div>
+
+                      {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
+                        <motion.button
+                          onClick={() => {
+                            setPeriodFilter(null);
+                            setPersonFilter(null);
+                            setSearchTerm('');
+                            setTodayFilter(false);
+                            setPrivateFilter(false);
+                            setShowSearchBox(false);
+                            setFlaggedFilter(false);
+                          }}
+                          whileTap={{ scale: 1.2 }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                          className="w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner"
+                          title="すべてのフィルターを解除"
+                        >
+                          <X className="w-5 h-5" />
+                        </motion.button>
+                      )}
+
+
                     </div>
-                  )}
-
-{/* // src/components/views/TaskView.tsx */}
-<div className="flex overflow-x-auto no-scrollbar space-x-2">
-  {/* ▼ 追加: plan が premium のときのみ FilterControls を表示。ローディング中(isChecking)は非表示 */}
-  {!isChecking && plan === 'premium' && (
-    <FilterControls
-      periodFilter={periodFilter}
-      personFilter={personFilter}
-      onTogglePeriod={togglePeriod}
-      onTogglePerson={togglePerson}
-      searchTerm={searchTerm}
-      onClearSearch={() => setSearchTerm('')}
-      pairStatus={pairStatus}
-      todayFilter={todayFilter}
-      onToggleTodayFilter={() => setTodayFilter((prev) => !prev)}
-      privateFilter={privateFilter}
-      onTogglePrivateFilter={() => setPrivateFilter((prev) => !prev)}
-      flaggedFilter={flaggedFilter}
-      onToggleFlaggedFilter={() => setFlaggedFilter((prev) => !prev)}
-    />
-  )}
-</div>
-
-                  {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
-                    <motion.button
-                      onClick={() => {
-                        setPeriodFilter(null);
-                        setPersonFilter(null);
-                        setSearchTerm('');
-                        setTodayFilter(false);
-                        setPrivateFilter(false);
-                        setShowSearchBox(false);
-                        setFlaggedFilter(false);
-                      }}
-                      whileTap={{ scale: 1.2 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                      className="w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner"
-                      title="すべてのフィルターを解除"
-                    >
-                      <X className="w-5 h-5" />
-                    </motion.button>
-                  )}
-
-
+                  </div>
                 </div>
-              </div>
-            </div>
+                <hr className="border-t border-gray-300 opacity-50 my-1" />
+              </>
+            )}
 
-            <hr className="border-t border-gray-300 opacity-50 my-1" />
+
 
             {(() => {
               const allFilteredTasks = periods
@@ -958,6 +963,29 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 >
                   <Flag className="w-6 h-6" />
                 </motion.button>
+
+                {/* ▼▼▼ 追加：フローティング用「×」クリアボタン（上部と同じ条件・挙動） ▼▼▼ */}
+                {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
+                  <motion.button
+                    onClick={() => {
+                      setPeriodFilter(null);
+                      setPersonFilter(null);
+                      setSearchTerm('');
+                      setTodayFilter(false);
+                      setPrivateFilter(false);
+                      setShowSearchBox(false);
+                      setFlaggedFilter(false);
+                    }}
+                    whileTap={{ scale: 1.2 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                    className="w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner"
+                    title="すべてのフィルターを解除"
+                    aria-label="すべてのフィルターを解除"
+                  >
+                    <X className="w-5 h-5" />
+                  </motion.button>
+                )}
+
               </div>
             </div>
           </div>,
