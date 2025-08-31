@@ -1,9 +1,8 @@
-// src/components/home/parts/TaskCalendar.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
-import { format, addDays, isSameDay, parseISO } from 'date-fns';
+import { format, addDays, isSameDay, parseISO, startOfDay, isBefore } from 'date-fns';
 import { dayNumberToName } from '@/lib/constants';
 import { useRef, useState, useMemo } from 'react';
 import { ja } from 'date-fns/locale';
@@ -27,6 +26,7 @@ type Props = {
 export default function TaskCalendar({ tasks }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const today = new Date();
+  const startToday = startOfDay(today);
 
   // ✅ day の赤線対策：型注釈を明示
   const days: Date[] = Array.from({ length: 7 }, (_, i) => addDays(today, i));
@@ -51,11 +51,11 @@ export default function TaskCalendar({ tasks }: Props) {
   };
 
   // ===== ▼▼ 並び順制御 ▼▼ =====
-  // period の優先度（毎日→週次→不定期）
+  // 通常の period の優先度（※期限切れは別途で最優先にする）
   const periodRank: Record<CalendarTask['period'], number> = {
-    '毎日': 0,
-    '週次': 1,
-    '不定期': 2,
+    '毎日': 1,
+    '週次': 2,
+    '不定期': 3,
   };
 
   // “かな順”で安定して並べるための日本語コレーター
@@ -92,6 +92,7 @@ export default function TaskCalendar({ tasks }: Props) {
             // ✅ 表示条件：
             //  1) period が「毎日」 or dates に当日含む or 週次で曜日一致
             //  2) かつ done === false（未処理のみ表示）
+            //  3) ＋ 不定期の期限切れ（今日より前の期日がある）は「今日の列」に表示
             const dailyTasks = tasks.filter((task) => {
               const isDaily = task.period === '毎日';
 
@@ -105,19 +106,41 @@ export default function TaskCalendar({ tasks }: Props) {
                   dayNumberToName[String(day.getDay())]
                 );
 
-              const isTargetDay = isDaily || isDateTask || isWeeklyTask;
+              // ▼ 追加：不定期の「期限切れ」を今日の列に表示
+              const isOverdueIrregularToday =
+                task.period === '不定期' &&
+                task.done === false &&
+                isSameDay(day, today) &&
+                (task.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false);
+
+              const isTargetDay = isDaily || isDateTask || isWeeklyTask || isOverdueIrregularToday;
 
               return isTargetDay && task.done === false;
             });
 
             // ★ 並び替え：
-            //   1) periodRank（毎日→週次→不定期）
-            //   2) 同 period 内は “かな順”
+            //   1) 期限切れ（不定期）を最優先
+            //   2) periodRank（毎日→週次→不定期）
+            //   3) 同 period 内は “かな順”
             const sortedTasks = dailyTasks
               .slice()
               .sort((a, b) => {
+                const isOverdueA =
+                  a.period === '不定期' &&
+                  (a.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false) &&
+                  isSameDay(day, today);
+
+                const isOverdueB =
+                  b.period === '不定期' &&
+                  (b.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false) &&
+                  isSameDay(day, today);
+
+                if (isOverdueA && !isOverdueB) return -1;
+                if (!isOverdueA && isOverdueB) return 1;
+
                 const pr = periodRank[a.period] - periodRank[b.period];
                 if (pr !== 0) return pr;
+
                 return collator.compare(a.name, b.name);
               });
 
@@ -141,7 +164,7 @@ export default function TaskCalendar({ tasks }: Props) {
                 variants={containerVariants}
                 initial="collapsed"
                 animate={isExpanded ? 'expanded' : 'collapsed'}
-                className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
+                className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
                 onClick={() =>
                   isSameDay(selectedDate ?? new Date(0), day)
                     ? setSelectedDate(null) // 同じ日ならトグルで閉じる
@@ -169,6 +192,12 @@ export default function TaskCalendar({ tasks }: Props) {
                         isSameDay(parseISO(dateStr), day)
                       );
 
+                      // 期限切れ（不定期）を赤系で表示（今日カラム）
+                      const isOverdue =
+                        task.period === '不定期' &&
+                        (task.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false) &&
+                        isSameDay(day, today);
+
                       return (
                         <motion.div
                           key={task.id}
@@ -179,11 +208,15 @@ export default function TaskCalendar({ tasks }: Props) {
                           exit="exit"
                           className={`mt-1 text-[10px] rounded px-1.5 py-[3px] font-semibold border border-white/30
                           ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
-                          ${isWeeklyTask
-                              ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
-                              : isDateTask
-                                ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
-                                : 'bg-gradient-to-b from-blue-300 to-blue-600 text-white'}
+                          ${
+                            isOverdue
+                              ? 'bg-gradient-to-b from-red-400 to-red-600 text-white' // ← 赤系グラデ
+                              : isWeeklyTask
+                                ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
+                                : isDateTask
+                                  ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
+                                  : 'bg-gradient-to-b from-blue-300 to-blue-600 text-white'
+                          }
                           `}
                         >
                           {task.name}
@@ -217,7 +250,7 @@ export default function TaskCalendar({ tasks }: Props) {
                     >
                       <ChevronDown className="w-3.5 h-3.5" />
                     </motion.span>
-                    <span className="font-medium">他 {hiddenCount} 件 • タップで全表示</span>
+                    <span className="font-medium">他 {hiddenCount} 件</span>
                   </motion.div>
                 )}
               </motion.div>
@@ -244,6 +277,12 @@ export default function TaskCalendar({ tasks }: Props) {
         <div className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full bg-orange-400 inline-block" />
           <span>日付指定</span>
+        </div>
+
+        {/* 期限切れ（不定期） */}
+        <div className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
+          <span>期限切れ</span>
         </div>
       </div>
     </div>

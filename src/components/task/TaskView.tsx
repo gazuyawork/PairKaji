@@ -182,7 +182,19 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index } = useView();
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
+  // 追加：'YYYY-MM-DD' を Date にして「今日以前か」判定する
+  const isSameOrBeforeToday = (ymd: string): boolean => {
+    if (typeof ymd !== 'string') return false;
+    // 安全にパース（YYYY-MM-DD 固定想定）
+    const [y, m, d] = ymd.split('-').map(Number);
+    if (!y || !m || !d) return false;
+    const target = new Date(y, m - 1, d, 0, 0, 0, 0);
 
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+    return target.getTime() <= today.getTime();
+  };
 
   // URL クエリの flagged=true を初期反映
   useEffect(() => {
@@ -288,30 +300,39 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     fetchPairStatus();
   }, [uid]);
 
-  // 今日対象かどうか（元ロジックを温存）
-  const isTodayTask = useCallback((task: Task): boolean => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
+  // 今日対象かどうか（期日すぎも含む）
+const isTodayTask = useCallback((task: Task): boolean => {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
 
-    const dayNumberToKanji: Record<number, string> = {
-      0: '日', 1: '月', 2: '火', 3: '水', 4: '木', 5: '金', 6: '土',
-    };
-    const todayDayKanji = dayNumberToKanji[today.getDay()];
+  const dayNumberToKanji: Record<number, string> = {
+    0: '日', 1: '月', 2: '火', 3: '水', 4: '木', 5: '金', 6: '土',
+  };
+  const todayDayKanji = dayNumberToKanji[today.getDay()];
 
-    if (task.period === '毎日') return true;
-    if (task.period === '週次') {
-      if (!Array.isArray(task.daysOfWeek)) return false;
-      return task.daysOfWeek.includes(todayDayKanji);
-    }
-    if (task.period === '不定期') {
-      if (!Array.isArray(task.dates)) return false;
-      return task.dates.includes(todayStr);
-    }
-    return false;
-  }, []);
+  if (task.period === '毎日') return true;
+
+  if (task.period === '週次') {
+    if (!Array.isArray(task.daysOfWeek)) return false;
+    return task.daysOfWeek.includes(todayDayKanji);
+  }
+
+  if (task.period === '不定期') {
+    if (!Array.isArray(task.dates) || task.dates.length === 0) return false;
+
+    // ① 今日が含まれていれば対象
+    if (task.dates.includes(todayStr)) return true;
+
+    // ② 今日以前（≦今日）の指定日がひとつでもあれば「期日超過」とみなして対象
+    return task.dates.some((d) => isSameOrBeforeToday(d));
+  }
+
+  return false;
+}, []);
+
 
   // フィルタボタンのトグル
   const togglePeriod = (p: Period | null) => setPeriodFilter((prev) => (prev === p ? null : p));

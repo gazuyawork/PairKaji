@@ -83,7 +83,7 @@ export default function TodoTaskCard({
   const [localDoneMap, setLocalDoneMap] = useState<Record<string, boolean>>({});
   const [animateTriggerMap, setAnimateTriggerMap] = useState<Record<string, number>>({});
 
-  // --- 追加: マウス用ドラッグスクロール状態 ---
+  // --- マウス用ドラッグスクロール状態 ---
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startScrollTopRef = useRef(0);
@@ -124,7 +124,7 @@ export default function TodoTaskCard({
     setDragging(false);
     el?.releasePointerCapture?.(e.pointerId);
   };
-  // --- 追加ここまで ---
+  // --- ここまで ---
 
   useEffect(() => {
     const newMap: Record<string, boolean> = {};
@@ -392,7 +392,15 @@ export default function TodoTaskCard({
                     defaultValue={todo.text}
                     onBlur={(e) => {
                       const newText = e.target.value.trim();
-                      if (!newText) return;
+
+                      // ✅ 空文字ならトーストでガイドを表示し、確定処理はしない
+                      if (!newText) {
+                        toast.info('削除する場合はゴミ箱アイコンで消してください');
+                        // 入力欄の表示は元の文字に戻す（空にしない運用）
+                        const inputEl = todoRefs.current[todo.id];
+                        if (inputEl) inputEl.value = todo.text;
+                        return;
+                      }
 
                       const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
                       if (isDuplicate) {
