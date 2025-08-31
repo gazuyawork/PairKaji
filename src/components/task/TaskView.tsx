@@ -181,6 +181,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index } = useView();
+  const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
+
 
   // URL クエリの flagged=true を初期反映
   useEffect(() => {
@@ -851,7 +853,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
                         })
 
-                        .filter((t) => showCompletedMap[period] || !t.done)
+                        // .filter((t) => showCompletedMap[period] || !t.done)
+                        .filter((t) => showCompletedMap[period] || !t.done || searchActive)
                         .map((task, idx) => (
                           <TaskCard
                             key={task.id}
