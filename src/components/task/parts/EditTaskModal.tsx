@@ -9,21 +9,46 @@ import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 import { createPortal } from 'react-dom';
 import BaseModal from '../../common/modals/BaseModal';
-import { Eraser, ChevronDown, ChevronUp } from 'lucide-react';
+import { Eraser, ChevronDown, ChevronUp, Utensils, ShoppingCart } from 'lucide-react';
+
+// =========================================
+// 🔎 デバッグ設定
+// =========================================
+const DEBUG_CAT = true;
+const DLOG = (...args: any[]) => {
+  if (!DEBUG_CAT) return;
+  // 連続描画でもまとまって見えるよう groupCollapsed を多用
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[EditTaskModal:Category]', ...args);
+  } catch {}
+};
 
 // 備考textareaの最大高さ（画面高さの50%）
 const MAX_TEXTAREA_VH = 50;
-// ★ 追加：備考の最大文字数
 const NOTE_MAX = 500;
 
-// Task に note?: string をローカルに許可
-type TaskWithNote = Task & { note?: string };
+// カテゴリ
+type TaskCategory = '料理' | '買い物';
+const CATEGORY_OPTIONS: Array<{ key: TaskCategory; label: TaskCategory; Icon: any }> = [
+  { key: '料理', label: '料理', Icon: Utensils },
+  { key: '買い物', label: '買い物', Icon: ShoppingCart },
+];
 
-type UserInfo = {
-  id: string;
-  name: string;
-  imageUrl: string;
+// 正規化
+const normalizeCategory = (v: any): TaskCategory | undefined => {
+  if (typeof v !== 'string') return undefined;
+  const s = v.normalize('NFKC').trim().toLowerCase();
+  if (s === '料理' || s === 'りょうり' || s === 'cooking' || s === 'cook' || s === 'meal') return '料理';
+  if (s === '買い物' || s === '買物' || s === 'かいもの' || s === 'shopping' || s === 'purchase' || s === 'groceries') return '買い物';
+  return undefined;
 };
+const eqCat = (a: any, b: TaskCategory) => normalizeCategory(a) === b;
+
+// Task に note / category をローカルに許可
+type TaskWithNote = Task & { note?: string; category?: TaskCategory };
+
+type UserInfo = { id: string; name: string; imageUrl: string };
 
 type Props = {
   isOpen: boolean;
@@ -35,65 +60,45 @@ type Props = {
   existingTasks: Task[];
 };
 
-// ▼▼▼ 画像URL解決関数（imageUrl が無い場合に photoURL 等も探索） ▼▼▼
+// 画像URL解決（既存）
 const resolveUserImageSrc = (user: any): string => {
-  const show = (v: any) => (v === undefined || v === null ? String(v) : String(v));
   try {
-    console.group(`[EditTaskModal] Checking image keys for userId: ${user?.id}`);
-    console.log('imageUrl:', show(user?.imageUrl));
-    console.log('photoURL:', show(user?.photoURL));
-    console.log('photoUrl:', show(user?.photoUrl));
-    console.log('profileImageUrl:', show(user?.profileImageUrl));
-    console.log('avatarUrl:', show(user?.avatarUrl));
-    console.log('icon:', show(user?.icon));
-    console.log('avatar:', show(user?.avatar));
-    console.log('picture:', show(user?.picture));
-    console.log('photo:', show(user?.photo));
-    console.log('profile.imageUrl:', show(user?.profile?.imageUrl));
-    console.log('profile.photoURL:', show(user?.profile?.photoURL));
-    console.log('profile.avatarUrl:', show(user?.profile?.avatarUrl));
-    console.log('pictureUrl:', show(user?.pictureUrl));
-    console.log('pictureURL:', show(user?.pictureURL));
-    console.log('photo_url:', show(user?.photo_url));
-    console.groupEnd();
-  } catch {
-    console.log('[EditTaskModal] raw user (stringified):', (() => {
-      try { return JSON.stringify(user); } catch { return '[unstringifiable]'; }
-    })());
-  }
+    if (DEBUG_CAT) {
+      console.groupCollapsed(`[EditTaskModal] Checking image keys for userId: ${user?.id}`);
+      const show = (v: any) => (v === undefined || v === null ? String(v) : String(v));
+      console.log('imageUrl:', show(user?.imageUrl));
+      console.log('photoURL:', show(user?.photoURL));
+      console.log('photoUrl:', show(user?.photoUrl));
+      console.log('profileImageUrl:', show(user?.profileImageUrl));
+      console.log('avatarUrl:', show(user?.avatarUrl));
+      console.log('icon:', show(user?.icon));
+      console.log('avatar:', show(user?.avatar));
+      console.log('picture:', show(user?.picture));
+      console.log('photo:', show(user?.photo));
+      console.log('profile.imageUrl:', show(user?.profile?.imageUrl));
+      console.log('profile.photoURL:', show(user?.profile?.photoURL));
+      console.log('profile.avatarUrl:', show(user?.profile?.avatarUrl));
+      console.log('pictureUrl:', show(user?.pictureUrl));
+      console.log('pictureURL:', show(user?.pictureURL));
+      console.log('photo_url:', show(user?.photo_url));
+      console.groupEnd();
+    }
+  } catch {}
 
   const candidates: Array<string | undefined> = [
-    user?.imageUrl,
-    user?.photoURL,
-    user?.photoUrl,
-    user?.profileImageUrl,
-    user?.avatarUrl,
-    user?.pictureUrl,
-    user?.pictureURL,
-    user?.photo_url,
-    user?.icon,
-    user?.avatar,
-    user?.picture,
-    user?.photo,
-    user?.profile?.imageUrl,
-    user?.profile?.photoURL,
-    user?.profile?.avatarUrl,
+    user?.imageUrl, user?.photoURL, user?.photoUrl, user?.profileImageUrl, user?.avatarUrl,
+    user?.pictureUrl, user?.pictureURL, user?.photo_url, user?.icon, user?.avatar,
+    user?.picture, user?.photo, user?.profile?.imageUrl, user?.profile?.photoURL, user?.profile?.avatarUrl,
   ];
 
   let src = candidates.find((v) => typeof v === 'string' && v.trim().length > 0) || '';
-
   if (src && !/^https?:\/\//.test(src) && !src.startsWith('/')) {
     console.warn('[EditTaskModal] Non-HTTP image path detected. Convert with getDownloadURL before passing:', { userId: user?.id, src });
     src = '';
   }
-
-  if (!src) {
-    console.warn('[EditTaskModal] imageUrl missing, fallback to default.png', { userId: user?.id });
-  }
-
+  if (!src) console.warn('[EditTaskModal] imageUrl missing, fallback to default.png', { userId: user?.id });
   return src || '/images/default.png';
 };
-// ▲▲▲ 画像URL解決関数ここまで ▲▲▲
 
 export default function EditTaskModal({
   isOpen,
@@ -114,16 +119,11 @@ export default function EditTaskModal({
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
-  // ★ 追加：備考エラー
   const [noteError, setNoteError] = useState<string | null>(null);
 
-  // iOS Safari(WebKit) のみ true
   const [isIOSMobileSafari, setIsIOSMobileSafari] = useState(false);
-
-  // ポータル先をクライアントマウント後に設定（SSRでdocument参照を避ける）
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
-  // 備考（note）エリア用
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -131,14 +131,9 @@ export default function EditTaskModal({
 
   const LOG = '[EditTaskModal]';
 
-  // src/components/task/parts/EditTaskModal.tsx
-  // ★ 追加：真偽値を厳密に正規化（"true" / 1 のみ true、"false" / 0 / undefined / null は false）
-  const toStrictBool = (v: unknown): boolean => {
-    return v === true || v === 'true' || v === 1 || v === '1';
-  };
+  const toStrictBool = (v: unknown): boolean => (v === true || v === 'true' || v === 1 || v === '1');
 
-
-  // 端末判定
+  // ===== 端末判定 =====
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const ua = navigator.userAgent || '';
@@ -146,129 +141,105 @@ export default function EditTaskModal({
     const platform = navigator.platform || '';
     const touchPoints = (navigator as any).maxTouchPoints || 0;
 
-    const isiOSFamily =
-      /iPhone|iPad|iPod/.test(ua) ||
-      (platform === 'MacIntel' && touchPoints > 1);
-
+    const isiOSFamily = /iPhone|iPad|iPod/.test(ua) || (platform === 'MacIntel' && touchPoints > 1);
     const isWebKitVendor = /Apple/.test(vendor);
     const isNotOtherIOSBrowsers = !/CriOS|FxiOS|EdgiOS/.test(ua);
-
     setIsIOSMobileSafari(isiOSFamily && isWebKitVendor && isNotOtherIOSBrowsers);
   }, []);
 
-  // portalTarget をマウント後に設定
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      setPortalTarget(document.body);
-    }
+    if (typeof document !== 'undefined') setPortalTarget(document.body);
   }, []);
 
   useEffect(() => {
-    if (shouldClose) {
-      onClose();
-      setShouldClose(false);
-    }
+    if (shouldClose) { onClose(); setShouldClose(false); }
   }, [shouldClose, onClose]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
+  // ===== モーダルオープン時：初期取り込み & ログ =====
   useEffect(() => {
     if (!isOpen) return;
 
-    // editedTask初期化
-    setEditedTask({
-      ...task,
-      daysOfWeek: task.daysOfWeek?.map((num) => dayNumberToName[num] || num) ?? [],
-      dates: task.dates ?? [],
-      users: task.users ?? [],
-      period: task.period ?? task.period,
-      note: (task as any)?.note ?? '',
-      // ★★ 追加：TODO表示（Firestore: tasks.visible）。未定義なら false で初期化
-      visible: task?.id ? toStrictBool((task as any)?.visible) : false,
-    });
+    const rawCat = (task as any)?.category;
+    const normalizedCategory = normalizeCategory(rawCat);
 
-    setIsPrivate(task.private ?? !isPairConfirmed);
-
-    setIsSaving(false);
-    setSaveComplete(false);
-    setNoteError(null); // ★ 追加：初期化
-
-    saveRequestIdRef.current += 1;
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
+    if (DEBUG_CAT) {
+      console.groupCollapsed(`${LOG} open`);
+      console.log('task.id:', (task as any)?.id);
+      console.log('task.category (raw):', rawCat, `| typeof: ${typeof rawCat}`);
+      console.log('task.category (normalized):', normalizedCategory);
+      console.log('task keys:', Object.keys(task || {}));
+      console.log('full task:', task);
+      console.groupEnd();
     }
 
-    const timer = setTimeout(() => {
-      nameInputRef.current?.focus();
-    }, 50);
+    if (rawCat !== undefined && normalizedCategory === undefined) {
+      console.warn('[EditTaskModal:Category] ⚠ categoryが文字列だが正規化で弾かれました。値/表記揺れを確認してください。', { rawCat });
+    }
+    if (rawCat === undefined) {
+      console.warn('[EditTaskModal:Category] ⚠ taskにcategoryフィールドが含まれていません（取得処理で落ちている可能性）。');
+    }
 
+    setEditedTask({
+      ...(task as any),
+      daysOfWeek: (task as any).daysOfWeek?.map((num: any) => dayNumberToName[num] || num) ?? [],
+      dates: (task as any).dates ?? [],
+      users: (task as any).users ?? [],
+      period: task.period ?? task.period,
+      note: (task as any)?.note ?? '',
+      visible: task?.id ? toStrictBool((task as any)?.visible) : false,
+      category: normalizedCategory, // ← 重要：正規化後を入れる
+    });
+
+    setIsPrivate((task as any).private ?? !isPairConfirmed);
+    setIsSaving(false);
+    setSaveComplete(false);
+    setNoteError(null);
+
+    saveRequestIdRef.current += 1;
+    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+
+    const timer = setTimeout(() => { nameInputRef.current?.focus(); }, 50);
     return () => clearTimeout(timer);
   }, [isOpen, task, isPairConfirmed]);
 
-  // 初期データログ
-  useEffect(() => {
-    if (!isOpen) return;
-    console.groupCollapsed(`${LOG} open`);
-    console.log(`${LOG} task.id:`, task?.id);
-    console.log(`${LOG} task.users:`, task?.users);
-    console.log(`${LOG} task.period:`, task?.period);
-    console.log(`${LOG} isPairConfirmed:`, isPairConfirmed);
-    console.log(`${LOG} task.visible:`, (task as any)?.visible);
-    console.log(`${LOG} users length:`, users?.length ?? 0);
-    try {
-      console.table(
-        (users || []).map(u => ({
-          id: u.id,
-          name: u.name,
-          imageUrl: u.imageUrl,
-          imageUrlType: typeof u.imageUrl,
-          hasImageUrl: !!u.imageUrl,
-        }))
-      );
-    } catch {
-      console.log(`${LOG} users(raw):`, users);
-    }
-    (users || []).forEach(u => {
-      console.log('[EditTaskModal] user image keys', {
-        id: u.id,
-        imageUrl: (u as any).imageUrl,
-        photoURL: (u as any).photoURL,
-        photoUrl: (u as any).photoUrl,
-        profileImageUrl: (u as any).profileImageUrl,
-        avatarUrl: (u as any).avatarUrl,
-      });
-    });
-    console.groupEnd();
-  }, [isOpen, task, users, isPairConfirmed]);
-
-  // editedTask 更新ログ
+  // ===== editedTask 変化時ログ =====
   useEffect(() => {
     if (!editedTask) return;
     console.groupCollapsed(`${LOG} editedTask updated`);
-    console.log(`${LOG} editedTask.id:`, editedTask.id);
-    console.log(`${LOG} editedTask.users:`, editedTask.users);
-    console.log(`${LOG} editedTask.period:`, editedTask.period);
-    console.log(`${LOG} editedTask.visible:`, (editedTask as any)?.visible);
-    console.log(`${LOG} editedTask.dates/time:`, editedTask.dates, editedTask.time);
+    console.log('editedTask.id:', editedTask.id);
+    console.log('editedTask.category:', editedTask.category);
+    console.log('editedTask.users:', editedTask.users);
+    console.log('editedTask.period:', editedTask.period);
+    console.log('editedTask.visible:', (editedTask as any)?.visible);
+    console.log('editedTask.dates/time:', editedTask.dates, editedTask.time);
     console.groupEnd();
   }, [editedTask]);
 
+  // ===== レンダリングごとの選択判定ログ（初回＋カテゴリ変化時に限定） =====
+  const lastLoggedCatRef = useRef<TaskCategory | undefined>(undefined);
+  useEffect(() => {
+    if (!editedTask) return;
+    const c = editedTask.category as TaskCategory | undefined;
+    if (lastLoggedCatRef.current === c) return;
+    lastLoggedCatRef.current = c;
+
+    const selRyouri = eqCat(c, '料理');
+    const selKaimono = eqCat(c, '買い物');
+    console.groupCollapsed('[EditTaskModal:Category] 判定ログ（レンダリング時）');
+    console.log('editedTask.category (raw):', c);
+    console.log('normalize(editedTask.category):', normalizeCategory(c));
+    console.log('selected? 料理:', selRyouri, '| 買い物:', selKaimono);
+    console.groupEnd();
+  }, [editedTask?.category]);
+
   // body スクロール制御
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
-  // スクロールヒント更新
   const updateHints = () => {
     const el = memoRef.current;
     if (!el) return;
@@ -278,21 +249,15 @@ export default function EditTaskModal({
     setShowScrollHint(canScroll && notAtBottom);
     setShowScrollUpHint(canScroll && notAtTop);
   };
-
   const onTextareaScroll = () => updateHints();
 
-  // 備考テキストエリアの自動リサイズ
   const resizeTextarea = () => {
     const el = memoRef.current;
     if (!el) return;
-
-    const maxHeightPx =
-      (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
-
+    const maxHeightPx = (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
     el.style.height = 'auto';
     el.style.maxHeight = `${maxHeightPx}px`;
     (el.style as any).webkitOverflowScrolling = 'touch';
-
     if (el.scrollHeight > maxHeightPx) {
       el.style.height = `${maxHeightPx}px`;
       el.style.overflowY = 'auto';
@@ -300,11 +265,8 @@ export default function EditTaskModal({
       el.style.height = `${el.scrollHeight}px`;
       el.style.overflowY = 'hidden';
     }
-
     updateHints();
   };
-
-  // モーダル表示時に備考textareaを初期リサイズ
   useEffect(() => {
     if (!isOpen) return;
     requestAnimationFrame(() => {
@@ -312,8 +274,6 @@ export default function EditTaskModal({
       requestAnimationFrame(resizeTextarea);
     });
   }, [isOpen]);
-
-  // 備考の変更時にリサイズ
   useEffect(() => {
     if (!editedTask) return;
     requestAnimationFrame(() => {
@@ -321,8 +281,6 @@ export default function EditTaskModal({
       requestAnimationFrame(resizeTextarea);
     });
   }, [editedTask?.note]);
-
-  // 端末回転/ウィンドウリサイズに追従
   useEffect(() => {
     const onResize = () => resizeTextarea();
     window.addEventListener('resize', onResize);
@@ -336,7 +294,7 @@ export default function EditTaskModal({
   const toggleUser = (userId: string) => {
     if (!editedTask) return;
     const next = editedTask.users[0] === userId ? [] : [userId];
-    console.log(`${LOG} toggleUser`, { clicked: userId, before: editedTask.users, after: next });
+    DLOG('toggleUser', { clicked: userId, before: editedTask.users, after: next });
     update('users', next);
   };
 
@@ -348,10 +306,22 @@ export default function EditTaskModal({
     update('daysOfWeek', newDays);
   };
 
+  // ===== カテゴリ切替：ログ =====
+  const toggleCategory = (cat: TaskCategory) => {
+    if (!editedTask) return;
+    const before = editedTask.category;
+    const next = eqCat(before, cat) ? undefined : cat;
+    console.groupCollapsed('[EditTaskModal:Category] toggleCategory');
+    console.log('clicked:', cat, '| before:', before, '| after:', next);
+    console.log('eq(before, clicked)?', eqCat(before, cat));
+    console.log('normalize(before):', normalizeCategory(before));
+    console.groupEnd();
+    update('category', next as any);
+  };
+
   const handleSave = () => {
     if (!editedTask) return;
 
-    // ★ 備考の長さチェック（保存時）
     const noteLen = (editedTask.note ?? '').length;
     if (noteLen > NOTE_MAX) {
       setNoteError('500文字以内で入力してください。');
@@ -369,7 +339,7 @@ export default function EditTaskModal({
       (t) =>
         t.name === editedTask.name &&
         t.id !== editedTask.id &&
-        t.userIds?.some((uid) => editedTask.users.includes(uid))
+        (t as any).userIds?.some((uid: string) => editedTask.users.includes(uid))
     );
 
     if (isDuplicate) {
@@ -377,28 +347,30 @@ export default function EditTaskModal({
       return;
     }
 
-const transformed = {
-  ...editedTask,
-  // ✅ 担当者フィールドを明示的に保存
-  users: Array.isArray(editedTask.users) ? [...editedTask.users] : [],
-  userIds: Array.isArray(editedTask.users) ? [...editedTask.users] : [], // 互換用（既存の参照ロジック対策）
+    const normalizedCat = normalizeCategory(editedTask.category);
+    const transformed = {
+      ...editedTask,
+      users: Array.isArray(editedTask.users) ? [...editedTask.users] : [],
+      userIds: Array.isArray(editedTask.users) ? [...editedTask.users] : [],
+      daysOfWeek: editedTask.daysOfWeek.map((d) => dayNumberToNumberWrapper(d)),
+      private: isPrivate,
+      category: normalizedCat,
+    };
 
-  daysOfWeek: editedTask.daysOfWeek.map((d) => dayNameToNumber[d] || d),
-  private: isPrivate,
-};
+    console.groupCollapsed('[EditTaskModal:Category] handleSave payload');
+    console.log('editedTask.category (raw):', editedTask.category);
+    console.log('category (normalized→保存):', normalizedCat);
+    console.log('payload:', transformed);
+    console.groupEnd();
 
     setIsSaving(true);
-    onSave(transformed as Task); // Task に note が無くても OK（保存側で無視される想定）
+    onSave(transformed as unknown as Task);
 
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
+    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
 
     setTimeout(() => {
       setIsSaving(false);
       setSaveComplete(true);
-
       closeTimerRef.current = setTimeout(() => {
         setSaveComplete(false);
         setShouldClose(true);
@@ -406,7 +378,19 @@ const transformed = {
     }, 300);
   };
 
+  // dayNameToNumber が既に import 済みだが、型の都合で安全ラッパ
+  const dayNumberToNumberWrapper = (d: any): any => (dayNameToNumber as any)[d] || d;
+
   if (!mounted || !isOpen || !editedTask || !portalTarget) return null;
+
+  // ===== レンダ直前ログ：各ボタンの選択判定 =====
+  if (DEBUG_CAT) {
+    const raw = editedTask.category as any;
+    const n = normalizeCategory(raw);
+    const sRyouri = eqCat(raw, '料理');
+    const sKaimono = eqCat(raw, '買い物');
+    DLOG('render check', { raw, normalized: n, selected_Ryouri: sRyouri, selected_Kaimono: sKaimono });
+  }
 
   return createPortal(
     <BaseModal
@@ -416,7 +400,6 @@ const transformed = {
       onClose={onClose}
       onSaveClick={handleSave}
       disableCloseAnimation={true}
-      // ★ 保存ボタン無効化条件に noteError を追加
       saveDisabled={!!nameError || !!noteError}
     >
       <div className="space-y-6">
@@ -436,8 +419,8 @@ const transformed = {
                 const isDuplicate = existingTasks.some(
                   (t) =>
                     t.name === newName &&
-                    t.id !== task.id &&
-                    t.userIds?.some((uid) => editedTask?.users.includes(uid))
+                    t.id !== (task as any).id &&
+                    (t as any).userIds?.some((uid: string) => editedTask?.users.includes(uid))
                 );
 
                 setNameError(isDuplicate ? 'すでに登録済みです。' : null);
@@ -445,11 +428,36 @@ const transformed = {
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
             />
           </div>
+          {nameError && <p className="text-xs text-red-500 ml-20 mt-1">{nameError}</p>}
+        </div>
 
-          {/* 🔻 エラーメッセージ */}
-          {nameError && (
-            <p className="text-xs text-red-500 ml-20 mt-1">{nameError}</p>
-          )}
+        {/* 🍱 カテゴリ選択（アイコン + 詳細ログ） */}
+        <div className="flex items-center">
+          <label className="w-20 text-gray-600 shrink-0">カテゴリ：</label>
+          <div className="flex gap-2">
+            {CATEGORY_OPTIONS.map(({ key, label, Icon }) => {
+              const selected = eqCat(editedTask.category, key);
+              if (DEBUG_CAT) {
+                DLOG('button render', { key, selected, editedTaskCat_raw: editedTask.category, editedTaskCat_norm: normalizeCategory(editedTask.category) });
+              }
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleCategory(key)}
+                  aria-pressed={selected}
+                  data-cat={key}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-full border transition
+                    ${selected ? 'border-[#FFCB7D] bg-yellow-500 text-white' : 'border-gray-300 text-gray-600 opacity-80'}
+                  `}
+                  title={label}
+                >
+                  <Icon size={18} />
+                  <span className="text-xs font-bold">{label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* 🗓 頻度選択 */}
@@ -459,29 +467,19 @@ const transformed = {
             value={editedTask.period}
             onChange={(e) => {
               const newPeriod = e.target.value as Period;
-              console.log(`${LOG} period changed:`, { from: editedTask?.period, to: newPeriod });
-
+              DLOG('period changed', { from: editedTask?.period, to: newPeriod });
               setEditedTask((prev) => {
-                if (!prev) return prev;
+                if (!prev) return prev as any;
                 const updated = { ...prev, period: newPeriod };
-                if (newPeriod === '毎日') {
-                  updated.daysOfWeek = [];
-                  updated.dates = [];
-                } else if (newPeriod === '週次') {
-                  updated.dates = [];
-                } else if (newPeriod === '不定期') {
-                  updated.daysOfWeek = [];
-                }
+                if (newPeriod === '毎日') { (updated as any).daysOfWeek = []; (updated as any).dates = []; }
+                else if (newPeriod === '週次') { (updated as any).dates = []; }
+                else if (newPeriod === '不定期') { (updated as any).daysOfWeek = []; }
                 return updated;
               });
             }}
             className="w-full border-b border-gray-300 outline-none pl-2"
           >
-            {['毎日', '週次', '不定期'].map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
+            {['毎日', '週次', '不定期'].map((p) => (<option key={p} value={p}>{p}</option>))}
           </select>
         </div>
 
@@ -495,10 +493,7 @@ const transformed = {
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                    ? 'bg-[#5E5E5E] text-white'
-                    : 'bg-gray-200 text-gray-600'
-                    }`}
+                  className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day) ? 'bg-[#5E5E5E] text-white' : 'bg-gray-200 text-gray-600'}`}
                 >
                   {day}
                 </button>
@@ -512,31 +507,18 @@ const transformed = {
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">時間：</label>
             <div className="relative w-[40%]">
-              {isIOSMobileSafari && (!editedTask.time || editedTask.time === '') && (
-                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-                  --:--
-                </span>
+              {isIOS && (!editedTask.time || editedTask.time === '') && (
+                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">--:--</span>
               )}
               <input
                 type="time"
                 value={editedTask.time || ''}
-                onChange={(e) => {
-                  const time = e.target.value;
-                  update('time', time);
-                }}
+                onChange={(e) => update('time', e.target.value as any)}
                 className="w-[90%] border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
               />
             </div>
-
             {editedTask.time && (
-              <button
-                type="button"
-                onClick={() => {
-                  update('time', '');
-                }}
-                className="text-red-500"
-                title="時間をクリア"
-              >
+              <button type="button" onClick={() => update('time', '' as any)} className="text-red-500" title="時間をクリア">
                 <Eraser size={18} />
               </button>
             )}
@@ -549,52 +531,34 @@ const transformed = {
             <label className="w-20 text-gray-600 shrink-0">日付：</label>
 
             <div className="relative w-[40%]">
-              {isIOSMobileSafari && (!editedTask.dates[0] || editedTask.dates[0] === '') && (
-                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-                  yyyy-mm-dd
-                </span>
+              {isIOS && (!(editedTask.dates as any)[0] || (editedTask.dates as any)[0] === '') && (
+                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">yyyy-mm-dd</span>
               )}
               <input
                 type="date"
-                value={editedTask.dates[0] || ''}
-                onChange={(e) => {
-                  const date = e.target.value;
-                  update('dates', [date]);
-                }}
+                value={(editedTask.dates as any)[0] || ''}
+                onChange={(e) => update('dates', [e.target.value] as any)}
                 className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
               />
             </div>
 
             <div className="relative w-[30%]">
-              {isIOSMobileSafari && (!editedTask.time || editedTask.time === '') && (
-                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-                  --:--
-                </span>
+              {isIOS && (!editedTask.time || editedTask.time === '') && (
+                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">--:--</span>
               )}
               <input
                 type="time"
                 value={editedTask.time || ''}
-                onChange={(e) => {
-                  const time = e.target.value;
-                  update('time', time);
-                }}
+                onChange={(e) => update('time', e.target.value as any)}
                 className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
               />
             </div>
 
-            {(editedTask.dates[0] || editedTask.time) && (
-              <button
-                type="button"
-                onClick={() => {
-                  update('dates', ['']);
-                  update('time', '');
-                }}
-                className="text-red-500"
-                title="日付と時間をクリア"
-              >
+            {(editedTask.dates as any)[0] || editedTask.time ? (
+              <button type="button" onClick={() => { update('dates', [''] as any); update('time', '' as any); }} className="text-red-500" title="日付と時間をクリア">
                 <Eraser size={18} />
               </button>
-            )}
+            ) : null}
           </div>
         )}
 
@@ -603,16 +567,11 @@ const transformed = {
           <div className="flex items-center">
             <label className="w-20 text-gray-600 shrink-0">ポイント：</label>
             <select
-              value={editedTask.point}
-              onChange={(e) => update('point', Number(e.target.value))}
+              value={(editedTask as any).point}
+              onChange={(e) => update('point' as any, Number(e.target.value) as any)}
               className="w-full border-b border-gray-300 outline-none pl-2"
             >
-              {/* {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => ( */}
-              {Array.from({ length: 11 }, (_, i) => i ).map((val) => (
-                <option key={val} value={val}>
-                  {val} pt
-                </option>
-              ))}
+              {Array.from({ length: 11 }, (_, i) => i ).map((val) => (<option key={val} value={val}>{val} pt</option>))}
             </select>
           </div>
         )}
@@ -696,11 +655,9 @@ const transformed = {
           </>
         )}
 
-        {/* // src/components/task/parts/EditTaskModal.tsx
-// ▼▼▼ TODO表示トグルのレンダリング部分を修正 ▼▼▼ */}
-        {/* ✅ TODO表示トグル（Firestore: tasks.visible） */}
+        {/* ✅ TODO表示トグル */}
         {(() => {
-          const isVisible = toStrictBool((editedTask as any)?.visible); // ← 厳密判定
+          const isVisible = toStrictBool((editedTask as any)?.visible);
           return (
             <div className="flex items-center gap-3 mt-2">
               <span className="text-sm text-gray-600">TODO表示：</span>
@@ -708,25 +665,19 @@ const transformed = {
                 type="button"
                 role="switch"
                 aria-checked={isVisible}
-                onClick={() => update('visible', !isVisible)} // ← 厳密判定で反転
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isVisible ? 'bg-yellow-400' : 'bg-gray-300'
-                  }`}
+                onClick={() => update('visible' as any, (!isVisible) as any)}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isVisible ? 'bg-yellow-500' : 'bg-gray-300'}`}
               >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isVisible ? 'translate-x-6' : ''
-                    }`}
-                />
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isVisible ? 'translate-x-6' : ''}`} />
               </button>
             </div>
           );
         })()}
 
-
-        {/* 📝 備考（任意） */}
+        {/* 📝 備考 */}
         <div className="relative pr-8">
           <div className="flex items-top">
             <label className="w-20 text-gray-600 shrink-0">備考：</label>
-
             <textarea
               ref={memoRef}
               data-scrollable="true"
@@ -734,15 +685,9 @@ const transformed = {
               value={editedTask.note ?? ''}
               rows={1}
               placeholder="備考を入力"
-              // maxLength は付けない：保存時にバリデーション
               onChange={(e) => {
                 const next = e.target.value;
-                // 入力中もエラー表示を更新
-                if (next.length > NOTE_MAX) {
-                  setNoteError('500文字以内で入力してください。');
-                } else {
-                  setNoteError(null);
-                }
+                if (next.length > NOTE_MAX) setNoteError('500文字以内で入力してください。'); else setNoteError(null);
                 setEditedTask((prev) => (prev ? { ...prev, note: next } : prev));
               }}
               onTouchMove={(e) => e.stopPropagation()}
@@ -750,20 +695,12 @@ const transformed = {
                          touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
             />
           </div>
-
-          {/* 文字数カウンター */}
           <div className="mt-1 pr-1 flex justify-end">
             <span className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'} text-xs`}>
               {(editedTask.note?.length ?? 0)}/{NOTE_MAX}
             </span>
           </div>
-
-          {/* 備考エラー（他と同じ位置・スタイル） */}
-          {noteError && (
-            <p className="text-xs text-red-500 ml-20 mt-1">{noteError}</p>
-          )}
-
-          {/* スクロールガイド（iOS時のみ） */}
+          {noteError && <p className="text-xs text-red-500 ml-20 mt-1">{noteError}</p>}
           {isIOS && showScrollHint && (
             <div className="pointer-events-none absolute bottom-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
               <ChevronDown size={16} className="text-white" />

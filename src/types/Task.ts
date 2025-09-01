@@ -56,6 +56,7 @@ export type Task = {
   createdAt?: Date | Timestamp | string | null;
   time?: string;
   note?: string;
+  category?: '料理' | '買い物';
 };
 
 
