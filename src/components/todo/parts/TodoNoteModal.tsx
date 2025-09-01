@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
 import { CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
@@ -47,7 +48,11 @@ export default function TodoNoteModal({
   const [initialLoad, setInitialLoad] = useState(true);
   const [saveLabel, setSaveLabel] = useState('保存');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveComplete, setSaveComplete] = useState(false);
+  const [saveComplete, setSaveComplete] = useState(false); // ← これが抜けると赤線になります
+
+  // 親タスクのカテゴリとレシピ（料理の時のみ使用）
+  const [category, setCategory] = useState<string | null>(null);
+  const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -73,7 +78,6 @@ export default function TodoNoteModal({
   const numericComparePrice = parseFloat(comparePrice);
   const numericCompareQuantity = parseFloat(compareQuantity);
   const isCompareQuantityMissing = !numericCompareQuantity || numericCompareQuantity <= 0;
-  // const compareDisplayUnit = isCompareQuantityMissing ? '個' : unit;
   const safeCompareQuantity = isCompareQuantityMissing ? 1 : numericCompareQuantity;
   const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
   const currentUnitPrice =
@@ -109,6 +113,8 @@ export default function TodoNoteModal({
         const taskSnap = await getDoc(taskRef);
         if (taskSnap.exists()) {
           const taskData = taskSnap.data();
+          setCategory((taskData as any)?.category ?? null);
+
           const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
           const todo = todos.find((t: { id: string }) => t.id === todoId);
           if (todo) {
@@ -116,10 +122,33 @@ export default function TodoNoteModal({
             setPrice(todo.price?.toString() || '');
             setQuantity(todo.quantity?.toString() || '');
             setUnit(todo.unit || 'g');
+
             const shouldShow = typeof todo.price === 'number' && todo.price > 0;
             setShowDetails(shouldShow);
             if (!compareQuantity && todo.quantity) {
               setCompareQuantity(todo.quantity.toString());
+            }
+
+            // 既存のレシピがあれば読み込み、なければ初期値
+            const existing = (todo as any).recipe as Recipe | undefined;
+            if (existing) {
+              const safeIngredients = Array.isArray(existing.ingredients)
+                ? existing.ingredients.map((ing, idx) => ({
+                    id: ing.id ?? `ing_${idx}`,
+                    name: ing.name ?? '',
+                    amount: typeof ing.amount === 'number' ? ing.amount : null,
+                    unit: ing.unit ?? '適量',
+                  }))
+                : [];
+              setRecipe({
+                ingredients: safeIngredients,
+                steps: Array.isArray(existing.steps) ? existing.steps : [],
+              });
+            } else {
+              setRecipe({
+                ingredients: [{ id: 'ing_0', name: '', amount: null, unit: '適量' }],
+                steps: [''],
+              });
             }
           }
         }
@@ -140,7 +169,8 @@ export default function TodoNoteModal({
     if (!el) return;
 
     // 50vh を px に換算（横回転等も考慮して毎回算出）
-    const maxHeightPx = (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
+    const maxHeightPx =
+      (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
 
     // 一旦リセットして内容に応じた scrollHeight を測る
     el.style.height = 'auto';
@@ -208,8 +238,8 @@ export default function TodoNoteModal({
       numericComparePrice > 0
         ? numericCompareQuantity
         : numericQuantity > 0
-          ? numericQuantity
-          : 1;
+        ? numericQuantity
+        : 1;
     const appliedUnit = numericQuantity > 0 ? unit : '個';
 
     const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
@@ -231,6 +261,21 @@ export default function TodoNoteModal({
         price: appliedPrice || null,
         quantity: appliedQuantity,
         unit: appliedUnit,
+        ...(category === '料理'
+          ? {
+              recipe: {
+                ingredients: recipe.ingredients
+                  .filter((i) => i.name.trim() !== '')
+                  .map((i) => ({
+                    id: i.id,
+                    name: i.name.trim(),
+                    amount: typeof i.amount === 'number' ? i.amount : null,
+                    unit: i.unit || '適量',
+                  })),
+                steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
+              } as Recipe,
+            }
+          : {}),
       });
 
       if (totalDifference !== null) {
@@ -383,6 +428,15 @@ export default function TodoNoteModal({
             }
           />
         )
+      )}
+
+      {/* ▼▼ 料理カテゴリのときだけレシピエディタを表示する ▼▼ */}
+      {category === '料理' && (
+        <RecipeEditor
+          headerNote="親タスク: 料理"
+          value={recipe}
+          onChange={setRecipe}
+        />
       )}
     </BaseModal>
   );
