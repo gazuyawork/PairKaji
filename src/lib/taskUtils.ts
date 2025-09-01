@@ -34,6 +34,15 @@ import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
 import { db, auth } from '@/lib/firebase';
 import { handleFirestoreError } from './errorUtils';
 
+// ▼ 追加：テキスト比較の正規化（全半角/NFKC・小文字化・連続空白→1つ・trim）
+const normalizeTodoText = (raw: string) =>
+  String(raw ?? '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+
 /* =========================================
  * 🔧 追加（①）：JSTのYYYY-MM-DDを取得するユーティリティ
  *    - “毎日/週次”で dates=[] の場合の時刻変更時に、当日分の notifyLogs を安全に削除するため
@@ -820,3 +829,50 @@ export const removeOrphanSharedTasksIfPairMissing = async (): Promise<void> => {
     handleFirestoreError(error);
   }
 };
+
+/**
+ * TODO名（text）を、同じIDの要素だけ置換する。
+ * - 同じタスク内で、"未処理(!done)" に同名(正規化後)が既に存在する場合はエラーにする。
+ * - arrayUnionは使わず、todos配列を読み出して組み直してupdate。
+ *
+ * @throws {Error} code === 'DUPLICATE_TODO' のとき、未処理重複あり
+ * @throws {Error} 'TASK_NOT_FOUND' | 'TODO_NOT_FOUND'
+ */
+export const updateTodoTextInTask = async (
+  taskId: string,
+  todoId: string,
+  newText: string
+): Promise<void> => {
+  const taskRef = doc(db, 'tasks', taskId);
+  const snap = await getDoc(taskRef);
+  if (!snap.exists()) throw new Error('TASK_NOT_FOUND');
+
+  const data = snap.data() as any;
+  const todos: any[] = Array.isArray(data?.todos) ? data.todos : [];
+
+  const idx = todos.findIndex((t) => t?.id === todoId);
+  if (idx === -1) throw new Error('TODO_NOT_FOUND');
+
+  const newKey = normalizeTodoText(newText);
+
+  // ▼ 自分以外で、未処理(!done)に同名(正規化後)があればブロック
+  const dup = todos.find(
+    (t, i) =>
+      i !== idx &&
+      !t?.done &&
+      normalizeTodoText(String(t?.text ?? '')) === newKey
+  );
+  if (dup) {
+    const err: any = new Error('DUPLICATE_TODO');
+    err.code = 'DUPLICATE_TODO';
+    throw err;
+  }
+
+  // ▼ 置換保存
+  const next = todos.map((t, i) =>
+    i === idx ? { ...t, text: newText } : t
+  );
+
+  await updateDoc(taskRef, { todos: next });
+};
+

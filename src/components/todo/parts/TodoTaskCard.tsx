@@ -1,3 +1,4 @@
+// src/components/todo/parts/TodoTaskCard.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -54,7 +55,7 @@ export default function TodoTaskCard({
   const [isComposing, setIsComposing] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [inputError, setInputError] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null); // 下部表示には使わないが互換用に残置
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
   const [showScrollDownHint, setShowScrollDownHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -90,7 +91,6 @@ export default function TodoTaskCard({
   const [dragging, setDragging] = useState(false);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // マウスのみドラッグスクロールを有効化（タッチはネイティブに任せる）
     if (e.pointerType !== 'mouse') return;
     const el = scrollRef.current;
     if (!el) return;
@@ -101,7 +101,6 @@ export default function TodoTaskCard({
     startScrollTopRef.current = el.scrollTop;
 
     el.setPointerCapture?.(e.pointerId);
-    // ドラッグ開始時のテキスト選択抑止
     e.preventDefault();
   };
 
@@ -112,8 +111,6 @@ export default function TodoTaskCard({
 
     const deltaY = e.clientY - startYRef.current;
     el.scrollTop = startScrollTopRef.current - deltaY;
-
-    // ドラッグ中の不要な選択を抑止
     e.preventDefault();
   };
 
@@ -145,9 +142,7 @@ export default function TodoTaskCard({
       const canScroll = el.scrollHeight > el.clientHeight + 1;
       const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
       const notAtTop = el.scrollTop > 1;
-      // 下方向ヒント：まだ下に余りがある
       setShowScrollDownHint(canScroll && notAtBottom);
-      // 上方向ヒント：すでに少し下がっている（=上へ戻れる）
       setShowScrollUpHint(canScroll && notAtTop);
     };
 
@@ -155,7 +150,7 @@ export default function TodoTaskCard({
       const canScroll = el.scrollHeight > el.clientHeight + 1;
       setIsScrollable(canScroll);
       if (canScroll) {
-        handleScroll(); // ratio と hint を同時更新
+        handleScroll();
       } else {
         setScrollRatio(0);
         setShowScrollDownHint(false);
@@ -180,7 +175,9 @@ export default function TodoTaskCard({
 
     const isDuplicateUndone = todos.some(todo => todo.text === trimmed && !todo.done);
     if (isDuplicateUndone) {
-      setInputError('既に登録済みです');
+      // ▼ 変更：下部の赤帯ではなくトーストで通知
+      toast.error('既に登録されています。');
+      setInputError(null);
       return;
     }
 
@@ -312,7 +309,6 @@ export default function TodoTaskCard({
                   >
                     {count}
                   </span>
-                  {/* {type === 'undone' ? '未処理' : '完了'} */}
                   {type === 'undone' ? '未' : '済'}
                 </button>
               );
@@ -341,15 +337,13 @@ export default function TodoTaskCard({
           <div
             ref={scrollRef}
             className={clsx(
-              "max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1",
+              "max-h:[40vh] max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1",
               dragging ? "cursor-grabbing select-none" : "cursor-grab"
             )}
-            // タッチはネイティブスクロール、マウスはドラッグスクロール
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
-            // 親（スワイプ等）にイベントが抜けるのを抑止
             onTouchMove={(e) => e.stopPropagation()}
           >
             {filteredTodos.length === 0 && tab === 'done' && (
@@ -360,20 +354,17 @@ export default function TodoTaskCard({
               <div key={todo.id} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <motion.div
-                    key={animateTriggerMap[todo.id] ?? 0} // アニメーション強制発火用のキー
+                    key={animateTriggerMap[todo.id] ?? 0}
                     className="cursor-pointer"
                     onClick={() => {
-                      // 表示状態だけ先に更新（Circle ↔ CheckCircle）
                       setLocalDoneMap(prev => ({
                         ...prev,
                         [todo.id]: !prev[todo.id],
                       }));
-                      // アニメーションのトリガーを更新
                       setAnimateTriggerMap(prev => ({
                         ...prev,
                         [todo.id]: (prev[todo.id] ?? 0) + 1,
                       }));
-                      // 実際のステータス切り替えはアニメ後に実行
                       setTimeout(() => onToggleDone(todo.id), 600);
                     }}
                     initial={{ rotate: 0 }}
@@ -396,7 +387,6 @@ export default function TodoTaskCard({
                       // ✅ 空文字ならトーストでガイドを表示し、確定処理はしない
                       if (!newText) {
                         toast.info('削除する場合はゴミ箱アイコンで消してください');
-                        // 入力欄の表示は元の文字に戻す（空にしない運用）
                         const inputEl = todoRefs.current[todo.id];
                         if (inputEl) inputEl.value = todo.text;
                         return;
@@ -418,7 +408,6 @@ export default function TodoTaskCard({
                         return;
                       }
 
-                      // エラーを削除
                       setEditingErrors(prev => {
                         const next = { ...prev };
                         delete next[todo.id];
@@ -536,9 +525,10 @@ export default function TodoTaskCard({
             />
           </div>
 
-          {inputError && (
+          {/* ▼ 旧：下部エラー表示は廃止（トーストに切替済み） */}
+          {/* {inputError && (
             <div className="bg-red-400 text-white text-xs mt-1 ml-6 px-2 py-1 rounded-md">{inputError}</div>
-          )}
+          )} */}
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+// src/.../TodoView.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -24,11 +25,13 @@ import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
 import GroupSelector from '@/components/todo/parts/GroupSelector';
 import { useView } from '@/context/ViewContext';
-import { saveTaskToFirestore } from '@/lib/firebaseUtils';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
+
+// ★ 追加: 同じIDのtext置換保存を使う
+import { updateTodoTextInTask } from '@/lib/taskUtils';
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName, index } = useView();
@@ -94,7 +97,7 @@ export default function TodoView() {
   }, [isOpen]);
 
   useEffect(() => {
-    // ★ 追加: uidが未取得の間はローディング扱いにしない（広告の点滅防止のため取得完了までtrueのままでもOK）
+    // uidが未取得の間はローディング扱いにしない
     if (!uid) {
       setTasks([]);
       setIsLoading(false);
@@ -124,7 +127,7 @@ export default function TodoView() {
         }
       });
 
-      // Firestore の 'in' クエリは最大10要素
+      // Firestore 'in' クエリは最大10要素
       const ids = Array.from(userIds).slice(0, 10);
 
       const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
@@ -297,15 +300,16 @@ export default function TodoView() {
                     updatedAt: serverTimestamp(),
                   });
                 }}
+                // ★ 入力中の見た目だけ置換（保存はしない）
                 onChangeTodo={(todoId, value) => {
                   const updated = tasks.map(t =>
                     t.id === task.id
                       ? {
-                        ...t,
-                        todos: t.todos.map(todo =>
-                          todo.id === todoId ? { ...todo, text: value } : todo
-                        ),
-                      }
+                          ...t,
+                          todos: t.todos.map(todo =>
+                            todo.id === todoId ? { ...todo, text: value } : todo
+                          ),
+                        }
                       : t
                   );
                   setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
@@ -319,18 +323,23 @@ export default function TodoView() {
                     updatedAt: serverTimestamp(),
                   });
                 }}
+                // ★ フォーカスアウト時に保存（同じIDのみ置換）。重複はトースト＋自然ロールバック（onSnapshot整合）
                 onBlurTodo={async (todoId, text) => {
-                  const updatedTask = tasks.find(t => t.id === task.id);
-                  if (!updatedTask) return;
+                  const trimmed = text.trim();
+                  if (!trimmed) return;
 
-                  const newTodos = updatedTask.todos.map(todo =>
-                    todo.id === todoId ? { ...todo, text } : todo
-                  );
-
-                  await saveTaskToFirestore(task.id, {
-                    ...updatedTask,
-                    todos: newTodos,
-                  });
+                  try {
+                    await updateTodoTextInTask(task.id, todoId, trimmed);
+                    // 成功時は onSnapshot で即時に同期されるため、ここでは何もしない
+                  } catch (e: any) {
+                    if (e?.code === 'DUPLICATE_TODO' || e?.message === 'DUPLICATE_TODO') {
+                      toast.error('既に登録されています。');
+                    } else {
+                      toast.error('保存に失敗しました');
+                      console.error(e);
+                    }
+                    // ローカルは onSnapshot で最新に戻る想定（特に手動rollback不要）
+                  }
                 }}
                 onDeleteTodo={async (todoId) => {
                   const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
