@@ -55,7 +55,7 @@ export default function TodoTaskCard({
   const [isComposing, setIsComposing] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [inputError, setInputError] = useState<string | null>(null); // 下部表示には使わないが互換用に残置
+  const [, setInputError] = useState<string | null>(null); // 下部表示には使わないが互換用に残置
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
   const [showScrollDownHint, setShowScrollDownHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
