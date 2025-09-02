@@ -6,14 +6,84 @@ import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react
 import { ChevronDown, ChevronUp, Eye, Pencil } from 'lucide-react';
 import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceAnimation';
 import BaseModal from '../../common/modals/BaseModal';
 
 // 表示上限: 画面高の 50%（vh基準）
 const MAX_TEXTAREA_VH = 50;
+
+// 画像圧縮ユーティリティ
+/**
+ * クライアント側で画像を圧縮して Blob を返す。
+ * - 最大辺 1600px に収まるよう等比縮小
+ * - WebP(0.7) と JPEG(0.7) を生成して小さい方を採用
+ * - もともと十分小さい場合は再圧縮スキップ
+ */
+async function compressImage(
+  file: File,
+  opts: { maxWidth?: number; maxHeight?: number; quality?: number } = {}
+): Promise<{ blob: Blob; mime: 'image/webp' | 'image/jpeg' }> {
+  const maxWidth = opts.maxWidth ?? 1600;
+  const maxHeight = opts.maxHeight ?? 1600;
+  const quality = opts.quality ?? 0.7;
+
+  // 200KB 未満はそのまま使う（品質劣化・再圧縮コストを避ける）
+  if (file.size < 200 * 1024) {
+    return { blob: file, mime: file.type === 'image/webp' ? 'image/webp' as const : 'image/jpeg' as const };
+  }
+
+  const bitmap = await (async () => {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = URL.createObjectURL(file);
+      });
+      return img as any as ImageBitmap;
+    }
+  })();
+
+  const { width, height } = bitmap;
+  let targetW = width;
+  let targetH = height;
+
+  if (width > maxWidth || height > maxHeight) {
+    const ratio = Math.min(maxWidth / width, maxHeight / height);
+    targetW = Math.round(width * ratio);
+    targetH = Math.round(height * ratio);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d', { alpha: true });
+  if (!ctx) throw new Error('Canvas 2D コンテキストの取得に失敗しました。');
+
+  ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+
+  const toBlob = (type: string, q: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, q));
+
+  const [webpBlob, jpegBlob] = await Promise.all([
+    toBlob('image/webp', quality),
+    toBlob('image/jpeg', quality),
+  ]);
+
+  if (!webpBlob && !jpegBlob) return { blob: file, mime: 'image/jpeg' };
+  if (webpBlob && jpegBlob) {
+    if (webpBlob.size <= jpegBlob.size) return { blob: webpBlob, mime: 'image/webp' };
+    return { blob: jpegBlob, mime: 'image/jpeg' };
+  }
+  if (webpBlob) return { blob: webpBlob, mime: 'image/webp' };
+  return { blob: jpegBlob!, mime: 'image/jpeg' };
+}
 
 interface TodoNoteModalProps {
   isOpen: boolean;
@@ -30,7 +100,6 @@ export default function TodoNoteModal({
   todoId,
   taskId,
 }: TodoNoteModalProps) {
-  // iOS判定（スクロールガイドの表示条件にのみ使用）
   const isIOS =
     typeof navigator !== 'undefined' &&
     /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
@@ -46,16 +115,25 @@ export default function TodoNoteModal({
   const [initialLoad, setInitialLoad] = useState(true);
   const [saveLabel, setSaveLabel] = useState('保存');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveComplete, setSaveComplete] = useState(false); // ← これが抜けると赤線になります
+  const [saveComplete, setSaveComplete] = useState(false);
 
-  // ▼ プレビューモード
   const [isPreview, setIsPreview] = useState(false);
 
-  // 親タスクのカテゴリとレシピ（料理の時のみ使用）
   const [category, setCategory] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
-  // ▼ recipe の浅い等価比較（参照が違っても中身が同じなら更新しない）
+  const [imageUrl, setImageUrl] = useState<string | null>(null); // 保存済みURL（Firestoreに保存される値）
+  const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null); // 差分削除用
+  const [isUploadingImage, setIsUploadingImage] = useState(false); // 選択時は圧縮中にのみ使用
+
+  // ★ 保存時アップロード方式のための追加state
+  const [pendingUpload, setPendingUpload] = useState<{ blob: Blob; mime: 'image/webp' | 'image/jpeg' } | null>(null); // 未アップロードの新画像
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // 画面表示用のローカルURL
+  const [isImageRemoved, setIsImageRemoved] = useState(false); // 削除予約（保存時に previous を削除）
+
+  const memoRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
     if (a === b) return true;
     if (a.ingredients.length !== b.ingredients.length) return false;
@@ -72,14 +150,10 @@ export default function TodoNoteModal({
     return true;
   }, []);
 
-  // ▼ RecipeEditor からの更新を等価時は参照温存
   const handleRecipeChange = useCallback((next: Recipe) => {
     setRecipe((prev) => (shallowEqualRecipe(prev, next) ? prev : next));
   }, [shallowEqualRecipe]);
 
-  const memoRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // ── スクロールガイド（維持） ─────────────────────────────
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
 
@@ -95,7 +169,6 @@ export default function TodoNoteModal({
 
   const onTextareaScroll = useCallback(() => updateHints(), [updateHints]);
 
-  // ── 単価系の計算 ──────────────────────────────────────────
   const numericPrice = parseFloat(price);
   const numericQuantity = parseFloat(quantity);
   const numericComparePrice = parseFloat(comparePrice);
@@ -117,7 +190,6 @@ export default function TodoNoteModal({
   const { animatedDifference, animationComplete: diffAnimationComplete } =
     useUnitPriceDifferenceAnimation(totalDifference);
 
-  // ── ラベル等 ──────────────────────────────────────────────
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -127,7 +199,6 @@ export default function TodoNoteModal({
     setSaveLabel(!isNaN(parsed) && parsed > 0 ? 'この価格で更新する' : '保存');
   }, [comparePrice]);
 
-  // ── Firestore 初期データ取得 ─────────────────────────────
   useEffect(() => {
     const fetchTodoData = async () => {
       if (!taskId || !todoId) return;
@@ -142,28 +213,24 @@ export default function TodoNoteModal({
           const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
           const todo = todos.find((t: { id: string }) => t.id === todoId);
           if (todo) {
-            setMemo(todo.memo || '');
-            setPrice(todo.price?.toString() || '');
-            setQuantity(todo.quantity?.toString() || '');
-            setUnit(todo.unit || 'g');
+            setMemo((todo as any).memo || '');
+            setPrice((todo as any).price?.toString?.() || '');
+            setQuantity((todo as any).quantity?.toString?.() || '');
+            setUnit((todo as any).unit || 'g');
 
-            if (!compareQuantity && todo.quantity) {
-              setCompareQuantity(todo.quantity.toString());
+            if (!compareQuantity && (todo as any).quantity) {
+              setCompareQuantity((todo as any).quantity.toString());
             }
 
-            // 既存のレシピがあれば読み込み、なければ初期値
             const existing = (todo as any).recipe as Recipe | undefined;
             if (existing) {
               const safeIngredients = Array.isArray(existing.ingredients)
-                ? existing.ingredients.map((ing, idx) => ({
-                    id: (ing as any).id ?? `ing_${idx}`,
-                    name: (ing as any).name ?? '',
-                    amount:
-                      typeof (ing as any).amount === 'number'
-                        ? (ing as any).amount
-                        : null,
-                    unit: (ing as any).unit ?? '適量',
-                  }))
+                ? existing.ingredients.map((ing: any, idx: number) => ({
+                  id: ing?.id ?? `ing_${idx}`,
+                  name: ing?.name ?? '',
+                  amount: typeof ing?.amount === 'number' ? ing.amount : null,
+                  unit: ing?.unit ?? '適量',
+                }))
                 : [];
               setRecipe({
                 ingredients: safeIngredients,
@@ -175,36 +242,38 @@ export default function TodoNoteModal({
                 steps: [''],
               });
             }
+
+            const existingImageUrl = ((todo as any).imageUrl as string | undefined) ?? null;
+            setImageUrl(existingImageUrl);
+            setPreviousImageUrl(existingImageUrl);
+            // 初期表示時は未アップロード画像もプレビューもなし
+            setPendingUpload(null);
+            setPreviewUrl(null);
+            setIsImageRemoved(false);
           }
         }
       } catch (e) {
         console.error('初期データの取得に失敗:', e);
       } finally {
         setInitialLoad(false);
-        // 初回のヒント計算は描画後
         setTimeout(updateHints, 0);
       }
     };
     fetchTodoData();
-    // compareQuantity は初期設定だけ参照したいので依存に含めない（ESLint 対応はプロジェクト方針に合わせてください）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, todoId, updateHints]);
 
-  // ── テキストエリアの自動リサイズ（内容に応じて拡大 / 上限でスクロール） ──
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
     if (!el) return;
 
-    // 50vh を px に換算（横回転等も考慮して毎回算出）
     const maxHeightPx =
       (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
 
-    // 一旦リセットして内容に応じた scrollHeight を測る
     el.style.height = 'auto';
     el.style.maxHeight = `${maxHeightPx}px`;
     (el.style as any).webkitOverflowScrolling = 'touch';
 
-    // 内容に合わせて伸ばす。ただし上限を超えたら固定してスクロール
     if (el.scrollHeight > maxHeightPx) {
       el.style.height = `${maxHeightPx}px`;
       el.style.overflowY = 'auto';
@@ -216,7 +285,6 @@ export default function TodoNoteModal({
     updateHints();
   }, [updateHints]);
 
-  // 開いた直後・初期ロード後・内容変化時にリサイズ
   useLayoutEffect(() => {
     if (isOpen) {
       requestAnimationFrame(() => {
@@ -242,12 +310,64 @@ export default function TodoNoteModal({
     });
   }, [memo, resizeTextarea]);
 
-  // 端末回転やリサイズに追従（上限 50vh が変わるため）
   useEffect(() => {
     const onResize = () => resizeTextarea();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [resizeTextarea]);
+
+  // ── 画像選択→圧縮のみ（アップロードは保存時に実施） ──────────────────────────
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const user = auth.currentUser;
+    if (!user) {
+      console.warn('未ログインのため画像選択不可');
+      return;
+    }
+
+    const inputEl = e.currentTarget;
+    const file = inputEl.files?.[0];
+    if (!file || !taskId || !todoId) return;
+
+    try {
+      setIsUploadingImage(true);
+
+      const { blob, mime } = await compressImage(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.7,
+      });
+
+      // 未アップロードとして保持
+      setPendingUpload({ blob, mime });
+
+      // プレビューURLを作成（前回があれば解放）
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      const localUrl = URL.createObjectURL(blob);
+      setPreviewUrl(localUrl);
+
+      // 新規選択なので削除予約は解除
+      setIsImageRemoved(false);
+    } catch (err) {
+      console.error('画像の読み込み/圧縮に失敗しました:', err);
+    } finally {
+      setIsUploadingImage(false);
+      try {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        else inputEl.value = '';
+      } catch { /* noop */ }
+    }
+  };
+
+  const handleClearImage = () => {
+    // 即時に Storage を削除せず、保存時にクリーンアップ（整合性のため）
+    setIsImageRemoved(true);
+    setPendingUpload(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    setImageUrl(null);
+  };
 
   // ── 保存処理 ────────────────────────────────────────────
   const handleSave = async () => {
@@ -271,50 +391,123 @@ export default function TodoNoteModal({
 
     const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
     const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
-    const currentUnitPrice =
+    const currentUnitPriceCalced =
       numericPrice > 0 && safeQuantity > 0 ? numericPrice / safeQuantity : null;
-    const compareUnitPrice =
+    const compareUnitPriceCalced =
       numericComparePrice > 0 ? numericComparePrice / safeCompareQuantity : null;
-    const unitPriceDiff =
-      compareUnitPrice !== null && currentUnitPrice !== null
-        ? compareUnitPrice - currentUnitPrice
+    const unitPriceDiffCalced =
+      compareUnitPriceCalced !== null && currentUnitPriceCalced !== null
+        ? compareUnitPriceCalced - currentUnitPriceCalced
         : null;
-    const totalDifference =
-      unitPriceDiff !== null ? unitPriceDiff * safeCompareQuantity : null;
+    const totalDifferenceCalced =
+      unitPriceDiffCalced !== null ? unitPriceDiffCalced * safeCompareQuantity : null;
 
     try {
-      await updateTodoInTask(taskId, todoId, {
+      // ▼ 保存直前に、必要なら Storage へアップロードして imageUrl を確定する
+      let nextImageUrl: string | null = imageUrl;
+
+      if (!isImageRemoved && pendingUpload) {
+        const ext = pendingUpload.mime === 'image/webp' ? 'webp' : 'jpg';
+        const storagePath = `task_todos/${taskId}/${todoId}/${Date.now()}.${ext}`;
+        const fileRef = ref(storage, storagePath);
+        await uploadBytes(fileRef, pendingUpload.blob, {
+          contentType: pendingUpload.mime,
+          customMetadata: {
+            ownerUid: user.uid,
+            taskId,
+            todoId,
+          },
+        });
+        nextImageUrl = await getDownloadURL(fileRef);
+      }
+
+      // ▼ Firestore 更新 payload
+      const payload: Record<string, any> = {
         memo,
         price: appliedPrice || null,
         quantity: appliedQuantity,
         unit: appliedUnit,
-        ...(category === '料理'
-          ? {
-              recipe: {
-                ingredients: recipe.ingredients
-                  .filter((i) => i.name.trim() !== '')
-                  .map((i) => ({
-                    id: i.id,
-                    name: i.name.trim(),
-                    amount: typeof i.amount === 'number' ? i.amount : null,
-                    unit: i.unit || '適量',
-                  })),
-                steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
-              } as Recipe,
-            }
-          : {}),
-      });
+      };
 
-      if (totalDifference !== null) {
+      if (category === '料理') {
+        payload.imageUrl = isImageRemoved ? null : (nextImageUrl ?? null);
+        payload.recipe = {
+          ingredients: recipe.ingredients
+            .filter((i) => i.name.trim() !== '')
+            .map((i) => ({
+              id: i.id,
+              name: i.name.trim(),
+              amount: typeof i.amount === 'number' ? i.amount : null,
+              unit: i.unit || '適量',
+            })),
+          steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
+        } as Recipe;
+      } else {
+        // 料理以外は常に画像なし
+        payload.imageUrl = null;
+      }
+
+      // ① Firestore 更新
+      await updateTodoInTask(taskId, todoId, payload);
+
+      // ② Storage クリーンアップ: previousImageUrl と nextImageUrl / 削除予約 をもとに不要なものを削除
+      // ② Storage クリーンアップ: previousImageUrl と nextImageUrl / 削除予約 をもとに不要なものを削除
+      try {
+        const urlsToDelete: string[] = [];
+
+        if (category === '料理') {
+          // 差し替え：previous があり、next と異なれば previous を削除
+          if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImageUrl) {
+            urlsToDelete.push(previousImageUrl);
+          }
+          // 削除：削除予約されていて、previous があれば削除
+          if (isImageRemoved && previousImageUrl) {
+            urlsToDelete.push(previousImageUrl);
+          }
+        } else if (previousImageUrl) {
+          // カテゴリ変更などで「画像なし」となった場合は previous を削除
+          urlsToDelete.push(previousImageUrl);
+        }
+
+        await Promise.all(
+          urlsToDelete.map(async (url) => {
+            try {
+              // downloadURL から参照を生成して削除
+              const storageRef = ref(storage, url); // https://～ の downloadURL でOK
+              await deleteObject(storageRef);
+            } catch (e) {
+              console.warn('Storage 画像削除に失敗:', url, e);
+            }
+          })
+        );
+
+        // 次回比較用に「前回値」を更新
+        setPreviousImageUrl(isImageRemoved ? null : (nextImageUrl ?? null));
+      } catch (e) {
+        console.warn('Storage クリーンアップ処理で警告:', e);
+      }
+
+
+      if (totalDifferenceCalced !== null) {
         await addDoc(collection(db, 'savings'), {
           userId: user.uid,
           todoId,
           savedAt: serverTimestamp(),
-          currentUnitPrice,
-          compareUnitPrice,
-          difference: Math.round(totalDifference),
+          currentUnitPrice: currentUnitPriceCalced,
+          compareUnitPrice: compareUnitPriceCalced,
+          difference: Math.round(totalDifferenceCalced),
         });
       }
+
+      // 後片付け（ローカルプレビューの解放など）
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setPendingUpload(null);
+      setIsImageRemoved(false);
+
+      setImageUrl(nextImageUrl ?? null);
 
       setSaveComplete(true);
       setTimeout(() => {
@@ -328,31 +521,34 @@ export default function TodoNoteModal({
     }
   };
 
-  // ▼ プレビュー初期化フラグ（同一オープン中は一度だけ初期化）
   const previewInitRef = useRef(false);
 
-  // ▼ モーダルを開いたら一度だけ、メモ登録済みならプレビューで開始（料理カテゴリのみ）
   useEffect(() => {
-    if (!isOpen) return;                // 未オープンなら何もしない
-    if (initialLoad) return;            // Firestore 読み込み完了を待つ
-    if (previewInitRef.current) return; // 同一オープン中は一度だけ
+    if (!isOpen) return;
+    if (initialLoad) return;
+    if (previewInitRef.current) return;
 
     const hasMemo = memo.trim().length > 0;
     setIsPreview(category === '料理' && hasMemo);
 
-    previewInitRef.current = true;      // 初期化済み
+    previewInitRef.current = true;
   }, [isOpen, initialLoad, category, memo]);
 
-  // ▼ 閉じたら初期化フラグをリセット（次回オープン時に再評価）
   useEffect(() => {
     if (!isOpen) {
+      // モーダルが閉じられたらローカルプレビューを解放し、未アップロードも破棄
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setPendingUpload(null);
+      setIsImageRemoved(false);
       previewInitRef.current = false;
     }
-  }, [isOpen]);
+  }, [isOpen, previewUrl]);
 
   if (!mounted || initialLoad) return null;
 
-  // ▼ 料理カテゴリ & メモあり のときだけトグルを表示
   const showPreviewToggle = category === '料理' && memo.trim().length > 0;
 
   return (
@@ -361,9 +557,11 @@ export default function TodoNoteModal({
       isSaving={isSaving}
       saveComplete={saveComplete}
       onClose={onClose}
+      // プレビュー時は保存ボタンを出さない（undefinedを渡す）
       onSaveClick={isPreview ? undefined : handleSave}
       saveLabel={isPreview ? undefined : saveLabel}
-      hideActions={isPreview}
+      // ← ここを false 固定に変更して、アクション領域自体は表示
+      hideActions={false}
     >
       {/* ヘッダー行 */}
       <div className="flex items-center justify-between">
@@ -394,30 +592,76 @@ export default function TodoNoteModal({
       </div>
 
       {/* プレビューバッジ（プレビュー中のみ） */}
-      {showPreviewToggle && isPreview && (
+      {/* {showPreviewToggle && isPreview && (
         <div className="ml-2 mt-1 inline-flex items-center gap-2 rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
           <Eye size={14} />
           プレビューモード
         </div>
+      )} */}
+
+      {/* 料理カテゴリのときだけ：備考の“上”に画像挿入 UI */}
+      {category === '料理' && (
+        <div className="mb-3 ml-2">
+          {/* ▼▼▼ プレビューモードでは操作UIを隠す ▼▼▼ */}
+          {!isPreview && (
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                  aria-label="画像を選択"
+                />
+                {isUploadingImage ? '圧縮中…' : '画像を選択'}
+              </label>
+
+              {(imageUrl || previewUrl) && (
+                <button
+                  type="button"
+                  onClick={handleClearImage}
+                  className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-800"
+                  aria-label="挿入画像を削除"
+                  title="挿入画像を削除"
+                >
+                  画像を削除
+                </button>
+              )}
+            </div>
+          )}
+          {/* ▲▲▲ 追加ここまで（isPreview のときは操作UI非表示） ▲▲▲ */}
+
+          {(previewUrl || imageUrl) && (
+            <div className="mt-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewUrl ?? imageUrl!}
+                alt="挿入画像プレビュー"
+                className="max-h-48 rounded-lg border border-gray-200 object-contain"
+                loading="lazy"
+              />
+            </div>
+          )}
+        </div>
       )}
 
-      {/* textarea 自体が唯一のスクロール領域（内容に応じて拡大、上限 50vh でスクロール） */}
+      {/* textarea */}
       <div className="relative pr-8">
         <textarea
           ref={memoRef}
-          data-scrollable="true"                 // ← BaseModal の iOS touchmove 抑止を回避する許可フラグ
-          onScroll={onTextareaScroll}           // ガイド表示更新
+          data-scrollable="true"
+          onScroll={onTextareaScroll}
           value={memo}
           rows={1}
           placeholder="備考を入力"
           onChange={(e) => setMemo(e.target.value)}
-          onTouchMove={(e) => e.stopPropagation()} // 上位のジェスチャに奪われないように
-          readOnly={showPreviewToggle && isPreview} // ▼ プレビュー中は編集不可
+          onTouchMove={(e) => e.stopPropagation()}
+          readOnly={showPreviewToggle && isPreview}
           aria-readonly={showPreviewToggle && isPreview}
           className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
         />
 
-        {/* スクロールガイド（iOS時のみ） */}
         {isIOS && showScrollHint && (
           <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
             <ChevronDown size={16} className="text-white" />
@@ -430,30 +674,27 @@ export default function TodoNoteModal({
         )}
       </div>
 
-      {/* ▼▼ 買い物カテゴリの詳細は常時表示（コンポーネント化） ▼▼ */}
+      {/* 買い物カテゴリ */}
       {category === '買い物' && (
         <ShoppingDetailsEditor
-          // 値
           price={price}
           quantity={quantity}
           unit={unit}
           compareMode={compareMode}
           comparePrice={comparePrice}
           compareQuantity={compareQuantity}
-          // 変更ハンドラ（親の state を更新）
           onChangePrice={setPrice}
           onChangeQuantity={setQuantity}
           onChangeUnit={setUnit}
           onToggleCompareMode={(next) => setCompareMode(next)}
           onChangeComparePrice={setComparePrice}
           onChangeCompareQuantity={setCompareQuantity}
-          // アニメーション関連
           animatedDifference={animatedDifference}
           animationComplete={diffAnimationComplete}
         />
       )}
 
-      {/* ▼▼ 料理カテゴリのときだけレシピエディタを表示する ▼▼ */}
+      {/* 料理カテゴリのレシピエディタ */}
       {category === '料理' && (
         <RecipeEditor
           headerNote="親タスク: 料理"

@@ -544,6 +544,8 @@ export const updateTodoInTask = async (
     price?: number | null;
     quantity?: number | null;
     unit?: string;
+    imageUrl?: string | null;
+    recipe?: { ingredients: unknown[]; steps: string[] } | null;
   }
 ) => {
   const taskRef = doc(db, 'tasks', taskId);
@@ -555,8 +557,37 @@ export const updateTodoInTask = async (
   const index = todos.findIndex((todo: any) => todo.id === todoId);
   if (index === -1) throw new Error('TODOが見つかりません');
 
-  todos[index] = { ...todos[index], ...updates };
+  // src/lib/firebaseUtils.ts（該当関数の末尾付近）
+  const current = todos[index];
+  const next: any = { ...current, ...updates };
+
+  // --- imageUrl の扱い ---
+  // 文字列（非空）なら保存、null ならキー削除、undefined は変更なし
+  if (typeof updates.imageUrl === 'string' && updates.imageUrl.length > 0) {
+    next.imageUrl = updates.imageUrl;
+  } else if (updates.imageUrl === null) {
+    delete next.imageUrl;
+  }
+
+  // --- recipe の扱い ---
+  // null なら削除、undefined は変更なし、オブジェクトが来たら上書き
+  if (updates.recipe === null) {
+    delete next.recipe;
+  } else if (typeof updates.recipe !== 'undefined') {
+    next.recipe = updates.recipe;
+  }
+
+  // （任意）price/quantity の NaN ガード
+  if (Object.prototype.hasOwnProperty.call(updates, 'price') && updates.price == null) {
+    next.price = null;
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'quantity') && updates.quantity == null) {
+    next.quantity = null;
+  }
+
+  todos[index] = next;
   await updateDoc(taskRef, { todos });
+
 };
 
 /**
