@@ -737,7 +737,7 @@ const isTodayTask = useCallback((task: Task): boolean => {
                     (!periodFilter || periodFilter === task.period) &&
                     (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task)) &&
+                    (!todayFilter || isTodayTask(task) || task.flagged === true) &&
                     (!privateFilter || task.private === true) &&
                     (!flaggedFilter || task.flagged === true)
                 );
@@ -755,7 +755,7 @@ const isTodayTask = useCallback((task: Task): boolean => {
                     (!periodFilter || periodFilter === period) &&
                     (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task)) &&
+                    (!todayFilter || isTodayTask(task) || task.flagged === true) &&
                     (!privateFilter || task.private === true) &&
                     (!flaggedFilter || task.flagged === true)
                 );
