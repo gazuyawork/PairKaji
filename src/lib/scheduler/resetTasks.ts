@@ -20,7 +20,7 @@ export const resetCompletedTasks = async () => {
 
     const taskRef = doc(db, 'tasks', docSnap.id);
 
-let completedAt: Date | null = null;
+    let completedAt: Date | null = null;
 
     if (task.completedAt != null) {
       if (typeof task.completedAt === 'string') {
@@ -43,7 +43,9 @@ let completedAt: Date | null = null;
     let shouldReset = false;
 
     if (task.period === '毎日' || task.period === '週次') {
-      if (completedAt && !isDoneToday) shouldReset = true;
+      if ((completedAt && !isDoneToday) || task.skipped) {
+        shouldReset = true;
+      }
     }
 
     if (shouldReset) {

@@ -664,6 +664,7 @@ export const toggleTaskDoneStatus = async (
       // 未完了へ戻す
       await updateDoc(taskRef, {
         done: false,
+        skipped: false,
         completedAt: null,
         completedBy: '',
       });
