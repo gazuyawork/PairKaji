@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, Pencil } from 'lucide-react';
 import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
 import { auth, db } from '@/lib/firebase';
@@ -48,11 +48,14 @@ export default function TodoNoteModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false); // ← これが抜けると赤線になります
 
+  // ▼ プレビューモード
+  const [isPreview, setIsPreview] = useState(false);
+
   // 親タスクのカテゴリとレシピ（料理の時のみ使用）
   const [category, setCategory] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
-  // ▼ 追加: recipe の浅い等価比較（参照が違っても中身が同じなら更新しない）
+  // ▼ recipe の浅い等価比較（参照が違っても中身が同じなら更新しない）
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
     if (a === b) return true;
     if (a.ingredients.length !== b.ingredients.length) return false;
@@ -69,7 +72,7 @@ export default function TodoNoteModal({
     return true;
   }, []);
 
-  // ▼ 追加: RecipeEditor からの更新を等価時は参照温存
+  // ▼ RecipeEditor からの更新を等価時は参照温存
   const handleRecipeChange = useCallback((next: Recipe) => {
     setRecipe((prev) => (shallowEqualRecipe(prev, next) ? prev : next));
   }, [shallowEqualRecipe]);
@@ -153,14 +156,14 @@ export default function TodoNoteModal({
             if (existing) {
               const safeIngredients = Array.isArray(existing.ingredients)
                 ? existing.ingredients.map((ing, idx) => ({
-                  id: (ing as any).id ?? `ing_${idx}`,
-                  name: (ing as any).name ?? '',
-                  amount:
-                    typeof (ing as any).amount === 'number'
-                      ? (ing as any).amount
-                      : null,
-                  unit: (ing as any).unit ?? '適量',
-                }))
+                    id: (ing as any).id ?? `ing_${idx}`,
+                    name: (ing as any).name ?? '',
+                    amount:
+                      typeof (ing as any).amount === 'number'
+                        ? (ing as any).amount
+                        : null,
+                    unit: (ing as any).unit ?? '適量',
+                  }))
                 : [];
               setRecipe({
                 ingredients: safeIngredients,
@@ -287,18 +290,18 @@ export default function TodoNoteModal({
         unit: appliedUnit,
         ...(category === '料理'
           ? {
-            recipe: {
-              ingredients: recipe.ingredients
-                .filter((i) => i.name.trim() !== '')
-                .map((i) => ({
-                  id: i.id,
-                  name: i.name.trim(),
-                  amount: typeof i.amount === 'number' ? i.amount : null,
-                  unit: i.unit || '適量',
-                })),
-              steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
-            } as Recipe,
-          }
+              recipe: {
+                ingredients: recipe.ingredients
+                  .filter((i) => i.name.trim() !== '')
+                  .map((i) => ({
+                    id: i.id,
+                    name: i.name.trim(),
+                    amount: typeof i.amount === 'number' ? i.amount : null,
+                    unit: i.unit || '適量',
+                  })),
+                steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
+              } as Recipe,
+            }
           : {}),
       });
 
@@ -325,7 +328,32 @@ export default function TodoNoteModal({
     }
   };
 
+  // ▼ プレビュー初期化フラグ（同一オープン中は一度だけ初期化）
+  const previewInitRef = useRef(false);
+
+  // ▼ モーダルを開いたら一度だけ、メモ登録済みならプレビューで開始（料理カテゴリのみ）
+  useEffect(() => {
+    if (!isOpen) return;                // 未オープンなら何もしない
+    if (initialLoad) return;            // Firestore 読み込み完了を待つ
+    if (previewInitRef.current) return; // 同一オープン中は一度だけ
+
+    const hasMemo = memo.trim().length > 0;
+    setIsPreview(category === '料理' && hasMemo);
+
+    previewInitRef.current = true;      // 初期化済み
+  }, [isOpen, initialLoad, category, memo]);
+
+  // ▼ 閉じたら初期化フラグをリセット（次回オープン時に再評価）
+  useEffect(() => {
+    if (!isOpen) {
+      previewInitRef.current = false;
+    }
+  }, [isOpen]);
+
   if (!mounted || initialLoad) return null;
+
+  // ▼ 料理カテゴリ & メモあり のときだけトグルを表示
+  const showPreviewToggle = category === '料理' && memo.trim().length > 0;
 
   return (
     <BaseModal
@@ -333,10 +361,45 @@ export default function TodoNoteModal({
       isSaving={isSaving}
       saveComplete={saveComplete}
       onClose={onClose}
-      onSaveClick={handleSave}
-      saveLabel={saveLabel}
+      onSaveClick={isPreview ? undefined : handleSave}
+      saveLabel={isPreview ? undefined : saveLabel}
+      hideActions={isPreview}
     >
-      <h1 className="text-2xl font-bold text-gray-800 ml-2">{todoText}</h1>
+      {/* ヘッダー行 */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-800 ml-2">{todoText}</h1>
+
+        {showPreviewToggle && (
+          <button
+            type="button"
+            onClick={() => setIsPreview((v) => !v)}
+            className="mr-1 inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition"
+            aria-pressed={isPreview}
+            aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+            title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+          >
+            {isPreview ? (
+              <>
+                <Pencil size={16} />
+                <span>編集</span>
+              </>
+            ) : (
+              <>
+                <Eye size={16} />
+                <span>プレビュー</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* プレビューバッジ（プレビュー中のみ） */}
+      {showPreviewToggle && isPreview && (
+        <div className="ml-2 mt-1 inline-flex items-center gap-2 rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+          <Eye size={14} />
+          プレビューモード
+        </div>
+      )}
 
       {/* textarea 自体が唯一のスクロール領域（内容に応じて拡大、上限 50vh でスクロール） */}
       <div className="relative pr-8">
@@ -349,8 +412,9 @@ export default function TodoNoteModal({
           placeholder="備考を入力"
           onChange={(e) => setMemo(e.target.value)}
           onTouchMove={(e) => e.stopPropagation()} // 上位のジェスチャに奪われないように
-          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1
-                     touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+          readOnly={showPreviewToggle && isPreview} // ▼ プレビュー中は編集不可
+          aria-readonly={showPreviewToggle && isPreview}
+          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
         />
 
         {/* スクロールガイド（iOS時のみ） */}
@@ -395,6 +459,7 @@ export default function TodoNoteModal({
           headerNote="親タスク: 料理"
           value={recipe}
           onChange={handleRecipeChange}
+          isPreview={isPreview}
         />
       )}
     </BaseModal>

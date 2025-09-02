@@ -13,12 +13,13 @@ type BaseModalProps = {
   isSaving: boolean;
   saveComplete: boolean;
   onClose: () => void;
-  onSaveClick: () => void;
   children: ReactNode;
-  saveLabel?: string;
   disableCloseAnimation?: boolean;
   onCompleteAnimation?: () => void;
   saveDisabled?: boolean;
+  onSaveClick?: () => void;   // 既存: オプショナル
+  saveLabel?: string;
+  hideActions?: boolean;      // 既存: プレビュー時にフッターを隠す
 };
 
 export default function BaseModal({
@@ -31,6 +32,7 @@ export default function BaseModal({
   saveLabel = '保存',
   onCompleteAnimation,
   saveDisabled,
+  hideActions = false,        // ★ 追加: デフォルト false にして参照
 }: BaseModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -129,27 +131,35 @@ export default function BaseModal({
         {/* 子がそのまま入る。スクロールは子（textarea）側のみで発生 */}
         <div className="space-y-6">
           {children}
-          <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-            <button
-              onClick={onSaveClick}
-              className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
-                ${saveDisabled || isSaving || saveComplete
-                  ? 'bg-gray-300 text-white cursor-not-allowed'
-                  : 'bg-[#FFCB7D] text-white'}
-              `}
-              disabled={isSaving || saveComplete || saveDisabled}
-            >
-              {saveLabel}
-            </button>
 
-            <button
-              onClick={onClose}
-              className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
-              disabled={isSaving || saveComplete}
-            >
-              キャンセル
-            </button>
-          </div>
+          {/* ★ ここを追加：hideActions が true のとき、フッター（保存/キャンセル）を描画しない */}
+          {!hideActions && (
+            <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+              {/* 保存ボタン：onSaveClick が指定されているときだけ表示（保険） */}
+              {onSaveClick && (
+                <button
+                  onClick={onSaveClick}
+                  className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
+                    ${saveDisabled || isSaving || saveComplete
+                      ? 'bg-gray-300 text-white cursor-not-allowed'
+                      : 'bg-[#FFCB7D] text-white'}
+                  `}
+                  disabled={isSaving || saveComplete || !!saveDisabled}
+                >
+                  {saveLabel}
+                </button>
+              )}
+
+              {/* キャンセルボタン */}
+              <button
+                onClick={onClose}
+                className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+                disabled={isSaving || saveComplete}
+              >
+                キャンセル
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>,
