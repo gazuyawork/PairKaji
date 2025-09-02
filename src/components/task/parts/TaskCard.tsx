@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, SkipForward, Info, X, SquareUser } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, SkipForward, Notebook, X, SquareUser } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -396,7 +396,7 @@ export default function TaskCard({
         {/* 右側：ポイント・画像（日時と曜日は左へ移動） */}
         <div className="flex items-center gap-1">
           {task.private && isPairConfirmed ? (
-            <div className="flex items-center gap-2 ml-2 mr-2">
+            <div className="flex items-center gap-2">
               {/* ★ 追加: 備考がある時だけ Info を表示（privateでも表示） */}
               {noteText && (
                 <button
@@ -409,11 +409,12 @@ export default function TaskCard({
                   }}
                   className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
-                  <Info className="w-5 h-5 text-blue-500" />
+                  <Notebook className="w-5 h-5 text-yellow-600" />
                 </button>
               )}
-
-              <SquareUser className="w-6 h-6 text-green-600" />
+              <div className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-300">
+                <SquareUser className="w-6 h-6 text-green-600" />
+              </div>
             </div>
           ) : !task.private ? (
             // ★ 備考Infoボタンは共通判定に統一（挙動は従来通り）
@@ -429,7 +430,7 @@ export default function TaskCard({
                   }}
                   className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
-                  <Info className="w-5 h-5 text-blue-500" />
+                  <Notebook className="w-5 h-5 text-yellow-600" />
                 </button>
               )}
 
@@ -463,7 +464,7 @@ export default function TaskCard({
                   }}
                   className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
-                  <Info className="w-5 h-5 text-blue-500" />
+                  <Notebook className="w-5 h-5 text-yellow-600" />
                 </button>
               )}
 
@@ -499,7 +500,7 @@ export default function TaskCard({
             >
               <div className="flex items-start gap-3 mb-3">
                 {/* インフォアイコン：オレンジ */}
-                <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                <Notebook className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
                 <h3 className="text-base font-semibold text-gray-800">備考</h3>
 
                 {/* 右上 × ボタン */}
