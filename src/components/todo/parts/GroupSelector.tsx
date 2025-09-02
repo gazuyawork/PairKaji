@@ -61,12 +61,12 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
     <div className="relative py-0 mb-3 mt-[-12px] flex items-center">
       {/* 横スクロール可能なタスクボタンエリア */}
       <div className="flex-1 overflow-x-auto whitespace-nowrap scroll-smooth px-2" ref={scrollRef}>
-        <div className="flex gap-2 w-max pr-3">
+        <div className="flex gap-1 w-max pr-3">
           {filteredTasks.map((task, idx) => (
             <button
               key={task.id ?? `fallback-${idx}`}
               onClick={() => onSelectGroup(task.id)}
-              className={`px-3 py-2 rounded-full text-sm border transition-all duration-300 whitespace-nowrap font-semibold
+              className={`px-2.5 py-2 rounded-sm text-sm border transition-all duration-300 whitespace-nowrap font-semibold
                 ${selectedGroupId === task.id
                   ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
                   : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
