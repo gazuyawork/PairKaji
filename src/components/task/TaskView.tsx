@@ -29,7 +29,7 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { X, Lightbulb, LightbulbOff, SquareUser, Calendar, Flag } from 'lucide-react';
+import { X, Lightbulb, LightbulbOff, SquareUser, Calendar, Flag, Search } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import AdCard from '@/components/home/parts/AdCard';
@@ -46,10 +46,10 @@ const periods: Period[] = ['毎日', '週次', '不定期'];
 const INITIAL_TASK_GROUPS: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
 
 /* =========================================================
- * ★★★ 追加：並び替え用ユーティリティ（日時/時間の抽出・比較）★★★
+ * ★★★ 並び替え用ユーティリティ（日時/時間の抽出・比較）★★★
  * - 日付あり（dates[] / scheduledAt / datetime） → 最も早い日時の昇順
  * - 時間のみ（time / scheduledTime / timeString）→ その日の早い時間順
- * - どちらも無し → 最後に登録順（createdAt の新しい順）で比較
+ * - どちらも無し → 最後に登録順（createdAt の新しい順）で比較（現在は名称順へフォールバック）
  * =======================================================*/
 
 // "HH:mm" → 分に変換（例: "09:30" → 570）。不正は null。
@@ -301,38 +301,37 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [uid]);
 
   // 今日対象かどうか（期日すぎも含む）
-const isTodayTask = useCallback((task: Task): boolean => {
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  const todayStr = `${yyyy}-${mm}-${dd}`;
+  const isTodayTask = useCallback((task: Task): boolean => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
 
-  const dayNumberToKanji: Record<number, string> = {
-    0: '日', 1: '月', 2: '火', 3: '水', 4: '木', 5: '金', 6: '土',
-  };
-  const todayDayKanji = dayNumberToKanji[today.getDay()];
+    const dayNumberToKanji: Record<number, string> = {
+      0: '日', 1: '月', 2: '火', 3: '水', 4: '木', 5: '金', 6: '土',
+    };
+    const todayDayKanji = dayNumberToKanji[today.getDay()];
 
-  if (task.period === '毎日') return true;
+    if (task.period === '毎日') return true;
 
-  if (task.period === '週次') {
-    if (!Array.isArray(task.daysOfWeek)) return false;
-    return task.daysOfWeek.includes(todayDayKanji);
-  }
+    if (task.period === '週次') {
+      if (!Array.isArray(task.daysOfWeek)) return false;
+      return task.daysOfWeek.includes(todayDayKanji);
+    }
 
-  if (task.period === '不定期') {
-    if (!Array.isArray(task.dates) || task.dates.length === 0) return false;
+    if (task.period === '不定期') {
+      if (!Array.isArray(task.dates) || task.dates.length === 0) return false;
 
-    // ① 今日が含まれていれば対象
-    if (task.dates.includes(todayStr)) return true;
+      // ① 今日が含まれていれば対象
+      if (task.dates.includes(todayStr)) return true;
 
-    // ② 今日以前（≦今日）の指定日がひとつでもあれば「期日超過」とみなして対象
-    return task.dates.some((d) => isSameOrBeforeToday(d));
-  }
+      // ② 今日以前（≦今日）の指定日がひとつでもあれば「期日超過」とみなして対象
+      return task.dates.some((d) => isSameOrBeforeToday(d));
+    }
 
-  return false;
-}, []);
-
+    return false;
+  }, []);
 
   // フィルタボタンのトグル
   const togglePeriod = (p: Period | null) => setPeriodFilter((prev) => (prev === p ? null : p));
@@ -639,27 +638,10 @@ const isTodayTask = useCallback((task: Task): boolean => {
                         <SearchBox value={searchTerm} onChange={setSearchTerm} />
                       </div>
                     )}
+
+                    {/* ▼▼▼ 上部の虫眼鏡ボタンは削除済み（フローティング列へ移設） ▼▼▼ */}
+
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center pr-2 border-r border-gray-300">
-                        <motion.button
-                          onClick={() => setShowSearchBox((prev) => (searchTerm.trim() ? true : !prev))}
-                          whileTap={{ scale: 1.2 }}
-                          transition={{ type: 'spring', stiffness: 300, damping: 12 }}
-                          className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300
-                        ${isSearchVisible
-                              ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                              : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'
-                            }
-                        `}
-                          title="検索"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </motion.button>
-                      </div>
-
-
                       {pairStatus === 'confirmed' && (
                         <div className="flex items-center pr-2 border-r border-gray-300">
                           <button
@@ -678,8 +660,7 @@ const isTodayTask = useCallback((task: Task): boolean => {
 
                       {/* // src/components/views/TaskView.tsx */}
                       <div className="flex overflow-x-auto no-scrollbar space-x-2">
-                        {/* ▼ 追加: plan が premium のときのみ FilterControls を表示。ローディング中(isChecking)は非表示 */}
-
+                        {/* ▼ plan が premium のときのみ FilterControls を表示。ローディング中(isChecking)は非表示 */}
                         <FilterControls
                           periodFilter={periodFilter}
                           personFilter={personFilter}
@@ -716,16 +697,12 @@ const isTodayTask = useCallback((task: Task): boolean => {
                           <X className="w-5 h-5" />
                         </motion.button>
                       )}
-
-
                     </div>
                   </div>
                 </div>
                 <hr className="border-t border-gray-300 opacity-50 my-1" />
               </>
             )}
-
-
 
             {(() => {
               const allFilteredTasks = periods
@@ -847,33 +824,9 @@ const isTodayTask = useCallback((task: Task): boolean => {
                             return aKey.hasTimeOnly ? -1 : 1;
                           }
 
-                          // ④ 最後は登録順（createdAt の新しい順）で比較
-                          // const getTimestampValue = (value: any): number => {
-                          //   if (!value) return 0;
-                          //   if (value instanceof Date) return value.getTime();
-                          //   if (typeof value === 'string') {
-                          //     const t = Date.parse(value);
-                          //     return Number.isNaN(t) ? 0 : t;
-                          //   }
-                          //   if (typeof value === 'number') return value;
-                          //   if (typeof (value as any).toDate === 'function') {
-                          //     try {
-                          //       return (value as any).toDate().getTime();
-                          //     } catch {
-                          //       return 0;
-                          //     }
-                          //   }
-                          //   return 0;
-                          // };
-                          // const aTime = getTimestampValue(a.createdAt);
-                          // const bTime = getTimestampValue(b.createdAt);
-                          // return bTime - aTime;
-
-                          // 名前順
+                          // ④ 最後は登録順ではなく名称順にフォールバック
                           return a.name.localeCompare(b.name);
-
                         })
-
                         // .filter((t) => showCompletedMap[period] || !t.done)
                         .filter((t) => showCompletedMap[period] || !t.done || searchActive)
                         .map((task, idx) => (
@@ -928,7 +881,7 @@ const isTodayTask = useCallback((task: Task): boolean => {
           mb-4
         "
             >
-              {/* 並び: 本日 /（条件）プライベート / フラグ */}
+              {/* 並び: 本日 /（条件）プライベート / フラグ / クリア（ある時） / 検索 ←★右端 */}
               <div className="flex items-center gap-2">
                 {/* 本日フィルター */}
                 <motion.button
@@ -988,7 +941,24 @@ const isTodayTask = useCallback((task: Task): boolean => {
                   <Flag className="w-6 h-6" />
                 </motion.button>
 
-                {/* ▼▼▼ 追加：フローティング用「×」クリアボタン（上部と同じ条件・挙動） ▼▼▼ */}
+                {/* ▼▼▼ 追加：右端の検索（虫眼鏡）ボタン ▼▼▼ */}
+                <motion.button
+                  onClick={() => setShowSearchBox((prev) => (searchTerm.trim() ? true : !prev))}
+                  whileTap={{ scale: 1.2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  aria-pressed={isSearchVisible}
+                  aria-label="検索ボックスを表示/非表示"
+                  title="検索"
+                  className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+                    ${isSearchVisible
+                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner ring-2 ring-white'
+                      : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] ring-2 ring-white'
+                    }`}
+                >
+                  <Search className={`w-7 h-7 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
+                </motion.button>
+
+                {/* クリア（条件一致のときのみ表示） */}
                 {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
                   <motion.button
                     onClick={() => {
@@ -1009,6 +979,7 @@ const isTodayTask = useCallback((task: Task): boolean => {
                     <X className="w-5 h-5" />
                   </motion.button>
                 )}
+
 
               </div>
             </div>
