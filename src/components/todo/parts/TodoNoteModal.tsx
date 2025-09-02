@@ -422,6 +422,7 @@ export default function TodoNoteModal({
       }
 
       // ▼ Firestore 更新 payload
+      // ▼ Firestore 更新 payload
       const payload: Record<string, any> = {
         memo,
         price: appliedPrice || null,
@@ -429,8 +430,18 @@ export default function TodoNoteModal({
         unit: appliedUnit,
       };
 
+      // ✅ 画像はカテゴリに依存させない
+      // - 削除予約: null（サーバ側でキー削除）
+      // - 新規/差し替えあり: URL を保存
+      // - それ以外: 送らない（＝変更なし）
+      if (isImageRemoved) {
+        payload.imageUrl = null;
+      } else if (nextImageUrl) {
+        payload.imageUrl = nextImageUrl;
+      }
+
+      // 料理のときだけレシピを保存（これは従来通りでOK）
       if (category === '料理') {
-        payload.imageUrl = isImageRemoved ? null : (nextImageUrl ?? null);
         payload.recipe = {
           ingredients: recipe.ingredients
             .filter((i) => i.name.trim() !== '')
@@ -442,9 +453,6 @@ export default function TodoNoteModal({
             })),
           steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
         } as Recipe;
-      } else {
-        // 料理以外は常に画像なし
-        payload.imageUrl = null;
       }
 
       // ① Firestore 更新
@@ -455,17 +463,13 @@ export default function TodoNoteModal({
       try {
         const urlsToDelete: string[] = [];
 
-        if (category === '料理') {
-          // 差し替え：previous があり、next と異なれば previous を削除
-          if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImageUrl) {
-            urlsToDelete.push(previousImageUrl);
-          }
-          // 削除：削除予約されていて、previous があれば削除
-          if (isImageRemoved && previousImageUrl) {
-            urlsToDelete.push(previousImageUrl);
-          }
-        } else if (previousImageUrl) {
-          // カテゴリ変更などで「画像なし」となった場合は previous を削除
+        // 差し替え: 前回URLがあり、今回URLと異なる → 前回を削除
+        if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImageUrl) {
+          urlsToDelete.push(previousImageUrl);
+        }
+
+        // 明示削除: 削除予約かつ前回URLがある → 前回を削除
+        if (isImageRemoved && previousImageUrl) {
           urlsToDelete.push(previousImageUrl);
         }
 
@@ -600,51 +604,51 @@ export default function TodoNoteModal({
       )} */}
 
       {/* 料理カテゴリのときだけ：備考の“上”に画像挿入 UI */}
-      {category === '料理' && (
-        <div className="mb-3 ml-2">
-          {/* ▼▼▼ プレビューモードでは操作UIを隠す ▼▼▼ */}
-          {!isPreview && (
-            <div className="flex items-center gap-3">
-              <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageSelect}
-                  aria-label="画像を選択"
-                />
-                {isUploadingImage ? '圧縮中…' : '画像を選択'}
-              </label>
-
-              {(imageUrl || previewUrl) && (
-                <button
-                  type="button"
-                  onClick={handleClearImage}
-                  className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-800"
-                  aria-label="挿入画像を削除"
-                  title="挿入画像を削除"
-                >
-                  画像を削除
-                </button>
-              )}
-            </div>
-          )}
-          {/* ▲▲▲ 追加ここまで（isPreview のときは操作UI非表示） ▲▲▲ */}
-
-          {(previewUrl || imageUrl) && (
-            <div className="mt-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl ?? imageUrl!}
-                alt="挿入画像プレビュー"
-                className="max-h-48 rounded-lg border border-gray-200 object-contain"
-                loading="lazy"
+      {/* {category === '料理' && ( */}
+      <div className="mb-3 ml-2">
+        {/* ▼▼▼ プレビューモードでは操作UIを隠す ▼▼▼ */}
+        {!isPreview && (
+          <div className="flex items-center gap-3">
+            <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageSelect}
+                aria-label="画像を選択"
               />
-            </div>
-          )}
-        </div>
-      )}
+              {isUploadingImage ? '圧縮中…' : '画像を選択'}
+            </label>
+
+            {(imageUrl || previewUrl) && (
+              <button
+                type="button"
+                onClick={handleClearImage}
+                className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-800"
+                aria-label="挿入画像を削除"
+                title="挿入画像を削除"
+              >
+                画像を削除
+              </button>
+            )}
+          </div>
+        )}
+        {/* ▲▲▲ 追加ここまで（isPreview のときは操作UI非表示） ▲▲▲ */}
+
+        {(previewUrl || imageUrl) && (
+          <div className="mt-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl ?? imageUrl!}
+              alt="挿入画像プレビュー"
+              className="max-h-58 rounded-lg border border-gray-200 object-contain"
+              loading="lazy"
+            />
+          </div>
+        )}
+      </div>
+      {/* )} */}
 
       {/* textarea */}
       <div className="relative pr-8">
