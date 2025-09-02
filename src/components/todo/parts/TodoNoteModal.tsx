@@ -113,7 +113,8 @@ export default function TodoNoteModal({
         const taskSnap = await getDoc(taskRef);
         if (taskSnap.exists()) {
           const taskData = taskSnap.data();
-          setCategory((taskData as any)?.category ?? null);
+          const cat = (taskData as any)?.category ?? null;
+          setCategory(cat);
 
           const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
           const todo = todos.find((t: { id: string }) => t.id === todoId);
@@ -124,7 +125,8 @@ export default function TodoNoteModal({
             setUnit(todo.unit || 'g');
 
             const shouldShow = typeof todo.price === 'number' && todo.price > 0;
-            setShowDetails(shouldShow);
+            // 価格詳細は「買い物」のときだけ初期展開
+            setShowDetails(cat === '買い物' && shouldShow);
             if (!compareQuantity && todo.quantity) {
               setCompareQuantity(todo.quantity.toString());
             }
@@ -134,11 +136,11 @@ export default function TodoNoteModal({
             if (existing) {
               const safeIngredients = Array.isArray(existing.ingredients)
                 ? existing.ingredients.map((ing, idx) => ({
-                    id: ing.id ?? `ing_${idx}`,
-                    name: ing.name ?? '',
-                    amount: typeof ing.amount === 'number' ? ing.amount : null,
-                    unit: ing.unit ?? '適量',
-                  }))
+                  id: ing.id ?? `ing_${idx}`,
+                  name: ing.name ?? '',
+                  amount: typeof ing.amount === 'number' ? ing.amount : null,
+                  unit: ing.unit ?? '適量',
+                }))
                 : [];
               setRecipe({
                 ingredients: safeIngredients,
@@ -238,8 +240,8 @@ export default function TodoNoteModal({
       numericComparePrice > 0
         ? numericCompareQuantity
         : numericQuantity > 0
-        ? numericQuantity
-        : 1;
+          ? numericQuantity
+          : 1;
     const appliedUnit = numericQuantity > 0 ? unit : '個';
 
     const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
@@ -263,18 +265,18 @@ export default function TodoNoteModal({
         unit: appliedUnit,
         ...(category === '料理'
           ? {
-              recipe: {
-                ingredients: recipe.ingredients
-                  .filter((i) => i.name.trim() !== '')
-                  .map((i) => ({
-                    id: i.id,
-                    name: i.name.trim(),
-                    amount: typeof i.amount === 'number' ? i.amount : null,
-                    unit: i.unit || '適量',
-                  })),
-                steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
-              } as Recipe,
-            }
+            recipe: {
+              ingredients: recipe.ingredients
+                .filter((i) => i.name.trim() !== '')
+                .map((i) => ({
+                  id: i.id,
+                  name: i.name.trim(),
+                  amount: typeof i.amount === 'number' ? i.amount : null,
+                  unit: i.unit || '適量',
+                })),
+              steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
+            } as Recipe,
+          }
           : {}),
       });
 
@@ -342,91 +344,95 @@ export default function TodoNoteModal({
         )}
       </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => {
-            const next = !showDetails;
-            setShowDetails(next);
-            if (!next) setCompareMode(false);
-          }}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
-        >
-          <Info size={16} />
-          {showDetails ? '詳細を閉じる' : '詳細を追加'}
-        </button>
-
-        {showDetails && !isNaN(parseFloat(price)) && parseFloat(price) > 0 && (
+      {category === '買い物' && (
+        <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => setCompareMode(!compareMode)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
+            onClick={() => {
+              const next = !showDetails;
+              setShowDetails(next);
+              if (!next) setCompareMode(false);
+            }}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
           >
-            <CheckCircle size={16} />
-            {compareMode ? '差額確認をやめる' : '差額確認'}
+            <Info size={16} />
+            {showDetails ? '詳細を閉じる' : '詳細を追加'}
           </button>
-        )}
-      </div>
 
-      {compareMode ? (
-        <ComparePriceTable
-          price={price}
-          quantity={quantity}
-          comparePrice={comparePrice}
-          compareQuantity={compareQuantity}
-          unit={unit}
-          animatedDifference={animatedDifference}
-          unitPriceDiff={
-            (() => {
-              const np = parseFloat(price);
-              const nq = parseFloat(quantity);
-              const ncp = parseFloat(comparePrice);
-              const ncq = parseFloat(compareQuantity) > 0 ? parseFloat(compareQuantity) : 1;
-              const cup = np > 0 && (nq > 0 ? nq : 1) > 0 ? np / (nq > 0 ? nq : 1) : null;
-              const cmp = ncp > 0 ? ncp / ncq : null;
-              return cmp !== null && cup !== null ? cmp - cup : null;
-            })()
-          }
-          compareDisplayUnit={
-            (() => {
-              const ncq = parseFloat(compareQuantity);
-              return !ncq || ncq <= 0 ? '個' : unit;
-            })()
-          }
-          onChangeComparePrice={setComparePrice}
-          onChangeCompareQuantity={setCompareQuantity}
-          showDiff={
-            (() => {
-              const ncp = parseFloat(comparePrice);
-              const ncq = parseFloat(compareQuantity);
-              const np = parseFloat(price);
-              const nq = parseFloat(quantity);
-              const sq = nq > 0 ? nq : 1;
-              const cup = np > 0 && sq > 0 ? np / sq : null;
-              const scq = ncq > 0 ? ncq : 1;
-              const cmp = ncp > 0 ? ncp / scq : null;
-              const diff = cmp !== null && cup !== null ? cmp - cup : null;
-              return diff !== null;
-            })()
-          }
-          animationComplete={diffAnimationComplete}
-        />
-      ) : (
-        showDetails && (
-          <DetailInputFields
+          {showDetails && !isNaN(parseFloat(price)) && parseFloat(price) > 0 && (
+            <button
+              onClick={() => setCompareMode(!compareMode)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
+            >
+              <CheckCircle size={16} />
+              {compareMode ? '差額確認をやめる' : '差額確認'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {category === '買い物' && (
+        compareMode ? (
+          <ComparePriceTable
             price={price}
             quantity={quantity}
+            comparePrice={comparePrice}
+            compareQuantity={compareQuantity}
             unit={unit}
-            onChangePrice={setPrice}
-            onChangeQuantity={setQuantity}
-            onChangeUnit={setUnit}
-            currentUnitPrice={
+            animatedDifference={animatedDifference}
+            unitPriceDiff={
               (() => {
                 const np = parseFloat(price);
                 const nq = parseFloat(quantity);
-                const sq = nq > 0 ? nq : 1;
-                return np > 0 && sq > 0 ? np / sq : null;
+                const ncp = parseFloat(comparePrice);
+                const ncq = parseFloat(compareQuantity) > 0 ? parseFloat(compareQuantity) : 1;
+                const cup = np > 0 && (nq > 0 ? nq : 1) > 0 ? np / (nq > 0 ? nq : 1) : null;
+                const cmp = ncp > 0 ? ncp / ncq : null;
+                return cmp !== null && cup !== null ? cmp - cup : null;
               })()
             }
+            compareDisplayUnit={
+              (() => {
+                const ncq = parseFloat(compareQuantity);
+                return !ncq || ncq <= 0 ? '個' : unit;
+              })()
+            }
+            onChangeComparePrice={setComparePrice}
+            onChangeCompareQuantity={setCompareQuantity}
+            showDiff={
+              (() => {
+                const ncp = parseFloat(comparePrice);
+                const ncq = parseFloat(compareQuantity);
+                const np = parseFloat(price);
+                const nq = parseFloat(quantity);
+                const sq = nq > 0 ? nq : 1;
+                const cup = np > 0 && sq > 0 ? np / sq : null;
+                const scq = ncq > 0 ? ncq : 1;
+                const cmp = ncp > 0 ? ncp / scq : null;
+                const diff = cmp !== null && cup !== null ? cmp - cup : null;
+                return diff !== null;
+              })()
+            }
+            animationComplete={diffAnimationComplete}
           />
+        ) : (
+          showDetails && (
+            <DetailInputFields
+              price={price}
+              quantity={quantity}
+              unit={unit}
+              onChangePrice={setPrice}
+              onChangeQuantity={setQuantity}
+              onChangeUnit={setUnit}
+              currentUnitPrice={
+                (() => {
+                  const np = parseFloat(price);
+                  const nq = parseFloat(quantity);
+                  const sq = nq > 0 ? nq : 1;
+                  return np > 0 && sq > 0 ? np / sq : null;
+                })()
+              }
+            />
+          )
         )
       )}
 
