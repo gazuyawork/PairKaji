@@ -212,7 +212,7 @@ export default function TodoView() {
           <div className="sticky top-0 z-[999] w-full bg-transparent">
             <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3">
               {/* ✅ セレクトボックス部分 */}
-              <div ref={selectBoxRef} className="relative w-full mb-6">
+              <div ref={selectBoxRef} className="relative w-full mb-4">
                 <input
                   type="text"
                   value=""
@@ -371,7 +371,7 @@ export default function TodoView() {
           className="fixed left-1/2 -translate-x-1/2 bottom-22 z-[1000] w-full max-w-xl px-2 pointer-events-none"
           aria-label="グループセレクタ固定バー"
         >
-          <div className="pointer-events-auto rounded-sm backdrop-blur-md bg-white/10">
+          <div className="pointer-events-auto rounded-sm">
             <div className="pt-5 pb-0">
               <GroupSelector
                 tasks={tasks}

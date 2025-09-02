@@ -14,7 +14,7 @@ type Props = {
 
 const SearchBox = forwardRef<HTMLInputElement, Props>(({ value, onChange }, ref) => {
   return (
-    <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white ring-4 ring-gray-200 focus-within:ring-3 transition">
+    <div className="flex items-center border border-[#ccc] rounded-xl px-3 py-2 bg-white ring-4 ring-white focus-within:ring-3 transition">
       <Search className="text-gray-400 mr-2" size={20} />
       <input
         ref={ref}
