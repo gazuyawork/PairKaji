@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TaskCard from '@/components/task/parts/TaskCard';
 import EditTaskModal from '@/components/task/parts/EditTaskModal';
 import SearchBox from '@/components/task/parts/SearchBox';
-import FilterControls from '@/components/task/parts/FilterControls';
+// import FilterControls from '@/components/task/parts/FilterControls';
 import {
   collection,
   onSnapshot,
@@ -49,7 +49,7 @@ const INITIAL_TASK_GROUPS: Record<Period, Task[]> = { 毎日: [], 週次: [], �
  * ★★★ 並び替え用ユーティリティ（日時/時間の抽出・比較）★★★
  * - 日付あり（dates[] / scheduledAt / datetime） → 最も早い日時の昇順
  * - 時間のみ（time / scheduledTime / timeString）→ その日の早い時間順
- * - どちらも無し → 最後に登録順（createdAt の新しい順）で比較（現在は名称順へフォールバック）
+ * - どちらも無し → 最後は名称順
  * =======================================================*/
 
 // "HH:mm" → 分に変換（例: "09:30" → 570）。不正は null。
@@ -72,9 +72,9 @@ const toMillis = (v: any): number => {
     const t = Date.parse(v);
     return Number.isNaN(t) ? 0 : t;
   }
-  if (typeof v.toDate === 'function') {
+  if (typeof (v as any)?.toDate === 'function') {
     try {
-      return v.toDate().getTime();
+      return (v as any).toDate().getTime();
     } catch {
       return 0;
     }
@@ -182,10 +182,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index } = useView();
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
+
+  // ▼ 追加：検索インプットへのref（虫眼鏡タップで即フォーカスさせる）
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // 追加：'YYYY-MM-DD' を Date にして「今日以前か」判定する
   const isSameOrBeforeToday = (ymd: string): boolean => {
     if (typeof ymd !== 'string') return false;
-    // 安全にパース（YYYY-MM-DD 固定想定）
     const [y, m, d] = ymd.split('-').map(Number);
     if (!y || !m || !d) return false;
     const target = new Date(y, m - 1, d, 0, 0, 0, 0);
@@ -204,7 +207,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   }, [searchParams]);
 
-  // 「パートナー解除後の孤児データ削除」案内の判定（auth.currentUser 依存を排除して uid に統一）
+  // 「パートナー解除後の孤児データ削除」案内の判定
   useEffect(() => {
     if (!uid) return;
 
@@ -214,7 +217,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     const unsubscribe = onSnapshot(pairQ, async (snapshot) => {
       const confirmedPairs = snapshot.docs.filter((d) => d.data()?.status === 'confirmed');
       if (confirmedPairs.length > 0) {
-        // ペアあり → 何もしない
         return;
       }
 
@@ -223,7 +225,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         if (!userSnap.exists()) return;
 
         const data = userSnap.data();
-        const cleaned = data?.sharedTasksCleaned;
+        const cleaned = (data as any)?.sharedTasksCleaned;
 
         if (cleaned === false) {
           setShowOrphanConfirm(true);
@@ -283,9 +285,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
         pairsSnap.forEach((d) => {
           const data = d.data();
-          if (data.status === 'confirmed') {
+          if ((data as any).status === 'confirmed') {
             foundConfirmed = true;
-            partnerId = data.userIds?.find((id: string) => id !== uid) ?? null;
+            partnerId = (data as any).userIds?.find((id: string) => id !== uid) ?? null;
           }
         });
 
@@ -326,7 +328,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       // ① 今日が含まれていれば対象
       if (task.dates.includes(todayStr)) return true;
 
-      // ② 今日以前（≦今日）の指定日がひとつでもあれば「期日超過」とみなして対象
+      // ② 今日以前（≦今日）の指定日がひとつでもあれば対象
       return task.dates.some((d) => isSameOrBeforeToday(d));
     }
 
@@ -334,8 +336,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, []);
 
   // フィルタボタンのトグル
-  const togglePeriod = (p: Period | null) => setPeriodFilter((prev) => (prev === p ? null : p));
-  const togglePerson = (name: string | null) => setPersonFilter((prev) => (prev === name ? null : name));
+  // const togglePeriod = (p: Period | null) => setPeriodFilter((prev) => (prev === p ? null : p));
+  // const togglePerson = (name: string | null) => setPersonFilter((prev) => (prev === name ? null : name));
 
   // Done トグル時のロジック（confirmの解決方法を堅牢化）
   const toggleDone = async (period: Period, taskId: string) => {
@@ -364,7 +366,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       !target.done,
       target.name,
       target.point,
-      target.person ?? ''
+      (target as any).person ?? ''
     );
   };
 
@@ -377,7 +379,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           return;
         }
         await skipTaskWithoutPoints(taskId, uid);
-        // ローカル state は触らず、onSnapshot の購読更新で UI 反映に任せる
         toast.success('タスクをスキップしました（ポイント加算なし）');
       } catch (e) {
         console.error('[handleSkip] スキップ失敗:', e);
@@ -422,7 +423,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     let unsubscribe: (() => void) | null = null;
 
     (async () => {
-      // uid: undefined(取得前) → 何もしない / null or ''(未ログイン) → ローディング解除
       if (uid === undefined) return;
       if (!uid) {
         setIsLoading(false);
@@ -439,7 +439,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
       const partnerUids = new Set<string>([uid]);
       pairsSnap.forEach((d) => {
-        const data = d.data();
+        const data = d.data() as any;
         if (Array.isArray(data.userIds)) {
           data.userIds.forEach((id: string) => partnerUids.add(id));
         }
@@ -462,26 +462,26 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         // completedAt の日付越え戻し（不定期以外）
         const updates: Promise<void>[] = [];
         for (const task of rawTasks) {
-          if (task.completedAt != null) {
+          if ((task as any).completedAt != null) {
             let completedDate: Date | null = null;
 
-            if (typeof task.completedAt === 'string') {
+            if (typeof (task as any).completedAt === 'string') {
               try {
-                completedDate = parseISO(task.completedAt);
+                completedDate = parseISO((task as any).completedAt);
               } catch {
-                console.warn('parseISO失敗:', task.completedAt);
+                console.warn('parseISO失敗:', (task as any).completedAt);
               }
-            } else if (task.completedAt instanceof Timestamp) {
-              completedDate = task.completedAt.toDate();
+            } else if ((task as any).completedAt instanceof Timestamp) {
+              completedDate = (task as any).completedAt.toDate();
             } else if (
-              task.completedAt &&
-              typeof task.completedAt === 'object' &&
-              'toDate' in task.completedAt &&
-              typeof (task.completedAt as Timestamp).toDate === 'function'
+              (task as any).completedAt &&
+              typeof (task as any).completedAt === 'object' &&
+              'toDate' in (task as any).completedAt &&
+              typeof ((task as any).completedAt as Timestamp).toDate === 'function'
             ) {
-              completedDate = (task.completedAt as Timestamp).toDate();
+              completedDate = ((task as any).completedAt as Timestamp).toDate();
             } else {
-              console.warn('不明な completedAt の型:', task.completedAt);
+              console.warn('不明な completedAt の型:', (task as any).completedAt);
             }
 
             if (completedDate !== null && !isToday(completedDate) && task.period !== '不定期') {
@@ -502,10 +502,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 })
               );
 
-              task.done = false;
-              task.skipped = false;
-              task.completedAt = null;
-              task.completedBy = '';
+              (task as any).done = false;
+              (task as any).skipped = false;
+              (task as any).completedAt = null;
+              (task as any).completedBy = '';
             }
           }
         }
@@ -547,7 +547,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       if (!url || url.trim() === '') {
         return '/images/default.png';
       }
-      // Storageパスや相対パスは、とりあえずデフォルトにする（非同期変換は別処理で）
       if (url.startsWith('gs://') || (!url.startsWith('http') && !url.startsWith('/'))) {
         console.warn('Storageパス検出: 事前にgetDownloadURLで変換してください', url);
         return '/images/default.png';
@@ -631,18 +630,19 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
             {!isChecking && plan === 'premium' && (
               <>
-                <div className="sticky top-0 bg-transparent mb-2 z-999">
-                  <div className="w-full max-w-xl m-auto p-2 backdrop-blur-md rounded-lg">
+                <div className="sticky top-0 bg-transparent z-999">
+                  <div className="w-full max-w-xl m-auto pt-2 px-1 backdrop-blur-md rounded-lg">
                     {isSearchVisible && (
                       <div className="mb-3">
-                        <SearchBox value={searchTerm} onChange={setSearchTerm} />
+                        {/* ▼ 検索ボックスにrefを渡す */}
+                        <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
                       </div>
                     )}
 
-                    {/* ▼▼▼ 上部の虫眼鏡ボタンは削除済み（フローティング列へ移設） ▼▼▼ */}
+                    {/* ▼ 上部の虫眼鏡ボタンは削除済み（フローティング列へ移設） */}
 
                     <div className="flex items-center gap-2">
-                      {pairStatus === 'confirmed' && (
+                      {/* {pairStatus === 'confirmed' && (
                         <div className="flex items-center pr-2 border-r border-gray-300">
                           <button
                             onClick={() => setPrivateFilter((prev) => !prev)}
@@ -656,11 +656,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             <SquareUser />
                           </button>
                         </div>
-                      )}
+                      )} */}
 
-                      {/* // src/components/views/TaskView.tsx */}
-                      <div className="flex overflow-x-auto no-scrollbar space-x-2">
-                        {/* ▼ plan が premium のときのみ FilterControls を表示。ローディング中(isChecking)は非表示 */}
+                      {/* <div className="flex overflow-x-auto no-scrollbar space-x-2">
                         <FilterControls
                           periodFilter={periodFilter}
                           personFilter={personFilter}
@@ -676,9 +674,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           flaggedFilter={flaggedFilter}
                           onToggleFlaggedFilter={() => setFlaggedFilter((prev) => !prev)}
                         />
-                      </div>
+                      </div> */}
 
-                      {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
+                      {/* {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
                         <motion.button
                           onClick={() => {
                             setPeriodFilter(null);
@@ -696,11 +694,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         >
                           <X className="w-5 h-5" />
                         </motion.button>
-                      )}
+                      )} */}
                     </div>
                   </div>
                 </div>
-                <hr className="border-t border-gray-300 opacity-50 my-1" />
+                {/* <hr className="border-t border-gray-300 opacity-50 my-1" /> */}
               </>
             )}
 
@@ -714,9 +712,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     (!periodFilter || periodFilter === task.period) &&
                     (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task) || task.flagged === true) &&
-                    (!privateFilter || task.private === true) &&
-                    (!flaggedFilter || task.flagged === true)
+                    (!todayFilter || isTodayTask(task) || (task as any).flagged === true) &&
+                    (!privateFilter || (task as any).private === true) &&
+                    (!flaggedFilter || (task as any).flagged === true)
                 );
 
               if (allFilteredTasks.length === 0) {
@@ -732,11 +730,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     (!periodFilter || periodFilter === period) &&
                     (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task) || task.flagged === true) &&
-                    (!privateFilter || task.private === true) &&
-                    (!flaggedFilter || task.flagged === true)
+                    (!todayFilter || isTodayTask(task) || (task as any).flagged === true) &&
+                    (!privateFilter || (task as any).private === true) &&
+                    (!flaggedFilter || (task as any).flagged === true)
                 );
-                const remaining = list.filter((t) => !t.done).length;
+                const remaining = list.filter((t) => !(t as any).done).length;
 
                 if (!uid) {
                   return (
@@ -768,7 +766,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         </span>
                       </h2>
 
-                      {list.some((t) => t.done) && (
+                      {list.some((t) => (t as any).done) && (
                         <button
                           onClick={() => setShowCompletedMap((prev) => ({ ...prev, [period]: !prev[period] }))}
                           title={
@@ -796,39 +794,38 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         .slice()
                         .sort((a, b) => {
                           // ① フラグ付きタスクを優先
-                          if (a.flagged && !b.flagged) return -1;
-                          if (!a.flagged && b.flagged) return 1;
+                          if ((a as any).flagged && !(b as any).flagged) return -1;
+                          if (!(a as any).flagged && (b as any).flagged) return 1;
 
                           // ② 未完了タスクを優先
-                          if (a.done !== b.done) return a.done ? 1 : -1;
+                          if ((a as any).done !== (b as any).done) return (a as any).done ? 1 : -1;
 
                           // ③ 日時/時間による優先ソート
                           const aKey = getComparableDateTimeMs(a);
                           const bKey = getComparableDateTimeMs(b);
 
-                          // 3-1. 明示的な日付あり同士 → 昇順
+                          // 明示的な日付あり同士 → 昇順
                           if (aKey.hasDate && bKey.hasDate) {
                             return (aKey.ms! - bKey.ms!);
                           }
-                          // 3-2. 片方のみ日付あり → 日付ありを優先
+                          // 片方のみ日付あり → 日付ありを優先
                           if (aKey.hasDate !== bKey.hasDate) {
                             return aKey.hasDate ? -1 : 1;
                           }
 
-                          // 3-3. 日付なしだが「時間だけ」あり同士 → 早い時間順
+                          // 時間だけあり同士 → 早い時間順
                           if (aKey.hasTimeOnly && bKey.hasTimeOnly) {
                             return (aKey.ms! - bKey.ms!);
                           }
-                          // 3-4. 片方のみ「時間だけ」あり → そちらを優先
+                          // 片方のみ時間だけあり → そちらを優先
                           if (aKey.hasTimeOnly !== bKey.hasTimeOnly) {
                             return aKey.hasTimeOnly ? -1 : 1;
                           }
 
-                          // ④ 最後は登録順ではなく名称順にフォールバック
+                          // 最後は名称順
                           return a.name.localeCompare(b.name);
                         })
-                        // .filter((t) => showCompletedMap[period] || !t.done)
-                        .filter((t) => showCompletedMap[period] || !t.done || searchActive)
+                        .filter((t) => showCompletedMap[period] || !(t as any).done || searchActive)
                         .map((task, idx) => (
                           <TaskCard
                             key={task.id}
@@ -843,12 +840,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                                 period: task.period,
                                 daysOfWeek: task.daysOfWeek ?? [],
                                 dates: task.dates ?? [],
-                                isTodo: task.isTodo ?? false,
+                                isTodo: (task as any).isTodo ?? false,
                               })
                             }
                             userList={userList}
                             isPairConfirmed={pairStatus === 'confirmed'}
-                            isPrivate={task.private === true}
+                            isPrivate={(task as any).private === true}
                             onLongPress={(x, y) => setLongPressPosition({ x, y })}
                             deletingTaskId={deletingTaskId}
                             onSwipeLeft={(taskId) => setDeletingTaskId(taskId)}
@@ -866,11 +863,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         {!isLoading && !isChecking && plan === 'free' && <AdCard />}
       </main>
 
+      {/* ▼ 左下のフローティング列（虫眼鏡は右端） */}
       {!editTargetTask && index === 1 &&
         typeof window !== 'undefined' &&
         createPortal(
           <div className="w-full pointer-events-none">
-            {/* max-w-xl の左端 + 1rem から配置（任意値 calc は _ でスペース置換） */}
             <div
               className="
           fixed
@@ -881,7 +878,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           mb-4
         "
             >
-              {/* 並び: 本日 /（条件）プライベート / フラグ / クリア（ある時） / 検索 ←★右端 */}
               <div className="flex items-center gap-2">
                 {/* 本日フィルター */}
                 <motion.button
@@ -941,9 +937,27 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   <Flag className="w-6 h-6" />
                 </motion.button>
 
-                {/* ▼▼▼ 追加：右端の検索（虫眼鏡）ボタン ▼▼▼ */}
+                                {/* ▼ 右端の検索（虫眼鏡）ボタン：タップで即フォーカス */}
                 <motion.button
-                  onClick={() => setShowSearchBox((prev) => (searchTerm.trim() ? true : !prev))}
+                  onClick={() => {
+                    // 1) まず検索UIを表示に
+                    setShowSearchBox(true);
+                    // 2) 次フレームで実DOMにフォーカス（iOS/Androidのキーボードを出す）
+                    requestAnimationFrame(() => {
+                      // Androidの一部端末対策でsetTimeout(0)も併用
+                      setTimeout(() => {
+                        const el = searchInputRef.current;
+                        if (el) {
+                          // 末尾にキャレットを置く
+                          const end = el.value?.length ?? 0;
+                          try {
+                            el.setSelectionRange(end, end);
+                          } catch {}
+                          el.focus({ preventScroll: true });
+                        }
+                      }, 0);
+                    });
+                  }}
                   whileTap={{ scale: 1.2 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   aria-pressed={isSearchVisible}
@@ -979,8 +993,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     <X className="w-5 h-5" />
                   </motion.button>
                 )}
-
-
               </div>
             </div>
           </div>,
