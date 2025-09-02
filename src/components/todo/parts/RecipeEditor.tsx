@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useLayoutEffect } from 'react';
 import { Plus } from 'lucide-react';
 
 export type Ingredient = { id: string; name: string; amount: number | null; unit: string };
@@ -39,7 +39,14 @@ const toHalfWidth = (s: string) =>
     .replace(/，/g, ',')
     .replace(/．/g, '.');
 
-
+type Props = {
+  /** 表示用ラベル（例：「親タスク: 料理」） */
+  headerNote?: string;
+  /** 値（親から渡す） */
+  value: Recipe;
+  /** 値が変わったら親に通知 */
+  onChange: (next: Recipe) => void;
+};
 
 // 親→子 同期時の“巻き戻り”抑制のための浅い比較
 const shallowEqualIngredients = (a: Ingredient[], b: Ingredient[]) => {
@@ -58,12 +65,74 @@ const shallowEqualSteps = (a: string[], b: string[]) => {
   return true;
 };
 
+/** 0 -> A, 1 -> B ... 25 -> Z, 26 -> AA, 27 -> AB ... */
+const indexToLetters = (idx: number) => {
+  let n = idx + 1;
+  let s = '';
+  while (n > 0) {
+    n--; // 1-based -> 0-based
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+};
+
+/** 手順テキストエリア（デフォルト1行、入力内容に応じて自動リサイズ） */
+function AutoResizeTextarea({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    // 最低1行相当の高さを確保しつつ、内容に応じて拡張
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  useLayoutEffect(() => {
+    resize();
+  }, [value]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // 初期表示時も1行分に設定
+    resize();
+    // フォントや幅が変化した場合の再計算（任意）
+    const ro = new ResizeObserver(resize);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={1} // デフォルト1行
+      className={className}
+      style={{ overflow: 'hidden' }} // スクロールバーを出さず自動拡張
+    />
+  );
+}
+
 export default function RecipeEditor({ headerNote, value, onChange }: Props) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(value.ingredients);
   const [steps, setSteps] = useState<string[]>(value.steps);
   const [userEditedUnitIds, setUserEditedUnitIds] = useState<Set<string>>(new Set());
 
-  // ★ 追加: IME 合成中の行を識別するためのステート
+  // ★ IME 合成中の行を識別
   const [composingId, setComposingId] = useState<string | null>(null);
 
   // 親からの値更新に追従（内容が変わったときのみ反映）
@@ -95,7 +164,7 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
     setComposingId((curr) => (curr === id ? null : curr));
   };
 
-  // ★ 修正: 合成中は unit を自動変更しない
+  // 合成中は unit を自動変更しない
   const changeIngredientName = (id: string, name: string) => {
     setIngredients((prev) =>
       prev.map((i) => {
@@ -129,7 +198,7 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
   const changeStep = (idx: number, val: string) => setSteps((prev) => prev.map((s, i) => (i === idx ? val : s)));
 
   return (
-    <div className="mt-6 rounded-xl border border-gray-200 bg-white">
+    <div className="">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <h2 className="text-lg font-semibold">レシピ（材料・手順）</h2>
         {headerNote && <span className="text-xs text-gray-500">{headerNote}</span>}
@@ -142,7 +211,7 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
           <button
             type="button"
             onClick={addIngredient}
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50"
+            className="inline-flex items-center gap-1 px-2 py-1 text-sm border-0 border-b border-gray-300 hover:border-blue-500"
           >
             <Plus size={16} />
             追加
@@ -150,13 +219,17 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
         </div>
 
         <div className="space-y-2">
-          {ingredients.map((ing) => (
+          {ingredients.map((ing, idx) => (
             <div key={ing.id} className="grid grid-cols-12 gap-2 items-center">
+              {/* A, B, C... ラベル */}
+              <div className="col-span-1 text-sm text-gray-500 select-none">{indexToLetters(idx)}.</div>
+
+              {/* 材料名 */}
               <input
                 value={ing.name}
                 onChange={(e) => changeIngredientName(ing.id, e.target.value)}
-                onCompositionStart={() => setComposingId(ing.id)} // ★ 追加
-                onCompositionEnd={(e) => {                       // ★ 追加
+                onCompositionStart={() => setComposingId(ing.id)}
+                onCompositionEnd={(e) => {
                   setComposingId((curr) => (curr === ing.id ? null : curr));
                   if (!userEditedUnitIds.has(ing.id)) {
                     const finalName = e.currentTarget.value;
@@ -166,9 +239,10 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
                   }
                 }}
                 placeholder="材料名（例：玉ねぎ）"
-                className="col-span-5 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
+                className="col-span-4 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
               />
 
+              {/* 数量 */}
               <input
                 inputMode="decimal"
                 // 小数とカンマ、全角も許容（ブラウザネイティブ検証を強くしすぎない）
@@ -179,10 +253,11 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
                 className="col-span-3 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm text-right focus:outline-none focus:ring-0 focus:border-blue-500"
               />
 
+              {/* 単位 */}
               <select
                 value={ing.unit}
                 onChange={(e) => changeIngredientUnit(ing.id, e.target.value)}
-                className="col-span-3 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 z-0 text-center"
+                className="col-span-3 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500"
               >
                 {UNIT_OPTIONS.map((u) => (
                   <option key={u} value={u}>
@@ -191,13 +266,14 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
                 ))}
               </select>
 
+              {/* 削除 */}
               <button
                 type="button"
                 onClick={() => removeIngredient(ing.id)}
                 aria-label="材料を削除"
-                className="group col-span-1 flex items-center justify-center w-8 h-8 rounded-2xl border border-gray-200 text-gray-700 hover:bg-red-50 hover:text-red-600 z-10 shrink-0"
+                className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
               >
-                <span aria-hidden className="text-lg font-semibold leading-none">×</span>
+                <span aria-hidden className="text-lg leading-none">×</span>
               </button>
             </div>
           ))}
@@ -211,7 +287,7 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
           <button
             type="button"
             onClick={addStep}
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50"
+            className="inline-flex items-center gap-1 px-2 py-1 text-sm border-0 border-b border-gray-300 hover:border-blue-500"
           >
             <Plus size={16} />
             追加
@@ -221,21 +297,25 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
         <ol className="space-y-2">
           {steps.map((s, idx) => (
             <li key={idx} className="grid grid-cols-12 gap-2 items-start">
-              <div className="col-span-1 pt-2 text-sm text-gray-500">{idx + 1}.</div>
-              <textarea
+              {/* 行番号 */}
+              <div className="col-span-1 pt-2 text-sm text-gray-500 select-none">{idx + 1}.</div>
+
+              {/* 自動リサイズ・下線のみのテキストエリア（デフォルト1行） */}
+              <AutoResizeTextarea
                 value={s}
-                onChange={(e) => changeStep(idx, e.target.value)}
+                onChange={(v) => changeStep(idx, v)}
                 placeholder="手順を入力"
-                rows={2}
-                className="col-span-10 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="col-span-10 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
               />
+
+              {/* 削除 */}
               <button
                 type="button"
                 onClick={() => removeStep(idx)}
                 aria-label="手順を削除"
-                className="group col-span-1 flex items-center justify-center w-8 h-8 rounded-2xl border border-gray-200 text-gray-700 hover:bg-red-50 hover:text-red-600 z-10 shrink-0"
+                className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
               >
-                <span aria-hidden className="text-lg font-semibold leading-none">×</span>
+                <span aria-hidden className="text-lg leading-none">×</span>
               </button>
             </li>
           ))}
