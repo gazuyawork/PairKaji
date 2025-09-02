@@ -1,16 +1,15 @@
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
+import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
 import { auth, db } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceAnimation';
-import ComparePriceTable from '@/components/todo/parts/ComparePriceTable';
-import DetailInputFields from '@/components/todo/parts/DetailInputFields';
 import BaseModal from '../../common/modals/BaseModal';
 
 // 表示上限: 画面高の 50%（vh基準）
@@ -44,7 +43,6 @@ export default function TodoNoteModal({
   const [compareMode, setCompareMode] = useState(false);
   const [comparePrice, setComparePrice] = useState('');
   const [compareQuantity, setCompareQuantity] = useState('');
-  const [showDetails, setShowDetails] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [saveLabel, setSaveLabel] = useState('保存');
   const [isSaving, setIsSaving] = useState(false);
@@ -124,9 +122,6 @@ export default function TodoNoteModal({
             setQuantity(todo.quantity?.toString() || '');
             setUnit(todo.unit || 'g');
 
-            const shouldShow = typeof todo.price === 'number' && todo.price > 0;
-            // 価格詳細は「買い物」のときだけ初期展開
-            setShowDetails(cat === '買い物' && shouldShow);
             if (!compareQuantity && todo.quantity) {
               setCompareQuantity(todo.quantity.toString());
             }
@@ -136,11 +131,14 @@ export default function TodoNoteModal({
             if (existing) {
               const safeIngredients = Array.isArray(existing.ingredients)
                 ? existing.ingredients.map((ing, idx) => ({
-                  id: ing.id ?? `ing_${idx}`,
-                  name: ing.name ?? '',
-                  amount: typeof ing.amount === 'number' ? ing.amount : null,
-                  unit: ing.unit ?? '適量',
-                }))
+                    id: (ing as any).id ?? `ing_${idx}`,
+                    name: (ing as any).name ?? '',
+                    amount:
+                      typeof (ing as any).amount === 'number'
+                        ? (ing as any).amount
+                        : null,
+                    unit: (ing as any).unit ?? '適量',
+                  }))
                 : [];
               setRecipe({
                 ingredients: safeIngredients,
@@ -163,7 +161,9 @@ export default function TodoNoteModal({
       }
     };
     fetchTodoData();
-  }, [taskId, todoId, compareQuantity, updateHints]);
+    // compareQuantity は初期設定だけ参照したいので依存に含めない（ESLint 対応はプロジェクト方針に合わせてください）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId, todoId, updateHints]);
 
   // ── テキストエリアの自動リサイズ（内容に応じて拡大 / 上限でスクロール） ──
   const resizeTextarea = useCallback(() => {
@@ -240,8 +240,8 @@ export default function TodoNoteModal({
       numericComparePrice > 0
         ? numericCompareQuantity
         : numericQuantity > 0
-          ? numericQuantity
-          : 1;
+        ? numericQuantity
+        : 1;
     const appliedUnit = numericQuantity > 0 ? unit : '個';
 
     const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
@@ -265,18 +265,18 @@ export default function TodoNoteModal({
         unit: appliedUnit,
         ...(category === '料理'
           ? {
-            recipe: {
-              ingredients: recipe.ingredients
-                .filter((i) => i.name.trim() !== '')
-                .map((i) => ({
-                  id: i.id,
-                  name: i.name.trim(),
-                  amount: typeof i.amount === 'number' ? i.amount : null,
-                  unit: i.unit || '適量',
-                })),
-              steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
-            } as Recipe,
-          }
+              recipe: {
+                ingredients: recipe.ingredients
+                  .filter((i) => i.name.trim() !== '')
+                  .map((i) => ({
+                    id: i.id,
+                    name: i.name.trim(),
+                    amount: typeof i.amount === 'number' ? i.amount : null,
+                    unit: i.unit || '適量',
+                  })),
+                steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
+              } as Recipe,
+            }
           : {}),
       });
 
@@ -344,96 +344,27 @@ export default function TodoNoteModal({
         )}
       </div>
 
+      {/* ▼▼ 買い物カテゴリの詳細は常時表示（コンポーネント化） ▼▼ */}
       {category === '買い物' && (
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => {
-              const next = !showDetails;
-              setShowDetails(next);
-              if (!next) setCompareMode(false);
-            }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition"
-          >
-            <Info size={16} />
-            {showDetails ? '詳細を閉じる' : '詳細を追加'}
-          </button>
-
-          {showDetails && !isNaN(parseFloat(price)) && parseFloat(price) > 0 && (
-            <button
-              onClick={() => setCompareMode(!compareMode)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm transition"
-            >
-              <CheckCircle size={16} />
-              {compareMode ? '差額確認をやめる' : '差額確認'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {category === '買い物' && (
-        compareMode ? (
-          <ComparePriceTable
-            price={price}
-            quantity={quantity}
-            comparePrice={comparePrice}
-            compareQuantity={compareQuantity}
-            unit={unit}
-            animatedDifference={animatedDifference}
-            unitPriceDiff={
-              (() => {
-                const np = parseFloat(price);
-                const nq = parseFloat(quantity);
-                const ncp = parseFloat(comparePrice);
-                const ncq = parseFloat(compareQuantity) > 0 ? parseFloat(compareQuantity) : 1;
-                const cup = np > 0 && (nq > 0 ? nq : 1) > 0 ? np / (nq > 0 ? nq : 1) : null;
-                const cmp = ncp > 0 ? ncp / ncq : null;
-                return cmp !== null && cup !== null ? cmp - cup : null;
-              })()
-            }
-            compareDisplayUnit={
-              (() => {
-                const ncq = parseFloat(compareQuantity);
-                return !ncq || ncq <= 0 ? '個' : unit;
-              })()
-            }
-            onChangeComparePrice={setComparePrice}
-            onChangeCompareQuantity={setCompareQuantity}
-            showDiff={
-              (() => {
-                const ncp = parseFloat(comparePrice);
-                const ncq = parseFloat(compareQuantity);
-                const np = parseFloat(price);
-                const nq = parseFloat(quantity);
-                const sq = nq > 0 ? nq : 1;
-                const cup = np > 0 && sq > 0 ? np / sq : null;
-                const scq = ncq > 0 ? ncq : 1;
-                const cmp = ncp > 0 ? ncp / scq : null;
-                const diff = cmp !== null && cup !== null ? cmp - cup : null;
-                return diff !== null;
-              })()
-            }
-            animationComplete={diffAnimationComplete}
-          />
-        ) : (
-          showDetails && (
-            <DetailInputFields
-              price={price}
-              quantity={quantity}
-              unit={unit}
-              onChangePrice={setPrice}
-              onChangeQuantity={setQuantity}
-              onChangeUnit={setUnit}
-              currentUnitPrice={
-                (() => {
-                  const np = parseFloat(price);
-                  const nq = parseFloat(quantity);
-                  const sq = nq > 0 ? nq : 1;
-                  return np > 0 && sq > 0 ? np / sq : null;
-                })()
-              }
-            />
-          )
-        )
+        <ShoppingDetailsEditor
+          // 値
+          price={price}
+          quantity={quantity}
+          unit={unit}
+          compareMode={compareMode}
+          comparePrice={comparePrice}
+          compareQuantity={compareQuantity}
+          // 変更ハンドラ（親の state を更新）
+          onChangePrice={setPrice}
+          onChangeQuantity={setQuantity}
+          onChangeUnit={setUnit}
+          onToggleCompareMode={(next) => setCompareMode(next)}
+          onChangeComparePrice={setComparePrice}
+          onChangeCompareQuantity={setCompareQuantity}
+          // アニメーション関連
+          animatedDifference={animatedDifference}
+          animationComplete={diffAnimationComplete}
+        />
       )}
 
       {/* ▼▼ 料理カテゴリのときだけレシピエディタを表示する ▼▼ */}
