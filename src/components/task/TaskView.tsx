@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TaskCard from '@/components/task/parts/TaskCard';
 import EditTaskModal from '@/components/task/parts/EditTaskModal';
+// 既存の import 先がこちらの場合はそのまま。現状の SearchBox のパスに合わせてください。
 import SearchBox from '@/components/task/parts/SearchBox';
 // import FilterControls from '@/components/task/parts/FilterControls';
 import {
@@ -152,6 +153,10 @@ type Props = {
 
 export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
   const uid = useUserUid();
+  // ▼ 追加：検索インプット用の ref
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // ▼ 追加：検索ボックスのラッパー参照（表示クラスの同期切替に使用）
+  const keyboardSummonerRef = useRef<HTMLInputElement>(null);
   const { profileImage, partnerImage } = useProfileImages();
   const { plan, isChecking } = useUserPlan();
   const searchParams = useSearchParams();
@@ -182,9 +187,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index } = useView();
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
-
-  // ▼ 追加：検索インプットへのref（虫眼鏡タップで即フォーカスさせる）
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 追加：'YYYY-MM-DD' を Date にして「今日以前か」判定する
   const isSameOrBeforeToday = (ymd: string): boolean => {
@@ -562,6 +564,16 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
+      {/* ▼ キーボード喚起用のダミー input（画面内に1pxだけ置く） */}
+      <input
+        ref={keyboardSummonerRef}
+        type="text"
+        // iOSで「画面内・可視扱い」にするため opacity を 0.001 程度に（0だとNG端末あり）
+        className="fixed bottom-[4rem] left-2 w-px h-px"
+        style={{ opacity: 0.001 }}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
       {editTargetTask && (
         <EditTaskModal
           key={editTargetTask.id}
@@ -634,7 +646,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   <div className="w-full max-w-xl m-auto pt-2 px-1 backdrop-blur-md rounded-lg">
                     {isSearchVisible && (
                       <div className="mb-3">
-                        {/* ▼ 検索ボックスにrefを渡す */}
                         <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
                       </div>
                     )}
@@ -937,25 +948,37 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   <Flag className="w-6 h-6" />
                 </motion.button>
 
-                                {/* ▼ 右端の検索（虫眼鏡）ボタン：タップで即フォーカス */}
+                {/* ▼ 右端の検索（虫眼鏡）ボタン：タップで即フォーカス */}
                 <motion.button
-                  onClick={() => {
-                    // 1) まず検索UIを表示に
+                  onMouseDown={() => {
+                    // 1) まずダミーでキーボードを確実に開く（ユーザー操作直後＆画面内要素）
+                    keyboardSummonerRef.current?.focus();
+                    // 2) 検索UIをマウント
                     setShowSearchBox(true);
-                    // 2) 次フレームで実DOMにフォーカス（iOS/Androidのキーボードを出す）
+                    // 3) 次フレーム（or もう一段）で本体にフォーカス移譲
                     requestAnimationFrame(() => {
-                      // Androidの一部端末対策でsetTimeout(0)も併用
-                      setTimeout(() => {
-                        const el = searchInputRef.current;
-                        if (el) {
-                          // 末尾にキャレットを置く
-                          const end = el.value?.length ?? 0;
-                          try {
-                            el.setSelectionRange(end, end);
-                          } catch {}
-                          el.focus({ preventScroll: true });
+                      requestAnimationFrame(() => {
+                        const real = searchInputRef.current;
+                        if (real) {
+                          try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { }
+                          real.focus({ preventScroll: true });
                         }
-                      }, 0);
+                        keyboardSummonerRef.current?.blur();
+                      });
+                    });
+                  }}
+                  onTouchStart={() => {
+                    keyboardSummonerRef.current?.focus();
+                    setShowSearchBox(true);
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        const real = searchInputRef.current;
+                        if (real) {
+                          try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { }
+                          real.focus({ preventScroll: true });
+                        }
+                        keyboardSummonerRef.current?.blur();
+                      });
                     });
                   }}
                   whileTap={{ scale: 1.2 }}
