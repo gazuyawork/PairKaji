@@ -211,7 +211,7 @@ export default function TaskCalendar({ tasks }: Props) {
                           ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
                           ${
                             isOverdue
-                              ? 'bg-gradient-to-b from-red-400 to-red-600 text-white' // ← 赤系グラデ
+                              ? 'bg-gradient-to-b from-red-300 to-red-500 text-white' // ← 赤系グラデ
                               : isWeeklyTask
                                 ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
                                 : isDateTask
