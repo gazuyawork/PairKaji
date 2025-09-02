@@ -1,4 +1,3 @@
-// src/.../TodoView.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +32,9 @@ import { useUserUid } from '@/hooks/useUserUid';
 // ★ 追加: 同じIDのtext置換保存を使う
 import { updateTodoTextInTask } from '@/lib/taskUtils';
 
+// ★ 追加: Portal で body 直下に描画するため
+import { createPortal } from 'react-dom';
+
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName, index } = useView();
   const [filterText, setFilterText] = useState('');
@@ -48,6 +50,10 @@ export default function TodoView() {
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
   const { plan, isChecking } = useUserPlan();
   const uid = useUserUid();
+
+  // ★ 追加: Portal を SSR 安全にするためのマウント判定
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // ★ 追加: ローディング状態
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -188,182 +194,198 @@ export default function TodoView() {
   }, [tasks, selectedGroupId]);
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
-      <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-40">
-        {/* ✅ indexが2（TodoView）である場合のみ表示 */}
-        {index === 2 && noteModalTask && noteModalTodo && (
-          <TodoNoteModal
-            isOpen={noteModalOpen}
-            onClose={closeNoteModal}
-            todoText={noteModalTodo.text}
-            todoId={noteModalTodo.id}
-            taskId={noteModalTask.id}
-          />
-        )}
-
-        {/* 🔁 Stickyラッパーでセレクトとフィルタをまとめて固定 */}
-        <div className="sticky top-0 z-[999] w-full bg-transparent">
-          <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3">
-            {/* ✅ セレクトボックス部分 */}
-            <div ref={selectBoxRef} className="relative w-full mb-6">
-              <input
-                type="text"
-                value=""
-                placeholder="追加する Todo を選択してください。"
-                readOnly
-                onClick={() => setIsOpen(true)}
-                className="w-full border border-gray-300 bg-white rounded-lg px-4 py-2 text-sm shadow cursor-pointer pr-10"
-              />
-              {isOpen && (
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="absolute right-3 top-0 text-red-500 hover:text-red-700 text-2xl font-bold"
-                  aria-label="閉じる"
-                >
-                  ×
-                </button>
-              )}
-              {isOpen && (
-                <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow mt-1 max-h-70 overflow-y-auto text-sm">
-                  {taskNameOptions.map((name) => (
-                    <li
-                      key={name}
-                      onClick={async () => {
-                        const matched = tasks.find(task => task.name === name);
-                        if (matched && !matched.visible) {
-                          await updateDoc(doc(db, 'tasks', matched.id), {
-                            visible: true,
-                            updatedAt: serverTimestamp(),
-                          });
-                          toast.success('非表示のタスクを再表示しました。');
-                        }
-                        setSelectedGroupId(matched?.id ?? null);
-                        setFilterText('');
-                        setIsOpen(false);
-                      }}
-                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                    >
-                      {name}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* ✅ グループセレクタ（フィルター）部分 */}
-            <GroupSelector
-              tasks={tasks}
-              selectedGroupId={selectedGroupId}
-              onSelectGroup={(groupId) => {
-                setSelectedGroupId(groupId);
-                setFilterText('');
-              }}
+    <>
+      <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
+        <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-52">
+          {/* ✅ indexが2（TodoView）である場合のみ表示 */}
+          {index === 2 && noteModalTask && noteModalTodo && (
+            <TodoNoteModal
+              isOpen={noteModalOpen}
+              onClose={closeNoteModal}
+              todoText={noteModalTodo.text}
+              todoId={noteModalTodo.id}
+              taskId={noteModalTask.id}
             />
+          )}
+
+          {/* 🔁 Stickyラッパーでセレクトのみ固定（GroupSelector は下部固定に移動済み） */}
+          <div className="sticky top-0 z-[999] w-full bg-transparent">
+            <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3">
+              {/* ✅ セレクトボックス部分 */}
+              <div ref={selectBoxRef} className="relative w-full mb-6">
+                <input
+                  type="text"
+                  value=""
+                  placeholder="追加する Todo を選択してください。"
+                  readOnly
+                  onClick={() => setIsOpen(true)}
+                  className="w-full border border-gray-300 bg-white rounded-lg px-4 py-2 text-sm shadow cursor-pointer pr-10"
+                />
+                {isOpen && (
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="absolute right-3 top-0 text-red-500 hover:text-red-700 text-2xl font-bold"
+                    aria-label="閉じる"
+                  >
+                    ×
+                  </button>
+                )}
+                {isOpen && (
+                  <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow mt-1 max-h-70 overflow-y-auto text-sm">
+                    {taskNameOptions.map((name) => (
+                      <li
+                        key={name}
+                        onClick={async () => {
+                          const matched = tasks.find(task => task.name === name);
+                          if (matched && !matched.visible) {
+                            await updateDoc(doc(db, 'tasks', matched.id), {
+                              visible: true,
+                              updatedAt: serverTimestamp(),
+                            });
+                            toast.success('非表示のタスクを再表示しました。');
+                          }
+                          setSelectedGroupId(matched?.id ?? null);
+                          setFilterText('');
+                          setIsOpen(false);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                      >
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* （削除済み）ここにあった GroupSelector は下部固定に移動 */}
+            </div>
           </div>
-        </div>
 
-        {(() => {
-          const filteredTasks = tasks
-            .filter(task =>
-              task.visible &&
-              (!selectedGroupId || task.id === selectedGroupId) &&
-              (filterText.trim() === '' || task.name.includes(filterText)) &&
-              (task.userId === uid || task.private !== true) // 自分のタスクまたは共有タスク
-            );
+          {(() => {
+            const filteredTasks = tasks
+              .filter(task =>
+                task.visible &&
+                (!selectedGroupId || task.id === selectedGroupId) &&
+                (filterText.trim() === '' || task.name.includes(filterText)) &&
+                (task.userId === uid || task.private !== true) // 自分のタスクまたは共有タスク
+              );
 
-          if (filteredTasks.length === 0) {
-            return (
-              <p className="text-center text-gray-500 mt-4">
-                TODOはありません。
-              </p>
-            );
-          }
+            if (filteredTasks.length === 0) {
+              return (
+                <p className="text-center text-gray-500 mt-4">
+                  TODOはありません。
+                </p>
+              );
+            }
 
-          return filteredTasks.map(task => (
-            <div key={task.id} className="mx-auto w-full max-w-xl">
-              <TodoTaskCard
-                task={task}
-                tab={activeTabs[task.id] ?? 'undone'}
-                setTab={(tab) =>
-                  setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
-                }
-                onOpenNote={(text) => {
-                  const todo = task.todos.find(t => t.text === text);
-                  if (todo) {
-                    openNoteModal(task, todo);
+            return filteredTasks.map(task => (
+              <div key={task.id} className="mx-auto w-full max-w-xl">
+                <TodoTaskCard
+                  task={task}
+                  tab={activeTabs[task.id] ?? 'undone'}
+                  setTab={(tab) =>
+                    setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
                   }
-                }}
-                onAddTodo={async (todoId, text) => {
-                  const newTodos = [...task.todos, { id: todoId, text, done: false }];
-                  await updateDoc(doc(db, 'tasks', task.id), {
-                    todos: newTodos,
-                    updatedAt: serverTimestamp(),
-                  });
-                }}
-                // ★ 入力中の見た目だけ置換（保存はしない）
-                onChangeTodo={(todoId, value) => {
-                  const updated = tasks.map(t =>
-                    t.id === task.id
-                      ? {
-                          ...t,
-                          todos: t.todos.map(todo =>
-                            todo.id === todoId ? { ...todo, text: value } : todo
-                          ),
-                        }
-                      : t
-                  );
-                  setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
-                }}
-                onToggleDone={async (todoId) => {
-                  const updatedTodos = task.todos.map(todo =>
-                    todo.id === todoId ? { ...todo, done: !todo.done } : todo
-                  );
-                  await updateDoc(doc(db, 'tasks', task.id), {
-                    todos: updatedTodos,
-                    updatedAt: serverTimestamp(),
-                  });
-                }}
-                // ★ フォーカスアウト時に保存（同じIDのみ置換）。重複はトースト＋自然ロールバック（onSnapshot整合）
-                onBlurTodo={async (todoId, text) => {
-                  const trimmed = text.trim();
-                  if (!trimmed) return;
-
-                  try {
-                    await updateTodoTextInTask(task.id, todoId, trimmed);
-                    // 成功時は onSnapshot で即時に同期されるため、ここでは何もしない
-                  } catch (e: any) {
-                    if (e?.code === 'DUPLICATE_TODO' || e?.message === 'DUPLICATE_TODO') {
-                      toast.error('既に登録されています。');
-                    } else {
-                      toast.error('保存に失敗しました');
-                      console.error(e);
+                  onOpenNote={(text) => {
+                    const todo = task.todos.find(t => t.text === text);
+                    if (todo) {
+                      openNoteModal(task, todo);
                     }
-                    // ローカルは onSnapshot で最新に戻る想定（特に手動rollback不要）
-                  }
+                  }}
+                  onAddTodo={async (todoId, text) => {
+                    const newTodos = [...task.todos, { id: todoId, text, done: false }];
+                    await updateDoc(doc(db, 'tasks', task.id), {
+                      todos: newTodos,
+                      updatedAt: serverTimestamp(),
+                    });
+                  }}
+                  // ★ 入力中の見た目だけ置換（保存はしない）
+                  onChangeTodo={(todoId, value) => {
+                    const updated = tasks.map(t =>
+                      t.id === task.id
+                        ? {
+                            ...t,
+                            todos: t.todos.map(todo =>
+                              todo.id === todoId ? { ...todo, text: value } : todo
+                            ),
+                          }
+                        : t
+                    );
+                    setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
+                  }}
+                  onToggleDone={async (todoId) => {
+                    const updatedTodos = task.todos.map(todo =>
+                      todo.id === todoId ? { ...todo, done: !todo.done } : todo
+                    );
+                    await updateDoc(doc(db, 'tasks', task.id), {
+                      todos: updatedTodos,
+                      updatedAt: serverTimestamp(),
+                    });
+                  }}
+                  // ★ フォーカスアウト時に保存（同じIDのみ置換）。重複はトースト＋自然ロールバック（onSnapshot整合）
+                  onBlurTodo={async (todoId, text) => {
+                    const trimmed = text.trim();
+                    if (!trimmed) return;
+
+                    try {
+                      await updateTodoTextInTask(task.id, todoId, trimmed);
+                      // 成功時は onSnapshot で即時に同期されるため、ここでは何もしない
+                    } catch (e: any) {
+                      if (e?.code === 'DUPLICATE_TODO' || e?.message === 'DUPLICATE_TODO') {
+                        toast.error('既に登録されています。');
+                      } else {
+                        toast.error('保存に失敗しました');
+                        console.error(e);
+                      }
+                      // ローカルは onSnapshot で最新に戻る想定（特に手動rollback不要）
+                    }
+                  }}
+                  onDeleteTodo={async (todoId) => {
+                    const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
+                    await updateDoc(doc(db, 'tasks', task.id), {
+                      todos: updatedTodos,
+                      updatedAt: serverTimestamp(),
+                    });
+                  }}
+                  onDeleteTask={async () => {
+                    await updateDoc(doc(db, 'tasks', task.id), {
+                      visible: false,
+                      groupId: null,
+                      updatedAt: serverTimestamp(),
+                    });
+                  }}
+                  todoRefs={todoRefs}
+                  focusedTodoId={focusedTodoId}
+                />
+              </div>
+            ));
+          })()}
+          {/* ✅ 広告カード（画面の末尾） */}
+          {!isLoading && !isChecking && plan === 'free' && <AdCard />}
+        </main>
+      </div>
+
+      {/* ★ 追加: Portal で body 直下に描画（Todo 画面のみ） */}
+      {mounted && index === 2 && createPortal(
+        <div
+          className="fixed left-1/2 -translate-x-1/2 bottom-22 z-[1000] w-full max-w-xl px-2 pointer-events-none"
+          aria-label="グループセレクタ固定バー"
+        >
+          <div className="pointer-events-auto rounded-sm backdrop-blur-md bg-white/10">
+            <div className="pt-5 pb-0">
+              <GroupSelector
+                tasks={tasks}
+                selectedGroupId={selectedGroupId}
+                onSelectGroup={(groupId) => {
+                  setSelectedGroupId(groupId);
+                  setFilterText('');
                 }}
-                onDeleteTodo={async (todoId) => {
-                  const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
-                  await updateDoc(doc(db, 'tasks', task.id), {
-                    todos: updatedTodos,
-                    updatedAt: serverTimestamp(),
-                  });
-                }}
-                onDeleteTask={async () => {
-                  await updateDoc(doc(db, 'tasks', task.id), {
-                    visible: false,
-                    groupId: null,
-                    updatedAt: serverTimestamp(),
-                  });
-                }}
-                todoRefs={todoRefs}
-                focusedTodoId={focusedTodoId}
               />
             </div>
-          ));
-        })()}
-        {/* ✅ 広告カード（画面の末尾） */}
-        {!isLoading && !isChecking && plan === 'free' && <AdCard />}
-      </main>
-    </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
