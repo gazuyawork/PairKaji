@@ -643,7 +643,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             {!isChecking && plan === 'premium' && (
               <>
                 <div className="sticky top-0 bg-transparent z-999">
-                  <div className="w-full max-w-xl m-auto pt-2 px-1 backdrop-blur-md rounded-lg">
+                  <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
                     {isSearchVisible && (
                       <div className="mb-3">
                         <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
@@ -900,8 +900,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   title="本日のタスクに絞り込む"
                   className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
               ${todayFilter
-                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner ring-2 ring-white'
-                      : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D] ring-2 ring-white'}
+                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner ring-2 ring-gray-300'
+                      : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D] ring-2 ring-gray-300'}
             `}
                 >
                   <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
@@ -923,8 +923,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     title="プライベートタスク"
                     className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
                 ${privateFilter
-                        ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[#059669] shadow-inner ring-2 ring-white'
-                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185] ring-2 ring-white'}
+                        ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[#059669] shadow-inner ring-2 ring-gray-300'
+                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185] ring-2 ring-gray-300'}
               `}
                   >
                     <SquareUser className="w-7 h-7" />
@@ -941,8 +941,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   title="フラグ付きタスク"
                   className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
               ${flaggedFilter
-                      ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] border-[#f43f5e] text-white shadow-inner ring-2 ring-white'
-                      : 'bg-white border-gray-300 text-[#5E5E5E] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:border-[#fb7185] hover:text-white ring-2 ring-white'}
+                      ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] border-[#f43f5e] text-white shadow-inner ring-2 ring-gray-300'
+                      : 'bg-white border-gray-300 text-[#5E5E5E] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:border-[#fb7185] hover:text-white ring-2 ring-gray-300'}
             `}
                 >
                   <Flag className="w-6 h-6" />
@@ -988,8 +988,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   title="検索"
                   className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
                     ${isSearchVisible
-                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner ring-2 ring-white'
-                      : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] ring-2 ring-white'
+                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner ring-2 ring-gray-300'
+                      : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] ring-2 ring-gray-300'
                     }`}
                 >
                   <Search className={`w-7 h-7 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
