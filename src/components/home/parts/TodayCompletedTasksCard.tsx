@@ -4,12 +4,26 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, SquareUser } from 'lucide-react';
 import type { Task } from '@/types/Task';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+
+// 追加: タスクがプライベート完了かどうかを判定
+function isTaskPrivate(task: Task): boolean {
+  const anyTask = task as any;
+  // よく使われがちな候補を網羅的にチェック（存在するものだけが true になる）
+  return !!(
+    anyTask?.isPrivate === true ||
+    anyTask?.private === true ||
+    anyTask?.privateMode === true ||
+    anyTask?.privacy === 'private' ||
+    anyTask?.mode === 'private'
+  );
+}
+
 
 /** 補助: 完了者の userId を決定する
  * 優先度: completedBy → completedUserId → completedById → users[0]
@@ -160,7 +174,6 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
         <ul className="divide-y divide-gray-200 mx-4">
           {tasks.map((task) => {
             const completedUserId = getCompletedUserId(task);
-
             const timeLabel = task.completedAt
               ? format(
                 typeof task.completedAt === 'string'
@@ -172,6 +185,9 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
               )
               : '';
 
+            // 追加: プライベート判定
+            const isPrivate = isTaskPrivate(task);
+
             const imgSrc = completedUserId ? imgMap[completedUserId] : '';
             const displayName =
               (completedUserId && nameMap[completedUserId]) || completedUserId || '';
@@ -181,13 +197,21 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
                 {/* 左：タスク名 */}
                 <span className="text-gray-700 truncate">{task.name}</span>
 
-                {/* 右：時刻 + 完了者アイコン */}
+                {/* 右：時刻 + 完了者表記（プライベート時は鍵アイコン） */}
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-sm text-gray-400">{timeLabel}</span>
 
-                  {completedUserId ? (
+                  {isPrivate ? (
+                    // 追加: プライベートアイコン（鍵）を表示
+                    <div
+                      className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center"
+                      title="プライベート（パートナーには非表示）"
+                      aria-label="プライベート（パートナーには非表示）"
+                    >
+                      <SquareUser className="w-6 h-6 text-green-600" />
+                    </div>
+                  ) : completedUserId ? (
                     imgSrc ? (
-                      // ✅ ラッパーで正円にクリッピングし、Image は fill + object-cover
                       <div className="relative w-6 h-6 rounded-full overflow-hidden shrink-0">
                         <Image
                           src={imgSrc}
@@ -203,13 +227,9 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
                               naturalWidth: t?.naturalWidth,
                               naturalHeight: t?.naturalHeight,
                             });
-                            // ❌ キャッシュは消さない：一度表示できた画像は維持して「消えない」ようにする
-                            // 必要があれば、別途リトライ機構を足す（ここでは安定性を優先）
                           }}
-
                         />
                       </div>
-
                     ) : (
                       <div
                         className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 text-xs flex items-center justify-center"
@@ -228,6 +248,7 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
               </li>
             );
           })}
+
         </ul>
       ) : (
         <p className="text-gray-500 text-sm text-center py-4">本日の完了タスクはありません。</p>
