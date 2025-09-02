@@ -135,11 +135,18 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
   // ★ IME 合成中の行を識別
   const [composingId, setComposingId] = useState<string | null>(null);
 
+  // ★ 追加: 英数入力など IME非合成のタイピング中は親からの同期を止めるための編集中ID
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   // 親からの値更新に追従（内容が変わったときのみ反映）
   useEffect(() => {
-    setIngredients((prev) => (shallowEqualIngredients(prev, value.ingredients) ? prev : value.ingredients));
+    // 材料名の入力中（editingIdあり）は ingredients の“巻き戻り”を抑止
+    if (editingId === null) {
+      setIngredients((prev) => (shallowEqualIngredients(prev, value.ingredients) ? prev : value.ingredients));
+    }
+    // 手順は従来どおり同期
     setSteps((prev) => (shallowEqualSteps(prev, value.steps) ? prev : value.steps));
-  }, [value.ingredients, value.steps]);
+  }, [value.ingredients, value.steps, editingId]);
 
   // 親へ伝播
   useEffect(() => {
@@ -238,6 +245,11 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
                     );
                   }
                 }}
+                // {/* ▼ 追加: 入力開始で編集中IDをセット */}
+                onFocus={() => setEditingId(ing.id)}
+                // {/* ▼ 追加: フォーカスアウトで解除 */}
+                onBlur={() => setEditingId((curr) => (curr === ing.id ? null : curr))}
+
                 placeholder="材料名（例：玉ねぎ）"
                 className="col-span-4 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
               />
@@ -257,7 +269,7 @@ export default function RecipeEditor({ headerNote, value, onChange }: Props) {
               <select
                 value={ing.unit}
                 onChange={(e) => changeIngredientUnit(ing.id, e.target.value)}
-                className="col-span-3 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500"
+                className="col-span-3 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 text-center"
               >
                 {UNIT_OPTIONS.map((u) => (
                   <option key={u} value={u}>

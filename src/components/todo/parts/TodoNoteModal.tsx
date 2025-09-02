@@ -52,6 +52,28 @@ export default function TodoNoteModal({
   const [category, setCategory] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
+  // ▼ 追加: recipe の浅い等価比較（参照が違っても中身が同じなら更新しない）
+  const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
+    if (a === b) return true;
+    if (a.ingredients.length !== b.ingredients.length) return false;
+    for (let i = 0; i < a.ingredients.length; i++) {
+      const x = a.ingredients[i];
+      const y = b.ingredients[i];
+      if (!x || !y) return false;
+      if (x.id !== y.id || x.name !== y.name || x.unit !== y.unit || x.amount !== y.amount) return false;
+    }
+    if (a.steps.length !== b.steps.length) return false;
+    for (let i = 0; i < a.steps.length; i++) {
+      if (a.steps[i] !== b.steps[i]) return false;
+    }
+    return true;
+  }, []);
+
+  // ▼ 追加: RecipeEditor からの更新を等価時は参照温存
+  const handleRecipeChange = useCallback((next: Recipe) => {
+    setRecipe((prev) => (shallowEqualRecipe(prev, next) ? prev : next));
+  }, [shallowEqualRecipe]);
+
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
 
   // ── スクロールガイド（維持） ─────────────────────────────
@@ -131,14 +153,14 @@ export default function TodoNoteModal({
             if (existing) {
               const safeIngredients = Array.isArray(existing.ingredients)
                 ? existing.ingredients.map((ing, idx) => ({
-                    id: (ing as any).id ?? `ing_${idx}`,
-                    name: (ing as any).name ?? '',
-                    amount:
-                      typeof (ing as any).amount === 'number'
-                        ? (ing as any).amount
-                        : null,
-                    unit: (ing as any).unit ?? '適量',
-                  }))
+                  id: (ing as any).id ?? `ing_${idx}`,
+                  name: (ing as any).name ?? '',
+                  amount:
+                    typeof (ing as any).amount === 'number'
+                      ? (ing as any).amount
+                      : null,
+                  unit: (ing as any).unit ?? '適量',
+                }))
                 : [];
               setRecipe({
                 ingredients: safeIngredients,
@@ -240,8 +262,8 @@ export default function TodoNoteModal({
       numericComparePrice > 0
         ? numericCompareQuantity
         : numericQuantity > 0
-        ? numericQuantity
-        : 1;
+          ? numericQuantity
+          : 1;
     const appliedUnit = numericQuantity > 0 ? unit : '個';
 
     const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
@@ -265,18 +287,18 @@ export default function TodoNoteModal({
         unit: appliedUnit,
         ...(category === '料理'
           ? {
-              recipe: {
-                ingredients: recipe.ingredients
-                  .filter((i) => i.name.trim() !== '')
-                  .map((i) => ({
-                    id: i.id,
-                    name: i.name.trim(),
-                    amount: typeof i.amount === 'number' ? i.amount : null,
-                    unit: i.unit || '適量',
-                  })),
-                steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
-              } as Recipe,
-            }
+            recipe: {
+              ingredients: recipe.ingredients
+                .filter((i) => i.name.trim() !== '')
+                .map((i) => ({
+                  id: i.id,
+                  name: i.name.trim(),
+                  amount: typeof i.amount === 'number' ? i.amount : null,
+                  unit: i.unit || '適量',
+                })),
+              steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
+            } as Recipe,
+          }
           : {}),
       });
 
@@ -372,7 +394,7 @@ export default function TodoNoteModal({
         <RecipeEditor
           headerNote="親タスク: 料理"
           value={recipe}
-          onChange={setRecipe}
+          onChange={handleRecipeChange}
         />
       )}
     </BaseModal>
