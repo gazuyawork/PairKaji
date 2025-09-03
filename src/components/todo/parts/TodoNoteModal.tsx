@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState, useRef, useLayoutEffect, useCallback } from 'react';
+import { useEffect, useState, useRef, useLayoutEffect, useCallback, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Eye, Pencil } from 'lucide-react';
 import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
@@ -133,6 +133,33 @@ export default function TodoNoteModal({
 
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ▼ 内容の存在判定（メモ／画像／レシピ／買い物入力）
+const hasMemo = useMemo(() => memo.trim().length > 0, [memo]);
+
+// 画像は Firestore 保存済みURLのみを対象（previewUrl は無視）
+const hasImage = useMemo(() => imageUrl !== null, [imageUrl]);
+
+const hasRecipe = useMemo(() => {
+  if (category !== '料理') return false;
+  const ings = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+  const hasAnyIngredient = ings.some((i) => (i?.name ?? '').trim() !== '');
+  const hasAnyStep = steps.some((s) => (s ?? '').trim() !== '');
+  return hasAnyIngredient || hasAnyStep;
+}, [category, recipe]);
+
+const hasShopping = useMemo(() => {
+  if (category !== '買い物') return false;
+  const p = parseFloat(price);
+  const q = parseFloat(quantity);
+  const validPrice = Number.isFinite(p) && p > 0;
+  const validQty = Number.isFinite(q) && q > 0;
+  return validPrice || validQty;
+}, [category, price, quantity]);
+
+const hasContent = hasMemo || hasImage || hasRecipe || hasShopping;
+
 
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
     if (a === b) return true;
@@ -527,16 +554,16 @@ export default function TodoNoteModal({
 
   const previewInitRef = useRef(false);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (initialLoad) return;
-    if (previewInitRef.current) return;
+useEffect(() => {
+  if (!isOpen) return;
+  if (initialLoad) return;
+  if (previewInitRef.current) return;
 
-    const hasMemo = memo.trim().length > 0;
-    setIsPreview(category === '料理' && hasMemo);
+  setIsPreview(category === '料理' && hasContent);
 
-    previewInitRef.current = true;
-  }, [isOpen, initialLoad, category, memo]);
+  previewInitRef.current = true;
+}, [isOpen, initialLoad, category, hasContent]);
+
 
   useEffect(() => {
     if (!isOpen) {
@@ -553,7 +580,7 @@ export default function TodoNoteModal({
 
   if (!mounted || initialLoad) return null;
 
-  const showPreviewToggle = category === '料理' && memo.trim().length > 0;
+  const showPreviewToggle = category === '料理' && hasContent;
 
   return (
     <BaseModal
