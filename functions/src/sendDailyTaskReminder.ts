@@ -55,7 +55,7 @@ async function pushToLine(lineUserId: string, flexMessage: any): Promise<boolean
  */
 export const sendDailyTaskReminder = onSchedule(
   {
-    schedule: '0 8 * * *', // 毎日 08:00 (JST)
+    schedule: '0 6 * * *', // 毎日 06:00 (JST)
     timeZone: 'Asia/Tokyo',
     secrets: [LINE_CHANNEL_ACCESS_TOKEN],
     timeoutSeconds: 540, // 5分待機+処理のため余裕を確保
