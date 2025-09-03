@@ -203,6 +203,9 @@ export default function TodoTaskCard({
   const [isDeleteAnimating, setIsDeleteAnimating] = useState(false);
   const deleteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // src/components/todo/parts/TodoTaskCard.tsx
+  // 変更点：handleDeleteClick の「確定」分岐にトースト表示を追加
+
   const handleDeleteClick = () => {
     if (isDeleteAnimating) return;
 
@@ -224,9 +227,19 @@ export default function TodoTaskCard({
         deleteTimeout.current = null;
       }
       setConfirmDelete(false);
-      onDeleteTask();
+
+      // ▼ ここを変更：onDeleteTask 後にトーストを表示（非同期でも対応）
+      Promise.resolve(onDeleteTask())
+        .then(() => {
+          toast.success('Todoを非表示にしました。');
+        })
+        .catch(() => {
+          // 任意：失敗時の通知
+          toast.error('非表示にできませんでした。もう一度お試しください。');
+        });
     }
   };
+
 
   const [confirmTodoDeletes, setConfirmTodoDeletes] = useState<Record<string, boolean>>({});
   const todoDeleteTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
