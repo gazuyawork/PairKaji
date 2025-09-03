@@ -116,15 +116,15 @@ export default function TodoNoteModal({
   const [saveLabel, setSaveLabel] = useState('保存');
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
-
   const [isPreview, setIsPreview] = useState(false);
-
   const [category, setCategory] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
-
   const [imageUrl, setImageUrl] = useState<string | null>(null); // 保存済みURL（Firestoreに保存される値）
   const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null); // 差分削除用
   const [isUploadingImage, setIsUploadingImage] = useState(false); // 選択時は圧縮中にのみ使用
+
+  const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
+  const [newRefUrl, setNewRefUrl] = useState('');
 
   // ★ 保存時アップロード方式のための追加state
   const [pendingUpload, setPendingUpload] = useState<{ blob: Blob; mime: 'image/webp' | 'image/jpeg' } | null>(null); // 未アップロードの新画像
@@ -135,30 +135,32 @@ export default function TodoNoteModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ▼ 内容の存在判定（メモ／画像／レシピ／買い物入力）
-const hasMemo = useMemo(() => memo.trim().length > 0, [memo]);
+  const hasMemo = useMemo(() => memo.trim().length > 0, [memo]);
 
-// 画像は Firestore 保存済みURLのみを対象（previewUrl は無視）
-const hasImage = useMemo(() => imageUrl !== null, [imageUrl]);
+  // 画像は Firestore 保存済みURLのみを対象（previewUrl は無視）
+  const hasImage = useMemo(() => imageUrl !== null, [imageUrl]);
 
-const hasRecipe = useMemo(() => {
-  if (category !== '料理') return false;
-  const ings = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
-  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
-  const hasAnyIngredient = ings.some((i) => (i?.name ?? '').trim() !== '');
-  const hasAnyStep = steps.some((s) => (s ?? '').trim() !== '');
-  return hasAnyIngredient || hasAnyStep;
-}, [category, recipe]);
+  const hasRecipe = useMemo(() => {
+    if (category !== '料理') return false;
+    const ings = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+    const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    const hasAnyIngredient = ings.some((i) => (i?.name ?? '').trim() !== '');
+    const hasAnyStep = steps.some((s) => (s ?? '').trim() !== '');
+    return hasAnyIngredient || hasAnyStep;
+  }, [category, recipe]);
 
-const hasShopping = useMemo(() => {
-  if (category !== '買い物') return false;
-  const p = parseFloat(price);
-  const q = parseFloat(quantity);
-  const validPrice = Number.isFinite(p) && p > 0;
-  const validQty = Number.isFinite(q) && q > 0;
-  return validPrice || validQty;
-}, [category, price, quantity]);
+  const hasShopping = useMemo(() => {
+    if (category !== '買い物') return false;
+    const p = parseFloat(price);
+    const q = parseFloat(quantity);
+    const validPrice = Number.isFinite(p) && p > 0;
+    const validQty = Number.isFinite(q) && q > 0;
+    return validPrice || validQty;
+  }, [category, price, quantity]);
 
-const hasContent = hasMemo || hasImage || hasRecipe || hasShopping;
+  // 変更: hasContent に参考URLがある場合も含める
+  const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || referenceUrls.length > 0;
+
 
 
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
@@ -277,6 +279,11 @@ const hasContent = hasMemo || hasImage || hasRecipe || hasShopping;
             setPendingUpload(null);
             setPreviewUrl(null);
             setIsImageRemoved(false);
+
+            const refs = Array.isArray((todo as any).referenceUrls)
+              ? (todo as any).referenceUrls.filter((s: any) => typeof s === 'string')
+              : [];
+            setReferenceUrls(refs); // ✅ ここで state へ反映
           }
         }
       } catch (e) {
@@ -408,13 +415,15 @@ const hasContent = hasMemo || hasImage || hasRecipe || hasShopping;
     const numericCompareQuantity = parseFloat(compareQuantity);
 
     const appliedPrice = numericComparePrice > 0 ? numericComparePrice : numericPrice;
-    const appliedQuantity =
+    // 入力が正しいときだけ数量を採用（未入力/NaN/0以下はnull）
+    const rawQuantity =
       numericComparePrice > 0
         ? numericCompareQuantity
-        : numericQuantity > 0
-          ? numericQuantity
-          : 1;
-    const appliedUnit = numericQuantity > 0 ? unit : '個';
+        : numericQuantity;
+    const validQuantity =
+      Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : null;
+    // 単位は数量があるときだけ採用（なければnull）
+    const appliedUnit = validQuantity ? unit : null;
 
     const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
     const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
@@ -452,9 +461,11 @@ const hasContent = hasMemo || hasImage || hasRecipe || hasShopping;
       // ▼ Firestore 更新 payload
       const payload: Record<string, any> = {
         memo,
-        price: appliedPrice || null,
-        quantity: appliedQuantity,
+        price: Number.isFinite(appliedPrice) && appliedPrice! > 0 ? appliedPrice : null,
+        quantity: validQuantity,
         unit: appliedUnit,
+        referenceUrls: referenceUrls
+          .filter((u) => typeof u === 'string' && u.trim() !== ''),
       };
 
       // ✅ 画像はカテゴリに依存させない
@@ -554,15 +565,15 @@ const hasContent = hasMemo || hasImage || hasRecipe || hasShopping;
 
   const previewInitRef = useRef(false);
 
-useEffect(() => {
-  if (!isOpen) return;
-  if (initialLoad) return;
-  if (previewInitRef.current) return;
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialLoad) return;
+    if (previewInitRef.current) return;
 
-  setIsPreview(category === '料理' && hasContent);
+    setIsPreview(category === '料理' && hasContent);
 
-  previewInitRef.current = true;
-}, [isOpen, initialLoad, category, hasContent]);
+    previewInitRef.current = true;
+  }, [isOpen, initialLoad, category, hasContent]);
 
 
   useEffect(() => {
@@ -704,6 +715,73 @@ useEffect(() => {
           </div>
         )}
       </div>
+
+      {/* ▼▼▼ 参考URL（プレビュー時は「追加項目」を非表示にする） ▼▼▼ */}
+      <div className="mt-2 ml-2">
+        {/* ラベルは：プレビュー中でもURLが1件以上あるなら表示 */}
+        {(!isPreview || referenceUrls.length > 0) && (
+          <label className="block text-sm text-gray-600 mb-1">参考URL</label>
+        )}
+
+        {/* 追加項目（入力欄＋追加ボタン）はプレビュー中は非表示 */}
+        {!isPreview && (
+          <div className="flex gap-2">
+            <input
+              type="url"
+              inputMode="url"
+              placeholder="https://example.com/ ..."
+              value={newRefUrl}
+              onChange={(e) => setNewRefUrl(e.target.value)}
+              className="flex-1 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
+            />
+            <button
+              type="button"
+              disabled={!/^https?:\/\/\S+/i.test(newRefUrl)}
+              onClick={() => {
+                const v = newRefUrl.trim();
+                if (!/^https?:\/\/\S+/i.test(v)) return;
+                setReferenceUrls((prev) => (prev.includes(v) ? prev : [...prev, v]));
+                setNewRefUrl('');
+              }}
+              className="shrink-0 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+              aria-label="参考URLを追加"
+              title="参考URLを追加"
+            >
+              追加
+            </button>
+          </div>
+        )}
+
+        {/* 一覧は従来どおり。プレビュー中は削除ボタンだけ非表示 */}
+        {referenceUrls.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {referenceUrls.map((url) => (
+              <li key={url} className="flex items-center gap-2">
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline underline-offset-2 break-all"
+                >
+                  {url}
+                </a>
+                {!isPreview && (
+                  <button
+                    type="button"
+                    onClick={() => setReferenceUrls((prev) => prev.filter((u) => u !== url))}
+                    className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2"
+                    aria-label="このURLを削除"
+                    title="このURLを削除"
+                  >
+                    削除
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {/* ▲▲▲ 参考URLここまで ▲▲▲ */}
 
       {/* 買い物カテゴリ */}
       {category === '買い物' && (

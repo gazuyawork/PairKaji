@@ -362,132 +362,165 @@ export default function TodoTaskCard({
             {filteredTodos.length === 0 && tab === 'done' && (
               <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
             )}
+            {filteredTodos.map((todo) => {
+              // ▼ まずはここでローカル変数を計算（JSXの外）
+              const category = (task as any)?.category as string | undefined;
 
-            {filteredTodos.map(todo => (
-              <div key={todo.id} className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <motion.div
-                    key={animateTriggerMap[todo.id] ?? 0}
-                    className="cursor-pointer"
-                    onClick={() => {
-                      setLocalDoneMap(prev => ({
-                        ...prev,
-                        [todo.id]: !prev[todo.id],
-                      }));
-                      setAnimateTriggerMap(prev => ({
-                        ...prev,
-                        [todo.id]: (prev[todo.id] ?? 0) + 1,
-                      }));
-                      setTimeout(() => onToggleDone(todo.id), 600);
-                    }}
-                    initial={{ rotate: 0 }}
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                  >
-                    {localDoneMap[todo.id] ? (
-                      <CheckCircle className="text-yellow-500" />
-                    ) : (
-                      <Circle className="text-gray-400" />
-                    )}
-                  </motion.div>
+              const hasMemo =
+                typeof todo.memo === 'string' && todo.memo.trim() !== '';
 
-                  <input
-                    type="text"
-                    defaultValue={todo.text}
-                    onBlur={(e) => {
-                      const newText = e.target.value.trim();
+              const hasShopping =
+                category === '買い物' &&
+                (
+                  (typeof todo.price === 'number' && Number.isFinite(todo.price) && todo.price > 0) ||
+                  (typeof todo.quantity === 'number' && Number.isFinite(todo.quantity) && todo.quantity > 0)
+                );
 
-                      // ✅ 空文字ならトーストでガイドを表示し、確定処理はしない
-                      if (!newText) {
-                        toast.info('削除する場合はゴミ箱アイコンで消してください');
-                        const inputEl = todoRefs.current[todo.id];
-                        if (inputEl) inputEl.value = todo.text;
-                        return;
-                      }
+              const hasImage =
+                typeof (todo as any)?.imageUrl === 'string' && (todo as any).imageUrl !== '';
 
-                      const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
-                      if (isDuplicate) {
-                        setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
-                        const inputEl = todoRefs.current[todo.id];
-                        if (inputEl) inputEl.value = todo.text;
-                        return;
-                      }
+              const hasRecipe =
+                category === '料理' &&
+                (
+                  (Array.isArray((todo as any)?.recipe?.ingredients) &&
+                    (todo as any).recipe.ingredients.some((i: any) => (i?.name ?? '').trim() !== '')) ||
+                  (Array.isArray((todo as any)?.recipe?.steps) &&
+                    (todo as any).recipe.steps.some((s: any) => (s ?? '').trim() !== ''))
+                );
 
-                      const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
-                      if (matchDone) {
-                        setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
-                        const inputEl = todoRefs.current[todo.id];
-                        if (inputEl) inputEl.value = todo.text;
-                        return;
-                      }
+              // ★追加：参考URLが1件以上あるか
+              const hasReferenceUrls =
+                Array.isArray((todo as any)?.referenceUrls) &&
+                (todo as any).referenceUrls.some(
+                  (u: any) => typeof u === 'string' && u.trim() !== ''
+                );
 
-                      setEditingErrors(prev => {
-                        const next = { ...prev };
-                        delete next[todo.id];
-                        return next;
-                      });
+              // ★変更：参考URLの有無もアイコン着色条件に含める
+              const hasContentForIcon =
+                hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls;
 
-                      onChangeTodo(todo.id, newText);
-                      onBlurTodo(todo.id, newText);
-                    }}
-                    onCompositionStart={() => setIsComposing(true)}
-                    onCompositionEnd={() => setIsComposing(false)}
-                    ref={(el) => {
-                      if (el) {
-                        todoRefs.current[todo.id] = el;
-                        if (focusedTodoId === todo.id) el.focus();
-                      }
-                    }}
-                    className={clsx(
-                      'flex-1 border-b bg-transparent outline-none border-gray-200',
-                      'h-8',
-                      todo.done ? 'text-gray-400 line-through' : 'text-black'
-                    )}
-                    placeholder="TODOを入力"
-                  />
-
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.85, rotate: -10 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                    className={clsx(
-                      'mr-1 active:scale-90',
-                      (
-                        (typeof todo.memo === 'string' && todo.memo.trim() !== '') ||
-                        (typeof todo.price === 'number' && todo.price !== 0) ||
-                        (typeof todo.quantity === 'number' && todo.quantity !== 0)
-                      )
-                        ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
-                        : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
-                    )}
-                    onClick={() => onOpenNote(todo.text)}
-                  >
-                    <Notebook size={22} />
-                  </motion.button>
-
-                  <motion.button
-                    type="button"
-                    onClick={() => handleTodoDeleteClick(todo.id)}
-                    animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
-                    variants={SHAKE_VARIANTS}
-                  >
-                    <Trash2
-                      size={22}
-                      className={clsx(
-                        'hover:text-red-500',
-                        confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
+              // ▼ ここからJSXをreturn
+              return (
+                <div key={todo.id} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      key={animateTriggerMap[todo.id] ?? 0}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setLocalDoneMap(prev => ({
+                          ...prev,
+                          [todo.id]: !prev[todo.id],
+                        }));
+                        setAnimateTriggerMap(prev => ({
+                          ...prev,
+                          [todo.id]: (prev[todo.id] ?? 0) + 1,
+                        }));
+                        setTimeout(() => onToggleDone(todo.id), 600);
+                      }}
+                      initial={{ rotate: 0 }}
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    >
+                      {localDoneMap[todo.id] ? (
+                        <CheckCircle className="text-yellow-500" />
+                      ) : (
+                        <Circle className="text-gray-400" />
                       )}
-                    />
-                  </motion.button>
-                </div>
+                    </motion.div>
 
-                {editingErrors[todo.id] && (
-                  <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
-                    {editingErrors[todo.id]}
+                    <input
+                      type="text"
+                      defaultValue={todo.text}
+                      onBlur={(e) => {
+                        const newText = e.target.value.trim();
+
+                        if (!newText) {
+                          toast.info('削除する場合はゴミ箱アイコンで消してください');
+                          const inputEl = todoRefs.current[todo.id];
+                          if (inputEl) inputEl.value = todo.text;
+                          return;
+                        }
+
+                        const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
+                        if (isDuplicate) {
+                          setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
+                          const inputEl = todoRefs.current[todo.id];
+                          if (inputEl) inputEl.value = todo.text;
+                          return;
+                        }
+
+                        const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
+                        if (matchDone) {
+                          setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
+                          const inputEl = todoRefs.current[todo.id];
+                          if (inputEl) inputEl.value = todo.text;
+                          return;
+                        }
+
+                        setEditingErrors(prev => {
+                          const next = { ...prev };
+                          delete next[todo.id];
+                          return next;
+                        });
+
+                        onChangeTodo(todo.id, newText);
+                        onBlurTodo(todo.id, newText);
+                      }}
+                      onCompositionStart={() => setIsComposing(true)}
+                      onCompositionEnd={() => setIsComposing(false)}
+                      ref={(el) => {
+                        if (el) {
+                          todoRefs.current[todo.id] = el;
+                          if (focusedTodoId === todo.id) el.focus();
+                        }
+                      }}
+                      className={clsx(
+                        'flex-1 border-b bg-transparent outline-none border-gray-200',
+                        'h-8',
+                        todo.done ? 'text-gray-400 line-through' : 'text-black'
+                      )}
+                      placeholder="TODOを入力"
+                    />
+
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.85, rotate: -10 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                      className={clsx(
+                        'mr-1 active:scale-90',
+                        hasContentForIcon
+                          ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
+                          : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
+                      )}
+                      onClick={() => onOpenNote(todo.text)}
+                    >
+                      <Notebook size={22} />
+                    </motion.button>
+
+                    <motion.button
+                      type="button"
+                      onClick={() => handleTodoDeleteClick(todo.id)}
+                      animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
+                      variants={SHAKE_VARIANTS}
+                    >
+                      <Trash2
+                        size={22}
+                        className={clsx(
+                          'hover:text-red-500',
+                          confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
+                        )}
+                      />
+                    </motion.button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {editingErrors[todo.id] && (
+                    <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
+                      {editingErrors[todo.id]}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* スクロール必要時のヒント */}
