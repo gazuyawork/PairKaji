@@ -1,8 +1,15 @@
 // src/lib/scheduler/resetTasks.ts
 import { collection, doc, getDocs, query, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { parseISO, isToday, getDay } from 'date-fns'; // ★ 追加: getDay を利用
+import { parseISO, isToday, getDay } from 'date-fns';
 import type { Task } from '@/types/Task';
+
+// ★追加: Task に存在しない可能性があるフィールドを安全に扱うためのローカル型
+type TaskLike = Task & {
+  skippedAt?: unknown;
+  daysOfWeek?: unknown;
+  id?: string;
+};
 
 /**
  * タスクのリセット処理
@@ -11,10 +18,10 @@ import type { Task } from '@/types/Task';
  * - 対象: period が「毎日」または「週次」のタスク
  * - 曜日判定:
  *    - 「毎日」…常に本日が対象
- *    - 「週次」… daysOfWeek に本日の曜日が含まれる場合のみ本日が対象（★ 追加）
- *      ※ daysOfWeek が未設定/空の場合は後方互換のため「本日が対象」とみなす
+ *    - 「週次」… daysOfWeek に本日の曜日(0=日〜6=土)が含まれる場合のみ対象
+ *      ※ daysOfWeek 未設定/空配列は後方互換で「本日対象」とみなす
  * - 完了日の扱い: completedAt が「今日ではない」場合にリセット対象
- * - スキップ日の扱い: skipped が true でも「今日スキップしたもの（skippedAt が今日）」はリセットしない（★ 既存仕様に基づく）
+ * - スキップ日の扱い: skipped が true でも「今日スキップ（skippedAt が今日）」はリセットしない
  *
  * ✅ 戻り値
  * - 実際にリセットを行った件数（Promise<number>）
@@ -29,15 +36,12 @@ export const resetCompletedTasks = async (): Promise<number> => {
   const updates: Promise<void>[] = [];
   let resetCount = 0;
 
-  // 共通: Firestore Timestamp / 文字列 ISO / 生オブジェクト を Date に吸収
+  // 値を Date に安全変換（Timestamp / ISO 文字列 / toDate を持つオブジェクトを許容）
   const toDateSafe = (value: unknown, label: string): Date | null => {
     if (value == null) return null;
 
-    // Firestore Timestamp
-    if (value instanceof Timestamp) {
-      return value.toDate();
-    }
-    // Timestamp 風オブジェクト
+    if (value instanceof Timestamp) return value.toDate();
+
     if (typeof value === 'object' && typeof (value as Timestamp).toDate === 'function') {
       try {
         return (value as Timestamp).toDate();
@@ -46,7 +50,7 @@ export const resetCompletedTasks = async (): Promise<number> => {
         return null;
       }
     }
-    // ISO 文字列
+
     if (typeof value === 'string') {
       try {
         return parseISO(value);
@@ -55,20 +59,23 @@ export const resetCompletedTasks = async (): Promise<number> => {
         return null;
       }
     }
+
     console.warn(`不明な型 (${label}):`, value);
     return null;
   };
 
-  // ★ 追加: daysOfWeek を数値(0=日〜6=土)の Set に正規化
+  // ★修正: 未使用だった head を削除し、any も使わない安全な正規化
   const normalizeDaysOfWeekToNumbers = (input: unknown): Set<number> | null => {
-    if (!input) return null;
-    if (!Array.isArray(input)) return null;
+    if (!input || !Array.isArray(input)) return null;
 
     const mapStrToNum = (s: string): number | null => {
-      const lower = s.trim().toLowerCase();
-      // 数字文字列
+      const trimmed = s.trim();
+      const lower = trimmed.toLowerCase();
+
+      // 数字文字列（"0"〜"6"）
       if (/^[0-6]$/.test(lower)) return parseInt(lower, 10);
-      // 英語略称
+
+      // 英語
       const eng: Record<string, number> = {
         sun: 0, sunday: 0,
         mon: 1, monday: 1,
@@ -80,12 +87,9 @@ export const resetCompletedTasks = async (): Promise<number> => {
       };
       if (lower in eng) return eng[lower];
 
-      // 日本語（先頭一文字で判定）: 日月火水木金土
-      const head = lower[0];
+      // 日本語（先頭一文字で判定: 日月火水木金土）
+      const originalHead = trimmed[0];
       const jp: Record<string, number> = { '日': 0, '月': 1, '火': 2, '水': 3, '木': 4, '金': 5, '土': 6 };
-      // lower をそのままキーにするより、元文字から判定
-      // 英数化されることはないので、ここは input の元値から見る
-      const originalHead = s.trim()[0];
       if (originalHead && originalHead in jp) return jp[originalHead];
 
       return null;
@@ -106,36 +110,38 @@ export const resetCompletedTasks = async (): Promise<number> => {
   const todayIdx = getDay(new Date()); // 0=日,1=月,...6=土
 
   for (const docSnap of snapshot.docs) {
-    const task = {
+    // ★変更: ローカル型で受け、any を使わずに拡張フィールドを参照
+    const task: TaskLike = {
       ...(docSnap.data() as Task),
       id: docSnap.id,
+      skippedAt: (docSnap.data() as any)?.skippedAt,   // ここは Firestore 生データのため unknown 受け
+      daysOfWeek: (docSnap.data() as any)?.daysOfWeek, // 同上
     };
 
     const taskRef = doc(db, 'tasks', docSnap.id);
 
-    // completedAt の日付判定
+    // 完了日の日付判定
     const completedAtDate = toDateSafe(task.completedAt as unknown, 'completedAt');
     const isDoneToday = !!(completedAtDate && isToday(completedAtDate));
 
-    // skippedAt の日付判定（★ 既存拡張）
-    const anyTask = task as any;
-    const skippedAtDate = toDateSafe(anyTask?.skippedAt as unknown, 'skippedAt');
+    // スキップ日の日付判定（今日スキップならリセットしない）
+    const skippedAtDate = toDateSafe(task.skippedAt, 'skippedAt');
     const isSkippedToday = task.skipped === true && !!(skippedAtDate && isToday(skippedAtDate));
 
-    // ★ 追加: 本日がスケジュール対象日かどうか
+    // 本日がスケジュール対象日かどうか
     let isScheduledToday = false;
     if (task.period === '毎日') {
       isScheduledToday = true;
     } else if (task.period === '週次') {
-      const daysSet = normalizeDaysOfWeekToNumbers((task as any)?.daysOfWeek);
-      // daysOfWeek 未設定/空配列は後方互換で「本日対象」とみなす
+      const daysSet = normalizeDaysOfWeekToNumbers(task.daysOfWeek);
+      // 後方互換: daysOfWeek 未設定/空は「本日対象」
       isScheduledToday = daysSet ? daysSet.has(todayIdx) : true;
     }
 
     let shouldReset = false;
 
     if (task.period === '毎日' || task.period === '週次') {
-      // ★ 変更: 「本日がスケジュール対象日のときだけ」リセット判定を行う
+      // 本日が対象日のときだけリセット判定
       if (isScheduledToday) {
         // 完了: 今日ではない → リセット
         // スキップ: 今日スキップではない → リセット（翌日以降）
@@ -147,14 +153,15 @@ export const resetCompletedTasks = async (): Promise<number> => {
 
     if (shouldReset) {
       resetCount++;
+      // ★追加: skippedAt もクリア（型はローカルで許容）
       updates.push(
         updateDoc(taskRef, {
           done: false,
           skipped: false,
           completedAt: null,
           completedBy: '',
-          skippedAt: null, // リセット時に skippedAt もクリア（★ 既存）
-        } as Partial<Task> & { skippedAt?: null })
+          skippedAt: null,
+        } as Partial<TaskLike>)
       );
     }
   }

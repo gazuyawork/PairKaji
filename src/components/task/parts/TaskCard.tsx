@@ -409,7 +409,7 @@ export default function TaskCard({
                   }}
                   className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
-                  <Notebook className="w-5 h-5 text-yellow-600" />
+                  <Notebook className="w-5 h-5 text-yellow-500" />
                 </button>
               )}
               <div className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-300">
@@ -430,7 +430,7 @@ export default function TaskCard({
                   }}
                   className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
-                  <Notebook className="w-5 h-5 text-yellow-600" />
+                  <Notebook className="w-5 h-5 text-yellow-500" />
                 </button>
               )}
 
@@ -464,7 +464,7 @@ export default function TaskCard({
                   }}
                   className="shrink-0 p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
-                  <Notebook className="w-5 h-5 text-yellow-600" />
+                  <Notebook className="w-5 h-5 text-yellow-500" />
                 </button>
               )}
 
@@ -500,7 +500,7 @@ export default function TaskCard({
             >
               <div className="flex items-start gap-3 mb-3">
                 {/* インフォアイコン：オレンジ */}
-                <Notebook className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
+                <Notebook className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
                 <h3 className="text-base font-semibold text-gray-800">備考</h3>
 
                 {/* 右上 × ボタン */}
