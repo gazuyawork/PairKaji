@@ -131,6 +131,11 @@ export default function TodoNoteModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null); // 画面表示用のローカルURL
   const [isImageRemoved, setIsImageRemoved] = useState(false); // 削除予約（保存時に previous を削除）
 
+  // 🆕 フェードイン／枠常時表示用
+  const [imgReady, setImgReady] = useState(false);             // 画像の読込完了フラグ
+  const displaySrc = previewUrl ?? imageUrl;                   // 表示に使うURL（プレビュー優先）
+  const showMediaFrame = isOpen && !!displaySrc; // 画像がある時だけ枠を出す
+
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -160,8 +165,6 @@ export default function TodoNoteModal({
 
   // 変更: hasContent に参考URLがある場合も含める
   const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || referenceUrls.length > 0;
-
-
 
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
     if (a === b) return true;
@@ -458,7 +461,6 @@ export default function TodoNoteModal({
       }
 
       // ▼ Firestore 更新 payload
-      // ▼ Firestore 更新 payload
       const payload: Record<string, any> = {
         memo,
         price: Number.isFinite(appliedPrice) && appliedPrice! > 0 ? appliedPrice : null,
@@ -496,8 +498,7 @@ export default function TodoNoteModal({
       // ① Firestore 更新
       await updateTodoInTask(taskId, todoId, payload);
 
-      // ② Storage クリーンアップ: previousImageUrl と nextImageUrl / 削除予約 をもとに不要なものを削除
-      // ② Storage クリーンアップ: previousImageUrl と nextImageUrl / 削除予約 をもとに不要なものを削除
+      // ② Storage クリーンアップ
       try {
         const urlsToDelete: string[] = [];
 
@@ -528,7 +529,6 @@ export default function TodoNoteModal({
       } catch (e) {
         console.warn('Storage クリーンアップ処理で警告:', e);
       }
-
 
       if (totalDifferenceCalced !== null) {
         await addDoc(collection(db, 'savings'), {
@@ -575,7 +575,6 @@ export default function TodoNoteModal({
     previewInitRef.current = true;
   }, [isOpen, initialLoad, category, hasContent]);
 
-
   useEffect(() => {
     if (!isOpen) {
       // モーダルが閉じられたらローカルプレビューを解放し、未アップロードも破棄
@@ -588,6 +587,23 @@ export default function TodoNoteModal({
       previewInitRef.current = false;
     }
   }, [isOpen, previewUrl]);
+
+  // 🆕 画像のプレロード（中身だけフェードインさせる）
+  useEffect(() => {
+    if (!displaySrc) {
+      setImgReady(false);
+      return;
+    }
+    setImgReady(false);
+    const img = new Image();
+    img.onload = () => setImgReady(true);
+    img.onerror = () => setImgReady(true); // エラー時も遷移終了扱い
+    img.src = displaySrc;
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [displaySrc]);
 
   if (!mounted || initialLoad) return null;
 
@@ -633,18 +649,8 @@ export default function TodoNoteModal({
         )}
       </div>
 
-      {/* プレビューバッジ（プレビュー中のみ） */}
-      {/* {showPreviewToggle && isPreview && (
-        <div className="ml-2 mt-1 inline-flex items-center gap-2 rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-          <Eye size={14} />
-          プレビューモード
-        </div>
-      )} */}
-
-      {/* 料理カテゴリのときだけ：備考の“上”に画像挿入 UI */}
-      {/* {category === '料理' && ( */}
+      {/* 画像挿入UI */}
       <div className="mb-3 ml-2">
-        {/* ▼▼▼ プレビューモードでは操作UIを隠す ▼▼▼ */}
         {!isPreview && (
           <div className="flex items-center gap-3">
             <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer">
@@ -672,21 +678,31 @@ export default function TodoNoteModal({
             )}
           </div>
         )}
-        {/* ▲▲▲ 追加ここまで（isPreview のときは操作UI非表示） ▲▲▲ */}
 
-        {(previewUrl || imageUrl) && (
-          <div className="mt-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* 🆕 画像表示エリア：画像がある時だけ枠を出す */}
+        {showMediaFrame && (
+          <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
+            {/* 高さ予約用のアスペクト比ボックス（4:3） */}
+            <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
+
+            {/* 実画像（ロード完了でフェードイン） */}
             <img
-              src={previewUrl ?? imageUrl!}
+              src={displaySrc}
               alt="挿入画像プレビュー"
-              className="max-h-58 rounded-lg border border-gray-200 object-contain"
+              className="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
+              style={{ opacity: imgReady ? 1 : 0 }}
               loading="lazy"
+              onLoad={() => setImgReady(true)}
             />
+
+            {/* スケルトン：画像ロード中のみ */}
+            {!imgReady && (
+              <div className="absolute inset-0 animate-pulse bg-gray-100" />
+            )}
           </div>
         )}
+
       </div>
-      {/* )} */}
 
       {/* textarea */}
       <div className="relative pr-8">
