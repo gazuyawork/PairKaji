@@ -415,10 +415,29 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   };
 
-  // 日次の自動リセット
+  // 日次の自動リセット（リセット件数 > 0 のときだけトースト表示）
   useEffect(() => {
-    resetCompletedTasks().catch(console.error);
+    let mounted = true;
+
+    (async () => {
+      try {
+        const count = await resetCompletedTasks(); // ← 戻り値: リセット件数
+        if (!mounted) return;
+
+        if (count > 0) {
+          // ✅ トースト表示（sonner）
+          toast.success('タスクのリセットが完了しました。今日も1日がんばりましょう！');
+        }
+      } catch (e) {
+        console.error('resetCompletedTasks 実行時にエラー', e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
+
 
   // タスク購読（uidの変化に追従・確実にクリーンアップ）
   useEffect(() => {

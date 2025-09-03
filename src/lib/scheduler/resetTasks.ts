@@ -1,16 +1,23 @@
+// src/lib/scheduler/resetTasks.ts
 import { collection, doc, getDocs, query, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { parseISO, isToday } from 'date-fns';
 import type { Task } from '@/types/Task';
 
-export const resetCompletedTasks = async () => {
+/**
+ * ✅ 変更点
+ * - 戻り値を Promise<number> に変更（実際にリセットした件数を返す）
+ * - リセット対象を検出したら resetCount++ する
+ */
+export const resetCompletedTasks = async (): Promise<number> => {
   const uid = auth.currentUser?.uid;
-  if (!uid) return;
+  if (!uid) return 0; // ← 変更：件数を返す
 
   const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
   const snapshot = await getDocs(q);
 
   const updates: Promise<void>[] = [];
+  let resetCount = 0; // ← 追加：実際にリセットした件数をカウント
 
   for (const docSnap of snapshot.docs) {
     const task = {
@@ -49,6 +56,7 @@ export const resetCompletedTasks = async () => {
     }
 
     if (shouldReset) {
+      resetCount++; // ← 追加：リセット対象のカウント
       updates.push(
         updateDoc(taskRef, {
           done: false,
@@ -61,4 +69,5 @@ export const resetCompletedTasks = async () => {
   }
 
   await Promise.all(updates);
+  return resetCount; // ← 追加：件数を返す
 };
