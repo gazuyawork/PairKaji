@@ -1,7 +1,7 @@
 // src/lib/scheduler/resetTasks.ts
 import { collection, doc, getDocs, query, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { parseISO, isToday } from 'date-fns';
+import { parseISO, isToday, getDay } from 'date-fns'; // ★ 追加: getDay を利用
 import type { Task } from '@/types/Task';
 
 /**
@@ -9,9 +9,12 @@ import type { Task } from '@/types/Task';
  *
  * ✅ 仕様
  * - 対象: period が「毎日」または「週次」のタスク
+ * - 曜日判定:
+ *    - 「毎日」…常に本日が対象
+ *    - 「週次」… daysOfWeek に本日の曜日が含まれる場合のみ本日が対象（★ 追加）
+ *      ※ daysOfWeek が未設定/空の場合は後方互換のため「本日が対象」とみなす
  * - 完了日の扱い: completedAt が「今日ではない」場合にリセット対象
- * - スキップ日の扱い: skipped が true でも「今日スキップしたもの（skippedAt が今日）」はリセットしない
- *   └ 翌日以降のリセットタイミングで未完了へ戻す
+ * - スキップ日の扱い: skipped が true でも「今日スキップしたもの（skippedAt が今日）」はリセットしない（★ 既存仕様に基づく）
  *
  * ✅ 戻り値
  * - 実際にリセットを行った件数（Promise<number>）
@@ -56,6 +59,52 @@ export const resetCompletedTasks = async (): Promise<number> => {
     return null;
   };
 
+  // ★ 追加: daysOfWeek を数値(0=日〜6=土)の Set に正規化
+  const normalizeDaysOfWeekToNumbers = (input: unknown): Set<number> | null => {
+    if (!input) return null;
+    if (!Array.isArray(input)) return null;
+
+    const mapStrToNum = (s: string): number | null => {
+      const lower = s.trim().toLowerCase();
+      // 数字文字列
+      if (/^[0-6]$/.test(lower)) return parseInt(lower, 10);
+      // 英語略称
+      const eng: Record<string, number> = {
+        sun: 0, sunday: 0,
+        mon: 1, monday: 1,
+        tue: 2, tuesday: 2,
+        wed: 3, wednesday: 3,
+        thu: 4, thursday: 4,
+        fri: 5, friday: 5,
+        sat: 6, saturday: 6,
+      };
+      if (lower in eng) return eng[lower];
+
+      // 日本語（先頭一文字で判定）: 日月火水木金土
+      const head = lower[0];
+      const jp: Record<string, number> = { '日': 0, '月': 1, '火': 2, '水': 3, '木': 4, '金': 5, '土': 6 };
+      // lower をそのままキーにするより、元文字から判定
+      // 英数化されることはないので、ここは input の元値から見る
+      const originalHead = s.trim()[0];
+      if (originalHead && originalHead in jp) return jp[originalHead];
+
+      return null;
+    };
+
+    const set = new Set<number>();
+    for (const v of input) {
+      if (typeof v === 'number' && v >= 0 && v <= 6) {
+        set.add(v);
+      } else if (typeof v === 'string') {
+        const n = mapStrToNum(v);
+        if (n != null) set.add(n);
+      }
+    }
+    return set.size ? set : null;
+  };
+
+  const todayIdx = getDay(new Date()); // 0=日,1=月,...6=土
+
   for (const docSnap of snapshot.docs) {
     const task = {
       ...(docSnap.data() as Task),
@@ -68,21 +117,31 @@ export const resetCompletedTasks = async (): Promise<number> => {
     const completedAtDate = toDateSafe(task.completedAt as unknown, 'completedAt');
     const isDoneToday = !!(completedAtDate && isToday(completedAtDate));
 
-    // ★ 追加: skippedAt の日付判定
-    // 既存 Task 型に無い可能性があるため any で吸収（型安全を壊さない箇所に限定）
+    // skippedAt の日付判定（★ 既存拡張）
     const anyTask = task as any;
     const skippedAtDate = toDateSafe(anyTask?.skippedAt as unknown, 'skippedAt');
     const isSkippedToday = task.skipped === true && !!(skippedAtDate && isToday(skippedAtDate));
 
+    // ★ 追加: 本日がスケジュール対象日かどうか
+    let isScheduledToday = false;
+    if (task.period === '毎日') {
+      isScheduledToday = true;
+    } else if (task.period === '週次') {
+      const daysSet = normalizeDaysOfWeekToNumbers((task as any)?.daysOfWeek);
+      // daysOfWeek 未設定/空配列は後方互換で「本日対象」とみなす
+      isScheduledToday = daysSet ? daysSet.has(todayIdx) : true;
+    }
+
     let shouldReset = false;
 
     if (task.period === '毎日' || task.period === '週次') {
-      // ★ 変更:
-      // 旧) (completedAt && !isDoneToday) || task.skipped
-      // 新) (completedAt && !isDoneToday) || (task.skipped && !isSkippedToday)
-      //     → 今日スキップしたものはリセットしない
-      if ((completedAtDate && !isDoneToday) || (task.skipped && !isSkippedToday)) {
-        shouldReset = true;
+      // ★ 変更: 「本日がスケジュール対象日のときだけ」リセット判定を行う
+      if (isScheduledToday) {
+        // 完了: 今日ではない → リセット
+        // スキップ: 今日スキップではない → リセット（翌日以降）
+        if ((completedAtDate && !isDoneToday) || (task.skipped && !isSkippedToday)) {
+          shouldReset = true;
+        }
       }
     }
 
@@ -94,8 +153,8 @@ export const resetCompletedTasks = async (): Promise<number> => {
           skipped: false,
           completedAt: null,
           completedBy: '',
-          skippedAt: null, // ★ 追加: リセット時に skippedAt もクリア
-        } as Partial<Task> & { skippedAt?: null }) // 型ガード（skippedAt が型に無くても問題なく送れるように）
+          skippedAt: null, // リセット時に skippedAt もクリア（★ 既存）
+        } as Partial<Task> & { skippedAt?: null })
       );
     }
   }
