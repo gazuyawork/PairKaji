@@ -131,27 +131,29 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
         createPortal(
           <AnimatePresence>
             {isSheetOpen && (
-              <motion.div
-                id="group-selector-sheet"
-                role="dialog"
-                aria-modal="true"
-                className="fixed inset-0 z-[1000] flex flex-col"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
+<motion.div
+  id="group-selector-sheet"
+  role="dialog"
+  aria-modal="true"
+  className="fixed inset-0 z-[1200] flex flex-col"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  exit={{ opacity: 0 }}
+>
+
                 <div
                   className="absolute inset-0 bg-black/40"
                   onClick={() => setIsSheetOpen(false)}
                 />
-                <motion.div
-                  className="relative ml-0 mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full bg-white rounded-t-2xl sm:rounded-2xl shadow-xl
-                             flex flex-col h-screen sm:h-auto sm:max-h-none pb-[max(env(safe-area-inset-bottom),16px)]"
-                  initial={{ y: 40 }}
-                  animate={{ y: 0 }}
-                  exit={{ y: 40 }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-                >
+<motion.div
+  className="relative mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full bg-white rounded-t-2xl sm:rounded-2xl shadow-xl
+             flex flex-col h-[70vh] sm:h-auto sm:max-h-[80vh] pb-[max(env(safe-area-inset-bottom),16px)]"
+  initial={{ y: 48 }}
+  animate={{ y: 0 }}
+  exit={{ y: 48 }}
+  transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+>
+
                   <div className="sticky top-0 z-10 bg-white border-b px-4 py-2 flex items-center gap-2">
                     <button
                       className="p-2 rounded-full hover:bg-gray-100"
