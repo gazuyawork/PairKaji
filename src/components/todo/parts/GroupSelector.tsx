@@ -1,12 +1,12 @@
-// ファイル名: GroupSelector.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
-import { motion } from 'framer-motion';
-import { ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Search, LayoutGrid } from 'lucide-react';
 import { useUserUid } from '@/hooks/useUserUid';
 
 type Props = {
@@ -16,116 +16,224 @@ type Props = {
 };
 
 export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [mounted, setMounted] = useState(false); // Portal用（SSR対策）
   const uid = useUserUid();
-  const updateArrows = () => {
-    const container = scrollRef.current;
-    if (container) {
-      const { scrollLeft, scrollWidth, clientWidth } = container;
-      setShowLeftArrow(scrollLeft > 0);
-      setShowRightArrow(scrollLeft + clientWidth < scrollWidth - 1);
-    }
-  };
-
-  // const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  // useEffect(() => {
-
-  //   if (uid) {
-  //     setCurrentUserId(uid);
-  //   }
-  // }, []);
-
 
   useEffect(() => {
-    updateArrows();
-    const container = scrollRef.current;
-    if (container) {
-      container.addEventListener('scroll', updateArrows);
-      return () => container.removeEventListener('scroll', updateArrows);
-    }
+    setMounted(true);
   }, []);
 
-  // const filteredTasks = tasks.filter(task =>
-  //   task.visible &&
-  //   (task.userId === currentUserId || task.private !== true)
-  // );
-  const filteredTasks = tasks.filter(task =>
-    task.visible &&
-    (task.userId === uid || task.private !== true)
+  // 可視 & （自分のタスク or 非private）
+  const baseFilteredTasks: TodoOnlyTask[] = useMemo(
+    () =>
+      tasks.filter(
+        (task) => task.visible && (task.userId === uid || task.private !== true)
+      ),
+    [tasks, uid]
   );
+
+  // ===== 展開シート =====
+  const [sheetQuery, setSheetQuery] = useState('');
+  const totalCount = baseFilteredTasks.length;
+
+  const sheetFiltered: TodoOnlyTask[] = useMemo<TodoOnlyTask[]>(() => {
+    const q = sheetQuery.trim().toLowerCase();
+    if (!q) return baseFilteredTasks;
+    return baseFilteredTasks.filter((t) => (t.name ?? '').toLowerCase().includes(q));
+  }, [baseFilteredTasks, sheetQuery]);
+
+  const filteredCount = sheetFiltered.length;
+
+  // Escで閉じる
+  useEffect(() => {
+    if (!isSheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSheetOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isSheetOpen]);
+
+  // シート表示中は背景スクロールロック
+  useEffect(() => {
+    if (!mounted) return;
+    const original = document.body.style.overflow;
+    if (isSheetOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = original || '';
+    }
+    return () => {
+      document.body.style.overflow = original || '';
+    };
+  }, [isSheetOpen, mounted]);
+
+  // 個別選択 → シートを閉じる
+  const handleSelectAndClose = (id: string | null) => {
+    onSelectGroup(id);
+    setIsSheetOpen(false);
+  };
+
+  // フィルター解除
+  const handleClearFilterInSheet = () => {
+    onSelectGroup(null);
+    setSheetQuery('');
+  };
 
   return (
-    <div className="relative mb-1 flex items-center">
-      {/* 横スクロール可能なタスクボタンエリア */}
-      <div className="flex-1 overflow-x-auto whitespace-nowrap scroll-smooth px-2" ref={scrollRef}>
-        <div className="flex gap-2 w-max pr-">
-          {filteredTasks.map((task, idx) => (
-            <button
-              key={task.id ?? `fallback-${idx}`}
-              onClick={() => onSelectGroup(task.id)}
-              className={`px-2.5 py-2 rounded-sm text-sm border transition-all duration-300 whitespace-nowrap font-semibold ring-2 ring-white
-                ${selectedGroupId === task.id
-                  ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
-                }`}
-
-            >
-              {task.name}
-            </button>
-          ))}
+    <>
+      {/* // 上部バー：左は状態テキスト、右ボタンは条件で「展開」or「解除」に切替 */}
+      <div className="mb-0 ml-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {selectedGroupId === null ? (
+            <span className="text-xs text-white bg-gray-400 px-3 py-2 rounded-sm">全件を表示中</span>
+          ) : (
+            <span className="text-xs text-white bg-orange-300 px-3 py-2 rounded-sm">フィルター適用中</span>
+          )}
         </div>
+
+        {selectedGroupId === null ? (
+          // まだフィルタ無し：展開シートオープンのボタン
+          <button
+            type="button"
+            onClick={() => setIsSheetOpen(true)}
+            className="h-15 px-3 py-3 mb-1 mr-2 rounded-full bg-white border border-gray-300 text-[#5E5E5E] flex items-center gap-1 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]"
+            aria-haspopup="dialog"
+            aria-expanded={isSheetOpen}
+            aria-controls="group-selector-sheet"
+            title="すべて表示"
+          >
+            <LayoutGrid className="w-9 h-9" />
+          </button>
+        ) : (
+          // フィルタ適用中：このボタン自体が解除（×）になる
+          <motion.button
+            type="button"
+            onClick={() => {
+              onSelectGroup(null);
+              setSheetQuery('');
+            }}
+            whileTap={{ scale: 1.05 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+            className="h-12 px-3 py-4 mb-1 mr-2 rounded-full bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border border-[#dc2626] text-white flex items-center gap-2 shadow-inner hover:opacity-95"
+            title="フィルター解除（全件表示）"
+            aria-label="フィルター解除（全件表示）"
+          >
+            <X className="w-6 h-6" />
+            {/* <span className="text-sm font-semibold">解除</span> */}
+          </motion.button>
+        )}
       </div>
 
-      {/* ❌ フィルター解除ボタン */}
-      {selectedGroupId !== null && (
-        <motion.button
-          onClick={() => onSelectGroup(null)}
-          whileTap={{ scale: 1.2 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-          className={`ml-2 w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all duration-300
-            ${selectedGroupId !== null
-              ? 'bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner text-white'
-              : 'bg-white border-red-500 text-red-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#ef4444] hover:border-[#ef4444] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'}`}
-          title="フィルター解除"
-        >
-          <X className="w-5 h-5" /> {/* ← アイコン化 */}
-        </motion.button>
-      )}
+      {/* ===== 展開シート ===== */}
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {isSheetOpen && (
+              <motion.div
+                id="group-selector-sheet"
+                role="dialog"
+                aria-modal="true"
+                className="fixed inset-0 z-[1000] flex flex-col"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <div
+                  className="absolute inset-0 bg-black/40"
+                  onClick={() => setIsSheetOpen(false)}
+                />
+                <motion.div
+                  className="relative ml-0 mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full bg-white rounded-t-2xl sm:rounded-2xl shadow-xl
+                             flex flex-col h-screen sm:h-auto sm:max-h-none pb-[max(env(safe-area-inset-bottom),16px)]"
+                  initial={{ y: 40 }}
+                  animate={{ y: 0 }}
+                  exit={{ y: 40 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                >
+                  <div className="sticky top-0 z-10 bg-white border-b px-4 py-2 flex items-center gap-2">
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100"
+                      onClick={() => setIsSheetOpen(false)}
+                      aria-label="閉じる"
+                    >
+                      <X className="w-5 h-5 text-gray-600" />
+                    </button>
+                    <h2 className="text-base font-semibold text-[#5E5E5E]">
+                      すべてのToDoから選択
+                    </h2>
+                    <span className="ml-auto text-xs text-gray-500">
+                      {sheetQuery ? `一致: ${filteredCount}件` : `全件: ${totalCount}件`}
+                    </span>
+                  </div>
 
+                  <div className="px-4 pt-3">
+                    <div className="flex items-center gap-2 border rounded-lg px-3 py-2">
+                      <Search className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={sheetQuery}
+                        onChange={(e) => setSheetQuery(e.target.value)}
+                        placeholder="キーワードで検索"
+                        className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
+                        autoFocus
+                      />
+                      {sheetQuery && (
+                        <button
+                          className="text-sm text-gray-500 hover:text-gray-700"
+                          onClick={() => setSheetQuery('')}
+                        >
+                          クリア
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        onClick={handleClearFilterInSheet}
+                        className="text-sm underline text-gray-600 hover:text-gray-800"
+                      >
+                        フィルター解除（全件表示）
+                      </button>
+                      {!sheetQuery && selectedGroupId === null && (
+                        <span className="text-xs text-gray-500">全件を表示中</span>
+                      )}
+                    </div>
+                  </div>
 
-      {/* ← 矢印 */}
-      {showLeftArrow && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
-          <div className="w-8 h-8 bg-[#5E5E5E] rounded-full flex items-center justify-center shadow-md animate-blink">
-            <ChevronLeft className="text-white w-4 h-4" />
-          </div>
-        </div>
-      )}
-      {showRightArrow && (
-        <div
-          className={`absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-300 ${selectedGroupId !== null ? 'right-14' : 'right-2'
-            }`}
-        >
-          <div className="w-8 h-8 bg-[#5E5E5E] rounded-full flex items-center justify-center shadow-md animate-blink">
-            <ChevronRight className="text-white w-4 h-4" />
-          </div>
-        </div>
-      )}
-
-      {/* アニメーション定義 */}
-      <style jsx>{`
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
-        }
-        .animate-blink {
-          animation: blink 3.4s infinite;
-        }
-      `}</style>
-    </div>
+                  <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
+                    {sheetFiltered.length === 0 ? (
+                      <div className="text-center text-sm text-gray-500 py-10">
+                        一致するToDoが見つかりませんでした。
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {sheetFiltered.map((task) => {
+                          const isActive = selectedGroupId === task.id;
+                          return (
+                            <button
+                              key={task.id}
+                              onClick={() => handleSelectAndClose(task.id ?? null)}
+                              className={`w-full px-3 py-3 rounded-lg border text-sm font-semibold transition-all text-left
+                                ${isActive
+                                  ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
+                                  : 'bg-white text-[#5E5E5E] border-gray-300 hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]'
+                                }`}
+                              title={task.name}
+                            >
+                              <span className="line-clamp-2">{task.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+    </>
   );
-
 }
