@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef, useLayoutEffect, useCallback, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Eye, Pencil } from 'lucide-react';
-import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
+// import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
+import RecipeEditor, { type Recipe, type RecipeEditorHandle } from '@/components/todo/parts/RecipeEditor';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
@@ -100,6 +101,7 @@ export default function TodoNoteModal({
   todoId,
   taskId,
 }: TodoNoteModalProps) {
+  const recipeEditorRef = useRef<RecipeEditorHandle>(null);
   const isIOS =
     typeof navigator !== 'undefined' &&
     /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
@@ -411,6 +413,7 @@ export default function TodoNoteModal({
     const user = auth.currentUser;
     if (!user) return;
     setIsSaving(true);
+    const committedIngredients = recipeEditorRef.current?.commitAllAmounts();
 
     const numericPrice = parseFloat(price);
     const numericQuantity = parseFloat(quantity);
@@ -482,8 +485,9 @@ export default function TodoNoteModal({
 
       // 料理のときだけレシピを保存（これは従来通りでOK）
       if (category === '料理') {
+        const finalIngredients = committedIngredients ?? recipe.ingredients;
         payload.recipe = {
-          ingredients: recipe.ingredients
+          ingredients: finalIngredients
             .filter((i) => i.name.trim() !== '')
             .map((i) => ({
               id: i.id,
@@ -833,7 +837,8 @@ export default function TodoNoteModal({
       {/* 料理カテゴリのレシピエディタ */}
       {category === '料理' && (
         <RecipeEditor
-          headerNote="親タスク: 料理"
+          ref={recipeEditorRef}
+          headerNote=""
           value={recipe}
           onChange={handleRecipeChange}
           isPreview={isPreview}

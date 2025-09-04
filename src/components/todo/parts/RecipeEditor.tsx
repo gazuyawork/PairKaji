@@ -10,11 +10,20 @@ import {
   useCallback,
   forwardRef,
   useMemo,
+  useImperativeHandle,
 } from 'react';
 import { Plus } from 'lucide-react';
 
 export type Ingredient = { id: string; name: string; amount: number | null; unit: string };
 export type Recipe = { ingredients: Ingredient[]; steps: string[] };
+
+/** 親から呼べる命令的API */
+export type RecipeEditorHandle = {
+  /** すべての数量を確定して state に反映し、確定後の配列を返す（同期的に値を算出） */
+  commitAllAmounts: () => Ingredient[];
+  /** 現在の値を取得（直前に commitAllAmounts を呼ぶのが安全） */
+  getValue: () => Recipe;
+};
 
 const UNIT_OPTIONS = ['g', 'kg', 'ml', 'L', '個', '本', '丁', '枚', '合', '大さじ', '小さじ', '少々', '適量'] as const;
 
@@ -23,9 +32,8 @@ const SUGGESTED_UNIT_RULES: Array<{ test: RegExp; unit: (typeof UNIT_OPTIONS)[nu
   { test: /(牛乳|豆乳|水|湯|スープ|だし|だし汁|みりん|日本酒|酒|めんつゆ|つゆ|ポン酢|酢|オリーブオイル|ごま油|サラダ油|油|しょうゆ|醤油)/, unit: 'ml' },
   { test: /(砂糖|上白糖|グラニュー糖|塩|こしょう|コショウ|胡椒|小麦粉|薄力粉|片栗粉|味噌|だしの素)/, unit: '小さじ' },
   { test: /(米|無洗米|白米)/, unit: '合' },
-  { test: /(卵|玉子)/, unit: '個' },
+  { test: /(卵|玉子|玉ねぎ|たまねぎ|にんじん|人参|じゃがいも|じゃが芋|じゃが|ねぎ|長ねぎ|白ねぎ|きゅうり|胡瓜|トマト|なす|ナス|ピーマン|大根|白菜|レタス|ほうれん草|キャベツ)/, unit: '個' },
   { test: /(豆腐)/, unit: '丁' },
-  { test: /(玉ねぎ|たまねぎ|にんじん|人参|じゃがいも|じゃが芋|じゃが|ねぎ|長ねぎ|白ねぎ|きゅうり|胡瓜|トマト|なす|ナス|ピーマン|大根|白菜|レタス|ほうれん草|キャベツ)/, unit: 'g' },
   { test: /(豚肉|鶏肉|鶏ささみ|鶏もも|鶏むね|牛こま|牛薄切り|牛肉|ひき肉|合いびき肉|合挽き肉|ベーコン|ハム|ウインナー|鮭|さけ|サーモン|鯖|さば|サバ|刺身)/, unit: 'g' },
 ];
 
@@ -47,7 +55,7 @@ const toHalfWidth = (s: string) =>
 const genId = () => {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch { }
+  } catch {}
   return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 };
 
@@ -165,10 +173,17 @@ const AutoResizeTextarea = forwardRef<
 );
 AutoResizeTextarea.displayName = 'AutoResizeTextarea';
 
-export default function RecipeEditor({ headerNote, value, onChange, isPreview = false }: Props) {
+/** ★ ここから RecipeEditor 本体（forwardRef + 命令的ハンドルを公開） */
+const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor(
+  { headerNote, value, onChange, isPreview = false },
+  ref
+) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(value.ingredients);
   const [steps, setSteps] = useState<string[]>(value.steps);
   const [userEditedUnitIds, setUserEditedUnitIds] = useState<Set<string>>(new Set());
+
+  // 数量：入力中の表示専用テキスト（id -> text）
+  const [amountText, setAmountText] = useState<Record<string, string>>({});
 
   // 材料：IME／編集中
   const [composingId, setComposingId] = useState<string | null>(null);
@@ -198,6 +213,23 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingredients, steps]);
 
+  // 数量テキストの初期化・同期（ingredients の増減や id 変化に追従）
+  useEffect(() => {
+    setAmountText((prev) => {
+      const next: Record<string, string> = { ...prev };
+      const currentIds = new Set(ingredients.map((i) => i.id));
+      // 追加分を補完
+      for (const ing of ingredients) {
+        if (next[ing.id] === undefined) next[ing.id] = ing.amount != null ? String(ing.amount) : '';
+      }
+      // 削除分を掃除
+      for (const id of Object.keys(next)) {
+        if (!currentIds.has(id)) delete next[id];
+      }
+      return next;
+    });
+  }, [ingredients]);
+
   // プレビュー時に空行を非表示にするためのフィルタ
   const visibleIngredients = useMemo(
     () => (isPreview ? ingredients.filter((i) => i.name.trim() !== '') : ingredients),
@@ -218,6 +250,8 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
         arr.splice(index + 1, 0, next);
         return arr;
       });
+      // 表示文字列も用意
+      setAmountText((m) => ({ ...m, [id]: '' }));
       setTimeout(() => {
         nameRefs.current[id]?.focus();
       }, 0);
@@ -230,6 +264,7 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     const id = `ing_${genId()}`;
     const next: Ingredient = { id, name: '', amount: null, unit: '適量' };
     setIngredients((prev) => [...prev, next]);
+    setAmountText((m) => ({ ...m, [id]: '' }));
     setTimeout(() => {
       nameRefs.current[id]?.focus();
     }, 0);
@@ -241,6 +276,11 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     setUserEditedUnitIds((prev) => {
       const n = new Set(prev);
       n.delete(id);
+      return n;
+    });
+    setAmountText((m) => {
+      const n = { ...m };
+      delete n[id];
       return n;
     });
     setComposingId((curr) => (curr === id ? null : curr));
@@ -256,29 +296,38 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     );
   };
 
-  const changeIngredientAmount = (id: string, v: string) => {
-    const target = ingredients.find((i) => i.id === id);
-    if (target && target.unit === '適量') return; // 適量は入力不可
+  // 数量：入力中は「文字列」を保持（全角→半角、,→. だけ行う）
+  const onAmountInputChange = (id: string, raw: string) => {
+    const normalized = toHalfWidth(raw).replace(',', '.');
+    setAmountText((m) => ({ ...m, [id]: normalized }));
+  };
 
-    const raw = v.trim();
-    if (raw === '') {
+  // 単一行の数量を確定
+  const commitAmount = (id: string) => {
+    const raw = (amountText[id] ?? '').trim();
+    if (!raw) {
       setIngredients((prev) => prev.map((i) => (i.id === id ? { ...i, amount: null } : i)));
+      setAmountText((m) => ({ ...m, [id]: '' }));
       return;
     }
-    const normalized = toHalfWidth(raw).replace(',', '.');
-    const n = Number(normalized);
+    const n = parseFloat(raw);
     setIngredients((prev) =>
       prev.map((i) => (i.id === id ? { ...i, amount: Number.isFinite(n) ? n : i.amount } : i))
     );
+    setAmountText((m) => ({
+      ...m,
+      [id]: Number.isFinite(n) ? String(n) : (m[id] ?? ''),
+    }));
   };
 
   const changeIngredientUnit = (id: string, unit: string) => {
     setIngredients((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i
-      )
+      prev.map((i) => (i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i))
     );
     setUserEditedUnitIds((prev) => new Set(prev).add(id));
+    if (unit === '適量') {
+      setAmountText((m) => ({ ...m, [id]: '' }));
+    }
   };
 
   const addStepAt = useCallback(
@@ -304,7 +353,6 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
       const idx = steps.length;
       stepRefs.current[idx]?.focus();
     }, 0);
-    // steps を依存に入れない（直後の length ずれ防止）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPreview]);
 
@@ -323,6 +371,15 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     addIngredientAt(idx);
   };
 
+  // Enterで連続追加（数量：確定→次の材料行追加も可）
+  const onAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, id: string, idx: number) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return;
+    e.preventDefault();
+    commitAmount(id);
+    addIngredientAt(idx);
+  };
+
   // Enterで連続追加（手順）
   const onStepKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, idx: number) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
@@ -330,6 +387,37 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     e.preventDefault();
     addStepAt(idx);
   };
+
+  /** ★ 全行の数量を同期的に確定 → state 更新し、確定後の配列を返す */
+  const commitAllAmountsSync = useCallback((): Ingredient[] => {
+    const next = ingredients.map((i) => {
+      // 単位が適量なら常に null
+      if (i.unit === '適量') return { ...i, amount: null };
+      const raw = (amountText[i.id] ?? '').trim();
+      if (!raw) return { ...i, amount: null };
+      const n = parseFloat(toHalfWidth(raw).replace(',', '.'));
+      return { ...i, amount: Number.isFinite(n) ? n : i.amount };
+    });
+    // 一括で state 反映（非同期だが next は確定値として返す）
+    setIngredients(next);
+    // 表示文字列も整える
+    setAmountText((m) => {
+      const n: Record<string, string> = { ...m };
+      for (const it of next) n[it.id] = it.amount != null ? String(it.amount) : '';
+      return n;
+    });
+    return next;
+  }, [ingredients, amountText]);
+
+  // 親からの命令的APIを公開
+  useImperativeHandle(
+    ref,
+    (): RecipeEditorHandle => ({
+      commitAllAmounts: commitAllAmountsSync,
+      getValue: () => ({ ingredients, steps }),
+    }),
+    [commitAllAmountsSync, ingredients, steps]
+  );
 
   return (
     <div className="">
@@ -413,9 +501,7 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
                         }
                       }}
                       onFocus={() => setEditingId(ing.id)}
-                      onBlur={() =>
-                        setEditingId((curr) => (curr === ing.id ? null : curr))
-                      }
+                      onBlur={() => setEditingId((curr) => (curr === ing.id ? null : curr))}
                       placeholder="材料名（例：玉ねぎ）"
                       className="col-span-6 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
                       readOnly={isPreview}
@@ -425,11 +511,12 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
                     {/* 数量（2カラム、約4桁幅 6ch・右寄せ） */}
                     <input
                       inputMode="decimal"
-                      pattern="[\\d０-９]*([.,．，]\\d+)?"
-                      value={ing.amount ?? ''}
-                      onChange={(e) => changeIngredientAmount(ing.id, e.target.value)}
+                      value={amountText[ing.id] ?? (ing.amount ?? '').toString()}
+                      onChange={(e) => onAmountInputChange(ing.id, e.target.value)}
+                      onBlur={() => commitAmount(ing.id)}
+                      onKeyDown={(e) => onAmountKeyDown(e, ing.id, idx)}
                       placeholder="数量"
-                      className="col-span-2 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm text-right focus:outline-none focus:ring-0 focus:border-blue-500 disabled:text-gray-400"
+                      className="col-span-2 border-0 border-b border-gray-300 bg-transparent pr-2 py-2 text-sm text-right focus:outline-none focus:ring-0 focus:border-blue-500 disabled:text-gray-400"
                       style={{ width: '6ch' }}
                       readOnly={isPreview}
                       aria-readonly={isPreview}
@@ -453,7 +540,7 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
                   </>
                 )}
 
-                {/* 削除（×）：編集時のみ、かつ2件以上のとき表示 */}
+                {/* 削除（×）：編集時のみ、かつ2件以上のとき表示（プレビューでは非表示＆空きなし） */}
                 {!isPreview && ingredients.length >= 2 && (
                   <button
                     type="button"
@@ -535,4 +622,6 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
       )}
     </div>
   );
-}
+});
+
+export default RecipeEditor;
