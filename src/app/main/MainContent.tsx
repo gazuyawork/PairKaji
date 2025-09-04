@@ -127,7 +127,7 @@ export default function MainContent() {
                     window.dispatchEvent(new Event('open-new-task-modal'));
                   }
                 }}
-                className="absolute right-0 w-14 h-14 rounded-full text-white text-3xl font-bold bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center pointer-events-auto mr-5"
+                className="absolute right-0 w-14 h-14 rounded-full text-white text-3xl bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center pointer-events-auto mr-5"
                 aria-label="新規タスク追加"
               >
                 ＋
