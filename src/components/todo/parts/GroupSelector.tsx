@@ -158,10 +158,10 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
                       onClick={() => setIsSheetOpen(false)}
                       aria-label="閉じる"
                     >
-                      <X className="w-5 h-5 text-gray-600" />
+                      <X className="w-5 h-5 text-red-600" />
                     </button>
                     <h2 className="text-base font-semibold text-[#5E5E5E]">
-                      すべてのToDoから選択
+                      Todoを探す
                     </h2>
                     <span className="ml-auto text-xs text-gray-500">
                       {sheetQuery ? `一致: ${filteredCount}件` : `全件: ${totalCount}件`}
@@ -189,14 +189,14 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
                       )}
                     </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <button
+                      {/* <button
                         onClick={handleClearFilterInSheet}
                         className="text-sm underline text-gray-600 hover:text-gray-800"
                       >
-                        フィルター解除（全件表示）
-                      </button>
+                        すべて表示する
+                      </button> */}
                       {!sheetQuery && selectedGroupId === null && (
-                        <span className="text-xs text-gray-500">全件を表示中</span>
+                        <span className="text-xs text-gray-500 ml-1">全件を表示中</span>
                       )}
                     </div>
                   </div>
