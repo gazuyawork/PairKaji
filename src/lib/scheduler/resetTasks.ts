@@ -4,6 +4,7 @@ import { auth, db } from '@/lib/firebase';
 import { parseISO, isToday, getDay } from 'date-fns';
 import type { Task } from '@/types/Task';
 
+
 type TaskLike = Task & {
   skippedAt?: unknown;
   updatedAt?: unknown;

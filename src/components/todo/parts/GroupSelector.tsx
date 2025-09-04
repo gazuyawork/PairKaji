@@ -69,7 +69,7 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
               className={`px-2.5 py-2 rounded-sm text-sm border transition-all duration-300 whitespace-nowrap font-semibold ring-2 ring-white
                 ${selectedGroupId === task.id
                   ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner'
-                  : 'bg-orange-50 text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
+                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]'
                 }`}
 
             >

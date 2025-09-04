@@ -216,7 +216,7 @@ export default function TaskCalendar({ tasks }: Props) {
                                 ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
                                 : isDateTask
                                   ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
-                                  : 'bg-gradient-to-b from-green-300 to-green-600 text-white'
+                                  : 'bg-gradient-to-b from-blue-300 to-blue-600 text-white'
                           }
                           `}
                         >
