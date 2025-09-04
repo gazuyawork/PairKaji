@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef, useLayoutEffect, useCallback, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Eye, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, Pencil, Plus } from 'lucide-react';
 // import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
 import RecipeEditor, { type Recipe, type RecipeEditorHandle } from '@/components/todo/parts/RecipeEditor';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
@@ -765,6 +765,7 @@ export default function TodoNoteModal({
               onChange={(e) => setNewRefUrl(e.target.value)}
               className="flex-1 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
             />
+            {/* // 参考URL 追加ボタン（修正後）: プレビューボタンと同じ右マージン（mr-1）に統一 */}
             <button
               type="button"
               disabled={!/^https?:\/\/\S+/i.test(newRefUrl)}
@@ -774,43 +775,53 @@ export default function TodoNoteModal({
                 setReferenceUrls((prev) => (prev.includes(v) ? prev : [...prev, v]));
                 setNewRefUrl('');
               }}
-              className="shrink-0 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500 mr-1 mt-2"
               aria-label="参考URLを追加"
               title="参考URLを追加"
             >
+              <Plus size={16} />
               追加
             </button>
+
           </div>
         )}
+
+
 
         {/* 一覧は従来どおり。プレビュー中は削除ボタンだけ非表示 */}
         {referenceUrls.length > 0 && (
           <ul className="mt-2 space-y-1">
             {referenceUrls.map((url) => (
-              <li key={url} className="flex items-center gap-2">
+              <li key={url} className="flex items-center justify-between gap-2">
+                {/* 左側：URL（長文でも折り返し） */}
                 <a
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 underline underline-offset-2 break-all"
+                  className="text-blue-600 underline underline-offset-2 break-all flex-1 min-w-0"
                 >
                   {url}
                 </a>
+
+                {/* 右側：×ボタン（追加ボタンの右端に合わせて mr-1） */}
                 {!isPreview && (
                   <button
                     type="button"
-                    onClick={() => setReferenceUrls((prev) => prev.filter((u) => u !== url))}
-                    className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2"
+                    onClick={() =>
+                      setReferenceUrls((prev) => prev.filter((u) => u !== url))
+                    }
+                    className="inline-flex items-center justify-center w-7 h-7 hover:bg-gray-50 mr-1 shrink-0"
                     aria-label="このURLを削除"
                     title="このURLを削除"
                   >
-                    削除
+                    <span aria-hidden="true" className="text-lg leading-none">×</span>
                   </button>
                 )}
               </li>
             ))}
           </ul>
         )}
+
       </div>
       {/* ▲▲▲ 参考URLここまで ▲▲▲ */}
 

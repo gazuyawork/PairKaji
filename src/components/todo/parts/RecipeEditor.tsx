@@ -527,7 +527,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                     <select
                       value={ing.unit}
                       onChange={(e) => changeIngredientUnit(ing.id, e.target.value)}
-                      className="col-span-2 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 text-center"
+                      className="col-span-2 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 text-center ml-1"
                       disabled={isPreview}
                       aria-disabled={isPreview}
                     >
