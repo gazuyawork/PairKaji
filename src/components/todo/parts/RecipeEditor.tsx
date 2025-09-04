@@ -2,7 +2,15 @@
 'use client';
 
 import type React from 'react';
-import { useEffect, useState, useRef, useLayoutEffect, useCallback, forwardRef } from 'react';
+import {
+  useEffect,
+  useState,
+  useRef,
+  useLayoutEffect,
+  useCallback,
+  forwardRef,
+  useMemo,
+} from 'react';
 import { Plus } from 'lucide-react';
 
 export type Ingredient = { id: string; name: string; amount: number | null; unit: string };
@@ -39,7 +47,7 @@ const toHalfWidth = (s: string) =>
 const genId = () => {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch {}
+  } catch { }
   return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 };
 
@@ -79,18 +87,21 @@ const indexToLetters = (idx: number) => {
 };
 
 /** 自動リサイズ Textarea（forwardRef対応） */
-const AutoResizeTextarea = forwardRef<HTMLTextAreaElement, {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  className?: string;
-  readOnly?: boolean;
-  onCompositionStart?: () => void;
-  onCompositionEnd?: () => void;
-  onFocus?: () => void;
-  onBlur?: () => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-}>(
+const AutoResizeTextarea = forwardRef<
+  HTMLTextAreaElement,
+  {
+    value: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+    className?: string;
+    readOnly?: boolean;
+    onCompositionStart?: () => void;
+    onCompositionEnd?: () => void;
+    onFocus?: () => void;
+    onBlur?: () => void;
+    onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  }
+>(
   (
     {
       value,
@@ -115,7 +126,9 @@ const AutoResizeTextarea = forwardRef<HTMLTextAreaElement, {
       el.style.height = `${el.scrollHeight}px`;
     };
 
-    useLayoutEffect(() => { resize(); }, [value]);
+    useLayoutEffect(() => {
+      resize();
+    }, [value]);
 
     useEffect(() => {
       const el = innerRef.current;
@@ -165,7 +178,7 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
   const [composingStepIndex, setComposingStepIndex] = useState<number | null>(null);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
 
-  // フォーカス管理（★厳密型付け）
+  // フォーカス管理
   const nameRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const stepRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
 
@@ -185,30 +198,51 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingredients, steps]);
 
-  const addIngredientAt = useCallback((index: number) => {
-    if (isPreview) return;
-    const id = `ing_${genId()}`;
-    const next: Ingredient = { id, name: '', amount: null, unit: '適量' };
-    setIngredients((prev) => {
-      const arr = [...prev];
-      arr.splice(index + 1, 0, next);
-      return arr;
-    });
-    setTimeout(() => { nameRefs.current[id]?.focus(); }, 0);
-  }, [isPreview]);
+  // プレビュー時に空行を非表示にするためのフィルタ
+  const visibleIngredients = useMemo(
+    () => (isPreview ? ingredients.filter((i) => i.name.trim() !== '') : ingredients),
+    [isPreview, ingredients]
+  );
+  const visibleSteps = useMemo(
+    () => (isPreview ? steps.filter((s) => s.trim() !== '') : steps),
+    [isPreview, steps]
+  );
+
+  const addIngredientAt = useCallback(
+    (index: number) => {
+      if (isPreview) return;
+      const id = `ing_${genId()}`;
+      const next: Ingredient = { id, name: '', amount: null, unit: '適量' };
+      setIngredients((prev) => {
+        const arr = [...prev];
+        arr.splice(index + 1, 0, next);
+        return arr;
+      });
+      setTimeout(() => {
+        nameRefs.current[id]?.focus();
+      }, 0);
+    },
+    [isPreview]
+  );
 
   const addIngredient = useCallback(() => {
     if (isPreview) return;
     const id = `ing_${genId()}`;
     const next: Ingredient = { id, name: '', amount: null, unit: '適量' };
     setIngredients((prev) => [...prev, next]);
-    setTimeout(() => { nameRefs.current[id]?.focus(); }, 0);
+    setTimeout(() => {
+      nameRefs.current[id]?.focus();
+    }, 0);
   }, [isPreview]);
 
   const removeIngredient = (id: string) => {
     if (isPreview) return;
     setIngredients((prev) => prev.filter((i) => i.id !== id));
-    setUserEditedUnitIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    setUserEditedUnitIds((prev) => {
+      const n = new Set(prev);
+      n.delete(id);
+      return n;
+    });
     setComposingId((curr) => (curr === id ? null : curr));
   };
 
@@ -218,7 +252,7 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
         if (i.id !== id) return i;
         const shouldAuto = !userEditedUnitIds.has(id) && composingId === null;
         return { ...i, name, unit: shouldAuto ? suggestUnit(name) : i.unit };
-      }),
+      })
     );
   };
 
@@ -234,33 +268,34 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
     const normalized = toHalfWidth(raw).replace(',', '.');
     const n = Number(normalized);
     setIngredients((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, amount: Number.isFinite(n) ? n : i.amount } : i)),
+      prev.map((i) => (i.id === id ? { ...i, amount: Number.isFinite(n) ? n : i.amount } : i))
     );
   };
 
   const changeIngredientUnit = (id: string, unit: string) => {
     setIngredients((prev) =>
       prev.map((i) =>
-        i.id === id
-          ? { ...i, unit, amount: unit === '適量' ? null : i.amount } // 適量にしたら amount をクリア
-          : i,
-      ),
+        i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i
+      )
     );
     setUserEditedUnitIds((prev) => new Set(prev).add(id));
   };
 
-  const addStepAt = useCallback((index: number) => {
-    if (isPreview) return;
-    setSteps((prev) => {
-      const arr = [...prev];
-      arr.splice(index + 1, 0, '');
-      return arr;
-    });
-    setTimeout(() => {
-      const nextIndex = index + 1;
-      stepRefs.current[nextIndex]?.focus();
-    }, 0);
-  }, [isPreview]);
+  const addStepAt = useCallback(
+    (index: number) => {
+      if (isPreview) return;
+      setSteps((prev) => {
+        const arr = [...prev];
+        arr.splice(index + 1, 0, '');
+        return arr;
+      });
+      setTimeout(() => {
+        const nextIndex = index + 1;
+        stepRefs.current[nextIndex]?.focus();
+      }, 0);
+    },
+    [isPreview]
+  );
 
   const addStep = useCallback(() => {
     if (isPreview) return;
@@ -283,7 +318,7 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
   // Enterで連続追加（材料名）
   const onIngredientNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
-    if (e.nativeEvent.isComposing) return; // IME中は無視
+    if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return; // IME中は無視
     e.preventDefault();
     addIngredientAt(idx);
   };
@@ -291,7 +326,7 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
   // Enterで連続追加（手順）
   const onStepKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, idx: number) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
-    if (e.nativeEvent.isComposing) return; // IME中は無視
+    if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return; // IME中は無視
     e.preventDefault();
     addStepAt(idx);
   };
@@ -303,176 +338,201 @@ export default function RecipeEditor({ headerNote, value, onChange, isPreview = 
         {headerNote && <span className="text-xs text-gray-500">{headerNote}</span>}
       </div>
 
-      {/* 材料 */}
-      <div className="px-4 py-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-medium">材料一覧</h3>
+      {/* 材料セクション（プレビュー時は空行除外、全て空なら見出しごと非表示） */}
+      {(!isPreview || visibleIngredients.length > 0) && (
+        <div className="px-4 py-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium">材料一覧</h3>
 
-          {!isPreview && (
-            <button
-              type="button"
-              onClick={addIngredient}
-              className="inline-flex items-center gap-1 px-2 py-1 text-sm border-0 border-b border-gray-300 hover:border-blue-500"
-            >
-              <Plus size={16} />
-              追加
-            </button>
-          )}
-        </div>
+            {!isPreview && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addIngredient}
+                  className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500  mr-[-10px] mt-2"
+                >
+                  <Plus size={16} />
+                  追加
+                </button>
+              </div>
+            )}
+          </div>
 
-        <div className="space-y-2">
-          {ingredients.map((ing, idx) => (
-            <div key={ing.id} className="grid grid-cols-12 gap-2 items-center">
-              {/* A, B, C... */}
-              <div className="col-span-1 text-sm text-gray-500 select-none">{indexToLetters(idx)}.</div>
-
-              {isPreview ? (
-                // プレビュー：一本下線で連結
-                <div className="col-span-10">
-                  <div className="flex items-baseline gap-2 border-b border-gray-300 pb-2">
-                    {/* 材料名（4相当） */}
-                    <span className="flex-1 min-w-0">
-                      {ing.name ? (
-                        <span className="text-sm">{ing.name}</span>
-                      ) : (
-                        <span className="text-sm text-gray-400">材料名</span>
-                      )}
-                    </span>
-                    {/* 数量（3相当）— 適量は非表示（余白確保でラインは連結） */}
-                    {ing.unit === '適量' ? (
-                      <span className="w-24" />
-                    ) : (
-                      <span className="w-24 text-right text-sm">{ing.amount ?? ''}</span>
-                    )}
-                    {/* 単位（3相当） */}
-                    <span className="w-20 text-center text-sm">{ ing.unit }</span>
-                  </div>
+          <div className="space-y-2">
+            {(isPreview ? visibleIngredients : ingredients).map((ing, idx) => (
+              <div key={ing.id} className="grid grid-cols-12 gap-2 items-center">
+                {/* A, B, C... */}
+                <div className="col-span-1 text-sm text-gray-500 select-none">
+                  {indexToLetters(idx)}.
                 </div>
-              ) : (
-                <>
-                  {/* 材料名 */}
-                  <input
-                    ref={(el) => { nameRefs.current[ing.id] = el; }}
-                    value={ing.name}
-                    onChange={(e) => changeIngredientName(ing.id, e.target.value)}
-                    onKeyDown={(e) => onIngredientNameKeyDown(e, idx)}
-                    onCompositionStart={() => setComposingId(ing.id)}
-                    onCompositionEnd={(e) => {
-                      setComposingId((curr) => (curr === ing.id ? null : curr));
-                      if (!userEditedUnitIds.has(ing.id)) {
-                        const finalName = e.currentTarget.value;
-                        setIngredients((prev) =>
-                          prev.map((i) => (i.id === ing.id ? { ...i, unit: suggestUnit(finalName) } : i)),
-                        );
+
+                {isPreview ? (
+                  // プレビュー：一本下線で連結。数量は約4桁幅（6ch）に固定、適量は空表示
+                  <div className="col-span-11">
+                    <div className="flex items-baseline gap-2 border-b border-gray-300 pb-2">
+                      {/* 材料名（左・可変） */}
+                      <span className="flex-1 min-w-0">
+                        {ing.name ? (
+                          <span className="text-sm">{ing.name}</span>
+                        ) : (
+                          <span className="text-sm text-gray-400">材料名</span>
+                        )}
+                      </span>
+                      {/* 数量 */}
+                      {ing.unit === '適量' ? (
+                        <span style={{ width: '6ch' }} />
+                      ) : (
+                        <span style={{ width: '6ch' }} className="text-right text-sm">
+                          {ing.amount ?? ''}
+                        </span>
+                      )}
+                      {/* 単位 */}
+                      <span className="w-20 text-center text-sm">{ing.unit}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* 材料名（6カラムへ拡張） */}
+                    <input
+                      ref={(el) => {
+                        nameRefs.current[ing.id] = el;
+                      }}
+                      value={ing.name}
+                      onChange={(e) => changeIngredientName(ing.id, e.target.value)}
+                      onKeyDown={(e) => onIngredientNameKeyDown(e, idx)}
+                      onCompositionStart={() => setComposingId(ing.id)}
+                      onCompositionEnd={(e) => {
+                        setComposingId((curr) => (curr === ing.id ? null : curr));
+                        if (!userEditedUnitIds.has(ing.id)) {
+                          const finalName = e.currentTarget.value;
+                          setIngredients((prev) =>
+                            prev.map((i) =>
+                              i.id === ing.id ? { ...i, unit: suggestUnit(finalName) } : i
+                            )
+                          );
+                        }
+                      }}
+                      onFocus={() => setEditingId(ing.id)}
+                      onBlur={() =>
+                        setEditingId((curr) => (curr === ing.id ? null : curr))
                       }
-                    }}
-                    onFocus={() => setEditingId(ing.id)}
-                    onBlur={() => setEditingId((curr) => (curr === ing.id ? null : curr))}
-                    placeholder="材料名（例：玉ねぎ）"
-                    className="col-span-4 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
-                    readOnly={isPreview}
-                    aria-readonly={isPreview}
-                  />
+                      placeholder="材料名（例：玉ねぎ）"
+                      className="col-span-6 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
+                      readOnly={isPreview}
+                      aria-readonly={isPreview}
+                    />
 
-                  {/* 数量（適量は入力不可＆グレー） */}
-                  <input
-                    inputMode="decimal"
-                    pattern="[\d０-９]*([.,．，]\d+)?"
-                    value={ing.amount ?? ''}
-                    onChange={(e) => changeIngredientAmount(ing.id, e.target.value)}
-                    placeholder="数量"
-                    className="col-span-3 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm text-right focus:outline-none focus:ring-0 focus:border-blue-500 disabled:text-gray-400"
-                    readOnly={isPreview}
-                    aria-readonly={isPreview}
-                    disabled={ing.unit === '適量' || isPreview}
-                  />
+                    {/* 数量（2カラム、約4桁幅 6ch・右寄せ） */}
+                    <input
+                      inputMode="decimal"
+                      pattern="[\\d０-９]*([.,．，]\\d+)?"
+                      value={ing.amount ?? ''}
+                      onChange={(e) => changeIngredientAmount(ing.id, e.target.value)}
+                      placeholder="数量"
+                      className="col-span-2 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm text-right focus:outline-none focus:ring-0 focus:border-blue-500 disabled:text-gray-400"
+                      style={{ width: '6ch' }}
+                      readOnly={isPreview}
+                      aria-readonly={isPreview}
+                      disabled={ing.unit === '適量' || isPreview}
+                    />
 
-                  {/* 単位 */}
-                  <select
-                    value={ing.unit}
-                    onChange={(e) => changeIngredientUnit(ing.id, e.target.value)}
-                    className="col-span-3 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 text-center"
-                    disabled={isPreview}
-                    aria-disabled={isPreview}
+                    {/* 単位（2カラム） */}
+                    <select
+                      value={ing.unit}
+                      onChange={(e) => changeIngredientUnit(ing.id, e.target.value)}
+                      className="col-span-2 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 text-center"
+                      disabled={isPreview}
+                      aria-disabled={isPreview}
+                    >
+                      {UNIT_OPTIONS.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+
+                {/* 削除（×）：編集時のみ、かつ2件以上のとき表示 */}
+                {!isPreview && ingredients.length >= 2 && (
+                  <button
+                    type="button"
+                    onClick={() => removeIngredient(ing.id)}
+                    aria-label="材料を削除"
+                    className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
                   >
-                    {UNIT_OPTIONS.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
+                    <span aria-hidden className="text-lg leading-none">×</span>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              {/* 削除 */}
-              {!isPreview && (
+      {/* 手順セクション（プレビュー時は空行除外、全て空なら見出しごと非表示） */}
+      {(!isPreview || visibleSteps.length > 0) && (
+        <div className="px-4 pb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium">手順</h3>
+
+            {!isPreview && (
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => removeIngredient(ing.id)}
-                  aria-label="材料を削除"
-                  className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
+                  onClick={addStep}
+                  className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500 mr-[-10px] mt-2"
                 >
-                  <span aria-hidden className="text-lg leading-none">×</span>
+                  <Plus size={16} />
+                  追加
                 </button>
-              )}
-            </div>
-          ))}
+              </div>
+            )}
+          </div>
+
+          <ol className="space-y-2">
+            {(isPreview ? visibleSteps : steps).map((s, idx) => (
+              <li key={idx} className="grid grid-cols-12 gap-2 items-start">
+                {/* 行番号 */}
+                <div className="col-span-1 pt-2 text-sm text-gray-500 select-none">
+                  {idx + 1}.
+                </div>
+
+                {/* 手順テキスト（プレビュー時は読み取り） */}
+                <AutoResizeTextarea
+                  ref={(el) => {
+                    stepRefs.current[idx] = el;
+                  }}
+                  value={s}
+                  onChange={(v) => changeStep(idx, v)}
+                  placeholder="手順を入力"
+                  className={`${isPreview ? 'col-span-11' : 'col-span-10'} w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 ${isPreview ? '' : 'focus:border-blue-500'}`}
+                  readOnly={isPreview}
+                  onCompositionStart={() => setComposingStepIndex(idx)}
+                  onCompositionEnd={() =>
+                    setComposingStepIndex((cur) => (cur === idx ? null : cur))
+                  }
+                  onFocus={() => setEditingStepIndex(idx)}
+                  onBlur={() => setEditingStepIndex((cur) => (cur === idx ? null : cur))}
+                  onKeyDown={(e) => onStepKeyDown(e, idx)}
+                />
+
+                {/* 削除（×）：編集時のみ、かつ2件以上のとき表示 */}
+                {!isPreview && steps.length >= 2 && (
+                  <button
+                    type="button"
+                    onClick={() => removeStep(idx)}
+                    aria-label="手順を削除"
+                    className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
+                  >
+                    <span aria-hidden className="text-lg leading-none">×</span>
+                  </button>
+                )}
+              </li>
+            ))}
+          </ol>
         </div>
-      </div>
-
-      {/* 手順 */}
-      <div className="px-4 pb-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-medium">手順</h3>
-
-          {!isPreview && (
-            <button
-              type="button"
-              onClick={addStep}
-              className="inline-flex items-center gap-1 px-2 py-1 text-sm border-0 border-b border-gray-300 hover:border-blue-500"
-            >
-              <Plus size={16} />
-              追加
-            </button>
-          )}
-        </div>
-
-        <ol className="space-y-2">
-          {steps.map((s, idx) => (
-            <li key={idx} className="grid grid-cols-12 gap-2 items-start">
-              {/* 行番号 */}
-              <div className="col-span-1 pt-2 text-sm text-gray-500 select-none">{idx + 1}.</div>
-
-              {/* 手順テキスト */}
-              <AutoResizeTextarea
-                ref={(el) => { stepRefs.current[idx] = el; }}
-                value={s}
-                onChange={(v) => changeStep(idx, v)}
-                placeholder="手順を入力"
-                className={`col-span-10 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 ${isPreview ? '' : 'focus:border-blue-500'}`}
-                readOnly={isPreview}
-                onCompositionStart={() => setComposingStepIndex(idx)}
-                onCompositionEnd={() => setComposingStepIndex((cur) => (cur === idx ? null : cur))}
-                onFocus={() => setEditingStepIndex(idx)}
-                onBlur={() => setEditingStepIndex((cur) => (cur === idx ? null : cur))}
-                onKeyDown={(e) => onStepKeyDown(e, idx)}
-              />
-
-              {/* 削除 */}
-              {!isPreview && (
-                <button
-                  type="button"
-                  onClick={() => removeStep(idx)}
-                  aria-label="手順を削除"
-                  className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
-                >
-                  <span aria-hidden className="text-lg leading-none">×</span>
-                </button>
-              )}
-            </li>
-          ))}
-        </ol>
-      </div>
+      )}
     </div>
   );
 }

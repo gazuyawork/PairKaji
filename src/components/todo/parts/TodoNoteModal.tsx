@@ -570,10 +570,18 @@ export default function TodoNoteModal({
     if (initialLoad) return;
     if (previewInitRef.current) return;
 
-    setIsPreview(category === '料理' && hasContent);
+    // ✅ メモがある場合は優先してプレビュー開始
+    if (hasMemo) {
+      setIsPreview(true);
+    } else if (hasContent) {
+      // メモ以外（画像・レシピ・買い物・参考URL）があればプレビュー開始
+      setIsPreview(true);
+    } else {
+      setIsPreview(false);
+    }
 
     previewInitRef.current = true;
-  }, [isOpen, initialLoad, category, hasContent]);
+  }, [isOpen, initialLoad, hasMemo, hasContent]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -607,7 +615,8 @@ export default function TodoNoteModal({
 
   if (!mounted || initialLoad) return null;
 
-  const showPreviewToggle = category === '料理' && hasContent;
+  // const showPreviewToggle = category === '料理' && hasContent;
+  const showPreviewToggle = hasContent;
 
   return (
     <BaseModal
@@ -715,8 +724,10 @@ export default function TodoNoteModal({
           placeholder="備考を入力"
           onChange={(e) => setMemo(e.target.value)}
           onTouchMove={(e) => e.stopPropagation()}
-          readOnly={showPreviewToggle && isPreview}
-          aria-readonly={showPreviewToggle && isPreview}
+          // readOnly={showPreviewToggle && isPreview}
+          // aria-readonly={showPreviewToggle && isPreview}
+          readOnly={isPreview}
+          aria-readonly={isPreview}
           className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
         />
 
