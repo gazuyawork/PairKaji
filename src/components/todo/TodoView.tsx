@@ -1,3 +1,4 @@
+// src/components/views/TodoView.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -35,12 +36,15 @@ import { updateTodoTextInTask } from '@/lib/taskUtils';
 // ★ 追加: Portal で body 直下に描画するため
 import { createPortal } from 'react-dom';
 
+// ★ 追加: 右下＋のシートUI用
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, X, Search } from 'lucide-react';
+
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName, index } = useView();
   const [filterText, setFilterText] = useState('');
 
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -69,6 +73,8 @@ export default function TodoView() {
     setNoteModalTodo(null);
   };
 
+  // ▼ 右下＋（追加用シート）で使う候補名：
+  //   非表示（visible:false）かつ（自分 or 共有）のタスク名一覧（重複排除）
   const taskNameOptions = useMemo(() => {
     const names = tasks
       .filter(task =>
@@ -82,25 +88,33 @@ export default function TodoView() {
     return Array.from(new Set(names));
   }, [tasks, uid]);
 
-  // TodoViewコンポーネント内に追加
-  const selectBoxRef = useRef<HTMLDivElement | null>(null);
+  // ★ 追加: 右下＋ボタン用の追加シートの開閉と検索キーワード
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState('');
 
+  // ★ 追加: 追加用シート表示中は背景スクロールをロック
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        isOpen &&
-        selectBoxRef.current &&
-        !selectBoxRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
+    if (!mounted) return;
+    const prev = document.body.style.overflow;
+    if (isAddSheetOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = prev || '';
+    }
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = prev || '';
     };
-  }, [isOpen]);
+  }, [isAddSheetOpen, mounted]);
+
+  // ★ 追加: Escキーで追加シートを閉じる
+  useEffect(() => {
+    if (!isAddSheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsAddSheetOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isAddSheetOpen]);
 
   useEffect(() => {
     // uidが未取得の間はローディング扱いにしない
@@ -196,7 +210,7 @@ export default function TodoView() {
   return (
     <>
       <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
-        <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-52">
+        <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-54">
           {/* ✅ indexが2（TodoView）である場合のみ表示 */}
           {index === 2 && noteModalTask && noteModalTodo && (
             <TodoNoteModal
@@ -208,56 +222,10 @@ export default function TodoView() {
             />
           )}
 
-          {/* 🔁 Stickyラッパーでセレクトのみ固定（GroupSelector は下部固定に移動済み） */}
+          {/* 🔁 Stickyラッパー（上部は空。上部の追加セレクトUIは＋ボタンに移行済み） */}
           <div className="sticky top-0 z-[999] w-full bg-transparent">
             <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3">
-              {/* ✅ セレクトボックス部分 */}
-              <div ref={selectBoxRef} className="relative w-full mb-4">
-                <input
-                  type="text"
-                  value=""
-                  placeholder="追加する Todo を選択してください。"
-                  readOnly
-                  onClick={() => setIsOpen(true)}
-                  className="w-full border border-gray-300 bg-white rounded-lg px-4 py-2 text-sm shadow cursor-pointer pr-10"
-                />
-                {isOpen && (
-                  <button
-                    onClick={() => setIsOpen(false)}
-                    className="absolute right-3 top-0 text-red-500 hover:text-red-700 text-2xl font-bold"
-                    aria-label="閉じる"
-                  >
-                    ×
-                  </button>
-                )}
-                {isOpen && (
-                  <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow mt-1 max-h-70 overflow-y-auto text-sm">
-                    {taskNameOptions.map((name) => (
-                      <li
-                        key={name}
-                        onClick={async () => {
-                          const matched = tasks.find(task => task.name === name);
-                          if (matched && !matched.visible) {
-                            await updateDoc(doc(db, 'tasks', matched.id), {
-                              visible: true,
-                              updatedAt: serverTimestamp(),
-                            });
-                            toast.success('非表示のタスクを再表示しました。');
-                          }
-                          setSelectedGroupId(matched?.id ?? null);
-                          setFilterText('');
-                          setIsOpen(false);
-                        }}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                      >
-                        {name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* （削除済み）ここにあった GroupSelector は下部固定に移動 */}
+              {/* （上部の追加セレクトUIは右下＋ボタンに移行） */}
             </div>
           </div>
 
@@ -365,7 +333,151 @@ export default function TodoView() {
         </main>
       </div>
 
-      {/* ★ 追加: Portal で body 直下に描画（Todo 画面のみ） */}
+      {/* ★ 追加: 右下の＋フローティングボタン（Todo画面のみ） */}
+      {mounted && index === 2 && createPortal(
+        <button
+          type="button"
+          onClick={() => setIsAddSheetOpen(true)}
+          className="fixed bottom-24 right-5 z-[1100] w-14 h-14 rounded-full bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white text-white flex items-center justify-center active:scale-95"
+          aria-label="Todoを追加"
+          title="Todoを追加"
+        >
+          <Plus className="w-7 h-7" />
+        </button>,
+        document.body
+      )}
+
+      {/* ★ 追加: 右下＋から開く「追加用シート」 */}
+      {mounted && index === 2 && createPortal(
+        <AnimatePresence>
+          {isAddSheetOpen && (
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              className="fixed inset-0 z-[1200] flex flex-col"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {/* 背景 */}
+              <div
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setIsAddSheetOpen(false)}
+              />
+
+              {/* シート本体 */}
+              <motion.div
+                className="relative mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full bg-white rounded-t-2xl sm:rounded-2xl shadow-xl
+                           flex flex-col h-[70vh] sm:h-auto sm:max-h-[80vh] pb-[max(env(safe-area-inset-bottom),16px)]"
+                initial={{ y: 48 }}
+                animate={{ y: 0 }}
+                exit={{ y: 48 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              >
+                {/* ヘッダ */}
+                <div className="sticky top-0 z-10 bg-white border-b px-4 py-2 flex items-center gap-2">
+                  <button
+                    className="p-2 rounded-full hover:bg-gray-100"
+                    onClick={() => setIsAddSheetOpen(false)}
+                    aria-label="閉じる"
+                  >
+                    <X className="w-5 h-5 text-red-600" />
+                  </button>
+                  <h2 className="text-base font-semibold text-[#5E5E5E]">
+                    非表示のTodoを再表示
+                  </h2>
+                  <span className="ml-auto text-xs text-gray-500">
+                    {addQuery
+                      ? `一致: ${taskNameOptions.filter(n => (n ?? '').toLowerCase().includes(addQuery.trim().toLowerCase())).length}件`
+                      : `候補: ${taskNameOptions.length}件`}
+                  </span>
+                </div>
+
+                {/* 検索 */}
+                <div className="px-4 pt-3">
+                  <div className="flex items-center gap-2 border rounded-lg px-3 py-2">
+                    <Search className="w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={addQuery}
+                      onChange={(e) => setAddQuery(e.target.value)}
+                      placeholder="キーワードで検索"
+                      className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
+                      autoFocus
+                    />
+                    {addQuery && (
+                      <button
+                        className="text-sm text-gray-500 hover:text-gray-700"
+                        onClick={() => setAddQuery('')}
+                      >
+                        クリア
+                      </button>
+                    )}
+                  </div>
+                  {!addQuery && taskNameOptions.length === 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      非表示のToDoはありません。
+                    </div>
+                  )}
+                </div>
+
+                {/* 候補一覧 */}
+                <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
+                  {(() => {
+                    const q = addQuery.trim().toLowerCase();
+                    const options = q
+                      ? taskNameOptions.filter(n => (n ?? '').toLowerCase().includes(q))
+                      : taskNameOptions;
+                    if (options.length === 0) {
+                      return (
+                        <div className="text-center text-sm text-gray-500 py-10">
+                          一致するToDoが見つかりませんでした。
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {options.map((name) => {
+                          const matched = tasks.find(t =>
+                            t.name === name &&
+                            !t.visible &&
+                            (t.userId === uid || t.private !== true)
+                          );
+                          return (
+                            <button
+                              key={name}
+                              onClick={async () => {
+                                if (!matched) return;
+                                await updateDoc(doc(db, 'tasks', matched.id), {
+                                  visible: true,
+                                  updatedAt: serverTimestamp(),
+                                });
+                                toast.success('非表示のタスクを再表示しました。');
+                                setSelectedGroupId(matched.id);
+                                setFilterText('');
+                                setAddQuery('');
+                                setIsAddSheetOpen(false);
+                              }}
+                              className="w-full px-3 py-3 rounded-lg border text-sm font-semibold transition-all text-left
+                                         bg-white text-[#5E5E5E] border-gray-300 hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]"
+                              title={name}
+                            >
+                              <span className="line-clamp-2">{name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ★ 既存: Portal で body 直下に描画（Todo 画面のみ） */}
       {mounted && index === 2 && createPortal(
         <div
           className="fixed left-1/2 -translate-x-1/2 bottom-22 z-[1000] w-full max-w-xl px-2 pointer-events-none"

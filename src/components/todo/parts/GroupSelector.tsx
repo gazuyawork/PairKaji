@@ -76,22 +76,22 @@ export default function GroupSelector({ tasks, selectedGroupId, onSelectGroup }:
   };
 
   // フィルター解除
-  const handleClearFilterInSheet = () => {
-    onSelectGroup(null);
-    setSheetQuery('');
-  };
+  // const handleClearFilterInSheet = () => {
+  //   onSelectGroup(null);
+  //   setSheetQuery('');
+  // };
 
   return (
     <>
       {/* // 上部バー：左は状態テキスト、右ボタンは条件で「展開」or「解除」に切替 */}
       <div className="mb-0 ml-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           {selectedGroupId === null ? (
             <span className="text-xs text-white bg-gray-400 px-3 py-2 rounded-sm">全件を表示中</span>
           ) : (
             <span className="text-xs text-white bg-orange-300 px-3 py-2 rounded-sm">フィルター適用中</span>
           )}
-        </div>
+        </div> */}
 
         {selectedGroupId === null ? (
           // まだフィルタ無し：展開シートオープンのボタン
