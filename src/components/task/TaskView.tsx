@@ -182,7 +182,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [isLoading, setIsLoading] = useState(true);
   const [, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
-  const [todayFilter, setTodayFilter] = useState(false);
+  const [todayFilter, setTodayFilter] = useState(true);
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index } = useView();

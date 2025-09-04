@@ -1,3 +1,4 @@
+// functions/src/index.ts
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import { format } from 'date-fns';
@@ -42,12 +43,13 @@ async function pushToLine(lineUserId: string, flexMessage: any): Promise<boolean
 }
 
 /**
- * 毎朝8時(JST)に、以下をLINE通知する:
+ * 毎朝6時(JST)に、以下をLINE通知する:
  * - 当日の未完了タスク（dates に今日を含む）
  * - 前日以前の未完了タスク（dates に今日より前の日付を含む = 繰越）
  * - 週次の当日分（daysOfWeek に当日の曜日番号を含む）
+ * - ★毎日タスク（period === 'daily'）
  *
- * Firestore の制約により、クエリ内で array-contains を複数併用しない設計に変更。
+ * Firestore の制約により、クエリ内で array-contains を複数併用しない設計。
  * → userIds の array-contains と done==false のみで取得し、残りはメモリで判定。
  *
  * ★ 要件対応:
@@ -96,8 +98,8 @@ export const sendDailyTaskReminder = onSchedule(
       }
 
       try {
-        // ★ 重要：Firestore制約回避のため、array-contains は userIds のみに限定
-        // 未完了タスクを一括取得し、アプリ側で「当日/繰越/週次(当日)」を振り分ける
+        // ★ Firestore制約回避のため、array-contains は userIds のみに限定
+        // 未完了タスクを一括取得し、アプリ側で「当日/繰越/週次(当日)/毎日」を振り分ける
         const userTasksSnap = await db
           .collection('tasks')
           .where('userIds', 'array-contains', userId) // ← array-contains はこれ1つのみ
@@ -125,24 +127,28 @@ export const sendDailyTaskReminder = onSchedule(
         const isWeeklyToday = (t: any): boolean =>
           Array.isArray(t?.daysOfWeek) && t.daysOfWeek.includes(dayOfWeek);
 
-        // 当日 / 繰越 / 週次(当日) に分類
+        // ★毎日タスク（period === 'daily' 想定）
+        const isDaily = (t: any): boolean => (t?.period === 'daily');
+
+        // 当日 / 繰越 / 週次(当日) / 毎日に分類
         const todayTasks = rawTasks.filter(isTodayByDates);
         const overdueTasks = rawTasks.filter(isOverdueByDates);
         const weeklyTodayTasks = rawTasks.filter(isWeeklyToday);
+        const dailyTasks = rawTasks.filter(isDaily);
 
         // 重複排除（同一タスクが複数カテゴリに該当しうるため）
         const uniqueMap = new Map<string, any>();
-        for (const t of [...todayTasks, ...overdueTasks, ...weeklyTodayTasks]) {
+        for (const t of [...todayTasks, ...overdueTasks, ...weeklyTodayTasks, ...dailyTasks]) {
           uniqueMap.set(t.id, t);
         }
         const notifyTasks = Array.from(uniqueMap.values());
 
         console.log(
-          `[INFO] user=${userId} 当日:${todayTasks.length} 繰越:${overdueTasks.length} 週次当日:${weeklyTodayTasks.length} 通知対象(重複除去後):${notifyTasks.length}`
+          `[INFO] user=${userId} 当日:${todayTasks.length} 繰越:${overdueTasks.length} 週次当日:${weeklyTodayTasks.length} 毎日:${dailyTasks.length} 通知対象(重複除去後):${notifyTasks.length}`
         );
 
         if (notifyTasks.length === 0) {
-          // 件名が空なら通知を送らずスキップ
+          // 件数が0なら通知を送らずスキップ
           continue;
         }
 
@@ -150,10 +156,10 @@ export const sendDailyTaskReminder = onSchedule(
         const lines: string[] = [];
 
         if (todayTasks.length > 0) {
-          lines.push(''); // 改行
+          lines.push('');
           lines.push('【日付指定のタスク】');
           for (const t of todayTasks) lines.push(`・${t.name}`);
-          lines.push(''); // 改行
+          lines.push('');
         }
 
         if (overdueTasks.length > 0) {
@@ -162,16 +168,23 @@ export const sendDailyTaskReminder = onSchedule(
           lines.push('');
         }
 
-        // 週次当日タスクは、当日分のみ通知（過去分の繰越は含めない）
         if (weeklyTodayTasks.length > 0) {
           lines.push('【週次(本日)】');
           for (const t of weeklyTodayTasks) lines.push(`・${t.name}`);
           lines.push('');
         }
 
+        // ★毎日タスク（period === 'daily'）
+        if (dailyTasks.length > 0) {
+          lines.push('【毎日】');
+          for (const t of dailyTasks) lines.push(`・${t.name}`);
+          lines.push('');
+        }
+
         const headerText = `📋 今日のタスク（${format(nowJST, 'M月d日（eee）', { locale: ja })}）`;
         const bodyText = lines.join('\n') || '（該当なし）';
-        const noteText = '\nℹ️ 『毎日』に設定しているタスクや『日付指定』のないタスクは通知されません。';
+        const noteText =
+          'ℹ️ 毎日／日付指定／週次(本日)／繰越の未完了タスクをお知らせしています。';
 
         const flexMessage = {
           type: 'flex',
