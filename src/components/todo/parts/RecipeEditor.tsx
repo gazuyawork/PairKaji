@@ -421,14 +421,14 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
 
   return (
     <div className="">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+      <div className="flex items-center justify-between px-3 ml-2 mb-2 border-l-4 border-green-500">
         <h2 className="text-lg font-semibold">レシピ（材料・手順）</h2>
         {headerNote && <span className="text-xs text-gray-500">{headerNote}</span>}
       </div>
 
       {/* 材料セクション（プレビュー時は空行除外、全て空なら見出しごと非表示） */}
       {(!isPreview || visibleIngredients.length > 0) && (
-        <div className="px-4 py-4">
+        <div className="px-2 py-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">材料一覧</h3>
 
@@ -559,7 +559,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
 
       {/* 手順セクション（プレビュー時は空行除外、全て空なら見出しごと非表示） */}
       {(!isPreview || visibleSteps.length > 0) && (
-        <div className="px-4 pb-4">
+        <div className="px-2 pb-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">手順</h3>
 

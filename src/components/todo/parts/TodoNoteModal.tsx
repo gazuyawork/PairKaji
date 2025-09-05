@@ -168,6 +168,8 @@ export default function TodoNoteModal({
   // 変更: hasContent に参考URLがある場合も含める
   const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || referenceUrls.length > 0;
 
+  const showMemo = useMemo(() => !isPreview || hasMemo, [isPreview, hasMemo]);
+
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
     if (a === b) return true;
     if (a.ingredients.length !== b.ingredients.length) return false;
@@ -717,41 +719,43 @@ export default function TodoNoteModal({
 
       </div>
 
-      {/* textarea */}
-      <div className="relative pr-8">
-        <textarea
-          ref={memoRef}
-          data-scrollable="true"
-          onScroll={onTextareaScroll}
-          value={memo}
-          rows={1}
-          placeholder="備考を入力"
-          onChange={(e) => setMemo(e.target.value)}
-          onTouchMove={(e) => e.stopPropagation()}
-          // readOnly={showPreviewToggle && isPreview}
-          // aria-readonly={showPreviewToggle && isPreview}
-          readOnly={isPreview}
-          aria-readonly={isPreview}
-          className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-        />
+      {/* textarea（備考） */}
+      {showMemo && (
+        <div className="relative pr-8">
+          <textarea
+            ref={memoRef}
+            data-scrollable="true"
+            onScroll={onTextareaScroll}
+            value={memo}
+            rows={1}
+            placeholder="備考を入力"
+            onChange={(e) => setMemo(e.target.value)}
+            onTouchMove={(e) => e.stopPropagation()}
+            readOnly={isPreview}
+            aria-readonly={isPreview}
+            className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+          />
 
-        {isIOS && showScrollHint && (
-          <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-            <ChevronDown size={16} className="text-white" />
-          </div>
-        )}
-        {isIOS && showScrollUpHint && (
-          <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-            <ChevronUp size={16} className="text-white" />
-          </div>
-        )}
-      </div>
+          {isIOS && showScrollHint && (
+            <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronDown size={16} className="text-white" />
+            </div>
+          )}
+          {isIOS && showScrollUpHint && (
+            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronUp size={16} className="text-white" />
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* ▼▼▼ 参考URL（プレビュー時は「追加項目」を非表示にする） ▼▼▼ */}
       <div className="mt-2 ml-2">
         {/* ラベルは：プレビュー中でもURLが1件以上あるなら表示 */}
         {(!isPreview || referenceUrls.length > 0) && (
-          <label className="block text-sm text-gray-600 mb-1">参考URL</label>
+          // <label className="block text-sm text-gray-600 mb-1">参考URL</label>
+          <h3 className="font-medium">参考URL</h3>
         )}
 
         {/* 追加項目（入力欄＋追加ボタン）はプレビュー中は非表示 */}
