@@ -42,7 +42,6 @@ import {
   useSensors,
   PointerSensor,
   KeyboardSensor,
-  type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
 import {
@@ -118,7 +117,7 @@ export default function TodoTaskCard({
 }: Props) {
   const router = useRouter();
   const todos = useMemo(() => task?.todos ?? [], [task?.todos]);
-
+  const [isDndDragging, setIsDndDragging] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -357,16 +356,18 @@ export default function TodoTaskCard({
 
   // dnd-kit センサー（モバイル対応：長押し開始）
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragStart = (_e: DragStartEvent) => {
-    // 何もしないが、必要なら activeId を保持して視覚効果を拡張可能
+  const handleDragStart = () => {
+    setIsDndDragging(true);
   };
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
+    setIsDndDragging(false); // ★追加：ドラッグ終了で元に戻す
+
     if (!over || active.id === over.id) return;
 
     const fromIdx = visibleIds.indexOf(String(active.id));
@@ -375,7 +376,6 @@ export default function TodoTaskCard({
 
     const newVisible = arrayMove(visibleIds, fromIdx, toIdx);
 
-    // 全体のID配列（task.todos の順）を、可視部分の相対順だけ差し替え
     const fullIds = (task?.todos ?? []).map(t => t.id);
     const visibleSet = new Set(visibleIds);
     let cursor = 0;
@@ -386,7 +386,7 @@ export default function TodoTaskCard({
         cursor += 1;
         return nextId;
       }
-      return id; // 非表示はそのまま
+      return id;
     });
 
     onReorderTodos(nextFull);
@@ -420,7 +420,7 @@ export default function TodoTaskCard({
         <div className="flex items-center gap-2">
           {/* 並び替えハンドル（ここからのみドラッグ開始） */}
           <span
-            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500"
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
             title="ドラッグで並び替え"
             {...attributes}
             {...listeners}
@@ -664,7 +664,8 @@ export default function TodoTaskCard({
           <div
             ref={scrollRef}
             className={clsx(
-              "max-h:[40vh] max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1"
+              "max-h:[40vh] max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1",
+              isDndDragging && "touch-none select-none" // ★追加：ドラッグ中はタッチ無効＋選択防止
             )}
             onTouchMove={(e) => e.stopPropagation()}
           >
