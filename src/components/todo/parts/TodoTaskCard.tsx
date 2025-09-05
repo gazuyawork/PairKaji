@@ -341,7 +341,7 @@ export default function TodoTaskCard({
     };
   }, []);
 
-  const shakeTapAnimation = { scale: 0.98 };
+  // const shakeTapAnimation = { scale: 0.98 };
 
   // カテゴリアイコンの決定（未定義は Tag）
   const CategoryIcon = useMemo(() => {
@@ -575,10 +575,11 @@ export default function TodoTaskCard({
         />
       )}
 
-      <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
-        {/* 見出し左側：ドラッグハンドル + カテゴリアイコン + タスク名 */}
-        <div className="flex items-center gap-2">
-          {/* ★ 追加：タスク（カード）全体の並び替えハンドル */}
+      {/* // 見出しコンテナ（★ overflow-hidden 追加） */}
+      <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center overflow-hidden">
+        {/* 左：ドラッグハンドル + アイコン + タスク名  */}
+        {/* ★ flex-[1_1_72%] + min-w-0 + gap 最適化 */}
+        <div className="flex items-center gap-1 sm:gap-2 flex-[1_1_72%] min-w-0">
           <button
             type="button"
             title="ドラッグでカードを並び替え"
@@ -588,24 +589,29 @@ export default function TodoTaskCard({
             <Grip size={18} />
           </button>
 
+          {/* ★ タイトルボタンは flex-1 + min-w-0（最大幅制限は撤廃） */}
           <button
-            className="flex items-center gap-2 pl-1 pr-2 py-1 max-w-[55%] hover:underline text-left"
+            className="flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 hover:underline text-left"
             onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
             type="button"
           >
+            {/* アイコンは極小端末での圧迫回避のため SP で微小化 */}
             <CategoryIcon
-              size={18}
-              className={clsx('shrink-0', category ? 'text-gray-600' : 'text-gray-400')}
+              size={16}
+              className={clsx('shrink-0 sm:size-[18px]', category ? 'text-gray-600' : 'text-gray-400')}
               aria-label={category ? `${category}カテゴリ` : 'カテゴリ未設定'}
             />
-            <span className="font-bold text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
+            {/* ★ タイトル文字：SPでわずかに小さくしつつ truncate 可能域拡大 */}
+            <span className="font-bold text-[15px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
               {task.name}
             </span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex space-x-0 h-10">
+        {/* 右：タブ＋×（★ shrink-0 と余白縮小） */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* タブボタン群（★ SP 幅を w-14 に、文字も僅かに小さく） */}
+          <div className="flex space-x-0 h-10 shrink-0">
             {['undone', 'done'].map((type) => {
               const count = type === 'undone' ? undoneCount : doneCount;
               return (
@@ -613,17 +619,18 @@ export default function TodoTaskCard({
                   key={type}
                   onClick={() => setTab(type as 'undone' | 'done')}
                   className={clsx(
-                    'relative pl-5 py-1 text-sm font-bold border border-gray-300',
-                    'rounded-t-md w-16 flex items-center justify-center',
+                    'relative pl-5 py-1 text-[13px] sm:text-sm font-bold border border-gray-300',
+                    'rounded-t-md w-14 sm:w-16 flex items-center justify-center',
                     type === tab
                       ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
                       : 'bg-gray-100 text-gray-400 z-0'
                   )}
                   type="button"
                 >
+                  {/* ★ バッジも SP で微縮小、位置も微調整 */}
                   <span
                     className={clsx(
-                      'absolute left-2 inline-block min-w-[20px] h-[20px] leading-[20px] text-white rounded-full text-center',
+                      'absolute left-1.5 sm:left-2 inline-block min-w-[18px] sm:min-w-[20px] h-[18px] sm:h-[20px] leading-[18px] sm:leading-[20px] text-white rounded-full text-center',
                       count === 0
                         ? 'bg-gray-300'
                         : type === 'undone'
@@ -638,21 +645,24 @@ export default function TodoTaskCard({
               );
             })}
           </div>
+
+          {/* 削除 ×（★ SP では text-lg、右パディングも微縮） */}
           <motion.button
             onClick={handleDeleteClick}
             animate={isDeleteAnimating ? 'shake' : undefined}
             variants={SHAKE_VARIANTS}
             className={clsx(
-              'text-2xl font-bold pr-1',
+              'font-bold pr-0.5 sm:pr-1 shrink-0 text-lg sm:text-2xl',
               confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
             )}
             type="button"
-            whileTap={shakeTapAnimation}
+            whileTap={{ scale: 0.98 }}
           >
             ×
           </motion.button>
         </div>
       </div>
+
 
       {/* 本体カード */}
       <div className="relative bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-12 space-y-2 min-h-20">
