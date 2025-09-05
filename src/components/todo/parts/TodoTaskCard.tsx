@@ -71,18 +71,23 @@ const normalizeJP = (v: unknown): string => {
   );
 };
 
+type CategoryIconConfig = {
+  icon: ComponentType<{ size?: number; className?: string }>;
+  color: string;
+};
+
 // カテゴリアイコンのマップ（未定義は Tag）
-const CATEGORY_ICON_MAP: Record<string, ComponentType<{ size?: number; className?: string }>> = {
-  '料理': UtensilsCrossed,
-  '買い物': ShoppingCart,
-  // '掃除': Broom,
-  '運動': Dumbbell,
-  '写真': Camera,
-  'ペット': PawPrint,
-  '音楽': Music,
-  'ゲーム': Gamepad,
-  '旅行': Plane,
-  '車': Car,
+const CATEGORY_ICON_MAP: Record<string, CategoryIconConfig> = {
+  '料理': { icon: UtensilsCrossed, color: 'text-red-500' },
+  '買い物': { icon: ShoppingCart, color: 'text-green-500' },
+  // '掃除': { icon: Broom, color: 'text-yellow-500' },
+  '運動': { icon: Dumbbell, color: 'text-blue-500' },
+  '写真': { icon: Camera, color: 'text-purple-500' },
+  'ペット': { icon: PawPrint, color: 'text-pink-500' },
+  '音楽': { icon: Music, color: 'text-indigo-500' },
+  'ゲーム': { icon: Gamepad, color: 'text-orange-500' },
+  '旅行': { icon: Plane, color: 'text-teal-500' },
+  '車': { icon: Car, color: 'text-gray-600' },
 };
 
 interface Props {
@@ -137,9 +142,18 @@ export default function TodoTaskCard({
   const [showScrollDownHint, setShowScrollDownHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
 
-  // カテゴリ関連
-  const category = (task as any)?.category as string | undefined;
+  // カテゴリ関連（null/undefinedを明示的に許容） ★ 変更: 型コメントを追加
+  const category = (task as any)?.category as string | null | undefined;
   const isCookingCategory = category === '料理';
+
+  // ★ 変更: カテゴリアイコンと色をまとめて取得（null/未登録は Tag + gray）
+  const { CatIcon, catColor } = useMemo(() => {
+    const conf = category ? CATEGORY_ICON_MAP[category] : undefined;
+    return {
+      CatIcon: (conf?.icon ?? Tag) as ComponentType<{ size?: number; className?: string }>,
+      catColor: conf?.color ?? 'text-gray-400',
+    };
+  }, [category]);
 
   // 検索クエリ（料理のときだけ有効）
   const [searchQuery, setSearchQuery] = useState('');
@@ -343,11 +357,11 @@ export default function TodoTaskCard({
 
   // const shakeTapAnimation = { scale: 0.98 };
 
-  // カテゴリアイコンの決定（未定義は Tag）
-  const CategoryIcon = useMemo(() => {
-    if (!category) return Tag;
-    return CATEGORY_ICON_MAP[category] ?? Tag;
-  }, [category]);
+  // ★ 削除: 旧 CategoryIcon useMemo（オブジェクト返却で型不一致の原因）
+  // const CategoryIcon = useMemo(() => {
+  //   if (!category) return Tag;
+  //   return CATEGORY_ICON_MAP[category] ?? Tag;
+  // }, [category]);
 
   // ====== 並び替え（dnd-kit：TODO 行） ======
 
@@ -595,10 +609,10 @@ export default function TodoTaskCard({
             onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
             type="button"
           >
-            {/* アイコンは極小端末での圧迫回避のため SP で微小化 */}
-            <CategoryIcon
+            {/* ★ 変更: ここで CatIcon と catColor を使用。null/未登録でもOK */}
+            <CatIcon
               size={16}
-              className={clsx('shrink-0 sm:size-[18px]', category ? 'text-gray-600' : 'text-gray-400')}
+              className={clsx('shrink-0 sm:size-[18px]', catColor)} // ← ★ 変更: 旧 'text-gray-600/400' 分岐を置換
               aria-label={category ? `${category}カテゴリ` : 'カテゴリ未設定'}
             />
             {/* ★ タイトル文字：SPでわずかに小さくしつつ truncate 可能域拡大 */}
@@ -663,9 +677,8 @@ export default function TodoTaskCard({
         </div>
       </div>
 
-
       {/* 本体カード */}
-      <div className="relative bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-12 space-y-2 min-h-20">
+      <div className="relative bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-8 space-y-2 min-h-20">
         {/* ▼ カテゴリ=料理 のときだけ検索ボックス */}
         {isCookingCategory && (
           <div className="px-1 pr-5">
@@ -708,10 +721,10 @@ export default function TodoTaskCard({
             onTouchMove={(e) => e.stopPropagation()}
           >
             {finalFilteredTodos.length === 0 && tab === 'done' && (
-              <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
+              <div className="text-gray-400 italic pt-4 pl-2">完了したタスクはありません</div>
             )}
             {finalFilteredTodos.length === 0 && tab === 'undone' && (
-              <div className="text-gray-400 italic pt-4">該当する未処理のタスクはありません</div>
+              <div className="text-gray-400 italic pt-4 pl-2">該当する未処理のタスクはありません</div>
             )}
 
             {/* ★ ここから dnd-kit で包む（TODO 行の並び替え） */}
@@ -775,7 +788,7 @@ export default function TodoTaskCard({
           )}
           {showScrollUpHint && (
             <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-              <ChevronUp size={16} className="text-white" />
+            <ChevronUp size={16} className="text-white" />
             </div>
           )}
         </div>
