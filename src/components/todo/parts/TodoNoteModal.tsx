@@ -721,7 +721,7 @@ export default function TodoNoteModal({
 
       {/* textarea（備考） */}
       {showMemo && (
-        <div className="relative pr-8">
+        <div className="relative pr-8 mt-4">
           <textarea
             ref={memoRef}
             data-scrollable="true"

@@ -87,11 +87,34 @@ export default function BaseModal({
   if (!mounted || !isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex justify-center items-center px-2">
+    <div className="fixed inset-0 h-dvh z-[9999] flex justify-center items-center px-2">
+      {/* ★ 保存/完了オーバーレイ：全画面を覆う（スクロール領域も含めて遮断） */}
+      {(isSaving || saveComplete) && (
+        <div className="fixed inset-0 z-[10000] bg-white/80 flex items-center justify-center">
+          <motion.div
+            key={saveComplete ? 'check' : 'spinner'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            {saveComplete ? (
+              <motion.div
+                initial={{ scale: 0, rotate: 0 }}
+                animate={{ scale: [0.8, 1.5, 1.2], rotate: [0, 360] }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              >
+                <CheckCircle className="text-green-500 w-12 h-12" />
+              </motion.div>
+            ) : (
+              <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+            )}
+          </motion.div>
+        </div>
+      )}
       {/* 背景オーバーレイ */}
       <div
         ref={overlayRef}
-        className="absolute inset-0 bg-white/80"
+        className="fixed inset-0 bg-white/80"
         onClick={onClose}
       />
 
@@ -102,10 +125,13 @@ export default function BaseModal({
         transition={{ duration: 0.25, ease: 'easeOut' }}
         role="dialog"
         aria-modal="true"
-        className="relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-x-hidden"
+        className={`relative z-10 bg-white w-full max-w-[400px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-x-hidden ${(isSaving || saveComplete) ? 'overflow-hidden' : ''}`}
+        onWheel={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
+        onTouchMove={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
         style={{ transform: 'none' }}
+
       >
-        {(isSaving || saveComplete) && (
+        {/* {(isSaving || saveComplete) && (
           <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
             <motion.div
               key={saveComplete ? 'check' : 'spinner'}
@@ -126,7 +152,7 @@ export default function BaseModal({
               )}
             </motion.div>
           </div>
-        )}
+        )} */}
 
         {/* 子がそのまま入る。スクロールは子（textarea）側のみで発生 */}
         <div className="space-y-6">
