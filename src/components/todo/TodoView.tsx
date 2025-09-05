@@ -272,11 +272,11 @@ export default function TodoView() {
                     const updated = tasks.map(t =>
                       t.id === task.id
                         ? {
-                            ...t,
-                            todos: t.todos.map(todo =>
-                              todo.id === todoId ? { ...todo, text: value } : todo
-                            ),
-                          }
+                          ...t,
+                          todos: t.todos.map(todo =>
+                            todo.id === todoId ? { ...todo, text: value } : todo
+                          ),
+                        }
                         : t
                     );
                     setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
@@ -324,6 +324,29 @@ export default function TodoView() {
                   }}
                   todoRefs={todoRefs}
                   focusedTodoId={focusedTodoId}
+
+                  onReorderTodos={async (orderedIds) => {
+                    // 楽観的更新（先にUIを並び替え）：
+                    const idToTodo = Object.fromEntries(task.todos.map(td => [td.id, td]));
+                    const newTodos = orderedIds
+                      .map(id => idToTodo[id])
+                      .filter((v): v is typeof task.todos[number] => Boolean(v));
+
+                    setTasks(prev =>
+                      prev.map(t => (t.id === task.id ? { ...t, todos: newTodos } : t))
+                    );
+
+                    try {
+                      await updateDoc(doc(db, 'tasks', task.id), {
+                        todos: newTodos,
+                        updatedAt: serverTimestamp(),
+                      });
+                    } catch (e) {
+                      console.error('reorder update error:', e);
+                      toast.error('並び替えの保存に失敗しました');
+                      // onSnapshotで直近状態に戻る前提。必要ならここで明示ロールバックも可。
+                    }
+                  }}
                 />
               </div>
             ));

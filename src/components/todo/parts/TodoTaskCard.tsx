@@ -1,10 +1,11 @@
 /* /src/components/todo/parts/TodoTaskCard.tsx */
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
+import type { ComponentType } from 'react';
 import {
   CheckCircle,
   Circle,
@@ -25,13 +26,32 @@ import {
   Gamepad2 as Gamepad,
   Plane,
   Car,
-  Tag
+  Tag,
+  GripVertical as Grip,
 } from 'lucide-react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import type { Variants } from 'framer-motion';
+
+// ★ 追加: dnd-kit（モバイル対応ドラッグ＆ドロップ）
+import {
+  DndContext,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  KeyboardSensor,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // コンポーネント外に退避（毎レンダー新規生成を回避）
 const SHAKE_VARIANTS: Variants = {
@@ -52,7 +72,7 @@ const normalizeJP = (v: unknown): string => {
 };
 
 // カテゴリアイコンのマップ（未定義は Tag）
-const CATEGORY_ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+const CATEGORY_ICON_MAP: Record<string, ComponentType<{ size?: number; className?: string }>> = {
   '料理': UtensilsCrossed,
   '買い物': ShoppingCart,
   // '掃除': Broom,
@@ -78,6 +98,7 @@ interface Props {
   todoRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
   focusedTodoId: string | null;
   onOpenNote: (text: string) => void;
+  onReorderTodos: (orderedIds: string[]) => void; // 並び替え結果を親へ通知
 }
 
 export default function TodoTaskCard({
@@ -93,6 +114,7 @@ export default function TodoTaskCard({
   todoRefs,
   focusedTodoId,
   onOpenNote,
+  onReorderTodos,
 }: Props) {
   const router = useRouter();
   const todos = useMemo(() => task?.todos ?? [], [task?.todos]);
@@ -100,7 +122,7 @@ export default function TodoTaskCard({
   const [isComposing, setIsComposing] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [, setInputError] = useState<string | null>(null); // 下部表示には使わないが互換用に残置
+  const [, setInputError] = useState<string | null>(null); // 互換用に残置（トーストへ移行済み）
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
   const [showScrollDownHint, setShowScrollDownHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -115,7 +137,7 @@ export default function TodoTaskCard({
   // 追加可能か（未処理タブのみ可）
   const canAdd = tab === 'undone';
 
-  // カウントをメモ化
+  // カウント
   const { undoneCount, doneCount } = useMemo(() => {
     let undone = 0;
     let done = 0;
@@ -125,14 +147,13 @@ export default function TodoTaskCard({
     return { undoneCount: undone, doneCount: done };
   }, [todos]);
 
-  // 下地のタブ絞り込み
+  // タブ絞り込み
   const baseFilteredByTab = useMemo(
     () => (tab === 'done' ? todos.filter(todo => todo.done) : todos.filter(todo => !todo.done)),
     [todos, tab]
   );
 
-  // 検索適用後の表示リスト（カテゴリ=料理のときのみ検索）
-  // 条件：todo.text（料理名） or todo.recipe.ingredients[].name（材料名）がヒット
+  // 検索適用後の表示リスト
   const finalFilteredTodos = useMemo(() => {
     if (!isCookingCategory) return baseFilteredByTab;
     const q = normalizeJP(searchQuery.trim());
@@ -149,7 +170,7 @@ export default function TodoTaskCard({
     });
   }, [baseFilteredByTab, isCookingCategory, searchQuery]);
 
-  // ▼ 未処理タブで検索しているとき、済側にヒットしている件数（料理名・材料名に対する一致）
+  // 未タブ検索時、済側ヒット件数
   const doneMatchesCount = useMemo(() => {
     if (!isCookingCategory) return 0;
     const q = normalizeJP(searchQuery.trim());
@@ -157,7 +178,7 @@ export default function TodoTaskCard({
 
     return todos.filter((t: any) => {
       if (!t.done) return false;
-      const nameHit = normalizeJP(t?.text).includes(q); // 料理名（TODOのtext）
+      const nameHit = normalizeJP(t?.text).includes(q);
       const ingHit =
         Array.isArray(t?.recipe?.ingredients) &&
         t.recipe.ingredients.some((ing: any) => normalizeJP(ing?.name).includes(q));
@@ -165,50 +186,14 @@ export default function TodoTaskCard({
     }).length;
   }, [todos, isCookingCategory, searchQuery]);
 
+  // 右側のスクロールバー風メータ
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
+
+  // doneアイコンのローカルアニメーション
   const [localDoneMap, setLocalDoneMap] = useState<Record<string, boolean>>({});
   const [animateTriggerMap, setAnimateTriggerMap] = useState<Record<string, number>>({});
-
-  // --- マウス用ドラッグスクロール状態 ---
-  const isDraggingRef = useRef(false);
-  const startYRef = useRef(0);
-  const startScrollTopRef = useRef(0);
-  const [dragging, setDragging] = useState(false);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== 'mouse') return;
-    const el = scrollRef.current;
-    if (!el) return;
-
-    isDraggingRef.current = true;
-    setDragging(true);
-    startYRef.current = e.clientY;
-    startScrollTopRef.current = el.scrollTop;
-
-    el.setPointerCapture?.(e.pointerId);
-    e.preventDefault();
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current) return;
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const deltaY = e.clientY - startYRef.current;
-    el.scrollTop = startScrollTopRef.current - deltaY;
-    e.preventDefault();
-  };
-
-  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current) return;
-    const el = scrollRef.current;
-    isDraggingRef.current = false;
-    setDragging(false);
-    el?.releasePointerCapture?.(e.pointerId);
-  };
-  // --- ここまで ---
 
   useEffect(() => {
     const newMap: Record<string, boolean> = {};
@@ -255,14 +240,12 @@ export default function TodoTaskCard({
   }, [finalFilteredTodos.length]);
 
   const handleAdd = () => {
-    if (!canAdd) return; // 念のためガード
-
+    if (!canAdd) return;
     const trimmed = newTodoText.trim();
     if (!trimmed) return;
 
     const isDuplicateUndone = todos.some(todo => todo.text === trimmed && !todo.done);
     if (isDuplicateUndone) {
-      // ▼ 変更：下部の赤帯ではなくトーストで通知
       toast.error('既に登録されています。');
       setInputError(null);
       return;
@@ -290,9 +273,6 @@ export default function TodoTaskCard({
   const [isDeleteAnimating, setIsDeleteAnimating] = useState(false);
   const deleteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // src/components/todo/parts/TodoTaskCard.tsx
-  // 変更点：handleDeleteClick の「確定」分岐にトースト表示を追加
-
   const handleDeleteClick = () => {
     if (isDeleteAnimating) return;
 
@@ -300,14 +280,10 @@ export default function TodoTaskCard({
       setConfirmDelete(true);
       setIsDeleteAnimating(true);
 
-      setTimeout(() => {
-        setIsDeleteAnimating(false);
-      }, 400);
+      setTimeout(() => setIsDeleteAnimating(false), 400);
 
       if (deleteTimeout.current) clearTimeout(deleteTimeout.current);
-      deleteTimeout.current = setTimeout(() => {
-        setConfirmDelete(false);
-      }, 2000);
+      deleteTimeout.current = setTimeout(() => setConfirmDelete(false), 2000);
     } else {
       if (deleteTimeout.current) {
         clearTimeout(deleteTimeout.current);
@@ -315,18 +291,11 @@ export default function TodoTaskCard({
       }
       setConfirmDelete(false);
 
-      // ▼ ここを変更：onDeleteTask 後にトーストを表示（非同期でも対応）
       Promise.resolve(onDeleteTask())
-        .then(() => {
-          toast.success('Todoを非表示にしました。');
-        })
-        .catch(() => {
-          // 任意：失敗時の通知
-          toast.error('非表示にできませんでした。もう一度お試しください。');
-        });
+        .then(() => toast.success('Todoを非表示にしました。'))
+        .catch(() => toast.error('非表示にできませんでした。もう一度お試しください。'));
     }
   };
-
 
   const [confirmTodoDeletes, setConfirmTodoDeletes] = useState<Record<string, boolean>>({});
   const todoDeleteTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -369,6 +338,217 @@ export default function TodoTaskCard({
     if (!category) return Tag;
     return CATEGORY_ICON_MAP[category] ?? Tag;
   }, [category]);
+
+  // ====== 並び替え（dnd-kit） ======
+
+  // ★ 削除対象（③）：HTML5 DnD 用の state/関数（draggingIdRef, dragOverId, draggable属性, handlePointerDown など）
+  // → すべて削除済み。スクロール用の Pointer キャプチャも競合回避のため削除しています。
+
+  // 可視リストのID配列
+  const visibleIds = useMemo(() => finalFilteredTodos.map(t => t.id), [finalFilteredTodos]);
+
+  // 要素移動ヘルパ
+  const arrayMove = <T,>(arr: T[], from: number, to: number) => {
+    const copy = arr.slice();
+    const [item] = copy.splice(from, 1);
+    copy.splice(to, 0, item);
+    return copy;
+  };
+
+  // dnd-kit センサー（モバイル対応：長押し開始）
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragStart = (_e: DragStartEvent) => {
+    // 何もしないが、必要なら activeId を保持して視覚効果を拡張可能
+  };
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+
+    const fromIdx = visibleIds.indexOf(String(active.id));
+    const toIdx = visibleIds.indexOf(String(over.id));
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const newVisible = arrayMove(visibleIds, fromIdx, toIdx);
+
+    // 全体のID配列（task.todos の順）を、可視部分の相対順だけ差し替え
+    const fullIds = (task?.todos ?? []).map(t => t.id);
+    const visibleSet = new Set(visibleIds);
+    let cursor = 0;
+
+    const nextFull = fullIds.map(id => {
+      if (visibleSet.has(id)) {
+        const nextId = newVisible[cursor];
+        cursor += 1;
+        return nextId;
+      }
+      return id; // 非表示はそのまま
+    });
+
+    onReorderTodos(nextFull);
+  };
+
+  // 各行の Sortable ラッパ
+  function SortableRow({ todo, hasContentForIcon }: { todo: any; hasContentForIcon: boolean }) {
+    const {
+      setNodeRef,
+      attributes,
+      listeners,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: todo.id });
+
+    const style: React.CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={clsx(
+          "flex flex-col gap-1",
+          isDragging && "opacity-60"
+        )}
+      >
+        <div className="flex items-center gap-2">
+          {/* 並び替えハンドル（ここからのみドラッグ開始） */}
+          <span
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500"
+            title="ドラッグで並び替え"
+            {...attributes}
+            {...listeners}
+          >
+            <Grip size={18} aria-label="並び替え" />
+          </span>
+
+          <motion.div
+            key={animateTriggerMap[todo.id] ?? 0}
+            className="cursor-pointer"
+            onClick={() => {
+              setLocalDoneMap(prev => ({
+                ...prev,
+                [todo.id]: !prev[todo.id],
+              }));
+              setAnimateTriggerMap(prev => ({
+                ...prev,
+                [todo.id]: (prev[todo.id] ?? 0) + 1,
+              }));
+              setTimeout(() => onToggleDone(todo.id), 600);
+            }}
+            initial={{ rotate: 0 }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            {localDoneMap[todo.id] ? (
+              <CheckCircle className="text-yellow-500" />
+            ) : (
+              <Circle className="text-gray-400" />
+            )}
+          </motion.div>
+
+          <input
+            type="text"
+            defaultValue={todo.text}
+            onBlur={(e) => {
+              const newText = e.target.value.trim();
+              const original = todo.text;
+
+              if (!newText) {
+                toast.info('削除する場合はゴミ箱アイコンで消してください');
+                const inputEl = todoRefs.current[todo.id];
+                if (inputEl) inputEl.value = original;
+                return;
+              }
+
+              const isDuplicate = todos.some((t: any) => t.id !== todo.id && t.text === newText && !t.done);
+              if (isDuplicate) {
+                setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
+                const inputEl = todoRefs.current[todo.id];
+                if (inputEl) inputEl.value = original;
+                return;
+              }
+
+              const matchDone = todos.find((t: any) => t.id !== todo.id && t.text === newText && t.done);
+              if (matchDone) {
+                setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
+                const inputEl = todoRefs.current[todo.id];
+                if (inputEl) inputEl.value = original;
+                return;
+              }
+
+              setEditingErrors(prev => {
+                const next = { ...prev };
+                delete next[todo.id];
+                return next;
+              });
+
+              onChangeTodo(todo.id, newText);
+              onBlurTodo(todo.id, newText);
+            }}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
+            ref={(el) => {
+              if (el) {
+                todoRefs.current[todo.id] = el;
+                if (focusedTodoId === todo.id) el.focus();
+              }
+            }}
+            className={clsx(
+              'flex-1 border-b bg-transparent outline-none border-gray-200',
+              'h-8',
+              todo.done ? 'text-gray-400 line-through' : 'text-black'
+            )}
+            placeholder="TODOを入力"
+          />
+
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.85, rotate: -10 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+            className={clsx(
+              'mr-1 active:scale-90',
+              hasContentForIcon
+                ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
+                : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
+            )}
+            onClick={() => onOpenNote(todo.text)}
+          >
+            <Notebook size={22} />
+          </motion.button>
+
+          <motion.button
+            type="button"
+            onClick={() => handleTodoDeleteClick(todo.id)}
+            animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
+            variants={SHAKE_VARIANTS}
+          >
+            <Trash2
+              size={22}
+              className={clsx(
+                'hover:text-red-500',
+                confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
+              )}
+            />
+          </motion.button>
+        </div>
+
+        {editingErrors[todo.id] && (
+          <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
+            {editingErrors[todo.id]}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ====== 並び替え ここまで ======
 
   return (
     <div className="relative mb-2.5">
@@ -446,9 +626,9 @@ export default function TodoTaskCard({
         </div>
       </div>
 
-      {/* 本体カード（相対位置） */}
+      {/* 本体カード */}
       <div className="relative bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-12 space-y-2 min-h-20">
-        {/* ▼ カテゴリ=料理 のときだけ表示する検索ボックス */}
+        {/* ▼ カテゴリ=料理 のときだけ検索ボックス */}
         {isCookingCategory && (
           <div className="px-1 pr-5">
             <div className="relative">
@@ -479,18 +659,13 @@ export default function TodoTaskCard({
           </div>
         )}
 
-        {/* スクロール領域（下部に固定入力が重ならないように余白を確保：pb-20） */}
+        {/* スクロール領域 */}
         <div className="relative">
           <div
             ref={scrollRef}
             className={clsx(
-              "max-h:[40vh] max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1",
-              dragging ? "cursor-grabbing select-none" : "cursor-grab"
+              "max-h:[40vh] max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1"
             )}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
             onTouchMove={(e) => e.stopPropagation()}
           >
             {finalFilteredTodos.length === 0 && tab === 'done' && (
@@ -499,164 +674,58 @@ export default function TodoTaskCard({
             {finalFilteredTodos.length === 0 && tab === 'undone' && (
               <div className="text-gray-400 italic pt-4">該当する未処理のタスクはありません</div>
             )}
-            {finalFilteredTodos.map((todo) => {
-              // ▼ まずはここでローカル変数を計算（JSXの外）
-              const hasMemo =
-                typeof (todo as any)?.memo === 'string' && (todo as any).memo.trim() !== '';
 
-              const hasShopping =
-                category === '買い物' &&
-                (
-                  (typeof (todo as any)?.price === 'number' && Number.isFinite((todo as any).price) && (todo as any).price > 0) ||
-                  (typeof (todo as any)?.quantity === 'number' && Number.isFinite((todo as any).quantity) && (todo as any).quantity > 0)
-                );
+            {/* ★ ここから dnd-kit で包む */}
+            <DndContext
+              sensors={sensors}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+                {finalFilteredTodos.map((todo) => {
+                  // 各種フラグ（アイコン色）
+                  const hasMemo =
+                    typeof (todo as any)?.memo === 'string' && (todo as any).memo.trim() !== '';
 
-              const hasImage =
-                typeof (todo as any)?.imageUrl === 'string' && (todo as any).imageUrl !== '';
+                  const hasShopping =
+                    category === '買い物' &&
+                    (
+                      (typeof (todo as any)?.price === 'number' && Number.isFinite((todo as any).price) && (todo as any).price > 0) ||
+                      (typeof (todo as any)?.quantity === 'number' && Number.isFinite((todo as any).quantity) && (todo as any).quantity > 0)
+                    );
 
-              const hasRecipe =
-                category === '料理' &&
-                (
-                  (Array.isArray((todo as any)?.recipe?.ingredients) &&
-                    (todo as any).recipe.ingredients.some((i: any) => (i?.name ?? '').trim() !== '')) ||
-                  (Array.isArray((todo as any)?.recipe?.steps) &&
-                    (todo as any).recipe.steps.some((s: any) => (s ?? '').trim() !== ''))
-                );
+                  const hasImage =
+                    typeof (todo as any)?.imageUrl === 'string' && (todo as any).imageUrl !== '';
 
-              // ★追加：参考URLが1件以上あるか
-              const hasReferenceUrls =
-                Array.isArray((todo as any)?.referenceUrls) &&
-                (todo as any).referenceUrls.some(
-                  (u: any) => typeof u === 'string' && u.trim() !== ''
-                );
+                  const hasRecipe =
+                    category === '料理' &&
+                    (
+                      (Array.isArray((todo as any)?.recipe?.ingredients) &&
+                        (todo as any).recipe.ingredients.some((i: any) => (i?.name ?? '').trim() !== '')) ||
+                      (Array.isArray((todo as any)?.recipe?.steps) &&
+                        (todo as any).recipe.steps.some((s: any) => (s ?? '').trim() !== ''))
+                    );
 
-              // ★変更：参考URLの有無もアイコン着色条件に含める
-              const hasContentForIcon =
-                hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls;
+                  const hasReferenceUrls =
+                    Array.isArray((todo as any)?.referenceUrls) &&
+                    (todo as any).referenceUrls.some(
+                      (u: any) => typeof u === 'string' && u.trim() !== ''
+                    );
 
-              // ▼ ここからJSXをreturn
-              return (
-                <div key={todo.id} className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      key={animateTriggerMap[todo.id] ?? 0}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setLocalDoneMap(prev => ({
-                          ...prev,
-                          [todo.id]: !prev[todo.id],
-                        }));
-                        setAnimateTriggerMap(prev => ({
-                          ...prev,
-                          [todo.id]: (prev[todo.id] ?? 0) + 1,
-                        }));
-                        setTimeout(() => onToggleDone(todo.id), 600);
-                      }}
-                      initial={{ rotate: 0 }}
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    >
-                      {localDoneMap[todo.id] ? (
-                        <CheckCircle className="text-yellow-500" />
-                      ) : (
-                        <Circle className="text-gray-400" />
-                      )}
-                    </motion.div>
+                  const hasContentForIcon =
+                    hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls;
 
-                    <input
-                      type="text"
-                      defaultValue={(todo as any).text}
-                      onBlur={(e) => {
-                        const newText = e.target.value.trim();
-                        const original = (todo as any).text;
-
-                        if (!newText) {
-                          toast.info('削除する場合はゴミ箱アイコンで消してください');
-                          const inputEl = todoRefs.current[todo.id];
-                          if (inputEl) inputEl.value = original;
-                          return;
-                        }
-
-                        const isDuplicate = todos.some((t: any) => t.id !== todo.id && t.text === newText && !t.done);
-                        if (isDuplicate) {
-                          setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
-                          const inputEl = todoRefs.current[todo.id];
-                          if (inputEl) inputEl.value = original;
-                          return;
-                        }
-
-                        const matchDone = todos.find((t: any) => t.id !== todo.id && t.text === newText && t.done);
-                        if (matchDone) {
-                          setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
-                          const inputEl = todoRefs.current[todo.id];
-                          if (inputEl) inputEl.value = original;
-                          return;
-                        }
-
-                        setEditingErrors(prev => {
-                          const next = { ...prev };
-                          delete next[todo.id];
-                          return next;
-                        });
-
-                        onChangeTodo(todo.id, newText);
-                        onBlurTodo(todo.id, newText);
-                      }}
-                      onCompositionStart={() => setIsComposing(true)}
-                      onCompositionEnd={() => setIsComposing(false)}
-                      ref={(el) => {
-                        if (el) {
-                          todoRefs.current[todo.id] = el;
-                          if (focusedTodoId === todo.id) el.focus();
-                        }
-                      }}
-                      className={clsx(
-                        'flex-1 border-b bg-transparent outline-none border-gray-200',
-                        'h-8',
-                        (todo as any).done ? 'text-gray-400 line-through' : 'text-black'
-                      )}
-                      placeholder="TODOを入力"
+                  return (
+                    <SortableRow
+                      key={todo.id}
+                      todo={todo}
+                      hasContentForIcon={hasContentForIcon}
                     />
-
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.85, rotate: -10 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                      className={clsx(
-                        'mr-1 active:scale-90',
-                        hasContentForIcon
-                          ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
-                          : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
-                      )}
-                      onClick={() => onOpenNote((todo as any).text)}
-                    >
-                      <Notebook size={22} />
-                    </motion.button>
-
-                    <motion.button
-                      type="button"
-                      onClick={() => handleTodoDeleteClick(todo.id)}
-                      animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
-                      variants={SHAKE_VARIANTS}
-                    >
-                      <Trash2
-                        size={22}
-                        className={clsx(
-                          'hover:text-red-500',
-                          confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
-                        )}
-                      />
-                    </motion.button>
-                  </div>
-
-                  {editingErrors[todo.id] && (
-                    <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
-                      {editingErrors[todo.id]}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
+            {/* ★ ここまで dnd-kit */}
           </div>
 
           {/* スクロール必要時のヒント */}
@@ -672,14 +741,14 @@ export default function TodoTaskCard({
           )}
         </div>
 
-        {/* ▼ 未処理タブで検索中に、済側ヒットがある場合の通知 */}
+        {/* ▼ 未処理タブで検索中に、済側ヒット通知 */}
         {isCookingCategory && tab === 'undone' && searchQuery.trim() !== '' && doneMatchesCount > 0 && (
           <div className="px-1 pr-5 mt-2 text-xs text-gray-600 border-t border-gray-200 pt-2">
             済に{doneMatchesCount}件見つかりました。
           </div>
         )}
 
-        {/* 追加入力エリア：カード下部に完全固定（未処理のみ有効） */}
+        {/* 追加入力エリア：カード下部に固定（未処理のみ） */}
         <div className="absolute left-4 right-4 bottom-3">
           <div className="flex items-center gap-2 bg-white">
             <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
@@ -713,11 +782,6 @@ export default function TodoTaskCard({
               placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
             />
           </div>
-
-          {/* ▼ 旧：下部エラー表示は廃止（トーストに切替済み） */}
-          {/* {inputError && (
-            <div className="bg-red-400 text-white text-xs mt-1 ml-6 px-2 py-1 rounded-md">{inputError}</div>
-          )} */}
         </div>
       </div>
     </div>
