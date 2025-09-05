@@ -57,7 +57,9 @@ async function pushToLine(lineUserId: string, flexMessage: any): Promise<boolean
  */
 export const sendDailyTaskReminder = onSchedule(
   {
-    schedule: '0 6 * * *', // 毎日 06:00 (JST)
+    // 毎日 06:00 (JST)
+    schedule: '0 6 * * *', 
+    // schedule: '* * * * *', 
     timeZone: 'Asia/Tokyo',
     secrets: [LINE_CHANNEL_ACCESS_TOKEN],
     timeoutSeconds: 540, // 5分待機+処理のため余裕を確保
@@ -112,9 +114,10 @@ export const sendDailyTaskReminder = onSchedule(
         }
 
         // まず任意の除外（visible=false, skipped=true）はクエリではなくメモリで除外
+        // ✅ 修正: visible の判定を撤廃し、通知では UI 非表示でも除外しない
         const rawTasks = userTasksSnap.docs
           .map((d) => ({ id: d.id, ...(d.data() as any) }))
-          .filter((t) => t?.visible !== false && t?.skipped !== true);
+          .filter((t) => t?.skipped !== true);
 
         // ユーティリティ
         const isTodayByDates = (t: any): boolean =>
@@ -128,7 +131,7 @@ export const sendDailyTaskReminder = onSchedule(
           Array.isArray(t?.daysOfWeek) && t.daysOfWeek.includes(dayOfWeek);
 
         // ★毎日タスク（period === 'daily' 想定）
-        const isDaily = (t: any): boolean => (t?.period === 'daily');
+        const isDaily = (t: any): boolean => (t?.period === '毎日');
 
         // 当日 / 繰越 / 週次(当日) / 毎日に分類
         const todayTasks = rawTasks.filter(isTodayByDates);
