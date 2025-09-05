@@ -47,34 +47,34 @@ export default function ComparePriceTable({
           <col className="w-[10%]" />
         </colgroup>
         <thead>
-          <tr>
-            <th colSpan={2} className="text-center text-gray-500 pt-4 pb-1">前回価格</th>
-            <th colSpan={2} className="text-center text-gray-500 pt-4 pb-1">比較価格</th>
+          <tr className="">
+            <th colSpan={2} className="text-center text-sm text-white py-1 bg-gray-500">前回価格</th>
+            <th colSpan={2} className="text-center text-sm text-white py-1 bg-blue-400">比較価格</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td className="text-right tabular-nums text-lg pr-3 py-2 align-bottom text-xl">{formatWithComma(price || '0')}</td>
+            <td className="text-center tabular-nums px-3 pt-4 pb-2 align-bottom text-2xl">{formatWithComma(price || '0')}</td>
             <td className="text-left text-sm pl-0 py-2 align-bottom">円</td>
             <td className="text-right align-bottom py-2">
               <input
                 type="number"
                 value={comparePrice}
                 onChange={(e) => onChangeComparePrice(e.target.value)}
-                className="w-[80px] border-b border-gray-300 focus:outline-none focus:border-blue-500 text-lg tabular-nums text-right text-xl"
+                className="w-[80px] border-b border-gray-300 focus:outline-none focus:border-blue-500 tabular-nums text-2xl text-center"
               />
             </td>
             <td className="text-left text-sm align-bottom pl-2 py-2">円</td>
           </tr>
           <tr>
-            <td className="text-right tabular-nums text-lg pr-3 py-2 align-bottom text-xl">{formatWithComma(quantity || '1')}</td>
+            <td className="text-center tabular-nums px-3 py-2 align-bottom text-2xl">{formatWithComma(quantity || '1')}</td>
             <td className="text-left text-sm pl-0 py-2 align-bottom">{unit || '個'}</td>
             <td className="text-right align-bottom py-2">
               <input
                 type="number"
                 value={compareQuantity}
                 onChange={(e) => onChangeCompareQuantity(e.target.value)}
-                className="w-[80px] border-b border-gray-300 focus:outline-none focus:border-blue-500 text-lg tabular-nums text-right text-xl"
+                className="w-[80px] border-b border-gray-300 focus:outline-none focus:border-blue-500 tabular-nums text-2xl text-center"
               />
             </td>
             <td className="text-left text-sm align-bottom pl-2 py-2">{compareDisplayUnit}</td>

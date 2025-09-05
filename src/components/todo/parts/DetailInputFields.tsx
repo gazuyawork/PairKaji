@@ -32,7 +32,7 @@ export default function DetailInputFields({
             value={price}
             onChange={(e) => onChangePrice(e.target.value)}
             placeholder="価格 (円)"
-            className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-xl text-right"
+            className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-2xl text-center"
           />
           <p className="pl-1">円</p>
         </div>
@@ -42,7 +42,7 @@ export default function DetailInputFields({
             value={quantity}
             onChange={(e) => onChangeQuantity(e.target.value)}
             placeholder="内容量"
-            className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-xl text-right"
+            className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-2xl text-center"
           />
           <select
             value={unit}
@@ -50,14 +50,17 @@ export default function DetailInputFields({
             className="border-b border-gray-300 focus:outline-none focus:border-blue-500"
           >
             <option value="g">g</option>
+            <option value="kg">kg</option>
             <option value="ml">ml</option>
+            <option value="l">l</option>
             <option value="個">個</option>
+            <option value="本">本</option>
           </select>
         </div>
       </div>
 
       {currentUnitPrice && (
-        <div className="text-gray-600 ml-2">
+        <div className="text-gray-600 ml-2 text-center">
           単価: <span className="text-lg">{Number(currentUnitPrice.toFixed(2)).toLocaleString()}</span> 円 / {unit}
         </div>
       )}

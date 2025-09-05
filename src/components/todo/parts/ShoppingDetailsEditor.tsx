@@ -1,3 +1,4 @@
+// ★ 変更あり：isPreview / onRequestEditMode を追加し、onClick ロジックを改修
 'use client';
 
 import { CheckCircle } from 'lucide-react';
@@ -20,6 +21,10 @@ type Props = {
   onToggleCompareMode: (next: boolean) => void;
   onChangeComparePrice: (v: string) => void;
   onChangeCompareQuantity: (v: string) => void;
+
+  // ★ 追加：プレビュー判定と編集切替要求（任意）
+  isPreview?: boolean;
+  onRequestEditMode?: () => void;
 
   // アニメーション用
   animatedDifference: number | null;
@@ -44,6 +49,9 @@ export default function ShoppingDetailsEditor({
   onToggleCompareMode,
   onChangeComparePrice,
   onChangeCompareQuantity,
+  // ★ 追加：デフォルト値で no-op にすることで親の既存実装を壊さない
+  isPreview = false,
+  onRequestEditMode = () => {},
   animatedDifference,
   animationComplete,
 }: Props) {
@@ -55,11 +63,8 @@ export default function ShoppingDetailsEditor({
   const safeQty = nq > 0 ? nq : 1;
   const safeCompareQty = ncqRaw > 0 ? ncqRaw : 1;
 
-  const currentUnitPrice =
-    np > 0 && safeQty > 0 ? np / safeQty : null;
-
-  const compareUnitPrice =
-    ncp > 0 ? ncp / safeCompareQty : null;
+  const currentUnitPrice = np > 0 && safeQty > 0 ? np / safeQty : null;
+  const compareUnitPrice = ncp > 0 ? ncp / safeCompareQty : null;
 
   const unitPriceDiff =
     compareUnitPrice !== null && currentUnitPrice !== null
@@ -71,9 +76,19 @@ export default function ShoppingDetailsEditor({
   return (
     <div className="mt-2">
       {/* 上部操作行：差額確認トグル（価格未入力時は非活性） */}
-      <div className="flex items-center justify-end mb-4">
+      <div className="flex items-center justify-between mb-4 ml-2">
+        <h3 className="font-medium">購入価格</h3>
         <button
-          onClick={() => canToggleCompare && onToggleCompareMode(!compareMode)}
+          // ★ 変更：プレビュー中は編集モードへ切替後、差額確認を強制的に ON
+          onClick={() => {
+            if (!canToggleCompare) return;
+            if (isPreview) {
+              onRequestEditMode();      // 親に編集モード切替を依頼
+              onToggleCompareMode(true); // プレビュー解除直後は差額確認を常に有効化
+            } else {
+              onToggleCompareMode(!compareMode); // 従来通りトグル
+            }
+          }}
           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition
             ${canToggleCompare
               ? 'bg-blue-50 hover:bg-blue-100 text-blue-600'

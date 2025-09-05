@@ -232,7 +232,7 @@ export default function TodoNoteModal({
 
   useEffect(() => {
     const parsed = parseFloat(comparePrice);
-    setSaveLabel(!isNaN(parsed) && parsed > 0 ? 'この価格で更新する' : '保存');
+    setSaveLabel(!isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
   }, [comparePrice]);
 
   useEffect(() => {
@@ -846,6 +846,8 @@ export default function TodoNoteModal({
           onChangeCompareQuantity={setCompareQuantity}
           animatedDifference={animatedDifference}
           animationComplete={diffAnimationComplete}
+          isPreview={isPreview}
+          onRequestEditMode={() => setIsPreview(false)}
         />
       )}
 
