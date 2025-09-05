@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
+import type React from 'react';
 import type { ComponentType } from 'react';
 import {
   CheckCircle,
@@ -27,7 +28,7 @@ import {
   Plane,
   Car,
   Tag,
-  GripVertical as Grip,
+  GripVertical as Grip, // ← グループDnD用ハンドル表示に使用
 } from 'lucide-react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
@@ -98,6 +99,15 @@ interface Props {
   focusedTodoId: string | null;
   onOpenNote: (text: string) => void;
   onReorderTodos: (orderedIds: string[]) => void; // 並び替え結果を親へ通知
+
+  // ★ 追加: 親から渡される「タスク（カード）全体DnD」用の受け口
+  // 親側の useSortable から取得した setNodeRef/style/handleProps/isDragging を受け取ります
+  groupDnd?: {
+    setNodeRef: (el: HTMLDivElement | null) => void;
+    style?: React.CSSProperties;
+    handleProps?: React.HTMLAttributes<HTMLButtonElement>;
+    isDragging?: boolean;
+  };
 }
 
 export default function TodoTaskCard({
@@ -114,6 +124,7 @@ export default function TodoTaskCard({
   focusedTodoId,
   onOpenNote,
   onReorderTodos,
+  groupDnd, // ★ 追加受け取り
 }: Props) {
   const router = useRouter();
   const todos = useMemo(() => task?.todos ?? [], [task?.todos]);
@@ -338,10 +349,7 @@ export default function TodoTaskCard({
     return CATEGORY_ICON_MAP[category] ?? Tag;
   }, [category]);
 
-  // ====== 並び替え（dnd-kit） ======
-
-  // ★ 削除対象（③）：HTML5 DnD 用の state/関数（draggingIdRef, dragOverId, draggable属性, handlePointerDown など）
-  // → すべて削除済み。スクロール用の Pointer キャプチャも競合回避のため削除しています。
+  // ====== 並び替え（dnd-kit：TODO 行） ======
 
   // 可視リストのID配列
   const visibleIds = useMemo(() => finalFilteredTodos.map(t => t.id), [finalFilteredTodos]);
@@ -551,7 +559,15 @@ export default function TodoTaskCard({
   // ====== 並び替え ここまで ======
 
   return (
-    <div className="relative mb-2.5">
+    <div
+      // ★ 追加: 親から渡された setNodeRef/style/isDragging を外枠に適用（グループDnD）
+      ref={groupDnd?.setNodeRef}
+      style={groupDnd?.style}
+      className={clsx(
+        "relative mb-2.5",
+        groupDnd?.isDragging && "opacity-70"
+      )}
+    >
       {isScrollable && (
         <div
           className="absolute top-10 right-1 w-1 bg-orange-200 rounded-full transition-all duration-150"
@@ -560,21 +576,33 @@ export default function TodoTaskCard({
       )}
 
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
-        {/* 見出し左側：カテゴリアイコン + タスク名 */}
-        <button
-          className="flex items-center gap-2 pl-2 pr-2 py-1 max-w-[55%] hover:underline text-left"
-          onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
-          type="button"
-        >
-          <CategoryIcon
-            size={18}
-            className={clsx('shrink-0', category ? 'text-gray-600' : 'text-gray-400')}
-            aria-label={category ? `${category}カテゴリ` : 'カテゴリ未設定'}
-          />
-          <span className="font-bold text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
-            {task.name}
-          </span>
-        </button>
+        {/* 見出し左側：ドラッグハンドル + カテゴリアイコン + タスク名 */}
+        <div className="flex items-center gap-2">
+          {/* ★ 追加：タスク（カード）全体の並び替えハンドル */}
+          <button
+            type="button"
+            title="ドラッグでカードを並び替え"
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
+            {...(groupDnd?.handleProps ?? {})}
+          >
+            <Grip size={18} />
+          </button>
+
+          <button
+            className="flex items-center gap-2 pl-1 pr-2 py-1 max-w-[55%] hover:underline text-left"
+            onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
+            type="button"
+          >
+            <CategoryIcon
+              size={18}
+              className={clsx('shrink-0', category ? 'text-gray-600' : 'text-gray-400')}
+              aria-label={category ? `${category}カテゴリ` : 'カテゴリ未設定'}
+            />
+            <span className="font-bold text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
+              {task.name}
+            </span>
+          </button>
+        </div>
 
         <div className="flex items-center gap-2">
           <div className="flex space-x-0 h-10">
@@ -676,7 +704,7 @@ export default function TodoTaskCard({
               <div className="text-gray-400 italic pt-4">該当する未処理のタスクはありません</div>
             )}
 
-            {/* ★ ここから dnd-kit で包む */}
+            {/* ★ ここから dnd-kit で包む（TODO 行の並び替え） */}
             <DndContext
               sensors={sensors}
               onDragStart={handleDragStart}

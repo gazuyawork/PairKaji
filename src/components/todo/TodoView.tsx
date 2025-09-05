@@ -18,6 +18,7 @@ import {
   query,
   where,
   getDocs,
+  writeBatch, // ★ 追加: 並び順の一括更新に使用
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
@@ -39,6 +40,70 @@ import { createPortal } from 'react-dom';
 // ★ 追加: 右下＋のシートUI用
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, Search } from 'lucide-react';
+
+// ★ 追加: グループDnD（タスク単位）用 dnd-kit
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// ★ 追加: 配列移動ヘルパ
+const moveItem = <T,>(arr: T[], from: number, to: number) => {
+  const copy = arr.slice();
+  const [it] = copy.splice(from, 1);
+  copy.splice(to, 0, it);
+  return copy;
+};
+
+// ★ 追加: タスクカード（グループ）を包む Sortable ラッパ
+function SortableTask({
+  id,
+  children,
+}: {
+  id: string;
+  children: (args: {
+    setNodeRef: (el: HTMLDivElement | null) => void;
+    style: React.CSSProperties | undefined;
+    handleProps: Record<string, any>;
+    isDragging: boolean;
+  }) => React.ReactNode;
+}) {
+  const {
+    setNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <>
+      {children({
+        setNodeRef,
+        style,
+        handleProps: { ...attributes, ...listeners },
+        isDragging,
+      })}
+    </>
+  );
+}
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName, index } = useView();
@@ -153,14 +218,24 @@ export default function TodoView() {
       const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
       unsubscribe = onSnapshot(q, (snapshot) => {
         if (!isMounted) return;
-        const newTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
-          const data = doc.data() as Omit<TodoOnlyTask, 'id'>;
+        const rawTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
+          const data = doc.data() as Omit<TodoOnlyTask, 'id'> & { order?: number };
           return {
             id: doc.id,
             ...data,
             todos: Array.isArray(data.todos) ? data.todos : [],
           };
         });
+
+        // ★ 追加: order で並び替え（未設定は末尾）。同値は名前等で安定化
+        const newTasks = rawTasks
+          .slice()
+          .sort((a, b) => {
+            const ao = typeof (a as any).order === 'number' ? (a as any).order : Number.POSITIVE_INFINITY;
+            const bo = typeof (b as any).order === 'number' ? (b as any).order : Number.POSITIVE_INFINITY;
+            if (ao !== bo) return ao - bo;
+            return (a.name ?? '').localeCompare(b.name ?? '');
+          });
 
         setTasks(newTasks);
         // 初回スナップショット受信でローディングOFF
@@ -207,6 +282,59 @@ export default function TodoView() {
     }
   }, [tasks, selectedGroupId]);
 
+  // ★ 追加: グループDnD用センサー（モバイル長押し対応＋キーボード）
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // ★ 追加: 並び替え完了（グループ＝タスクカード単位）
+  const handleTaskDragEnd = async (e: DragEndEvent, filteredTaskIds: string[]) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+
+    // 1) 表示中（フィルタ後）の並び替え位置
+    const fromInFiltered = filteredTaskIds.indexOf(String(active.id));
+    const toInFiltered = filteredTaskIds.indexOf(String(over.id));
+    if (fromInFiltered === -1 || toInFiltered === -1) return;
+
+    // 2) 全体順序（現在の tasks state の順）を取得
+    const allIds = tasks.map(t => t.id);
+
+    // 3) 表示対象の id を新しい並びに並べ替え
+    const newFiltered = moveItem(filteredTaskIds, fromInFiltered, toInFiltered);
+    const filteredSet = new Set(filteredTaskIds);
+
+    // 4) 全体順序に反映：filtered に含まれる要素のみを newFiltered の順で差し替える
+    let cursor = 0;
+    const newAllOrder = allIds.map(id => {
+      if (filteredSet.has(id)) {
+        const nid = newFiltered[cursor];
+        cursor += 1;
+        return nid;
+      }
+      return id; // 非表示（フィルタ外）はそのままの相対順
+    });
+
+    // 5) state を並び替え（オブジェクトを順序に合わせて並び替え）
+    const idToTask = Object.fromEntries(tasks.map(t => [t.id, t]));
+    const newTasks = newAllOrder.map(id => idToTask[id]).filter(Boolean) as TodoOnlyTask[];
+    setTasks(newTasks); // 楽観更新
+
+    // 6) Firestore の order を一括更新（任意だが推奨）
+    try {
+      const batch = writeBatch(db);
+      newAllOrder.forEach((id, idx) => {
+        batch.update(doc(db, 'tasks', id), { order: idx });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error('Failed to update task order:', err);
+      toast.error('タスクの順序を保存できませんでした');
+      // onSnapshot によりその後正しい状態で同期される想定
+    }
+  };
+
   return (
     <>
       <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
@@ -246,110 +374,138 @@ export default function TodoView() {
               );
             }
 
-            return filteredTasks.map(task => (
-              <div key={task.id} className="mx-auto w-full max-w-xl">
-                <TodoTaskCard
-                  task={task}
-                  tab={activeTabs[task.id] ?? 'undone'}
-                  setTab={(tab) =>
-                    setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
-                  }
-                  onOpenNote={(text) => {
-                    const todo = task.todos.find(t => t.text === text);
-                    if (todo) {
-                      openNoteModal(task, todo);
-                    }
-                  }}
-                  onAddTodo={async (todoId, text) => {
-                    const newTodos = [...task.todos, { id: todoId, text, done: false }];
-                    await updateDoc(doc(db, 'tasks', task.id), {
-                      todos: newTodos,
-                      updatedAt: serverTimestamp(),
-                    });
-                  }}
-                  // ★ 入力中の見た目だけ置換（保存はしない）
-                  onChangeTodo={(todoId, value) => {
-                    const updated = tasks.map(t =>
-                      t.id === task.id
-                        ? {
-                          ...t,
-                          todos: t.todos.map(todo =>
-                            todo.id === todoId ? { ...todo, text: value } : todo
-                          ),
-                        }
-                        : t
-                    );
-                    setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
-                  }}
-                  onToggleDone={async (todoId) => {
-                    const updatedTodos = task.todos.map(todo =>
-                      todo.id === todoId ? { ...todo, done: !todo.done } : todo
-                    );
-                    await updateDoc(doc(db, 'tasks', task.id), {
-                      todos: updatedTodos,
-                      updatedAt: serverTimestamp(),
-                    });
-                  }}
-                  // ★ フォーカスアウト時に保存（同じIDのみ置換）。重複はトースト＋自然ロールバック（onSnapshot整合）
-                  onBlurTodo={async (todoId, text) => {
-                    const trimmed = text.trim();
-                    if (!trimmed) return;
+            // ★ 追加: グループDnD（カード並び替え）で使う現在の表示中ID配列
+            const filteredTaskIds = filteredTasks.map(t => t.id);
 
-                    try {
-                      await updateTodoTextInTask(task.id, todoId, trimmed);
-                      // 成功時は onSnapshot で即時に同期されるため、ここでは何もしない
-                    } catch (e: any) {
-                      if (e?.code === 'DUPLICATE_TODO' || e?.message === 'DUPLICATE_TODO') {
-                        toast.error('既に登録されています。');
-                      } else {
-                        toast.error('保存に失敗しました');
-                        console.error(e);
-                      }
-                      // ローカルは onSnapshot で最新に戻る想定（特に手動rollback不要）
-                    }
-                  }}
-                  onDeleteTodo={async (todoId) => {
-                    const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
-                    await updateDoc(doc(db, 'tasks', task.id), {
-                      todos: updatedTodos,
-                      updatedAt: serverTimestamp(),
-                    });
-                  }}
-                  onDeleteTask={async () => {
-                    await updateDoc(doc(db, 'tasks', task.id), {
-                      visible: false,
-                      groupId: null,
-                      updatedAt: serverTimestamp(),
-                    });
-                  }}
-                  todoRefs={todoRefs}
-                  focusedTodoId={focusedTodoId}
+            return (
+              // ★ 追加: ここから グループDnD で包む
+              <DndContext
+                sensors={sensors}
+                onDragEnd={(e) => handleTaskDragEnd(e, filteredTaskIds)}
+              >
+                <SortableContext
+                  items={filteredTaskIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {filteredTasks.map(task => (
+                    <SortableTask key={task.id} id={task.id}>
+                      {({ setNodeRef, style, handleProps, isDragging }) => (
+                        <div className="mx-auto w-full max-w-xl">
+                          <TodoTaskCard
+                            task={task}
+                            tab={activeTabs[task.id] ?? 'undone'}
+                            setTab={(tab) =>
+                              setActiveTabs((prev) => ({ ...prev, [task.id]: tab }))
+                            }
+                            onOpenNote={(text) => {
+                              const todo = task.todos.find(t => t.text === text);
+                              if (todo) {
+                                openNoteModal(task, todo);
+                              }
+                            }}
+                            onAddTodo={async (todoId, text) => {
+                              const newTodos = [...task.todos, { id: todoId, text, done: false }];
+                              await updateDoc(doc(db, 'tasks', task.id), {
+                                todos: newTodos,
+                                updatedAt: serverTimestamp(),
+                              });
+                            }}
+                            // ★ 入力中の見た目だけ置換（保存はしない）
+                            onChangeTodo={(todoId, value) => {
+                              const updated = tasks.map(t =>
+                                t.id === task.id
+                                  ? {
+                                      ...t,
+                                      todos: t.todos.map(todo =>
+                                        todo.id === todoId ? { ...todo, text: value } : todo
+                                      ),
+                                    }
+                                  : t
+                              );
+                              setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
+                            }}
+                            onToggleDone={async (todoId) => {
+                              const updatedTodos = task.todos.map(todo =>
+                                todo.id === todoId ? { ...todo, done: !todo.done } : todo
+                              );
+                              await updateDoc(doc(db, 'tasks', task.id), {
+                                todos: updatedTodos,
+                                updatedAt: serverTimestamp(),
+                              });
+                            }}
+                            // ★ フォーカスアウト時に保存（同じIDのみ置換）。重複はトースト＋自然ロールバック（onSnapshot整合）
+                            onBlurTodo={async (todoId, text) => {
+                              const trimmed = text.trim();
+                              if (!trimmed) return;
 
-                  onReorderTodos={async (orderedIds) => {
-                    // 楽観的更新（先にUIを並び替え）：
-                    const idToTodo = Object.fromEntries(task.todos.map(td => [td.id, td]));
-                    const newTodos = orderedIds
-                      .map(id => idToTodo[id])
-                      .filter((v): v is typeof task.todos[number] => Boolean(v));
+                              try {
+                                await updateTodoTextInTask(task.id, todoId, trimmed);
+                                // 成功時は onSnapshot で即時に同期されるため、ここでは何もしない
+                              } catch (e: any) {
+                                if (e?.code === 'DUPLICATE_TODO' || e?.message === 'DUPLICATE_TODO') {
+                                  toast.error('既に登録されています。');
+                                } else {
+                                  toast.error('保存に失敗しました');
+                                  console.error(e);
+                                }
+                                // ローカルは onSnapshot で最新に戻る想定（特に手動rollback不要）
+                              }
+                            }}
+                            onDeleteTodo={async (todoId) => {
+                              const updatedTodos = task.todos.filter(todo => todo.id !== todoId);
+                              await updateDoc(doc(db, 'tasks', task.id), {
+                                todos: updatedTodos,
+                                updatedAt: serverTimestamp(),
+                              });
+                            }}
+                            onDeleteTask={async () => {
+                              await updateDoc(doc(db, 'tasks', task.id), {
+                                visible: false,
+                                groupId: null,
+                                updatedAt: serverTimestamp(),
+                              });
+                            }}
+                            todoRefs={todoRefs}
+                            focusedTodoId={focusedTodoId}
+                            onReorderTodos={async (orderedIds) => {
+                              // 楽観的更新（先にUIを並び替え）：
+                              const idToTodo = Object.fromEntries(task.todos.map(td => [td.id, td]));
+                              const newTodos = orderedIds
+                                .map(id => idToTodo[id])
+                                .filter((v): v is typeof task.todos[number] => Boolean(v));
 
-                    setTasks(prev =>
-                      prev.map(t => (t.id === task.id ? { ...t, todos: newTodos } : t))
-                    );
+                              setTasks(prev =>
+                                prev.map(t => (t.id === task.id ? { ...t, todos: newTodos } : t))
+                              );
 
-                    try {
-                      await updateDoc(doc(db, 'tasks', task.id), {
-                        todos: newTodos,
-                        updatedAt: serverTimestamp(),
-                      });
-                    } catch (e) {
-                      console.error('reorder update error:', e);
-                      toast.error('並び替えの保存に失敗しました');
-                      // onSnapshotで直近状態に戻る前提。必要ならここで明示ロールバックも可。
-                    }
-                  }}
-                />
-              </div>
-            ));
+                              try {
+                                await updateDoc(doc(db, 'tasks', task.id), {
+                                  todos: newTodos,
+                                  updatedAt: serverTimestamp(),
+                                });
+                              } catch (e) {
+                                console.error('reorder update error:', e);
+                                toast.error('並び替えの保存に失敗しました');
+                                // onSnapshotで直近状態に戻る前提。必要ならここで明示ロールバックも可。
+                              }
+                            }}
+
+                            // ★ 追加: グループDnD（カード）連携 props を渡す
+                            groupDnd={{
+                              setNodeRef,
+                              style,
+                              handleProps,
+                              isDragging,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </SortableTask>
+                  ))}
+                </SortableContext>
+              </DndContext>
+              // ★ 追加: ここまで グループDnD
+            );
           })()}
           {/* ✅ 広告カード（画面の末尾） */}
           {!isLoading && !isChecking && plan === 'free' && <AdCard />}
