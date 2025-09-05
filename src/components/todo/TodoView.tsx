@@ -1,4 +1,3 @@
-// src/components/views/TodoView.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +17,7 @@ import {
   query,
   where,
   getDocs,
-  writeBatch, // ★ 追加: 並び順の一括更新に使用
+  writeBatch, // ★ 並び順の一括更新に使用
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
@@ -31,17 +30,17 @@ import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 
-// ★ 追加: 同じIDのtext置換保存を使う
+// ★ 同じIDのtext置換保存を使う
 import { updateTodoTextInTask } from '@/lib/taskUtils';
 
-// ★ 追加: Portal で body 直下に描画するため
+// ★ Portal で body 直下に描画するため
 import { createPortal } from 'react-dom';
 
-// ★ 追加: 右下＋のシートUI用
+// ★ 右下＋のシートUI用
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, Search } from 'lucide-react';
 
-// ★ 追加: グループDnD（タスク単位）用 dnd-kit
+// ★ グループDnD（タスク単位）用 dnd-kit
 import {
   DndContext,
   PointerSensor,
@@ -58,7 +57,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// ★ 追加: 配列移動ヘルパ
+// ★ 配列移動ヘルパ
 const moveItem = <T,>(arr: T[], from: number, to: number) => {
   const copy = arr.slice();
   const [it] = copy.splice(from, 1);
@@ -66,7 +65,7 @@ const moveItem = <T,>(arr: T[], from: number, to: number) => {
   return copy;
 };
 
-// ★ 追加: タスクカード（グループ）を包む Sortable ラッパ
+// ★ タスクカード（グループ）を包む Sortable ラッパ
 function SortableTask({
   id,
   children,
@@ -113,18 +112,18 @@ export default function TodoView() {
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const todoRefs = useRef<Record<string, HTMLInputElement | null>>({ });
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
   const { plan, isChecking } = useUserPlan();
   const uid = useUserUid();
 
-  // ★ 追加: Portal を SSR 安全にするためのマウント判定
+  // ★ Portal を SSR 安全にするためのマウント判定
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // ★ 追加: ローディング状態
+  // ★ ローディング状態
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
@@ -153,11 +152,11 @@ export default function TodoView() {
     return Array.from(new Set(names));
   }, [tasks, uid]);
 
-  // ★ 追加: 右下＋ボタン用の追加シートの開閉と検索キーワード
+  // ★ 右下＋ボタン用の追加シートの開閉と検索キーワード
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [addQuery, setAddQuery] = useState('');
 
-  // ★ 追加: 追加用シート表示中は背景スクロールをロック
+  // ★ 追加用シート表示中は背景スクロールをロック
   useEffect(() => {
     if (!mounted) return;
     const prev = document.body.style.overflow;
@@ -171,7 +170,7 @@ export default function TodoView() {
     };
   }, [isAddSheetOpen, mounted]);
 
-  // ★ 追加: Escキーで追加シートを閉じる
+  // ★ Escキーで追加シートを閉じる
   useEffect(() => {
     if (!isAddSheetOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -227,7 +226,7 @@ export default function TodoView() {
           };
         });
 
-        // ★ 追加: order で並び替え（未設定は末尾）。同値は名前等で安定化
+        // ★ order で並び替え（未設定は末尾）。同値は名前等で安定化
         const newTasks = rawTasks
           .slice()
           .sort((a, b) => {
@@ -282,13 +281,13 @@ export default function TodoView() {
     }
   }, [tasks, selectedGroupId]);
 
-  // ★ 追加: グループDnD用センサー（モバイル長押し対応＋キーボード）
+  // ★ グループDnD用センサー（モバイル長押し対応＋キーボード）
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // ★ 追加: 並び替え完了（グループ＝タスクカード単位）
+  // ★ 並び替え完了（グループ＝タスクカード単位）
   const handleTaskDragEnd = async (e: DragEndEvent, filteredTaskIds: string[]) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
@@ -313,15 +312,15 @@ export default function TodoView() {
         cursor += 1;
         return nid;
       }
-      return id; // 非表示（フィルタ外）はそのままの相対順
+      return id; // フィルタ外は相対順を保持
     });
 
-    // 5) state を並び替え（オブジェクトを順序に合わせて並び替え）
+    // 5) state 楽観更新
     const idToTask = Object.fromEntries(tasks.map(t => [t.id, t]));
     const newTasks = newAllOrder.map(id => idToTask[id]).filter(Boolean) as TodoOnlyTask[];
-    setTasks(newTasks); // 楽観更新
+    setTasks(newTasks);
 
-    // 6) Firestore の order を一括更新（任意だが推奨）
+    // 6) Firestore の order を一括更新
     try {
       const batch = writeBatch(db);
       newAllOrder.forEach((id, idx) => {
@@ -331,12 +330,12 @@ export default function TodoView() {
     } catch (err) {
       console.error('Failed to update task order:', err);
       toast.error('タスクの順序を保存できませんでした');
-      // onSnapshot によりその後正しい状態で同期される想定
     }
   };
 
   return (
     <>
+      {/* 背景：現行の雰囲気を活かした柔らかいグラデ + ほんのり陰影 */}
       <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
         <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-54">
           {/* ✅ indexが2（TodoView）である場合のみ表示 */}
@@ -352,9 +351,7 @@ export default function TodoView() {
 
           {/* 🔁 Stickyラッパー（上部は空。上部の追加セレクトUIは＋ボタンに移行済み） */}
           <div className="sticky top-0 z-[999] w-full bg-transparent">
-            <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3">
-              {/* （上部の追加セレクトUIは右下＋ボタンに移行） */}
-            </div>
+            <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3" />
           </div>
 
           {(() => {
@@ -374,11 +371,11 @@ export default function TodoView() {
               );
             }
 
-            // ★ 追加: グループDnD（カード並び替え）で使う現在の表示中ID配列
+            // ★ グループDnD（カード並び替え）で使う現在の表示中ID配列
             const filteredTaskIds = filteredTasks.map(t => t.id);
 
             return (
-              // ★ 追加: ここから グループDnD で包む
+              // ★ ここから グループDnD
               <DndContext
                 sensors={sensors}
                 onDragEnd={(e) => handleTaskDragEnd(e, filteredTaskIds)}
@@ -410,7 +407,7 @@ export default function TodoView() {
                                 updatedAt: serverTimestamp(),
                               });
                             }}
-                            // ★ 入力中の見た目だけ置換（保存はしない）
+                            // ★ 入力中はローカルのみ置換（見た目の反映）
                             onChangeTodo={(todoId, value) => {
                               const updated = tasks.map(t =>
                                 t.id === task.id
@@ -422,7 +419,7 @@ export default function TodoView() {
                                     }
                                   : t
                               );
-                              setTasks(updated); // ← Firestore保存はせず、ローカルのみ反映
+                              setTasks(updated);
                             }}
                             onToggleDone={async (todoId) => {
                               const updatedTodos = task.todos.map(todo =>
@@ -433,14 +430,13 @@ export default function TodoView() {
                                 updatedAt: serverTimestamp(),
                               });
                             }}
-                            // ★ フォーカスアウト時に保存（同じIDのみ置換）。重複はトースト＋自然ロールバック（onSnapshot整合）
+                            // ★ フォーカスアウト時に保存（同一IDのみ置換）
                             onBlurTodo={async (todoId, text) => {
                               const trimmed = text.trim();
                               if (!trimmed) return;
 
                               try {
                                 await updateTodoTextInTask(task.id, todoId, trimmed);
-                                // 成功時は onSnapshot で即時に同期されるため、ここでは何もしない
                               } catch (e: any) {
                                 if (e?.code === 'DUPLICATE_TODO' || e?.message === 'DUPLICATE_TODO') {
                                   toast.error('既に登録されています。');
@@ -448,7 +444,6 @@ export default function TodoView() {
                                   toast.error('保存に失敗しました');
                                   console.error(e);
                                 }
-                                // ローカルは onSnapshot で最新に戻る想定（特に手動rollback不要）
                               }
                             }}
                             onDeleteTodo={async (todoId) => {
@@ -468,7 +463,7 @@ export default function TodoView() {
                             todoRefs={todoRefs}
                             focusedTodoId={focusedTodoId}
                             onReorderTodos={async (orderedIds) => {
-                              // 楽観的更新（先にUIを並び替え）：
+                              // 楽観的更新
                               const idToTodo = Object.fromEntries(task.todos.map(td => [td.id, td]));
                               const newTodos = orderedIds
                                 .map(id => idToTodo[id])
@@ -486,11 +481,10 @@ export default function TodoView() {
                               } catch (e) {
                                 console.error('reorder update error:', e);
                                 toast.error('並び替えの保存に失敗しました');
-                                // onSnapshotで直近状態に戻る前提。必要ならここで明示ロールバックも可。
                               }
                             }}
 
-                            // ★ 追加: グループDnD（カード）連携 props を渡す
+                            // ★ グループDnD（カード）連携 props
                             groupDnd={{
                               setNodeRef,
                               style,
@@ -504,7 +498,7 @@ export default function TodoView() {
                   ))}
                 </SortableContext>
               </DndContext>
-              // ★ 追加: ここまで グループDnD
+              // ★ ここまで グループDnD
             );
           })()}
           {/* ✅ 広告カード（画面の末尾） */}
@@ -512,12 +506,18 @@ export default function TodoView() {
         </main>
       </div>
 
-      {/* ★ 追加: 右下の＋フローティングボタン（Todo画面のみ） */}
+      {/* ★ 右下の＋フローティングボタン（Todo画面のみ） */}
       {mounted && index === 2 && createPortal(
         <button
           type="button"
           onClick={() => setIsAddSheetOpen(true)}
-          className="fixed bottom-24 right-5 z-[1100] w-14 h-14 rounded-full bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white text-white flex items-center justify-center active:scale-95"
+          className="fixed bottom-24 right-5 z-[1100] w-14 h-14 rounded-full
+                     bg-gradient-to-b from-[#FFC25A] to-[#FFA726]
+                     shadow-[0_12px_24px_rgba(0,0,0,0.18)]
+                     ring-2 ring-white text-white flex items-center justify-center
+                     active:translate-y-[1px]
+                     hover:shadow-[0_16px_30px_rgba(0,0,0,0.22)]
+                     transition"
           aria-label="Todoを追加"
           title="Todoを追加"
         >
@@ -526,7 +526,7 @@ export default function TodoView() {
         document.body
       )}
 
-      {/* ★ 追加: 右下＋から開く「追加用シート」 */}
+      {/* ★ 右下＋から開く「追加用シート」：立体化スタイル適用 */}
       {mounted && index === 2 && createPortal(
         <AnimatePresence>
           {isAddSheetOpen && (
@@ -538,23 +538,30 @@ export default function TodoView() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              {/* 背景 */}
+              {/* 背景（半透明 + ぼかし） */}
               <div
-                className="absolute inset-0 bg-black/40"
+                className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
                 onClick={() => setIsAddSheetOpen(false)}
               />
 
-              {/* シート本体 */}
+              {/* シート本体（淡いグラデ + 枠線 + 強めの影） */}
               <motion.div
-                className="relative mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full bg-white rounded-t-2xl sm:rounded-2xl shadow-xl
-                           flex flex-col h-[70vh] sm:h-auto sm:max-h-[80vh] pb-[max(env(safe-area-inset-bottom),16px)]"
+                className="relative mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full
+                           bg-gradient-to-b from-white to-gray-50
+                           rounded-t-2xl sm:rounded-2xl border border-gray-200
+                           shadow-[0_20px_40px_rgba(0,0,0,0.18)]
+                           flex flex-col h-[70vh] sm:h-auto sm:max-h-[80vh]
+                           pb-[max(env(safe-area-inset-bottom),16px)]"
                 initial={{ y: 48 }}
                 animate={{ y: 0 }}
                 exit={{ y: 48 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 22 }}
               >
-                {/* ヘッダ */}
-                <div className="sticky top-0 z-10 bg-white border-b px-4 py-2 flex items-center gap-2">
+                {/* ハンドル（つまみ） */}
+                <div className="mx-auto mt-2 mb-1 h-1.5 w-12 rounded-full bg-gray-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" />
+
+                {/* ヘッダ（半透明 + 影） */}
+                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-2 flex items-center gap-2 shadow-[0_6px_12px_rgba(0,0,0,0.06)]">
                   <button
                     className="p-2 rounded-full hover:bg-gray-100"
                     onClick={() => setIsAddSheetOpen(false)}
@@ -572,9 +579,12 @@ export default function TodoView() {
                   </span>
                 </div>
 
-                {/* 検索 */}
+                {/* 検索（浅い凹み表現） */}
                 <div className="px-4 pt-3">
-                  <div className="flex items-center gap-2 border rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 rounded-xl px-3 py-2
+                                  bg-gradient-to-b from-white to-gray-50
+                                  border border-gray-200
+                                  shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
                     <Search className="w-4 h-4 text-gray-400" />
                     <input
                       type="text"
@@ -586,7 +596,7 @@ export default function TodoView() {
                     />
                     {addQuery && (
                       <button
-                        className="text-sm text-gray-500 hover:text-gray-700"
+                        className="text-sm text-gray-600 hover:text-gray-800"
                         onClick={() => setAddQuery('')}
                       >
                         クリア
@@ -600,7 +610,7 @@ export default function TodoView() {
                   )}
                 </div>
 
-                {/* 候補一覧 */}
+                {/* 候補一覧（カードを立体化） */}
                 <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
                   {(() => {
                     const q = addQuery.trim().toLowerCase();
@@ -637,8 +647,11 @@ export default function TodoView() {
                                 setAddQuery('');
                                 setIsAddSheetOpen(false);
                               }}
-                              className="w-full px-3 py-3 rounded-lg border text-sm font-semibold transition-all text-left
-                                         bg-white text-[#5E5E5E] border-gray-300 hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]"
+                              className="w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition
+                                         bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
+                                         shadow-[0_2px_1px_rgba(0,0,0,0.1)]
+                                         hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
+                                         hover:border-[#FFCB7D] active:translate-y-[1px]"
                               title={name}
                             >
                               <span className="line-clamp-2">{name}</span>

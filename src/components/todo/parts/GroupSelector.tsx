@@ -260,8 +260,8 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                           onClick={() => setSelectedCategoryId(null)}
                           className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
   ${selectedCategoryId === null
-                              ? 'bg-gray-900 text-white border-gray-900 shadow-[0_8px_16px_rgba(0,0,0,0.25)]'
-                              : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_6px_12px_rgba(0,0,0,0.10)] hover:from-gray-50 hover:to-white hover:shadow-[0_10px_18px_rgba(0,0,0,0.14)]'}
+                              ? 'bg-gray-900 text-white border-gray-900 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                              : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-gray-50 hover:to-white hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)]'}
   active:translate-y-[1px]`}
                           aria-pressed={selectedCategoryId === null}
                         >
@@ -278,8 +278,8 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                               onClick={() => setSelectedCategoryId(c.id)}
                               className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
   ${active
-                                  ? 'bg-gradient-to-b from-orange-400 to-orange-500 text-white border-orange-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]'
-                                  : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_6px_12px_rgba(0,0,0,0.10)] hover:from-[#fff5eb] hover:to-white hover:shadow-[0_10px_18px_rgba(0,0,0,0.14)]'}
+                                  ? 'bg-gradient-to-b from-orange-400 to-orange-500 text-white border-orange-500 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                                  : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)]'}
   active:translate-y-[1px]`}
                               aria-pressed={active}
                               title={c.label}
@@ -291,11 +291,11 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                       </div>
 
                       {/* 選択状態の補助表示（任意） */}
-                      <div className="mt-1 text-[11px] text-gray-500">
+                      {/* <div className="mt-1 text-[11px] text-gray-500">
                         {selectedCategoryId
                           ? `カテゴリ: ${sheetCategories.find((s) => s.id === selectedCategoryId)?.label ?? '不明'}`
                           : 'カテゴリ: すべて'}
-                      </div>
+                      </div> */}
 
                       {/* 情報メッセージ（未指定時） */}
                       <div className="mt-2 flex items-center gap-2">
@@ -320,8 +320,8 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                               onClick={() => handleSelectAndClose(task.id ?? null)}
                               className={`w-full px-3 py-3 rounded-xl border text-sm font-semibold transition-all text-left
   ${isActive
-                                  ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)]'
-                                  : 'bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200 shadow-[0_8px_16px_rgba(0,0,0,0.10)] hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)] hover:border-[#FFCB7D]'
+                                  ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                                  : 'bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:border-[#FFCB7D]'
                                 }
   active:translate-y-[1px]`}
                               title={task.name ?? ''}
