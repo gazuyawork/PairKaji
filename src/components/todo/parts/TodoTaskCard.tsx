@@ -1,11 +1,32 @@
-// src/components/todo/parts/TodoTaskCard.tsx
+/* /src/components/todo/parts/TodoTaskCard.tsx */
 'use client';
 
 export const dynamic = 'force-dynamic'
 
 import clsx from 'clsx';
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { CheckCircle, Circle, Trash2, Plus, Notebook, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  CheckCircle,
+  Circle,
+  Trash2,
+  Plus,
+  Notebook,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  X,
+  UtensilsCrossed,
+  ShoppingCart,
+  // Broom,
+  Dumbbell,
+  Camera,
+  PawPrint,
+  Music,
+  Gamepad2 as Gamepad,
+  Plane,
+  Car,
+  Tag
+} from 'lucide-react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -18,6 +39,30 @@ const SHAKE_VARIANTS: Variants = {
     x: [0, -6, 6, -4, 4, -2, 2, 0],
     transition: { duration: 0.4 },
   },
+};
+
+// 日本語向けゆる正規化（全角→半角・小文字化・カタカナ→ひらがな）
+const normalizeJP = (v: unknown): string => {
+  if (typeof v !== 'string') return '';
+  const s = v.normalize('NFKC').toLowerCase();
+  // カタカナ → ひらがな（Unicodeで0x60引く）
+  return s.replace(/[\u30a1-\u30f6]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+};
+
+// カテゴリアイコンのマップ（未定義は Tag）
+const CATEGORY_ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  '料理': UtensilsCrossed,
+  '買い物': ShoppingCart,
+  // '掃除': Broom,
+  '運動': Dumbbell,
+  '写真': Camera,
+  'ペット': PawPrint,
+  '音楽': Music,
+  'ゲーム': Gamepad,
+  '旅行': Plane,
+  '車': Car,
 };
 
 interface Props {
@@ -60,6 +105,13 @@ export default function TodoTaskCard({
   const [showScrollDownHint, setShowScrollDownHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
 
+  // カテゴリ関連
+  const category = (task as any)?.category as string | undefined;
+  const isCookingCategory = category === '料理';
+
+  // 検索クエリ（料理のときだけ有効）
+  const [searchQuery, setSearchQuery] = useState('');
+
   // 追加可能か（未処理タブのみ可）
   const canAdd = tab === 'undone';
 
@@ -73,10 +125,45 @@ export default function TodoTaskCard({
     return { undoneCount: undone, doneCount: done };
   }, [todos]);
 
-  const filteredTodos = useMemo(
+  // 下地のタブ絞り込み
+  const baseFilteredByTab = useMemo(
     () => (tab === 'done' ? todos.filter(todo => todo.done) : todos.filter(todo => !todo.done)),
     [todos, tab]
   );
+
+  // 検索適用後の表示リスト（カテゴリ=料理のときのみ検索）
+  // 条件：todo.text（料理名） or todo.recipe.ingredients[].name（材料名）がヒット
+  const finalFilteredTodos = useMemo(() => {
+    if (!isCookingCategory) return baseFilteredByTab;
+    const q = normalizeJP(searchQuery.trim());
+    if (q === '') return baseFilteredByTab;
+
+    return baseFilteredByTab.filter((todo: any) => {
+      const nameHit = normalizeJP(todo?.text).includes(q); // 料理名（各TODOのtext）
+      const ingHit =
+        Array.isArray(todo?.recipe?.ingredients) &&
+        todo.recipe.ingredients.some(
+          (ing: any) => normalizeJP(ing?.name).includes(q)
+        );
+      return nameHit || ingHit;
+    });
+  }, [baseFilteredByTab, isCookingCategory, searchQuery]);
+
+  // ▼ 未処理タブで検索しているとき、済側にヒットしている件数（料理名・材料名に対する一致）
+  const doneMatchesCount = useMemo(() => {
+    if (!isCookingCategory) return 0;
+    const q = normalizeJP(searchQuery.trim());
+    if (q === '') return 0;
+
+    return todos.filter((t: any) => {
+      if (!t.done) return false;
+      const nameHit = normalizeJP(t?.text).includes(q); // 料理名（TODOのtext）
+      const ingHit =
+        Array.isArray(t?.recipe?.ingredients) &&
+        t.recipe.ingredients.some((ing: any) => normalizeJP(ing?.name).includes(q));
+      return nameHit || ingHit;
+    }).length;
+  }, [todos, isCookingCategory, searchQuery]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
@@ -165,7 +252,7 @@ export default function TodoTaskCard({
       el.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', checkScrollable);
     };
-  }, [filteredTodos.length]);
+  }, [finalFilteredTodos.length]);
 
   const handleAdd = () => {
     if (!canAdd) return; // 念のためガード
@@ -277,6 +364,12 @@ export default function TodoTaskCard({
 
   const shakeTapAnimation = { scale: 0.98 };
 
+  // カテゴリアイコンの決定（未定義は Tag）
+  const CategoryIcon = useMemo(() => {
+    if (!category) return Tag;
+    return CATEGORY_ICON_MAP[category] ?? Tag;
+  }, [category]);
+
   return (
     <div className="relative mb-2.5">
       {isScrollable && (
@@ -287,12 +380,22 @@ export default function TodoTaskCard({
       )}
 
       <div className="bg-gray-100 rounded-t-xl pl-2 pr-2 border-t border-l border-r border-gray-300 flex justify-between items-center">
-        <h2
-          className="font-bold text-md text-[#5E5E5E] pl-2 truncate whitespace-nowrap overflow-hidden max-w-[55%] cursor-pointer hover:underline"
+        {/* 見出し左側：カテゴリアイコン + タスク名 */}
+        <button
+          className="flex items-center gap-2 pl-2 pr-2 py-1 max-w-[55%] hover:underline text-left"
           onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
+          type="button"
         >
-          {task.name}
-        </h2>
+          <CategoryIcon
+            size={18}
+            className={clsx('shrink-0', category ? 'text-gray-600' : 'text-gray-400')}
+            aria-label={category ? `${category}カテゴリ` : 'カテゴリ未設定'}
+          />
+          <span className="font-bold text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
+            {task.name}
+          </span>
+        </button>
+
         <div className="flex items-center gap-2">
           <div className="flex space-x-0 h-10">
             {['undone', 'done'].map((type) => {
@@ -345,6 +448,37 @@ export default function TodoTaskCard({
 
       {/* 本体カード（相対位置） */}
       <div className="relative bg-white rounded-b-xl shadow-sm border border-gray-300 border-t-0 pt-3 pl-4 pb-12 space-y-2 min-h-20">
+        {/* ▼ カテゴリ=料理 のときだけ表示する検索ボックス */}
+        {isCookingCategory && (
+          <div className="px-1 pr-5">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="料理名・材料名で検索"
+                className="w-full pl-8 pr-8 py-1.5 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-orange-300"
+              />
+              {searchQuery.trim() !== '' && (
+                <button
+                  type="button"
+                  aria-label="検索をクリア"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            {searchQuery.trim() !== '' && (
+              <div className="mt-1 text-xs text-gray-500">
+                「{searchQuery}」に一致：{finalFilteredTodos.length} 件
+              </div>
+            )}
+          </div>
+        )}
+
         {/* スクロール領域（下部に固定入力が重ならないように余白を確保：pb-20） */}
         <div className="relative">
           <div
@@ -359,21 +493,22 @@ export default function TodoTaskCard({
             onPointerCancel={endDrag}
             onTouchMove={(e) => e.stopPropagation()}
           >
-            {filteredTodos.length === 0 && tab === 'done' && (
+            {finalFilteredTodos.length === 0 && tab === 'done' && (
               <div className="text-gray-400 italic pt-4">完了したタスクはありません</div>
             )}
-            {filteredTodos.map((todo) => {
+            {finalFilteredTodos.length === 0 && tab === 'undone' && (
+              <div className="text-gray-400 italic pt-4">該当する未処理のタスクはありません</div>
+            )}
+            {finalFilteredTodos.map((todo) => {
               // ▼ まずはここでローカル変数を計算（JSXの外）
-              const category = (task as any)?.category as string | undefined;
-
               const hasMemo =
-                typeof todo.memo === 'string' && todo.memo.trim() !== '';
+                typeof (todo as any)?.memo === 'string' && (todo as any).memo.trim() !== '';
 
               const hasShopping =
                 category === '買い物' &&
                 (
-                  (typeof todo.price === 'number' && Number.isFinite(todo.price) && todo.price > 0) ||
-                  (typeof todo.quantity === 'number' && Number.isFinite(todo.quantity) && todo.quantity > 0)
+                  (typeof (todo as any)?.price === 'number' && Number.isFinite((todo as any).price) && (todo as any).price > 0) ||
+                  (typeof (todo as any)?.quantity === 'number' && Number.isFinite((todo as any).quantity) && (todo as any).quantity > 0)
                 );
 
               const hasImage =
@@ -430,30 +565,31 @@ export default function TodoTaskCard({
 
                     <input
                       type="text"
-                      defaultValue={todo.text}
+                      defaultValue={(todo as any).text}
                       onBlur={(e) => {
                         const newText = e.target.value.trim();
+                        const original = (todo as any).text;
 
                         if (!newText) {
                           toast.info('削除する場合はゴミ箱アイコンで消してください');
                           const inputEl = todoRefs.current[todo.id];
-                          if (inputEl) inputEl.value = todo.text;
+                          if (inputEl) inputEl.value = original;
                           return;
                         }
 
-                        const isDuplicate = todos.some(t => t.id !== todo.id && t.text === newText && !t.done);
+                        const isDuplicate = todos.some((t: any) => t.id !== todo.id && t.text === newText && !t.done);
                         if (isDuplicate) {
                           setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
                           const inputEl = todoRefs.current[todo.id];
-                          if (inputEl) inputEl.value = todo.text;
+                          if (inputEl) inputEl.value = original;
                           return;
                         }
 
-                        const matchDone = todos.find(t => t.id !== todo.id && t.text === newText && t.done);
+                        const matchDone = todos.find((t: any) => t.id !== todo.id && t.text === newText && t.done);
                         if (matchDone) {
                           setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
                           const inputEl = todoRefs.current[todo.id];
-                          if (inputEl) inputEl.value = todo.text;
+                          if (inputEl) inputEl.value = original;
                           return;
                         }
 
@@ -477,7 +613,7 @@ export default function TodoTaskCard({
                       className={clsx(
                         'flex-1 border-b bg-transparent outline-none border-gray-200',
                         'h-8',
-                        todo.done ? 'text-gray-400 line-through' : 'text-black'
+                        (todo as any).done ? 'text-gray-400 line-through' : 'text-black'
                       )}
                       placeholder="TODOを入力"
                     />
@@ -492,7 +628,7 @@ export default function TodoTaskCard({
                           ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
                           : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
                       )}
-                      onClick={() => onOpenNote(todo.text)}
+                      onClick={() => onOpenNote((todo as any).text)}
                     >
                       <Notebook size={22} />
                     </motion.button>
@@ -535,6 +671,13 @@ export default function TodoTaskCard({
             </div>
           )}
         </div>
+
+        {/* ▼ 未処理タブで検索中に、済側ヒットがある場合の通知 */}
+        {isCookingCategory && tab === 'undone' && searchQuery.trim() !== '' && doneMatchesCount > 0 && (
+          <div className="px-1 pr-5 mt-2 text-xs text-gray-600 border-t border-gray-200 pt-2">
+            済に{doneMatchesCount}件見つかりました。
+          </div>
+        )}
 
         {/* 追加入力エリア：カード下部に完全固定（未処理のみ有効） */}
         <div className="absolute left-4 right-4 bottom-3">
