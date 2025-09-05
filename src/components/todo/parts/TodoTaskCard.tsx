@@ -652,7 +652,7 @@ export default function TodoTaskCard({
             animate={isDeleteAnimating ? 'shake' : undefined}
             variants={SHAKE_VARIANTS}
             className={clsx(
-              'font-bold pr-0.5 sm:pr-1 shrink-0 text-lg sm:text-2xl',
+              'font-bold pr-0.5 pl-1 sm:pr-1 shrink-0 text-lg sm:text-2xl',
               confirmDelete ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
             )}
             type="button"
