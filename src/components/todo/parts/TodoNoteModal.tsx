@@ -380,11 +380,11 @@ export default function TodoNoteModal({
         if (existing) {
           const safeIngredients: Ingredient[] = Array.isArray(existing.ingredients)
             ? existing.ingredients.map((ing, idx) => ({
-                id: isString(ing?.id) ? ing!.id : `ing_${idx}`,
-                name: isString(ing?.name) ? ing!.name : '',
-                amount: isNumber(ing?.amount) ? ing!.amount : null,
-                unit: isString(ing?.unit) ? ing!.unit : '適量',
-              }))
+              id: isString(ing?.id) ? ing!.id : `ing_${idx}`,
+              name: isString(ing?.name) ? ing!.name : '',
+              amount: isNumber(ing?.amount) ? ing!.amount : null,
+              unit: isString(ing?.unit) ? ing!.unit : '適量',
+            }))
             : [];
           setRecipe({
             ingredients: safeIngredients,
@@ -932,35 +932,50 @@ export default function TodoNoteModal({
         <div className="mt-4 ml-2">
           <h3 className="font-medium">時間帯</h3>
           <div className="flex items-center gap-2 mt-1">
+            {/* 開始 */}
             <div className="relative">
-              <input
-                type="time"
-                value={timeStart}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setTimeStart(v);
-                  setTimeError(validateTimeRange(v, timeEnd));
-                }}
-                disabled={isPreview}
-                className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
-                aria-label="開始時刻"
-              />
+              {isPreview ? (
+                <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                  {timeStart || '— —'}
+                </span>
+              ) : (
+                <input
+                  type="time"
+                  value={timeStart}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTimeStart(v);
+                    setTimeError(validateTimeRange(v, timeEnd));
+                  }}
+                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                  aria-label="開始時刻"
+                />
+              )}
             </div>
+
             <span className="text-gray-500">~</span>
+
+            {/* 終了 */}
             <div className="relative">
-              <input
-                type="time"
-                value={timeEnd}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setTimeEnd(v);
-                  setTimeError(validateTimeRange(timeStart, v));
-                }}
-                disabled={isPreview}
-                className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
-                aria-label="終了時刻"
-              />
+              {isPreview ? (
+                <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                  {timeEnd || '— —'}
+                </span>
+              ) : (
+                <input
+                  type="time"
+                  value={timeEnd}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTimeEnd(v);
+                    setTimeError(validateTimeRange(timeStart, v));
+                  }}
+                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                  aria-label="終了時刻"
+                />
+              )}
             </div>
+
           </div>
           {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
 
