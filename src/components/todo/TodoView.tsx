@@ -112,7 +112,7 @@ export default function TodoView() {
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const todoRefs = useRef<Record<string, HTMLInputElement | null>>({ });
+  const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
@@ -283,7 +283,7 @@ export default function TodoView() {
 
   // ★ グループDnD用センサー（モバイル長押し対応＋キーボード）
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -412,11 +412,11 @@ export default function TodoView() {
                               const updated = tasks.map(t =>
                                 t.id === task.id
                                   ? {
-                                      ...t,
-                                      todos: t.todos.map(todo =>
-                                        todo.id === todoId ? { ...todo, text: value } : todo
-                                      ),
-                                    }
+                                    ...t,
+                                    todos: t.todos.map(todo =>
+                                      todo.id === todoId ? { ...todo, text: value } : todo
+                                    ),
+                                  }
                                   : t
                               );
                               setTasks(updated);

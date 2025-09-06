@@ -1,3 +1,4 @@
+// src/components/todo/parts/RecipeEditor.tsx
 'use client';
 
 import type React from 'react';
@@ -22,6 +23,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DraggableAttributes,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -112,6 +114,15 @@ const indexToLetters = (idx: number) => {
   return s;
 };
 
+/**
+ * useSortable の戻り値から listeners 型を推論し、
+ * 外部に公開されていない SyntheticListenerMap へ依存しない。
+ */
+type DragHandleRenderProps = {
+  attributes: DraggableAttributes;
+  listeners: ReturnType<typeof useSortable>['listeners'];
+};
+
 /** 自動リサイズ Textarea（forwardRef対応） */
 const AutoResizeTextarea = forwardRef<
   HTMLTextAreaElement,
@@ -195,7 +206,7 @@ AutoResizeTextarea.displayName = 'AutoResizeTextarea';
 function SortableIngredientRow({
   id,
   children,
-}: { id: string; children: (p: { attributes: any; listeners: any }) => React.ReactNode }) {
+}: { id: string; children: (p: DragHandleRenderProps) => React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -212,7 +223,7 @@ function SortableIngredientRow({
 function SortableStepRow({
   id,
   children,
-}: { id: string; children: (p: { attributes: any; listeners: any }) => React.ReactNode }) {
+}: { id: string; children: (p: DragHandleRenderProps) => React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),

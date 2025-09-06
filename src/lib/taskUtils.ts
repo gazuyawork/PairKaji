@@ -1,18 +1,7 @@
+// src/lib/firebaseUtils.ts
 /**
- * タスクに関連する Firestore 処理を一括で管理するユーティリティモジュール。
- *
- * 主な責務：
- * - タスクの新規作成・更新・削除
- * - タスクの完了・未完了の切り替え（ポイント処理も含む）
- * - ToDo（サブタスク）の部分更新
- * - 差額（節約）ログの記録
- * - パートナー解除時の userIds 更新処理
- *
- * 依存モジュール：
- * - Firebase Firestore
- * - Firebase Auth
- * - errorUtils（共通エラーハンドリング）
- * - taskCompletions や savings など Firestore サブコレクション
+ * Firestore 由来の値を型安全に扱いながら
+ * タスク関連の処理をまとめたユーティリティ。
  */
 import {
   collection,
@@ -28,13 +17,79 @@ import {
   arrayRemove,
   writeBatch,
 } from 'firebase/firestore';
-import { dayNameToNumber } from '@/lib/constants';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
 import { db, auth } from '@/lib/firebase';
 import { handleFirestoreError } from './errorUtils';
 
-// ▼ 追加：テキスト比較の正規化（全半角/NFKC・小文字化・連続空白→1つ・trim）
+/* =========================================================
+ * 型・型ガード
+ * =======================================================*/
+type Category = '料理' | '買い物';
+
+type PairDoc = {
+  userIds?: string[];
+  status?: 'pending' | 'confirmed' | 'rejected';
+};
+
+type TaskDocMinimal = {
+  userId?: string;
+  userIds?: string[];
+  name?: string;
+  title?: string;
+  period?: '毎日' | '週次' | '不定期';
+  point?: number;
+  daysOfWeek?: (string | number)[];
+  dates?: string[];
+  time?: string;
+  isTodo?: boolean;
+  done?: boolean;
+  skipped?: boolean;
+  groupId?: string | null;
+  completedAt?: unknown;
+  completedBy?: string;
+  visible?: boolean;
+  note?: string;
+  private?: boolean;
+  users?: string[];
+  todos?: unknown[];
+  category?: Category;
+};
+
+type TodoDoc = {
+  id: string;
+  text?: string;
+  done?: boolean;
+  memo?: string;
+  price?: number | null;
+  quantity?: number | null;
+  unit?: string;
+  imageUrl?: string | null;
+  referenceUrls?: string[];
+  recipe?: {
+    ingredients?: unknown[];
+    steps?: string[];
+  };
+};
+
+function isString(x: unknown): x is string {
+  return typeof x === 'string';
+}
+function isStringArray(x: unknown): x is string[] {
+  return Array.isArray(x) && x.every(isString);
+}
+function asStringArray(x: unknown): string[] {
+  return isStringArray(x) ? x : [];
+}
+function isTodoArray(x: unknown): x is TodoDoc[] {
+  return Array.isArray(x) && x.every((t) => t && typeof (t as TodoDoc).id === 'string');
+}
+
+/* =========================================================
+ * 共通ユーティリティ
+ * =======================================================*/
+
+// ▼ テキスト比較の正規化（全半角/NFKC・小文字化・連続空白→1つ・trim）
 const normalizeTodoText = (raw: string) =>
   String(raw ?? '')
     .normalize('NFKC')
@@ -42,9 +97,7 @@ const normalizeTodoText = (raw: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-/* =========================================
- * 🔧 追加（①）：JSTのYYYY-MM-DDを取得するユーティリティ
- * =======================================*/
+/* JSTのYYYY-MM-DDを取得 */
 const getJstYmd = () =>
   new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Tokyo',
@@ -53,127 +106,136 @@ const getJstYmd = () =>
     day: '2-digit',
   }).format(new Date()); // → "YYYY-MM-DD"
 
-/* =========================================
- * 🔧 追加（②）：タスク保存用のペイロードを正規化
- *    - Firestore は undefined を許容しないため、除去
- *    - 文字列になりがちな数値/真偽を型変換
- *    - 配列/文字列のデフォルト整形
- *    - ★ カテゴリ '料理' | '買い物' を許容
- * =======================================*/
-const normalizeTaskPayload = (raw: any, uid: string, userIds: string[]) => {
-  const point =
-    raw?.point === '' || raw?.point == null ? null : Number(raw.point);
-  const visible =
-    raw?.visible === '' || raw?.visible == null ? null : Boolean(raw.visible);
+/* =========================================================
+ * 保存用正規化
+ *  - Firestore は undefined を保存しないので削除
+ * =======================================================*/
+type NormalizedTaskPayload = {
+  userId: string;
+  userIds: string[];
+  users: string[];
+  category?: Category;
+  name: string;
+  period: '毎日' | '週次' | '不定期';
+  point: number | null;
+  visible: boolean | null;
+  dates: string[];
+  daysOfWeek: (string | number)[];
+  time: string;
+  note: string;
+  private: boolean;
+};
 
-  // users を文字列配列に正規化（null/undefined/空文字を除去、重複除去）
-  const users: string[] = Array.isArray(raw?.users)
-    ? Array.from(
-      new Set(
-        raw.users
-          .filter((v: unknown) => typeof v === 'string')
-          .map((v: string) => v.trim())
-          .filter((v: string) => v.length > 0)
-      )
-    )
+const normalizeTaskPayload = (
+  raw: unknown,
+  uid: string,
+  userIds: string[]
+): NormalizedTaskPayload => {
+  const r = (raw as Record<string, unknown>) ?? {};
+
+  const pointVal = r.point;
+  const point = pointVal === '' || pointVal == null ? null : Number(pointVal);
+
+  const visibleVal = r.visible;
+  const visible = visibleVal === '' || visibleVal == null ? null : Boolean(visibleVal);
+
+  // users を文字列配列に正規化（trim + 重複除去）
+  const usersRaw = r.users;
+  const users = isStringArray(usersRaw)
+    ? Array.from(new Set(usersRaw.map((v) => v.trim()).filter((v) => v.length > 0)))
     : [];
 
-  // ★ category を正規化
-  const rawCat = typeof raw?.category === 'string' ? raw.category.trim() : undefined;
-  const category: '料理' | '買い物' | undefined =
-    rawCat === '料理' || rawCat === '買い物' ? rawCat : undefined;
+  // category
+  const rawCat = isString(r.category) ? r.category.trim() : undefined;
+  const category: Category | undefined = rawCat === '料理' || rawCat === '買い物' ? rawCat : undefined;
 
-  const payload: any = {
+  const payload: NormalizedTaskPayload = {
     userId: uid,
     userIds: Array.isArray(userIds) && userIds.length ? userIds : [uid],
-
-    // 担当者
     users,
-
-    // ★ カテゴリ
-    category, // undefined は後で除去
-
-    name: typeof raw?.name === 'string' ? raw.name.trim() : '',
+    category,
+    name: isString(r.name) ? r.name.trim() : '',
     period:
-      raw?.period == null || ['毎日', '週次', '不定期'].includes(raw.period)
-        ? raw?.period ?? '毎日'
+      r.period == null || (isString(r.period) && ['毎日', '週次', '不定期'].includes(r.period))
+        ? ((r.period as '毎日' | '週次' | '不定期') ?? '毎日')
         : '毎日',
     point: Number.isNaN(point) ? null : point,
-    visible, // boolean | null
-
-    dates: Array.isArray(raw?.dates) ? raw.dates : [],
-    daysOfWeek: Array.isArray(raw?.daysOfWeek) ? raw.daysOfWeek : [],
-    time: typeof raw?.time === 'string' ? raw.time : '',
-    note:
-      typeof raw?.note === 'string'
-        ? raw.note
-        : raw?.note == null
-          ? ''
-          : String(raw.note),
-
-    private: raw?.private === true,
+    visible,
+    dates: asStringArray(r.dates),
+    daysOfWeek: Array.isArray(r.daysOfWeek) ? (r.daysOfWeek as (string | number)[]) : [],
+    time: isString(r.time) ? r.time : '',
+    note: isString(r.note) ? r.note : r.note == null ? '' : String(r.note),
+    private: r.private === true,
   };
 
-  Object.keys(payload).forEach((k) => {
-    if (payload[k] === undefined) delete payload[k];
+  // 念のため undefined 除去
+  (Object.keys(payload) as (keyof NormalizedTaskPayload)[]).forEach((k) => {
+    if ((payload as Record<string, unknown>)[k] === undefined) {
+      delete (payload as Record<string, unknown>)[k];
+    }
   });
 
   return payload;
 };
 
-/**
- * 指定されたpairIdのペアに属するuserIdsを取得する関数
- * @param pairId FirestoreのpairsドキュメントID
- * @returns ペアに所属するuserIdsの配列（statusがconfirmedの時のみ）
- */
+/* =========================================================
+ * ペア情報
+ * =======================================================*/
+/** 指定 uid を含む confirmed ペアの userIds を取得 */
 export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
   try {
-    const q = query(
+    const qy = query(
       collection(db, 'pairs'),
       where('userIds', 'array-contains', uid),
       where('status', '==', 'confirmed')
     );
-
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(qy);
     if (snapshot.empty) return [];
-
-    const docSnap = snapshot.docs[0];
-    const data = docSnap.data();
-
-    return data.userIds ?? [];
+    const data = snapshot.docs[0].data() as PairDoc;
+    return Array.isArray(data.userIds) ? data.userIds : [];
   } catch (e) {
     console.error('ペア情報の取得に失敗:', e);
     return [];
   }
 };
 
-/**
- * Firestoreに保存するタスクデータ（FirestoreTask型）を構築する関数
- * - ★ category を含める
- */
+/* =========================================================
+ * FirestoreTask 生成
+ * =======================================================*/
 export const buildFirestoreTaskData = (
   task: Task | TaskManageTask,
   userIds: string[],
   uid: string
 ): FirestoreTask => {
+  const toDayIndex = (d: string | number): string | number => {
+    if (typeof d === 'number') return d;
+    // dayNameToNumber の内容に依存せず自前でマッピング（存在しない場合はそのまま返す）
+    switch (d) {
+      case '日': return 0;
+      case '月': return 1;
+      case '火': return 2;
+      case '水': return 3;
+      case '木': return 4;
+      case '金': return 5;
+      case '土': return 6;
+      default: return d;
+    }
+  };
+
   const convertedDaysOfWeek =
     task.period === '週次'
-      ? (task.daysOfWeek ?? []).map((d) => dayNameToNumber[d] ?? d)
+      ? (task.daysOfWeek ?? []).map((d) => toDayIndex(d))
       : [];
+  const t = task as unknown as TaskDocMinimal;
+
+  const category: Category | undefined =
+    t.category === '料理' || t.category === '買い物' ? t.category : undefined;
 
   return {
     userId: uid,
     userIds,
-
-    // 担当者（存在すれば配列で保存）
-    users: (task as any).users ?? [],
-
-    // ★ カテゴリ（'料理' | '買い物' | undefined）
-    category:
-      (task as any)?.category === '料理' || (task as any)?.category === '買い物'
-        ? (task as any).category
-        : undefined,
-
+    users: t.users ?? [],
+    category,
     name: task.name ?? '',
     title: task.title ?? '',
     period: task.period ?? '毎日',
@@ -181,29 +243,24 @@ export const buildFirestoreTaskData = (
     daysOfWeek: convertedDaysOfWeek,
     dates: task.dates ?? [],
     time: task.time ?? '',
-    isTodo: (task as any).isTodo ?? false,
-    done: (task as any).done ?? false,
-    skipped: (task as any).skipped ?? false,
-    groupId: (task as any).groupId ?? null,
-    completedAt: (task as any).completedAt ?? null,
-    completedBy: (task as any).completedBy ?? '',
-    visible: (task as any).visible ?? false,
+    isTodo: t.isTodo ?? false,
+    done: t.done ?? false,
+    skipped: t.skipped ?? false,
+    groupId: t.groupId ?? null,
+    completedAt: t.completedAt ?? null,
+    completedBy: t.completedBy ?? '',
+    visible: t.visible ?? false,
     todos: [],
-    note: (task as any).note ?? '',
-  } as unknown as FirestoreTask;
+    note: t.note ?? '',
+  } as FirestoreTask;
 };
 
-/**
- * タスク一覧をFirestoreに一括保存する関数
- */
-export const saveAllTasks = async (
-  tasks: TaskManageTask[],
-  uid: string,
-  userIds: string[]
-) => {
+/* =========================================================
+ * 複数保存（TaskManageTask[]）
+ * =======================================================*/
+export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds: string[]) => {
   for (const task of tasks) {
     const taskData = buildFirestoreTaskData(task, userIds, uid);
-
     try {
       await saveTaskToFirestore(task.isNew ? null : task.id, taskData);
     } catch (e) {
@@ -213,10 +270,7 @@ export const saveAllTasks = async (
   }
 };
 
-/**
- * 同名の共有タスクがすでに存在するかを確認
- * （既存仕様：カテゴリ条件は追加しない）
- */
+/* 同名の共有タスクが既にあるか（private=false 対象） */
 const checkDuplicateSharedTaskName = async (
   name: string,
   uid: string,
@@ -225,21 +279,21 @@ const checkDuplicateSharedTaskName = async (
   const pairUserIds = await fetchPairUserIds(uid);
   if (pairUserIds.length === 0) return false;
 
-  const q = query(
+  const qy = query(
     collection(db, 'tasks'),
     where('name', '==', name),
     where('private', '==', false),
     where('userIds', 'array-contains-any', pairUserIds)
   );
 
-  const snapshot = await getDocs(q);
-  const filtered = snapshot.docs.filter((doc) => doc.id !== excludeTaskId);
+  const snapshot = await getDocs(qy);
+  const filtered = snapshot.docs.filter((d) => d.id !== excludeTaskId);
   return filtered.length > 0;
 };
 
-/**
- * タスクの完了履歴をtaskCompletionsコレクションに追加
- */
+/* =========================================================
+ * 完了履歴
+ * =======================================================*/
 export const addTaskCompletion = async (
   taskId: string,
   userId: string,
@@ -250,7 +304,6 @@ export const addTaskCompletion = async (
 ) => {
   try {
     const todayISO = new Date().toISOString().split('T')[0];
-
     await addDoc(collection(db, 'taskCompletions'), {
       taskId,
       userId,
@@ -266,17 +319,13 @@ export const addTaskCompletion = async (
   }
 };
 
-/**
- * 単一タスクをFirestoreに保存（TaskView用）
- * - ★ category を保存対象に含める
- */
-export const saveSingleTask = async (
-  task: TaskManageTask,
-  uid: string
-) => {
+/* =========================================================
+ * 単体保存（TaskView から）
+ * =======================================================*/
+export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
   try {
-    // ペアの userIds を取得
-    let userIds = [uid];
+    // ペア userIds
+    let userIds: string[] | null = null;
     const pairsSnap = await getDocs(
       query(
         collection(db, 'pairs'),
@@ -284,26 +333,18 @@ export const saveSingleTask = async (
         where('status', '==', 'confirmed')
       )
     );
-    pairsSnap.forEach((docSnap) => {
-      const data = docSnap.data();
-      if (Array.isArray(data.userIds)) {
-        userIds = data.userIds;
-      }
+    pairsSnap.forEach((d) => {
+      const data = d.data() as PairDoc;
+      if (Array.isArray(data.userIds)) userIds = data.userIds;
     });
+    const resolvedUserIds = userIds ?? [uid];
 
+    // private → shared へ変更する場合のみ重複名チェック
     const isPrivate = task.private ?? false;
-
-    // private → shared に変える場合のみ同名チェック
     if (!isPrivate) {
-      const isDup = await checkDuplicateSharedTaskName(
-        task.name,
-        uid,
-        task.id
-      );
+      const isDup = await checkDuplicateSharedTaskName(task.name, uid, task.id);
       if (isDup) {
-        throw new Error(
-          '同名の共有タスクが既に存在します。名前を変更してください。'
-        );
+        throw new Error('同名の共有タスクが既に存在します。名前を変更してください。');
       }
     }
 
@@ -317,15 +358,13 @@ export const saveSingleTask = async (
         period: task.period,
         private: task.private ?? false,
         time: task.time,
-        note: (task as any).note,
-        visible: (task as any).visible,
-        users: (task as any).users,
-
-        // ★ 追加：カテゴリ（'料理' | '買い物' | undefined）
-        category: (task as any).category,
+        note: (task as unknown as TaskDocMinimal).note,
+        visible: (task as unknown as TaskDocMinimal).visible,
+        users: (task as unknown as TaskDocMinimal).users,
+        category: (task as unknown as TaskDocMinimal).category,
       },
       uid,
-      userIds
+      resolvedUserIds
     );
 
     await saveTaskToFirestore(task.id, taskData);
@@ -335,9 +374,9 @@ export const saveSingleTask = async (
   }
 };
 
-/**
- * クリーンユーティリティ
- */
+/* =========================================================
+ * オブジェクトクリーン
+ * =======================================================*/
 export const cleanObject = <T>(obj: T): T => {
   if (Array.isArray(obj)) {
     return obj
@@ -347,21 +386,18 @@ export const cleanObject = <T>(obj: T): T => {
           v !== undefined &&
           v !== null &&
           !(typeof v === 'string' && v.trim() === '')
-      ) as T;
+      ) as unknown as T;
   }
 
   if (typeof obj === 'object' && obj !== null) {
     const cleaned: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(
-      obj as Record<string, unknown>
-    )) {
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       if (
         value !== undefined &&
         value !== null &&
         !(typeof value === 'string' && value.trim() === '')
       ) {
-        const cleanedValue = cleanObject(value);
-        cleaned[key] = cleanedValue;
+        cleaned[key] = cleanObject(value);
       }
     }
     return cleaned as T;
@@ -370,67 +406,64 @@ export const cleanObject = <T>(obj: T): T => {
   return obj;
 };
 
-/**
- * タスクを Firestore に保存（新規 or 更新）
- * - 正規化（normalizeTaskPayload）を通し、category も含めて保存
- * - dates/time の差分を見て notifyLogs を整理
- */
+/* =========================================================
+ * Firestore 保存（新規/更新）
+ * =======================================================*/
 export const saveTaskToFirestore = async (
   taskId: string | null,
-  taskData: any
+  taskData: Record<string, unknown>
 ): Promise<void> => {
   try {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');
 
+    // Record<string, unknown> → 部分的に絞ったビューで扱う
+    const td = taskData as Partial<NormalizedTaskPayload> & {
+      dates?: string[];
+      time?: string;
+      period?: string;
+      private?: boolean;
+    };
+
     let userIds: string[] = [uid];
-    const isPrivate = taskData.private === true;
+    const isPrivate = td.private === true;
 
     if (!isPrivate) {
       const pairUserIds = await fetchPairUserIds(uid);
-      if (pairUserIds.length > 0) {
-        userIds = pairUserIds;
-      }
+      if (pairUserIds.length > 0) userIds = pairUserIds;
     }
 
-    // ここで category も含めて正規化
-    const commonData = normalizeTaskPayload(
-      { ...taskData, private: isPrivate },
-      uid,
-      userIds
-    );
-
+    // category を含めて正規化
+    const commonData = normalizeTaskPayload({ ...td, private: isPrivate }, uid, userIds);
     if (taskId) {
       const taskRef = doc(db, 'tasks', taskId);
 
-      // 変更前のデータ取得
+      // 変更前データ
       const originalSnap = await getDoc(taskRef);
-      const originalData = originalSnap.data();
+      const originalData = originalSnap.data() as TaskDocMinimal | undefined;
 
-      const originalDates: string[] = originalData?.dates ?? [];
-      const newDates: string[] = taskData.dates ?? [];
+      const originalDates = asStringArray(originalData?.dates);
+      const newDates = asStringArray(td.dates);
 
       const removedDates = originalDates.filter((d) => !newDates.includes(d));
 
-      const originalTime = (originalData?.time ?? '') as string;
-      const newTimeInput = (taskData.time ?? '') as string;
+      const originalTime = isString(originalData?.time) ? originalData.time : '';
+      const newTimeInput = isString(td.time) ? td.time : '';
 
-      const originalPeriod = (originalData?.period ?? '') as string;
-      const newPeriod = (taskData.period ?? '') as string;
+      const originalPeriod = isString(originalData?.period) ? originalData.period : '';
+      const newPeriod = isString(td.period) ? td.period : '';
 
       let finalDates: string[] = newDates;
-      let finalTime: string = newTimeInput;
+      let finalTime = newTimeInput;
 
-      // 1) 日付が消えた分は削除
+      // 1) 日付が消えた分の notifyLogs から削除
       if (removedDates.length > 0) {
         await removeTaskIdFromNotifyLogs(uid, taskId, removedDates);
       }
 
-      // 2) time の変更：共通日付 or 当日（毎日/週次の dates=[]）を削除
+      // 2) time の変更
       if (originalTime && newTimeInput && originalTime !== newTimeInput) {
-        const intersectDates = originalDates.filter((d) =>
-          newDates.includes(d)
-        );
+        const intersectDates = originalDates.filter((d) => newDates.includes(d));
         if (intersectDates.length > 0) {
           await removeTaskIdFromNotifyLogs(uid, taskId, intersectDates);
         } else {
@@ -439,16 +472,14 @@ export const saveTaskToFirestore = async (
         }
       }
 
-      // 3) time 削除（'08:00' → ''）
+      // 3) time 削除
       if (originalTime && !newTimeInput && originalDates.length > 0) {
         await removeTaskIdFromNotifyLogs(uid, taskId, originalDates);
       }
 
-      // 4) 期間切替：不定期 → 週次/毎日
-      const isOtherToWeekly =
-        originalPeriod !== newPeriod && newPeriod === '週次';
-      const isOtherToDaily =
-        originalPeriod !== newPeriod && newPeriod === '毎日';
+      // 4) 不定期 → 週次/毎日
+      const isOtherToWeekly = originalPeriod !== newPeriod && newPeriod === '週次';
+      const isOtherToDaily = originalPeriod !== newPeriod && newPeriod === '毎日';
 
       if (isOtherToWeekly || isOtherToDaily) {
         if (originalDates.length > 0 && originalTime) {
@@ -480,13 +511,10 @@ export const saveTaskToFirestore = async (
   }
 };
 
-/**
- * 指定タスクIDの Firestore ドキュメントを削除
- * - 削除前に notifyLogs からも taskId を削除
- */
-export const deleteTaskFromFirestore = async (
-  taskId: string
-): Promise<void> => {
+/* =========================================================
+ * タスク削除（notifyLogs からの削除含む）
+ * =======================================================*/
+export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => {
   try {
     const taskRef = doc(db, 'tasks', taskId);
     const taskSnap = await getDoc(taskRef);
@@ -496,36 +524,33 @@ export const deleteTaskFromFirestore = async (
       return;
     }
 
-    const taskData = taskSnap.data();
-    const userId = taskData.userId;
-    const dates: string[] = taskData.dates ?? [];
+    const taskData = taskSnap.data() as TaskDocMinimal;
+    const userId = isString(taskData.userId) ? taskData.userId : '';
+    const dates = asStringArray(taskData.dates);
 
-    await removeTaskIdFromNotifyLogs(userId, taskId, dates);
+    if (userId) {
+      await removeTaskIdFromNotifyLogs(userId, taskId, dates);
+    }
     await deleteDoc(taskRef);
   } catch (err) {
     handleFirestoreError(err);
   }
 };
 
-/**
- * ペア解除時：全タスクの userIds から partnerUid を除外
- */
+/* =========================================================
+ * ペア解除時：userIds から partnerUid を除外
+ * =======================================================*/
 export const removePartnerFromUserTasks = async (partnerUid: string) => {
   const user = auth.currentUser;
   if (!user) throw new Error('ユーザー情報が取得できません');
 
-  const q = query(
-    collection(db, 'tasks'),
-    where('userIds', 'array-contains', user.uid)
-  );
-  const snapshot = await getDocs(q);
+  const qy = query(collection(db, 'tasks'), where('userIds', 'array-contains', user.uid));
+  const snapshot = await getDocs(qy);
 
-  const batchUpdates = snapshot.docs.map(async (docRef) => {
-    const task = docRef.data();
-    const newUserIds = (task.userIds || []).filter(
-      (id: string) => id !== partnerUid
-    );
-    await updateDoc(doc(db, 'tasks', docRef.id), {
+  const batchUpdates = snapshot.docs.map(async (d) => {
+    const task = d.data() as TaskDocMinimal;
+    const newUserIds = (Array.isArray(task.userIds) ? task.userIds : []).filter((id) => id !== partnerUid);
+    await updateDoc(doc(db, 'tasks', d.id), {
       userIds: newUserIds,
       private: task.private ?? false,
     });
@@ -533,9 +558,9 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
   await Promise.all(batchUpdates);
 };
 
-/**
- * 指定されたタスク内のToDoアイテムを部分更新
- */
+/* =========================================================
+ * ToDo 部分更新
+ * =======================================================*/
 export const updateTodoInTask = async (
   taskId: string,
   todoId: string,
@@ -546,53 +571,82 @@ export const updateTodoInTask = async (
     unit?: string;
     imageUrl?: string | null;
     recipe?: { ingredients: unknown[]; steps: string[] } | null;
+    referenceUrls?: string[];
   }
 ) => {
   const taskRef = doc(db, 'tasks', taskId);
   const latestSnap = await getDoc(taskRef);
   if (!latestSnap.exists()) throw new Error('タスクが存在しません');
 
-  const taskData = latestSnap.data();
-  const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
-  const index = todos.findIndex((todo: any) => todo.id === todoId);
+  const taskData = latestSnap.data() as TaskDocMinimal;
+  const todosRaw = taskData.todos;
+  const todos: TodoDoc[] = isTodoArray(todosRaw) ? todosRaw : [];
+
+  const index = todos.findIndex((t) => t.id === todoId);
   if (index === -1) throw new Error('TODOが見つかりません');
 
-  // src/lib/firebaseUtils.ts（該当関数の末尾付近）
   const current = todos[index];
-  const next: any = { ...current, ...updates };
+
+  // ベースは現在値
+  let next: TodoDoc = { ...current };
+
+  // --- memo（指定時のみ反映） ---
+  if (typeof updates.memo !== 'undefined') {
+    next = { ...next, memo: updates.memo };
+  }
+
+  // --- price / quantity / unit ---
+  if ('price' in updates) {
+    next = { ...next, price: updates.price ?? null };
+  }
+  if ('quantity' in updates) {
+    next = { ...next, quantity: updates.quantity ?? null };
+  }
+  if ('unit' in updates) {
+    // 数量が無いなら unit は残しても良い/消す、どちらでも運用次第。
+    // ここでは指定時のみ上書き（未指定なら現状維持）
+    next = { ...next, unit: updates.unit };
+  }
+
+  // --- referenceUrls（配列を整える） ---
+  if (typeof updates.referenceUrls !== 'undefined') {
+    const urls = Array.isArray(updates.referenceUrls)
+      ? updates.referenceUrls.filter((u): u is string => typeof u === 'string' && u.trim() !== '')
+      : [];
+    next = { ...next, referenceUrls: urls };
+  }
 
   // --- imageUrl の扱い ---
-  // 文字列（非空）なら保存、null ならキー削除、undefined は変更なし
-  if (typeof updates.imageUrl === 'string' && updates.imageUrl.length > 0) {
-    next.imageUrl = updates.imageUrl;
-  } else if (updates.imageUrl === null) {
-    delete next.imageUrl;
+  if (updates.imageUrl === null) {
+    // プロパティごと除去した新オブジェクトを作る
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { imageUrl: _omit, ...rest } = next;
+    next = rest as TodoDoc;
+  } else if (typeof updates.imageUrl === 'string') {
+    next = { ...next, imageUrl: updates.imageUrl };
   }
+  // undefined の場合は変更なし
 
   // --- recipe の扱い ---
-  // null なら削除、undefined は変更なし、オブジェクトが来たら上書き
   if (updates.recipe === null) {
-    delete next.recipe;
+    // プロパティごと除去
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { recipe: _omit, ...rest } = next;
+    next = rest as TodoDoc;
   } else if (typeof updates.recipe !== 'undefined') {
-    next.recipe = updates.recipe;
+    next = { ...next, recipe: updates.recipe };
   }
 
-  // （任意）price/quantity の NaN ガード
-  if (Object.prototype.hasOwnProperty.call(updates, 'price') && updates.price == null) {
-    next.price = null;
-  }
-  if (Object.prototype.hasOwnProperty.call(updates, 'quantity') && updates.quantity == null) {
-    next.quantity = null;
-  }
-
-  todos[index] = next;
-  await updateDoc(taskRef, { todos });
+  // 置換して保存
+  const newTodos = todos.slice();
+  newTodos[index] = next;
+  await updateDoc(taskRef, { todos: newTodos });
 
 };
 
-/**
- * 差額（節約）ログを追加
- */
+/* =========================================================
+ * 差額（節約）ログ
+ * =======================================================*/
 export const addSavingsLog = async (
   userId: string,
   taskId: string,
@@ -612,38 +666,28 @@ export const addSavingsLog = async (
   });
 };
 
-/**
- * 通知ログから taskId を削除
- */
-const removeTaskIdFromNotifyLogs = async (
-  userId: string,
-  taskId: string,
-  dates: string[]
-) => {
+/* =========================================================
+ * notifyLogs から taskId を削除
+ * =======================================================*/
+const removeTaskIdFromNotifyLogs = async (userId: string, taskId: string, dates: string[]) => {
   if (!dates || dates.length === 0) return;
 
   const batch = writeBatch(db);
 
   for (const date of dates) {
     const notifyRef = doc(db, 'users', userId, 'notifyLogs', date);
-    const snap = await getDoc(notifyRef); // 存在チェック
+    const snap = await getDoc(notifyRef);
     if (snap.exists()) {
-      batch.update(notifyRef, {
-        taskIds: arrayRemove(taskId),
-      });
-    } else {
-      // 無い日はスキップ
+      batch.update(notifyRef, { taskIds: arrayRemove(taskId) });
     }
   }
 
   await batch.commit();
 };
 
-/**
- * 完了 ↔ 未完了 切り替え
- * - 完了時：履歴/ポイント（共有時のみ）を追加
- * - 未完了：notifyLogs & taskCompletions を削除
- */
+/* =========================================================
+ * 完了 ↔ 未完了
+ * =======================================================*/
 export const toggleTaskDoneStatus = async (
   taskId: string,
   userId: string,
@@ -655,17 +699,14 @@ export const toggleTaskDoneStatus = async (
   try {
     const taskRef = doc(db, 'tasks', taskId);
 
-    // ペア情報を取得して userIds を用意
+    // ペア userIds
     let userIds = [userId];
-    const pairId =
-      typeof window !== 'undefined' ? sessionStorage.getItem('pairId') : null;
+    const pairId = typeof window !== 'undefined' ? sessionStorage.getItem('pairId') : null;
 
     if (pairId) {
       const pairDoc = await getDoc(doc(db, 'pairs', pairId));
-      const pairData = pairDoc.data();
-      if (pairData?.userIds) {
-        userIds = pairData.userIds;
-      }
+      const pairData = pairDoc.data() as PairDoc | undefined;
+      if (pairData?.userIds) userIds = pairData.userIds;
     }
 
     if (done) {
@@ -678,24 +719,16 @@ export const toggleTaskDoneStatus = async (
       });
 
       const taskSnap = await getDoc(taskRef);
-      const taskData = taskSnap.data();
+      const taskData = taskSnap.data() as TaskDocMinimal | undefined;
       const isPrivate = taskData?.private === true;
 
-      if (!isPrivate && taskName && point !== undefined && person) {
-        await addTaskCompletion(
-          taskId,
-          userId,
-          userIds,
-          taskName,
-          point,
-          person
-        );
+      if (!isPrivate && taskName && typeof point === 'number' && person) {
+        await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
       }
     } else {
       // 未完了へ戻す
       await updateDoc(taskRef, {
         done: false,
-
         skipped: false,
         completedAt: null,
         completedBy: '',
@@ -703,22 +736,18 @@ export const toggleTaskDoneStatus = async (
 
       // 通知ログから削除
       const taskSnap = await getDoc(taskRef);
-      const taskData = taskSnap.data();
-      const taskDates: string[] = taskData?.dates ?? [];
-
+      const taskData = taskSnap.data() as TaskDocMinimal | undefined;
+      const taskDates = asStringArray(taskData?.dates);
       await removeTaskIdFromNotifyLogs(userId, taskId, taskDates);
 
       // taskCompletions 履歴削除
-      const q = query(
+      const qy = query(
         collection(db, 'taskCompletions'),
         where('taskId', '==', taskId),
         where('userId', '==', userId)
       );
-
-      const snapshot = await getDocs(q);
-      const deletePromises = snapshot.docs.map((docSnap) =>
-        deleteDoc(docSnap.ref)
-      );
+      const snapshot = await getDocs(qy);
+      const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref));
       await Promise.all(deletePromises);
     }
   } catch (error) {
@@ -726,16 +755,12 @@ export const toggleTaskDoneStatus = async (
   }
 };
 
-/* =========================================
- * ▼ スキップ処理：履歴/ポイントなしで done=true にする
- * =======================================*/
-export const skipTaskWithoutPoints = async (
-  taskId: string,
-  userId: string
-): Promise<void> => {
+/* =========================================================
+ * スキップ（履歴/ポイントなしで done=true）
+ * =======================================================*/
+export const skipTaskWithoutPoints = async (taskId: string, userId: string): Promise<void> => {
   try {
     const taskRef = doc(db, 'tasks', taskId);
-
     await updateDoc(taskRef, {
       done: true,
       skipped: true,
@@ -749,15 +774,14 @@ export const skipTaskWithoutPoints = async (
   }
 };
 
-/**
- * ペアが存在しない場合に共有タスク（userIdsが2人以上）を削除
- */
+/* =========================================================
+ * ペアが無い場合の共有タスク削除
+ * =======================================================*/
 export const removeOrphanSharedTasksIfPairMissing = async (): Promise<void> => {
   try {
     const user = auth.currentUser;
     if (!user) return;
 
-    // ① 自身のペアが存在するか確認（status: confirmed）
     const pairSnap = await getDocs(
       query(
         collection(db, 'pairs'),
@@ -765,25 +789,18 @@ export const removeOrphanSharedTasksIfPairMissing = async (): Promise<void> => {
         where('status', '==', 'confirmed')
       )
     );
-
     const hasConfirmedPair = !pairSnap.empty;
+    if (hasConfirmedPair) return;
 
-    if (hasConfirmedPair) {
-      return; // ペアが存在するなら何もしない
-    }
-
-    // ② 自身が含まれる userIds で、共有タスクを検索
     const taskSnap = await getDocs(
       query(collection(db, 'tasks'), where('userIds', 'array-contains', user.uid))
     );
 
     const deletePromises: Promise<void>[] = [];
-
     taskSnap.forEach((taskDoc) => {
-      const taskData = taskDoc.data();
-      const userIds = Array.isArray(taskData.userIds) ? taskData.userIds : [];
-
-      if (userIds.length > 1) {
+      const taskData = taskDoc.data() as TaskDocMinimal;
+      const uids = Array.isArray(taskData.userIds) ? taskData.userIds : [];
+      if (uids.length > 1) {
         deletePromises.push(deleteDoc(doc(db, 'tasks', taskDoc.id)));
       }
     });
@@ -794,10 +811,9 @@ export const removeOrphanSharedTasksIfPairMissing = async (): Promise<void> => {
   }
 };
 
-/**
- * TODO名（text）を、同じIDの要素だけ置換
- * - 同じタスク内で、"未処理(!done)" に同名(正規化後)が既に存在する場合はエラー
- */
+/* =========================================================
+ * ToDo テキスト置換（重複チェック付き）
+ * =======================================================*/
 export const updateTodoTextInTask = async (
   taskId: string,
   todoId: string,
@@ -807,31 +823,25 @@ export const updateTodoTextInTask = async (
   const snap = await getDoc(taskRef);
   if (!snap.exists()) throw new Error('TASK_NOT_FOUND');
 
-  const data = snap.data() as any;
-  const todos: any[] = Array.isArray(data?.todos) ? data.todos : [];
+  const data = snap.data() as TaskDocMinimal;
+  const todos: TodoDoc[] = isTodoArray(data?.todos) ? (data.todos as TodoDoc[]) : [];
 
   const idx = todos.findIndex((t) => t?.id === todoId);
   if (idx === -1) throw new Error('TODO_NOT_FOUND');
 
   const newKey = normalizeTodoText(newText);
 
-  // ▼ 自分以外で、未処理(!done)に同名(正規化後)があればブロック
+  // 自分以外で、未処理(!done)に同名(正規化後)があればブロック
   const dup = todos.find(
-    (t, i) =>
-      i !== idx &&
-      !t?.done &&
-      normalizeTodoText(String(t?.text ?? '')) === newKey
+    (t, i) => i !== idx && !t?.done && normalizeTodoText(String(t?.text ?? '')) === newKey
   );
   if (dup) {
-    const err: any = new Error('DUPLICATE_TODO');
+    const err = new Error('DUPLICATE_TODO') as Error & { code?: string };
     err.code = 'DUPLICATE_TODO';
     throw err;
   }
 
-  // ▼ 置換保存
-  const next = todos.map((t, i) =>
-    i === idx ? { ...t, text: newText } : t
-  );
-
+  // 置換保存
+  const next = todos.map((t, i) => (i === idx ? { ...t, text: newText } : t));
   await updateDoc(taskRef, { todos: next });
 };

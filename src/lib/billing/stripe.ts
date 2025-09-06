@@ -6,7 +6,10 @@ if (!STRIPE_SECRET_KEY) {
   throw new Error('ENV STRIPE_SECRET_KEY is required');
 }
 
-// Stripe 推奨の最新 API バージョンを指定（プロジェクトに合わせて固定）
+// 型を string 固定にしてから fallback
+const API_VERSION: string = process.env.STRIPE_API_VERSION || '2024-06-20';
+
 export const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: '2024-06-20' as any,
+  // 型定義が古くても通るように二段階キャスト
+  apiVersion: API_VERSION as unknown as Stripe.StripeConfig['apiVersion'],
 });

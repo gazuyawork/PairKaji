@@ -1,23 +1,92 @@
+// src/components/todo/parts/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState, useRef, useLayoutEffect, useCallback, useMemo } from 'react';
+import {
+  useEffect,
+  useState,
+  useRef,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import { ChevronDown, ChevronUp, Eye, Pencil, Plus } from 'lucide-react';
-// import RecipeEditor, { type Recipe } from '@/components/todo/parts/RecipeEditor';
-import RecipeEditor, { type Recipe, type RecipeEditorHandle } from '@/components/todo/parts/RecipeEditor';
+import RecipeEditor, {
+  type Recipe,
+  type RecipeEditorHandle,
+} from '@/components/todo/parts/RecipeEditor';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
-import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  doc,
+  getDoc,
+} from 'firebase/firestore';
+import {
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from 'firebase/storage';
 import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceAnimation';
 import BaseModal from '../../common/modals/BaseModal';
+import NextImage from 'next/image';
+
+/* ---------------- Types & guards ---------------- */
+
+type Category = '料理' | '買い物';
+
+type Ingredient = {
+  id: string;
+  name: string;
+  amount: number | null;
+  unit: string;
+};
+
+type TaskDoc = {
+  category?: Category;
+  todos?: TodoDoc[];
+};
+
+type TodoDoc = {
+  id: string;
+  text?: string;
+  memo?: string;
+  price?: number | null;
+  quantity?: number | null;
+  unit?: string;
+  imageUrl?: string | null;
+  referenceUrls?: string[];
+  recipe?: {
+    ingredients?: Partial<Ingredient>[];
+    steps?: string[];
+  };
+};
+
+function isString(v: unknown): v is string {
+  return typeof v === 'string';
+}
+function isNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+function asStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter(isString) : [];
+}
+function isTodoArray(v: unknown): v is TodoDoc[] {
+  return Array.isArray(v) && v.every((x) => x && typeof x.id === 'string');
+}
+
+/* ---------------- Constants ---------------- */
 
 // 表示上限: 画面高の 50%（vh基準）
 const MAX_TEXTAREA_VH = 50;
 
-// 画像圧縮ユーティリティ
+/* ---------------- Image compression ---------------- */
+
 /**
  * クライアント側で画像を圧縮して Blob を返す。
  * - 最大辺 1600px に収まるよう等比縮小
@@ -34,24 +103,31 @@ async function compressImage(
 
   // 200KB 未満はそのまま使う（品質劣化・再圧縮コストを避ける）
   if (file.size < 200 * 1024) {
-    return { blob: file, mime: file.type === 'image/webp' ? 'image/webp' as const : 'image/jpeg' as const };
+    return {
+      blob: file,
+      mime: file.type === 'image/webp' ? 'image/webp' : 'image/jpeg',
+    };
   }
 
-  const bitmap = await (async () => {
+  // 画像読み込み（ImageBitmap がだめなら <img> フォールバック）
+  const bitmapOrImg: ImageBitmap | HTMLImageElement = await (async () => {
     try {
       return await createImageBitmap(file);
     } catch {
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const i = new Image();
+        const i = document.createElement('img');
         i.onload = () => resolve(i);
         i.onerror = reject;
         i.src = URL.createObjectURL(file);
       });
-      return img as any as ImageBitmap;
+      return img;
     }
   })();
 
-  const { width, height } = bitmap;
+  // サイズ取得（HTMLImageElement / ImageBitmap 両対応）
+  const width = 'naturalWidth' in bitmapOrImg ? bitmapOrImg.naturalWidth : (bitmapOrImg as ImageBitmap).width;
+  const height = 'naturalHeight' in bitmapOrImg ? bitmapOrImg.naturalHeight : (bitmapOrImg as ImageBitmap).height;
+
   let targetW = width;
   let targetH = height;
 
@@ -67,7 +143,7 @@ async function compressImage(
   const ctx = canvas.getContext('2d', { alpha: true });
   if (!ctx) throw new Error('Canvas 2D コンテキストの取得に失敗しました。');
 
-  ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+  ctx.drawImage(bitmapOrImg as unknown as CanvasImageSource, 0, 0, targetW, targetH);
 
   const toBlob = (type: string, q: number) =>
     new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, q));
@@ -79,12 +155,15 @@ async function compressImage(
 
   if (!webpBlob && !jpegBlob) return { blob: file, mime: 'image/jpeg' };
   if (webpBlob && jpegBlob) {
-    if (webpBlob.size <= jpegBlob.size) return { blob: webpBlob, mime: 'image/webp' };
-    return { blob: jpegBlob, mime: 'image/jpeg' };
+    return webpBlob.size <= jpegBlob.size
+      ? { blob: webpBlob, mime: 'image/webp' }
+      : { blob: jpegBlob, mime: 'image/jpeg' };
   }
   if (webpBlob) return { blob: webpBlob, mime: 'image/webp' };
   return { blob: jpegBlob!, mime: 'image/jpeg' };
 }
+
+/* ---------------- Component ---------------- */
 
 interface TodoNoteModalProps {
   isOpen: boolean;
@@ -93,6 +172,11 @@ interface TodoNoteModalProps {
   todoId: string;
   taskId: string;
 }
+
+type PendingUpload = { blob: Blob; mime: 'image/webp' | 'image/jpeg' };
+
+// ★ updateTodoInTask の第三引数の型をそのまま利用（payload 赤線の根対策）
+type TodoUpdates = Parameters<typeof updateTodoInTask>[2];
 
 export default function TodoNoteModal({
   isOpen,
@@ -119,32 +203,34 @@ export default function TodoNoteModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
-  const [category, setCategory] = useState<string | null>(null);
-  const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
-  const [imageUrl, setImageUrl] = useState<string | null>(null); // 保存済みURL（Firestoreに保存される値）
-  const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null); // 差分削除用
-  const [isUploadingImage, setIsUploadingImage] = useState(false); // 選択時は圧縮中にのみ使用
+  const [category, setCategory] = useState<Category | null>(null);
 
+  const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
+
+  // 保存済みURL（Firestore側の値）
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // 差分削除用：直前に保存されていたURL
+  const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null);
+  // 選択後～保存前までの状態
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isImageRemoved, setIsImageRemoved] = useState(false);
+
+  // 参考URL
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
   const [newRefUrl, setNewRefUrl] = useState('');
 
-  // ★ 保存時アップロード方式のための追加state
-  const [pendingUpload, setPendingUpload] = useState<{ blob: Blob; mime: 'image/webp' | 'image/jpeg' } | null>(null); // 未アップロードの新画像
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // 画面表示用のローカルURL
-  const [isImageRemoved, setIsImageRemoved] = useState(false); // 削除予約（保存時に previous を削除）
-
-  // 🆕 フェードイン／枠常時表示用
-  const [imgReady, setImgReady] = useState(false);             // 画像の読込完了フラグ
-  const displaySrc = previewUrl ?? imageUrl;                   // 表示に使うURL（プレビュー優先）
-  const showMediaFrame = isOpen && !!displaySrc; // 画像がある時だけ枠を出す
+  // フェードイン用
+  const [imgReady, setImgReady] = useState(false);
+  const displaySrc = previewUrl ?? imageUrl;
+  const showMediaFrame = isOpen && !!displaySrc;
 
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ▼ 内容の存在判定（メモ／画像／レシピ／買い物入力）
+  // 内容の存在判定
   const hasMemo = useMemo(() => memo.trim().length > 0, [memo]);
-
-  // 画像は Firestore 保存済みURLのみを対象（previewUrl は無視）
   const hasImage = useMemo(() => imageUrl !== null, [imageUrl]);
 
   const hasRecipe = useMemo(() => {
@@ -158,16 +244,14 @@ export default function TodoNoteModal({
 
   const hasShopping = useMemo(() => {
     if (category !== '買い物') return false;
-    const p = parseFloat(price);
-    const q = parseFloat(quantity);
+    const p = Number.parseFloat(price);
+    const q = Number.parseFloat(quantity);
     const validPrice = Number.isFinite(p) && p > 0;
     const validQty = Number.isFinite(q) && q > 0;
     return validPrice || validQty;
   }, [category, price, quantity]);
 
-  // 変更: hasContent に参考URLがある場合も含める
   const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || referenceUrls.length > 0;
-
   const showMemo = useMemo(() => !isPreview || hasMemo, [isPreview, hasMemo]);
 
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
@@ -177,7 +261,8 @@ export default function TodoNoteModal({
       const x = a.ingredients[i];
       const y = b.ingredients[i];
       if (!x || !y) return false;
-      if (x.id !== y.id || x.name !== y.name || x.unit !== y.unit || x.amount !== y.amount) return false;
+      if (x.id !== y.id || x.name !== y.name || x.unit !== y.unit || x.amount !== y.amount)
+        return false;
     }
     if (a.steps.length !== b.steps.length) return false;
     for (let i = 0; i < a.steps.length; i++) {
@@ -186,9 +271,12 @@ export default function TodoNoteModal({
     return true;
   }, []);
 
-  const handleRecipeChange = useCallback((next: Recipe) => {
-    setRecipe((prev) => (shallowEqualRecipe(prev, next) ? prev : next));
-  }, [shallowEqualRecipe]);
+  const handleRecipeChange = useCallback(
+    (next: Recipe) => {
+      setRecipe((prev) => (shallowEqualRecipe(prev, next) ? prev : next));
+    },
+    [shallowEqualRecipe]
+  );
 
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -205,11 +293,12 @@ export default function TodoNoteModal({
 
   const onTextareaScroll = useCallback(() => updateHints(), [updateHints]);
 
-  const numericPrice = parseFloat(price);
-  const numericQuantity = parseFloat(quantity);
-  const numericComparePrice = parseFloat(comparePrice);
-  const numericCompareQuantity = parseFloat(compareQuantity);
-  const isCompareQuantityMissing = !numericCompareQuantity || numericCompareQuantity <= 0;
+  const numericPrice = Number.parseFloat(price);
+  const numericQuantity = Number.parseFloat(quantity);
+  const numericComparePrice = Number.parseFloat(comparePrice);
+  const numericCompareQuantity = Number.parseFloat(compareQuantity);
+  const isCompareQuantityMissing =
+    !numericCompareQuantity || Number.isNaN(numericCompareQuantity) || numericCompareQuantity <= 0;
   const safeCompareQuantity = isCompareQuantityMissing ? 1 : numericCompareQuantity;
   const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
   const currentUnitPrice =
@@ -226,73 +315,67 @@ export default function TodoNoteModal({
   const { animatedDifference, animationComplete: diffAnimationComplete } =
     useUnitPriceDifferenceAnimation(totalDifference);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    const parsed = parseFloat(comparePrice);
-    setSaveLabel(!isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
+    const parsed = Number.parseFloat(comparePrice);
+    setSaveLabel(!Number.isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
   }, [comparePrice]);
 
+  // 初期データの取得
   useEffect(() => {
     const fetchTodoData = async () => {
       if (!taskId || !todoId) return;
       try {
-        const taskRef = doc(db, 'tasks', taskId);
-        const taskSnap = await getDoc(taskRef);
-        if (taskSnap.exists()) {
-          const taskData = taskSnap.data();
-          const cat = (taskData as any)?.category ?? null;
-          setCategory(cat);
+        const tRef = doc(db, 'tasks', taskId);
+        const tSnap = await getDoc(tRef);
+        if (!tSnap.exists()) return;
 
-          const todos = Array.isArray(taskData.todos) ? taskData.todos : [];
-          const todo = todos.find((t: { id: string }) => t.id === todoId);
-          if (todo) {
-            setMemo((todo as any).memo || '');
-            setPrice((todo as any).price?.toString?.() || '');
-            setQuantity((todo as any).quantity?.toString?.() || '');
-            setUnit((todo as any).unit || 'g');
+        const taskData = tSnap.data() as TaskDoc;
+        setCategory(taskData?.category ?? null);
 
-            if (!compareQuantity && (todo as any).quantity) {
-              setCompareQuantity((todo as any).quantity.toString());
-            }
+        const todos = isTodoArray(taskData.todos) ? taskData.todos : [];
+        const todo = todos.find((t) => t.id === todoId);
+        if (!todo) return;
 
-            const existing = (todo as any).recipe as Recipe | undefined;
-            if (existing) {
-              const safeIngredients = Array.isArray(existing.ingredients)
-                ? existing.ingredients.map((ing: any, idx: number) => ({
-                  id: ing?.id ?? `ing_${idx}`,
-                  name: ing?.name ?? '',
-                  amount: typeof ing?.amount === 'number' ? ing.amount : null,
-                  unit: ing?.unit ?? '適量',
-                }))
-                : [];
-              setRecipe({
-                ingredients: safeIngredients,
-                steps: Array.isArray(existing.steps) ? existing.steps : [],
-              });
-            } else {
-              setRecipe({
-                ingredients: [{ id: 'ing_0', name: '', amount: null, unit: '適量' }],
-                steps: [''],
-              });
-            }
+        setMemo(todo.memo ?? '');
+        setPrice(isNumber(todo.price) ? String(todo.price) : '');
+        setQuantity(isNumber(todo.quantity) ? String(todo.quantity) : '');
+        setUnit(todo.unit ?? 'g');
 
-            const existingImageUrl = ((todo as any).imageUrl as string | undefined) ?? null;
-            setImageUrl(existingImageUrl);
-            setPreviousImageUrl(existingImageUrl);
-            // 初期表示時は未アップロード画像もプレビューもなし
-            setPendingUpload(null);
-            setPreviewUrl(null);
-            setIsImageRemoved(false);
-
-            const refs = Array.isArray((todo as any).referenceUrls)
-              ? (todo as any).referenceUrls.filter((s: any) => typeof s === 'string')
-              : [];
-            setReferenceUrls(refs); // ✅ ここで state へ反映
-          }
+        if (!compareQuantity && isNumber(todo.quantity)) {
+          setCompareQuantity(String(todo.quantity));
         }
+
+        const existing = todo.recipe;
+        if (existing) {
+          const safeIngredients: Ingredient[] = Array.isArray(existing.ingredients)
+            ? existing.ingredients.map((ing, idx) => ({
+                id: isString(ing?.id) ? ing!.id : `ing_${idx}`,
+                name: isString(ing?.name) ? ing!.name : '',
+                amount: isNumber(ing?.amount) ? ing!.amount : null,
+                unit: isString(ing?.unit) ? ing!.unit : '適量',
+              }))
+            : [];
+          setRecipe({
+            ingredients: safeIngredients,
+            steps: Array.isArray(existing.steps) ? existing.steps.filter(isString) : [],
+          });
+        } else {
+          setRecipe({
+            ingredients: [{ id: 'ing_0', name: '', amount: null, unit: '適量' }],
+            steps: [''],
+          });
+        }
+
+        const existingImageUrl = isString(todo.imageUrl) ? todo.imageUrl : null;
+        setImageUrl(existingImageUrl);
+        setPreviousImageUrl(existingImageUrl);
+        setPendingUpload(null);
+        setPreviewUrl(null);
+        setIsImageRemoved(false);
+
+        setReferenceUrls(asStringArray(todo.referenceUrls));
       } catch (e) {
         console.error('初期データの取得に失敗:', e);
       } finally {
@@ -301,8 +384,7 @@ export default function TodoNoteModal({
       }
     };
     fetchTodoData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId, todoId, updateHints]);
+  }, [taskId, todoId, updateHints, compareQuantity]);
 
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
@@ -313,7 +395,7 @@ export default function TodoNoteModal({
 
     el.style.height = 'auto';
     el.style.maxHeight = `${maxHeightPx}px`;
-    (el.style as any).webkitOverflowScrolling = 'touch';
+    el.style.setProperty('-webkit-overflow-scrolling', 'touch');
 
     if (el.scrollHeight > maxHeightPx) {
       el.style.height = `${maxHeightPx}px`;
@@ -357,7 +439,7 @@ export default function TodoNoteModal({
     return () => window.removeEventListener('resize', onResize);
   }, [resizeTextarea]);
 
-  // ── 画像選択→圧縮のみ（アップロードは保存時に実施） ──────────────────────────
+  // 画像選択→圧縮（アップロードは保存時）
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const user = auth.currentUser;
     if (!user) {
@@ -395,7 +477,9 @@ export default function TodoNoteModal({
       try {
         if (fileInputRef.current) fileInputRef.current.value = '';
         else inputEl.value = '';
-      } catch { /* noop */ }
+      } catch {
+        // noop
+      }
     }
   };
 
@@ -410,85 +494,75 @@ export default function TodoNoteModal({
     setImageUrl(null);
   };
 
-  // ── 保存処理 ────────────────────────────────────────────
+  // 保存処理
   const handleSave = async () => {
     const user = auth.currentUser;
     if (!user) return;
     setIsSaving(true);
     const committedIngredients = recipeEditorRef.current?.commitAllAmounts();
 
-    const numericPrice = parseFloat(price);
-    const numericQuantity = parseFloat(quantity);
-    const numericComparePrice = parseFloat(comparePrice);
-    const numericCompareQuantity = parseFloat(compareQuantity);
+    const nPrice = Number.parseFloat(price);
+    const nQty = Number.parseFloat(quantity);
+    const nCmpPrice = Number.parseFloat(comparePrice);
+    const nCmpQty = Number.parseFloat(compareQuantity);
 
-    const appliedPrice = numericComparePrice > 0 ? numericComparePrice : numericPrice;
-    // 入力が正しいときだけ数量を採用（未入力/NaN/0以下はnull）
-    const rawQuantity =
-      numericComparePrice > 0
-        ? numericCompareQuantity
-        : numericQuantity;
-    const validQuantity =
-      Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : null;
-    // 単位は数量があるときだけ採用（なければnull）
+    const appliedPrice = nCmpPrice > 0 ? nCmpPrice : nPrice;
+    const rawQuantity = nCmpPrice > 0 ? nCmpQty : nQty;
+    const validQuantity = Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : null;
     const appliedUnit = validQuantity ? unit : null;
 
-    const safeCompareQuantity = numericCompareQuantity > 0 ? numericCompareQuantity : 1;
-    const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
+    const safeCmpQty = nCmpQty > 0 ? nCmpQty : 1;
+    const safeQty = nQty > 0 ? nQty : 1;
     const currentUnitPriceCalced =
-      numericPrice > 0 && safeQuantity > 0 ? numericPrice / safeQuantity : null;
+      nPrice > 0 && safeQty > 0 ? nPrice / safeQty : null;
     const compareUnitPriceCalced =
-      numericComparePrice > 0 ? numericComparePrice / safeCompareQuantity : null;
+      nCmpPrice > 0 ? nCmpPrice / safeCmpQty : null;
     const unitPriceDiffCalced =
       compareUnitPriceCalced !== null && currentUnitPriceCalced !== null
         ? compareUnitPriceCalced - currentUnitPriceCalced
         : null;
     const totalDifferenceCalced =
-      unitPriceDiffCalced !== null ? unitPriceDiffCalced * safeCompareQuantity : null;
+      unitPriceDiffCalced !== null ? unitPriceDiffCalced * safeCmpQty : null;
 
     try {
-      // ▼ 保存直前に、必要なら Storage へアップロードして imageUrl を確定する
-      let nextImageUrl: string | null = imageUrl;
+      // アップロード（必要時）
+      let nextImage: string | null = imageUrl;
 
       if (!isImageRemoved && pendingUpload) {
         const ext = pendingUpload.mime === 'image/webp' ? 'webp' : 'jpg';
-        const storagePath = `task_todos/${taskId}/${todoId}/${Date.now()}.${ext}`;
-        const fileRef = ref(storage, storagePath);
+        const path = `task_todos/${taskId}/${todoId}/${Date.now()}.${ext}`;
+        const fileRef = storageRef(storage, path);
         await uploadBytes(fileRef, pendingUpload.blob, {
           contentType: pendingUpload.mime,
-          customMetadata: {
-            ownerUid: user.uid,
-            taskId,
-            todoId,
-          },
+          customMetadata: { ownerUid: user.uid, taskId, todoId },
         });
-        nextImageUrl = await getDownloadURL(fileRef);
+        nextImage = await getDownloadURL(fileRef);
       }
 
-      // ▼ Firestore 更新 payload
-      const payload: Record<string, any> = {
+      // Firestore 更新 payload（型は updateTodoInTask から取得）
+      const payload: TodoUpdates = {
         memo,
         price: Number.isFinite(appliedPrice) && appliedPrice! > 0 ? appliedPrice : null,
         quantity: validQuantity,
-        unit: appliedUnit,
-        referenceUrls: referenceUrls
-          .filter((u) => typeof u === 'string' && u.trim() !== ''),
+        referenceUrls: referenceUrls.filter((u) => isString(u) && u.trim() !== ''),
       };
 
-      // ✅ 画像はカテゴリに依存させない
-      // - 削除予約: null（サーバ側でキー削除）
-      // - 新規/差し替えあり: URL を保存
-      // - それ以外: 送らない（＝変更なし）
-      if (isImageRemoved) {
-        payload.imageUrl = null;
-      } else if (nextImageUrl) {
-        payload.imageUrl = nextImageUrl;
+      // unit は数量があるときだけ付ける（undefined ならキーを作らない）
+      if (appliedUnit) {
+        (payload as { unit?: string }).unit = appliedUnit;
       }
 
-      // 料理のときだけレシピを保存（これは従来通りでOK）
+      // 画像の扱い
+      if (isImageRemoved) {
+        (payload as { imageUrl?: string | null }).imageUrl = null;
+      } else if (nextImage) {
+        (payload as { imageUrl?: string | null }).imageUrl = nextImage;
+      }
+
+      // 料理のときだけレシピを保存
       if (category === '料理') {
         const finalIngredients = committedIngredients ?? recipe.ingredients;
-        payload.recipe = {
+        (payload as { recipe?: Recipe }).recipe = {
           ingredients: finalIngredients
             .filter((i) => i.name.trim() !== '')
             .map((i) => ({
@@ -498,7 +572,7 @@ export default function TodoNoteModal({
               unit: i.unit || '適量',
             })),
           steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
-        } as Recipe;
+        };
       }
 
       // ① Firestore 更新
@@ -509,11 +583,11 @@ export default function TodoNoteModal({
         const urlsToDelete: string[] = [];
 
         // 差し替え: 前回URLがあり、今回URLと異なる → 前回を削除
-        if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImageUrl) {
+        if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImage) {
           urlsToDelete.push(previousImageUrl);
         }
 
-        // 明示削除: 削除予約かつ前回URLがある → 前回を削除
+        // 明示削除
         if (isImageRemoved && previousImageUrl) {
           urlsToDelete.push(previousImageUrl);
         }
@@ -521,21 +595,20 @@ export default function TodoNoteModal({
         await Promise.all(
           urlsToDelete.map(async (url) => {
             try {
-              // downloadURL から参照を生成して削除
-              const storageRef = ref(storage, url); // https://～ の downloadURL でOK
-              await deleteObject(storageRef);
+              const refFromUrl = storageRef(storage, url);
+              await deleteObject(refFromUrl);
             } catch (e) {
               console.warn('Storage 画像削除に失敗:', url, e);
             }
           })
         );
 
-        // 次回比較用に「前回値」を更新
-        setPreviousImageUrl(isImageRemoved ? null : (nextImageUrl ?? null));
+        setPreviousImageUrl(isImageRemoved ? null : nextImage ?? null);
       } catch (e) {
         console.warn('Storage クリーンアップ処理で警告:', e);
       }
 
+      // 節約ログ
       if (totalDifferenceCalced !== null) {
         await addDoc(collection(db, 'savings'), {
           userId: user.uid,
@@ -547,15 +620,14 @@ export default function TodoNoteModal({
         });
       }
 
-      // 後片付け（ローカルプレビューの解放など）
+      // 後片付け
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
       }
       setPendingUpload(null);
       setIsImageRemoved(false);
-
-      setImageUrl(nextImageUrl ?? null);
+      setImageUrl(nextImage ?? null);
 
       setSaveComplete(true);
       setTimeout(() => {
@@ -572,15 +644,10 @@ export default function TodoNoteModal({
   const previewInitRef = useRef(false);
 
   useEffect(() => {
-    if (!isOpen) return;
-    if (initialLoad) return;
-    if (previewInitRef.current) return;
+    if (!isOpen || initialLoad || previewInitRef.current) return;
 
-    // ✅ メモがある場合は優先してプレビュー開始
-    if (hasMemo) {
-      setIsPreview(true);
-    } else if (hasContent) {
-      // メモ以外（画像・レシピ・買い物・参考URL）があればプレビュー開始
+    // メモがある/他の内容がある場合はプレビュー開始
+    if (hasMemo || hasContent) {
       setIsPreview(true);
     } else {
       setIsPreview(false);
@@ -602,14 +669,14 @@ export default function TodoNoteModal({
     }
   }, [isOpen, previewUrl]);
 
-  // 🆕 画像のプレロード（中身だけフェードインさせる）
+  // 画像のプレロード（中身だけフェードイン）
   useEffect(() => {
     if (!displaySrc) {
       setImgReady(false);
       return;
     }
     setImgReady(false);
-    const img = new Image();
+    const img = document.createElement('img');
     img.onload = () => setImgReady(true);
     img.onerror = () => setImgReady(true); // エラー時も遷移終了扱い
     img.src = displaySrc;
@@ -621,7 +688,6 @@ export default function TodoNoteModal({
 
   if (!mounted || initialLoad) return null;
 
-  // const showPreviewToggle = category === '料理' && hasContent;
   const showPreviewToggle = hasContent;
 
   return (
@@ -630,10 +696,8 @@ export default function TodoNoteModal({
       isSaving={isSaving}
       saveComplete={saveComplete}
       onClose={onClose}
-      // プレビュー時は保存ボタンを出さない（undefinedを渡す）
       onSaveClick={isPreview ? undefined : handleSave}
       saveLabel={isPreview ? undefined : saveLabel}
-      // ← ここを false 固定に変更して、アクション領域自体は表示
       hideActions={false}
     >
       {/* ヘッダー行 */}
@@ -694,29 +758,26 @@ export default function TodoNoteModal({
           </div>
         )}
 
-        {/* 🆕 画像表示エリア：画像がある時だけ枠を出す */}
+        {/* 画像表示エリア：画像がある時だけ枠を出す（Next/Image 使用） */}
         {showMediaFrame && (
           <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
-            {/* 高さ予約用のアスペクト比ボックス（4:3） */}
+            {/* 高さ予約（4:3） */}
             <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
-
-            {/* 実画像（ロード完了でフェードイン） */}
-            <img
-              src={displaySrc}
-              alt="挿入画像プレビュー"
-              className="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
-              style={{ opacity: imgReady ? 1 : 0 }}
-              loading="lazy"
-              onLoad={() => setImgReady(true)}
-            />
-
-            {/* スケルトン：画像ロード中のみ */}
-            {!imgReady && (
-              <div className="absolute inset-0 animate-pulse bg-gray-100" />
-            )}
+            {/* 実画像（fill） */}
+            <div className="absolute inset-0">
+              <NextImage
+                src={displaySrc!}
+                alt="挿入画像プレビュー"
+                fill
+                sizes="(max-width: 640px) 100vw, 640px"
+                className="object-contain transition-opacity duration-200"
+                style={{ opacity: imgReady ? 1 : 0 }}
+                priority={false}
+              />
+              {!imgReady && <div className="absolute inset-0 animate-pulse bg-gray-100" />}
+            </div>
           </div>
         )}
-
       </div>
 
       {/* textarea（備考） */}
@@ -749,16 +810,10 @@ export default function TodoNoteModal({
         </div>
       )}
 
-
       {/* ▼▼▼ 参考URL（プレビュー時は「追加項目」を非表示にする） ▼▼▼ */}
       <div className="mt-2 ml-2">
-        {/* ラベルは：プレビュー中でもURLが1件以上あるなら表示 */}
-        {(!isPreview || referenceUrls.length > 0) && (
-          // <label className="block text-sm text-gray-600 mb-1">参考URL</label>
-          <h3 className="font-medium">参考URL</h3>
-        )}
+        {(!isPreview || referenceUrls.length > 0) && <h3 className="font-medium">参考URL</h3>}
 
-        {/* 追加項目（入力欄＋追加ボタン）はプレビュー中は非表示 */}
         {!isPreview && (
           <div className="flex gap-2">
             <input
@@ -769,7 +824,6 @@ export default function TodoNoteModal({
               onChange={(e) => setNewRefUrl(e.target.value)}
               className="flex-1 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
             />
-            {/* // 参考URL 追加ボタン（修正後）: プレビューボタンと同じ右マージン（mr-1）に統一 */}
             <button
               type="button"
               disabled={!/^https?:\/\/\S+/i.test(newRefUrl)}
@@ -786,18 +840,13 @@ export default function TodoNoteModal({
               <Plus size={16} />
               追加
             </button>
-
           </div>
         )}
 
-
-
-        {/* 一覧は従来どおり。プレビュー中は削除ボタンだけ非表示 */}
         {referenceUrls.length > 0 && (
           <ul className="mt-2 space-y-1">
             {referenceUrls.map((url) => (
               <li key={url} className="flex items-center justify-between gap-2">
-                {/* 左側：URL（長文でも折り返し） */}
                 <a
                   href={url}
                   target="_blank"
@@ -806,8 +855,6 @@ export default function TodoNoteModal({
                 >
                   {url}
                 </a>
-
-                {/* 右側：×ボタン（追加ボタンの右端に合わせて mr-1） */}
                 {!isPreview && (
                   <button
                     type="button"
@@ -818,14 +865,15 @@ export default function TodoNoteModal({
                     aria-label="このURLを削除"
                     title="このURLを削除"
                   >
-                    <span aria-hidden="true" className="text-lg leading-none">×</span>
+                    <span aria-hidden="true" className="text-lg leading-none">
+                      ×
+                    </span>
                   </button>
                 )}
               </li>
             ))}
           </ul>
         )}
-
       </div>
       {/* ▲▲▲ 参考URLここまで ▲▲▲ */}
 
@@ -851,7 +899,7 @@ export default function TodoNoteModal({
         />
       )}
 
-      {/* 料理カテゴリのレシピエディタ */}
+      {/* 料理カテゴリ */}
       {category === '料理' && (
         <RecipeEditor
           ref={recipeEditorRef}
