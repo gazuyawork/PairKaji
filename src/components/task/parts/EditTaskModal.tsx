@@ -9,17 +9,26 @@ import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
 import { createPortal } from 'react-dom';
 import BaseModal from '../../common/modals/BaseModal';
-import { Eraser, ChevronDown, ChevronUp, Utensils, ShoppingCart, type LucideIcon } from 'lucide-react';
+import {
+  Eraser,
+  ChevronDown,
+  ChevronUp,
+  Utensils,
+  ShoppingCart,
+  Plane,              // ★ 追加: 旅行用アイコン
+  type LucideIcon,
+} from 'lucide-react';
 
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
 
-type TaskCategory = '料理' | '買い物';
+type TaskCategory = '料理' | '買い物' | '旅行'; // ★ 追加: 旅行
 
 type CategoryOption = { key: TaskCategory; label: TaskCategory; Icon: LucideIcon };
 const CATEGORY_OPTIONS: CategoryOption[] = [
   { key: '料理', label: '料理', Icon: Utensils },
   { key: '買い物', label: '買い物', Icon: ShoppingCart },
+  { key: '旅行', label: '旅行', Icon: Plane }, // ★ 追加
 ];
 
 type TaskWithNote = Task & { note?: string; category?: TaskCategory };
@@ -61,6 +70,8 @@ const normalizeCategory = (v: unknown): TaskCategory | undefined => {
   const s = v.normalize('NFKC').trim().toLowerCase();
   if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
   if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
+  // ★ 追加: 旅行のゆらぎ
+  if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
   return undefined;
 };
 const eqCat = (a: unknown, b: TaskCategory) => normalizeCategory(a) === b;
@@ -183,7 +194,7 @@ export default function EditTaskModal({
       period: task.period,
       note: (task as unknown as { note?: string }).note ?? '',
       visible: Boolean((task as unknown as { visible?: unknown }).visible),
-      category: normalizedCategory,
+      category: normalizedCategory, // 正規化後の値（'料理' | '買い物' | '旅行' | undefined）
     });
 
     setIsPrivate(Boolean((task as unknown as { private?: unknown }).private) || !isPairConfirmed);
@@ -332,7 +343,7 @@ export default function EditTaskModal({
       userIds: [...editedUsers],
       daysOfWeek: editedTask.daysOfWeek.map((d) => toDayNumber(d)) as Task['daysOfWeek'],
       private: isPrivate,
-      category: normalizedCat,
+      category: normalizedCat, // '料理' | '買い物' | '旅行' | undefined
     } as Task;
 
     setIsSaving(true);

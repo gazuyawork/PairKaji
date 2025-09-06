@@ -38,7 +38,8 @@ import NextImage from 'next/image';
 
 /* ---------------- Types & guards ---------------- */
 
-type Category = '料理' | '買い物';
+// ★ 旅行を追加
+type Category = '料理' | '買い物' | '旅行';
 
 type Ingredient = {
   id: string;
@@ -52,6 +53,7 @@ type TaskDoc = {
   todos?: TodoDoc[];
 };
 
+// ★ TodoDocにも時間帯を追加（読み込みのため）
 type TodoDoc = {
   id: string;
   text?: string;
@@ -65,6 +67,8 @@ type TodoDoc = {
     ingredients?: Partial<Ingredient>[];
     steps?: string[];
   };
+  timeStart?: string; // "HH:mm"
+  timeEnd?: string;   // "HH:mm"
 };
 
 function isString(v: unknown): v is string {
@@ -84,6 +88,26 @@ function isTodoArray(v: unknown): v is TodoDoc[] {
 
 // 表示上限: 画面高の 50%（vh基準）
 const MAX_TEXTAREA_VH = 50;
+
+/* ---------------- Helpers (time validation) ---------------- */
+
+// ★ 旅行時の時間帯入力検証
+const isHHmm = (s: string) => /^\d{1,2}:\d{2}$/.test(s);
+const toMinutes = (s: string) => {
+  if (!isHHmm(s)) return null;
+  const [h, m] = s.split(':').map(Number);
+  if (h > 23 || m > 59) return null;
+  return h * 60 + m;
+};
+const validateTimeRange = (start: string, end: string): string => {
+  if (!start && !end) return '';
+  if (!isHHmm(start) || !isHHmm(end)) return '時間は HH:MM 形式で入力してください。';
+  const s = toMinutes(start);
+  const e = toMinutes(end);
+  if (s == null || e == null) return '存在しない時刻です。';
+  if (s >= e) return '開始は終了より前にしてください。';
+  return '';
+};
 
 /* ---------------- Image compression ---------------- */
 
@@ -205,6 +229,11 @@ export default function TodoNoteModal({
   const [isPreview, setIsPreview] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
 
+  // ★ 旅行時間帯の状態とエラー
+  const [timeStart, setTimeStart] = useState<string>('');
+  const [timeEnd, setTimeEnd] = useState<string>('');
+  const [timeError, setTimeError] = useState<string>('');
+
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
   // 保存済みURL（Firestore側の値）
@@ -251,7 +280,7 @@ export default function TodoNoteModal({
     return validPrice || validQty;
   }, [category, price, quantity]);
 
-  const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || referenceUrls.length > 0;
+  const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || referenceUrls.length > 0 || (!!timeStart && !!timeEnd);
   const showMemo = useMemo(() => !isPreview || hasMemo, [isPreview, hasMemo]);
 
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
@@ -376,6 +405,11 @@ export default function TodoNoteModal({
         setIsImageRemoved(false);
 
         setReferenceUrls(asStringArray(todo.referenceUrls));
+
+        // ★ 旅行の時間帯をロード
+        setTimeStart(isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '');
+        setTimeEnd(isString((todo as TodoDoc).timeEnd) ? (todo as TodoDoc).timeEnd! : '');
+        setTimeError('');
       } catch (e) {
         console.error('初期データの取得に失敗:', e);
       } finally {
@@ -524,6 +558,16 @@ export default function TodoNoteModal({
     const totalDifferenceCalced =
       unitPriceDiffCalced !== null ? unitPriceDiffCalced * safeCmpQty : null;
 
+    // ★ 旅行カテゴリの時間帯チェック（エラー時は保存中断）
+    if (category === '旅行') {
+      const err = validateTimeRange(timeStart, timeEnd);
+      if (err) {
+        setTimeError(err);
+        setIsSaving(false);
+        return;
+      }
+    }
+
     try {
       // アップロード（必要時）
       let nextImage: string | null = imageUrl;
@@ -573,6 +617,12 @@ export default function TodoNoteModal({
             })),
           steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
         };
+      }
+
+      // ★ 旅行のときだけ時間範囲を保存（空なら null で削除）
+      if (category === '旅行') {
+        (payload as { timeStart?: string | null }).timeStart = timeStart || null;
+        (payload as { timeEnd?: string | null }).timeEnd = timeEnd || null;
       }
 
       // ① Firestore 更新
@@ -876,6 +926,52 @@ export default function TodoNoteModal({
         )}
       </div>
       {/* ▲▲▲ 参考URLここまで ▲▲▲ */}
+
+      {/* ★ 旅行カテゴリ：時間帯入力（開始〜終了） */}
+      {category === '旅行' && (
+        <div className="mt-4 ml-2">
+          <h3 className="font-medium">時間帯</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="relative">
+              <input
+                type="time"
+                value={timeStart}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTimeStart(v);
+                  setTimeError(validateTimeRange(v, timeEnd));
+                }}
+                disabled={isPreview}
+                className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
+                aria-label="開始時刻"
+              />
+            </div>
+            <span className="text-gray-500">~</span>
+            <div className="relative">
+              <input
+                type="time"
+                value={timeEnd}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTimeEnd(v);
+                  setTimeError(validateTimeRange(timeStart, v));
+                }}
+                disabled={isPreview}
+                className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
+                aria-label="終了時刻"
+              />
+            </div>
+          </div>
+          {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
+
+          {/* プレビュー時：値があれば表示 */}
+          {/* {isPreview && timeStart && timeEnd && !timeError && (
+            <p className="text-md text-gray-700 mt-1">
+              {timeStart} ~ {timeEnd}
+            </p>
+          )} */}
+        </div>
+      )}
 
       {/* 買い物カテゴリ */}
       {category === '買い物' && (

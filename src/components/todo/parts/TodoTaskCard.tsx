@@ -95,7 +95,12 @@ type SimpleTodo = {
   referenceUrls?: Array<string | null>;
   price?: number | null;
   quantity?: number | null;
+
+  // ★ 追加（旅行タスクの時間帯）
+  timeStart?: string | null;
+  timeEnd?: string | null;
 };
+
 
 function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
   return Array.isArray(arr) && arr.every(t => !!t && typeof t === 'object' && 'id' in (t as object));
@@ -747,8 +752,13 @@ export default function TodoTaskCard({
                     Array.isArray(todo.referenceUrls) &&
                     todo.referenceUrls.some((u) => nonEmptyString(u ?? ''));
 
+                  // ★ 追加：旅行カテゴリで時間帯が入っている場合はアイコンをオレンジ扱い
+                  const hasTravelTime =
+                    category === '旅行' &&
+                    (nonEmptyString(todo.timeStart ?? '') || nonEmptyString(todo.timeEnd ?? ''));
+
                   const hasContentForIcon =
-                    hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls;
+                    hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls || hasTravelTime;
 
                   return (
                     <SortableRow

@@ -18,14 +18,14 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { toast } from 'sonner';
-import type { Task, TaskManageTask, FirestoreTask } from '@/types/Task';
+import type { Task, TaskManageTask, FirestoreTask, TaskCategory } from '@/types/Task';
 import { db, auth } from '@/lib/firebase';
 import { handleFirestoreError } from './errorUtils';
 
 /* =========================================================
  * 型・型ガード
  * =======================================================*/
-type Category = '料理' | '買い物';
+// type Category = '料理' | '買い物';
 
 type PairDoc = {
   userIds?: string[];
@@ -53,7 +53,7 @@ type TaskDocMinimal = {
   private?: boolean;
   users?: string[];
   todos?: unknown[];
-  category?: Category;
+  category?: TaskCategory;
 };
 
 type TodoDoc = {
@@ -70,6 +70,9 @@ type TodoDoc = {
     ingredients?: unknown[];
     steps?: string[];
   };
+  /** 旅行時の時間帯（"HH:mm"）。存在しない場合は未定義 */
+  timeStart?: string;
+  timeEnd?: string;
 };
 
 function isString(x: unknown): x is string {
@@ -114,7 +117,7 @@ type NormalizedTaskPayload = {
   userId: string;
   userIds: string[];
   users: string[];
-  category?: Category;
+  category?: TaskCategory;
   name: string;
   period: '毎日' | '週次' | '不定期';
   point: number | null;
@@ -147,7 +150,8 @@ const normalizeTaskPayload = (
 
   // category
   const rawCat = isString(r.category) ? r.category.trim() : undefined;
-  const category: Category | undefined = rawCat === '料理' || rawCat === '買い物' ? rawCat : undefined;
+  const category: TaskCategory | undefined =
+    rawCat === '料理' || rawCat === '買い物' || rawCat === '旅行' ? (rawCat as TaskCategory) : undefined;
 
   const payload: NormalizedTaskPayload = {
     userId: uid,
@@ -228,8 +232,10 @@ export const buildFirestoreTaskData = (
       : [];
   const t = task as unknown as TaskDocMinimal;
 
-  const category: Category | undefined =
-    t.category === '料理' || t.category === '買い物' ? t.category : undefined;
+  const category: TaskCategory | undefined =
+    t.category === '料理' || t.category === '買い物' || t.category === '旅行'
+      ? (t.category as TaskCategory)
+      : undefined;
 
   return {
     userId: uid,
@@ -559,7 +565,7 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
 };
 
 /* =========================================================
- * ToDo 部分更新
+ * ToDo 部分更新（旅行の時間帯保存に対応）
  * =======================================================*/
 export const updateTodoInTask = async (
   taskId: string,
@@ -572,6 +578,9 @@ export const updateTodoInTask = async (
     imageUrl?: string | null;
     recipe?: { ingredients: unknown[]; steps: string[] } | null;
     referenceUrls?: string[];
+    /** 旅行時の時間帯。null指定でフィールド削除 */
+    timeStart?: string | null;
+    timeEnd?: string | null;
   }
 ) => {
   const taskRef = doc(db, 'tasks', taskId);
@@ -637,11 +646,32 @@ export const updateTodoInTask = async (
     next = { ...next, recipe: updates.recipe };
   }
 
+  // --- 旅行の時間帯 timeStart/timeEnd の扱い ---
+  if (Object.prototype.hasOwnProperty.call(updates, 'timeStart')) {
+    if (updates.timeStart === null) {
+      // フィールド削除
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { timeStart: _omit, ...rest } = next;
+      next = rest as TodoDoc;
+    } else if (typeof updates.timeStart === 'string') {
+      next = { ...next, timeStart: updates.timeStart };
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'timeEnd')) {
+    if (updates.timeEnd === null) {
+      // フィールド削除
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { timeEnd: _omit, ...rest } = next;
+      next = rest as TodoDoc;
+    } else if (typeof updates.timeEnd === 'string') {
+      next = { ...next, timeEnd: updates.timeEnd };
+    }
+  }
+
   // 置換して保存
   const newTodos = todos.slice();
   newTodos[index] = next;
   await updateDoc(taskRef, { todos: newTodos });
-
 };
 
 /* =========================================================

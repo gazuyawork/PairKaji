@@ -28,6 +28,8 @@ export type FirestoreTask = {
   time?: string;
 };
 
+export type TaskCategory = '料理' | '買い物' | '旅行';
+
 // アプリ共通で使うTask型（画面表示用ベース型）
 export type Task = {
   id: string;
@@ -56,7 +58,7 @@ export type Task = {
   createdAt?: Date | Timestamp | string | null;
   time?: string;
   note?: string;
-  category?: '料理' | '買い物';
+  category?: TaskCategory;
 };
 
 

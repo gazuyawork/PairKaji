@@ -1,5 +1,5 @@
 // src/lib/taskMappers.ts
-import type { Task, FirestoreTask } from '@/types/Task';
+import type { Task, FirestoreTask, TaskCategory } from '@/types/Task';
 import { dayNumberToName } from '@/lib/constants';
 import { QueryDocumentSnapshot } from 'firebase/firestore';
 
@@ -11,11 +11,15 @@ function hasToDate(v: unknown): v is WithToDate {
 }
 
 // 最小のカテゴリ正規化（'料理' / '買い物' のみ採用）
-const normalizeCategory = (v: unknown): '料理' | '買い物' | undefined => {
-  if (typeof v !== 'string') return undefined;
-  const s = v.normalize('NFKC').trim();
-  return s === '料理' ? '料理' : s === '買い物' ? '買い物' : undefined;
-};
+ // カテゴリ正規化（'料理' / '買い物' / '旅行' を許可。ゆらぎも吸収）
+ const normalizeCategory = (v: unknown): TaskCategory | undefined => {
+   if (typeof v !== 'string') return undefined;
+   const s = v.normalize('NFKC').trim().toLowerCase();
+   if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
+   if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
+   if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
+   return undefined;
+ };
 
 export const mapFirestoreDocToTask = (
   doc: QueryDocumentSnapshot<FirestoreTask>
