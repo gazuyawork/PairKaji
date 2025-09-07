@@ -691,39 +691,61 @@ export default function TodoTaskCard({
         {category === '旅行' && nonEmptyString(todo.timeStart ?? '') && nonEmptyString(todo.timeEnd ?? '') && (
           <div className="pl-8 pr-2">
             {/* ベースレール */}
-            <div className="relative h-1.5 rounded-full bg-gray-200/70 overflow-hidden">
-              {(() => {
-                const start = toDayRatio(todo.timeStart);
-                const end = toDayRatio(todo.timeEnd);
-                const left = `${start * 100}%`;
-                const width = `${Math.max(0, end - start) * 100}%`;
 
-                // (end <= start) の異常系は非表示にして無理やり出さない
-                if (end <= start) return null;
+{/* ベースレールの外側ラッパ（ここは overflow を隠さない） */}
+<div className="relative">
+  {/* 内側：実際のレール。丸角クリップのため overflow-hidden はここにだけ付ける */}
+  <div className="h-1.5 rounded-full bg-gray-200/70 overflow-hidden relative">
+    {(() => {
+      const start = toDayRatio(todo.timeStart);
+      const end = toDayRatio(todo.timeEnd);
 
-                return (
-                  <div
-                    className="absolute top-0 bottom-0 rounded-full"
-                    style={{
-                      left,
-                      width,
-                      // 視認性の高いオレンジ系グラデ。必要なら朝/昼/夜で分岐もOK
-                      background: makeTimeRangeGradient(todo.timeStart, todo.timeEnd),
+      if (end <= start) return null;
 
-                      boxShadow: '0 0 0 1px rgba(0,0,0,0.05) inset',
-                    }}
-                    aria-label={`${todo.timeStart} ~ ${todo.timeEnd}`}
-                    title={`${todo.timeStart} ~ ${todo.timeEnd}`}
-                  />
-                );
-              })()}
-            </div>
+      const leftPct = start * 100;
+      const widthPct = Math.max(0, end - start) * 100;
 
-            {/* 下部ラベル（任意。数字の桁ブレ防止に tabular-nums） */}
-            <div className="mt-1 text-xs text-gray-500 flex justify-between tabular-nums">
-              <span className="text-center">{todo.timeStart}</span>
-              <span className="text-center">{todo.timeEnd}</span>
-            </div>
+      return (
+        <div
+          className="absolute top-0 bottom-0 rounded-full"
+          style={{
+            left: `${leftPct}%`,
+            width: `${widthPct}%`,
+            background: makeTimeRangeGradient(todo.timeStart, todo.timeEnd),
+            boxShadow: '0 0 0 1px rgba(0,0,0,0.05) inset',
+          }}
+          aria-label={`${(todo.timeStart ?? '').trim()} ~ ${(todo.timeEnd ?? '').trim()}`}
+          title={`${(todo.timeStart ?? '').trim()} ~ ${(todo.timeEnd ?? '').trim()}`}
+        />
+      );
+    })()}
+  </div>
+
+  {/* ラベルは外側ラッパに配置 → overflow で隠れない */}
+  {(() => {
+    const start = toDayRatio(todo.timeStart);
+    const end = toDayRatio(todo.timeEnd);
+    if (end <= start) return null;
+
+    const leftPct = start * 100;
+    const widthPct = Math.max(0, end - start) * 100;
+
+    return (
+      <div
+        className="absolute mt-1 text-xs text-gray-600 tabular-nums whitespace-nowrap z-10"
+        style={{
+          left: `calc(${leftPct}% + ${widthPct / 2}%)`,
+          top: '100%',
+          transform: 'translateX(-50%)',
+        }}
+      >
+        {`${(todo.timeStart ?? '').trim()} ~ ${(todo.timeEnd ?? '').trim()}`}
+      </div>
+    );
+  })()}
+</div>
+
+
           </div>
         )}
 

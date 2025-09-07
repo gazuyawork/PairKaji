@@ -121,6 +121,15 @@ const addMinutesToHHmm = (hhmm: string, deltaMin: number): string => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
+// ★ 追加: HH:mm 同士の差分（分）を返す。無効なら null
+const minutesBetweenHHmm = (start: string, end: string): number | null => {
+  if (!isHHmm(start) || !isHHmm(end)) return null;
+  const s = toMinutes(start);
+  const e = toMinutes(end);
+  if (s == null || e == null || e <= s) return null;
+  return e - s;
+};
+
 /* ---------------- Image compression ---------------- */
 
 /**
@@ -245,7 +254,7 @@ export default function TodoNoteModal({
   const [timeStart, setTimeStart] = useState<string>('');
   const [timeEnd, setTimeEnd] = useState<string>('');
   const [timeError, setTimeError] = useState<string>('');
-  // ★ 追加: 所要時間（分）— 編集時のみ使用／保存対象外
+  // ★ 追加: 所要時間（分）— 編集時のみ使用／DB保存対象外
   const [durationMin, setDurationMin] = useState<string>(''); // ← 新規
 
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
@@ -358,6 +367,11 @@ export default function TodoNoteModal({
   const { animatedDifference, animationComplete: diffAnimationComplete } =
     useUnitPriceDifferenceAnimation(totalDifference);
 
+  const previewDurationMin = useMemo(() => {
+    const diff = minutesBetweenHHmm(timeStart, timeEnd);
+    return diff != null ? diff : null;
+  }, [timeStart, timeEnd]);
+
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -421,12 +435,15 @@ export default function TodoNoteModal({
         setReferenceUrls(asStringArray(todo.referenceUrls));
 
         // ★ 旅行の時間帯をロード
-        setTimeStart(isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '');
-        setTimeEnd(isString((todo as TodoDoc).timeEnd) ? (todo as TodoDoc).timeEnd! : '');
+        const loadedStart = isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '';
+        const loadedEnd = isString((todo as TodoDoc).timeEnd) ? (todo as TodoDoc).timeEnd! : '';
+        setTimeStart(loadedStart);
+        setTimeEnd(loadedEnd);
         setTimeError('');
 
-        // ★ 所要分（編集のみ）— 初期値は空。必要なら推定可（今回は空のまま）
-        setDurationMin('');
+        // ★ 追加: 再表示時に開始・終了の差分（分）を所要に表示（DB保存なし）
+        const diffMin = minutesBetweenHHmm(loadedStart, loadedEnd);
+        setDurationMin(diffMin != null ? String(diffMin) : '');
       } catch (e) {
         console.error('初期データの取得に失敗:', e);
       } finally {
@@ -767,33 +784,37 @@ export default function TodoNoteModal({
       saveLabel={isPreview ? undefined : saveLabel}
       hideActions={false}
     >
-      {/* ヘッダー行 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800 ml-2">{todoText}</h1>
+{/* ヘッダー行 */}
+<div className="flex items-start justify-between ml-2 mr-1">
+  {/* todo名は複数行OK・折返し表示 */}
+  <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">
+    {todoText}
+  </h1>
 
-        {showPreviewToggle && (
-          <button
-            type="button"
-            onClick={() => setIsPreview((v) => !v)}
-            className="mr-1 inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition"
-            aria-pressed={isPreview}
-            aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
-            title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
-          >
-            {isPreview ? (
-              <>
-                <Pencil size={16} />
-                <span>編集</span>
-              </>
-            ) : (
-              <>
-                <Eye size={16} />
-                <span>プレビュー</span>
-              </>
-            )}
-          </button>
-        )}
-      </div>
+  {showPreviewToggle && (
+    <button
+      type="button"
+      onClick={() => setIsPreview((v) => !v)}
+      className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition flex-shrink-0"
+      aria-pressed={isPreview}
+      aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+      title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+    >
+      {isPreview ? (
+        <>
+          <Pencil size={16} />
+          <span>編集</span>
+        </>
+      ) : (
+        <>
+          <Eye size={16} />
+          <span>プレビュー</span>
+        </>
+      )}
+    </button>
+  )}
+</div>
+
 
       {/* 画像挿入UI */}
       <div className="mb-3 ml-2">
@@ -827,7 +848,7 @@ export default function TodoNoteModal({
 
         {/* 画像表示エリア：画像がある時だけ枠を出す（Next/Image 使用） */}
         {showMediaFrame && (
-          <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg白">
+          <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
             {/* 高さ予約（4:3） */}
             <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
             {/* 実画像（fill） */}
@@ -972,6 +993,12 @@ export default function TodoNoteModal({
                     } else {
                       setTimeError(validateTimeRange(v, timeEnd));
                     }
+
+                    // ★ 追加: すでに終了が入っている場合、所要分を開始～終了差で同期
+                    const diff2 = minutesBetweenHHmm(v, timeEnd);
+                    if (diff2 != null) {
+                      setDurationMin(String(diff2));
+                    }
                   }}
                   className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
                   aria-label="開始時刻"
@@ -984,9 +1011,17 @@ export default function TodoNoteModal({
             {/* 終了 */}
             <div className="relative">
               {isPreview ? (
-                <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                  {timeEnd || '— —'}
-                </span>
+                <>
+                  <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                    {timeEnd || '— —'}
+                  </span>
+                  {/* ★ 追加: プレビュー時のみ所要時間を併記（有効な時間帯かつエラーなし時） */}
+                  {previewDurationMin !== null && !timeError && (
+                    <span className="ml-2 text-gray-700">
+                      （所要時間：{previewDurationMin}分）
+                    </span>
+                  )}
+                </>
               ) : (
                 <input
                   type="time"
@@ -995,14 +1030,21 @@ export default function TodoNoteModal({
                     const v = e.target.value;
                     setTimeEnd(v);
                     setTimeError(validateTimeRange(timeStart, v));
+
+                    // （既存）終了手入力時に所要分を同期
+                    const diff = minutesBetweenHHmm(timeStart, v);
+                    if (diff != null) {
+                      setDurationMin(String(diff));
+                    }
                   }}
                   className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
                   aria-label="終了時刻"
                 />
               )}
+
             </div>
 
-            {/* ★ 追加: 終了の右隣に「所要（分）」入力 */}
+            {/* ★ 追加: 終了の右隣に「所要（分）」入力（DB保存なし） */}
             {!isPreview && (
               <div className="flex items-center gap-1 ml-2">
                 <span className="text-gray-500 text-sm">所要</span>
