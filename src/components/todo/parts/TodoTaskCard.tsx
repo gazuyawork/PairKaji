@@ -29,7 +29,6 @@ import {
   GripVertical as Grip,
 } from 'lucide-react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import type { Variants } from 'framer-motion';
@@ -250,7 +249,6 @@ export default function TodoTaskCard({
   groupDnd,
   isFilteredGlobal = false,
 }: Props) {
-  const router = useRouter();
 
   const todos: SimpleTodo[] = useMemo(() => {
     const raw = (task as unknown as { todos?: unknown }).todos;
@@ -787,9 +785,9 @@ export default function TodoTaskCard({
           </button>
 
           <button
-            className="flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 hover:underline text-left"
-            onClick={() => router.push(`/main?view=task&search=${encodeURIComponent(task.name)}`)}
+            className="flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text-left"
             type="button"
+            aria-label="タスク名"
           >
             <CatIcon
               size={16}
