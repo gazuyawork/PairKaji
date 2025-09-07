@@ -2,14 +2,21 @@
 import { collection, doc, getDocs, query, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { parseISO, isToday, getDay } from 'date-fns';
-import type { Task } from '@/types/Task';
 
-
-type TaskLike = Task & {
-  skippedAt?: unknown;
-  updatedAt?: unknown;
-  daysOfWeek?: unknown;
-  id?: string;
+/**
+ * Firestoreから取得した「生の」タスクデータの型（アプリ内Taskとは切り離す）
+ */
+type FirestoreTaskRaw = {
+  name?: unknown;
+  period?: unknown;          // '毎日' | '週次' | その他の可能性も考慮
+  done?: unknown;
+  skipped?: unknown;
+  completedAt?: unknown;     // Timestamp | string | null など
+  completedBy?: unknown;
+  skippedAt?: unknown;       // Timestamp | string | null など
+  updatedAt?: unknown;       // Timestamp | string | null など
+  daysOfWeek?: unknown;      // number[] | string[] | ...
+  userIds?: unknown;         // string[]
 };
 
 export const resetCompletedTasks = async (): Promise<number> => {
@@ -26,10 +33,25 @@ export const resetCompletedTasks = async (): Promise<number> => {
     if (value == null) return null;
     if (value instanceof Timestamp) return value.toDate();
     if (typeof value === 'object' && typeof (value as Timestamp).toDate === 'function') {
-      try { return (value as Timestamp).toDate(); } catch (e) { console.warn(`toDate失敗(${label})`, value, e); return null; }
+      try {
+        return (value as Timestamp).toDate();
+      } catch (e) {
+        console.warn(`toDate失敗(${label})`, value, e);
+        return null;
+      }
     }
     if (typeof value === 'string') {
-      try { return parseISO(value); } catch (e) { console.warn(`parseISO失敗(${label})`, value, e); return null; }
+      try {
+        const d = parseISO(value);
+        if (isNaN(d.getTime())) {
+          console.warn(`parseISO無効(${label})`, value);
+          return null;
+        }
+        return d;
+      } catch (e) {
+        console.warn(`parseISO失敗(${label})`, value, e);
+        return null;
+      }
     }
     console.warn(`不明な型(${label})`, value);
     return null;
@@ -45,14 +67,26 @@ export const resetCompletedTasks = async (): Promise<number> => {
 
     const set = new Set<number>();
     for (const v of input) {
-      if (typeof v === 'number' && v >= 0 && v <= 6) { set.add(v); continue; }
+      if (typeof v === 'number' && v >= 0 && v <= 6) {
+        set.add(v);
+        continue;
+      }
       if (typeof v === 'string') {
         const trimmed = v.trim();
         const lower = trimmed.toLowerCase();
-        if (/^[0-6]$/.test(lower)) { set.add(parseInt(lower, 10)); continue; }
-        if (lower in eng) { set.add(eng[lower]); continue; }
+        if (/^[0-6]$/.test(lower)) {
+          set.add(parseInt(lower, 10));
+          continue;
+        }
+        if (lower in eng) {
+          set.add(eng[lower]);
+          continue;
+        }
         const head = trimmed[0];
-        if (head && head in jp) { set.add(jp[head]); continue; }
+        if (head && head in jp) {
+          set.add(jp[head]);
+          continue;
+        }
       }
     }
     return set.size ? set : null;
@@ -61,49 +95,42 @@ export const resetCompletedTasks = async (): Promise<number> => {
   const todayIdx = getDay(new Date()); // 0=日,1=月,...,6=土
 
   for (const docSnap of snapshot.docs) {
-    const raw = docSnap.data();
-    const task: TaskLike = {
-      ...(raw as Task),
-      id: docSnap.id,
-      skippedAt: (raw as any)?.skippedAt,
-      updatedAt: (raw as any)?.updatedAt,
-      daysOfWeek: (raw as any)?.daysOfWeek,
-    };
+    const raw = docSnap.data() as FirestoreTaskRaw;
+
+    const period = typeof raw.period === 'string' ? raw.period : undefined;
+    const skipped = raw.skipped === true;
+
+    const completedAtDate = toDateSafe(raw.completedAt, 'completedAt');
+    const skippedAtDate = toDateSafe(raw.skippedAt, 'skippedAt');
+    const updatedAtDate = toDateSafe(raw.updatedAt, 'updatedAt');
 
     const taskRef = doc(db, 'tasks', docSnap.id);
 
-    // 完了：今日でなければリセット対象
-    const completedAtDate = toDateSafe(task.completedAt as unknown, 'completedAt');
     const isDoneToday = !!(completedAtDate && isToday(completedAtDate));
 
-    // 🔧 スキップ：今日スキップのみ保護（skippedAt が無い旧データ/未反映は updatedAt でフォールバック、それも無ければ安全側で当日扱い）
-    const skippedAtDate = toDateSafe(task.skippedAt, 'skippedAt');
-    const updatedAtDate = toDateSafe(task.updatedAt, 'updatedAt');
     let isSkippedToday = false;
-    if (task.skipped === true) {
+    if (skipped) {
       if (skippedAtDate) {
         isSkippedToday = isToday(skippedAtDate);
       } else if (updatedAtDate) {
         isSkippedToday = isToday(updatedAtDate);
       } else {
-        // 最低限の安全策：即時リセットを避ける
         isSkippedToday = true;
       }
     }
 
-    // 本日がスケジュール対象日か
     let isScheduledToday = false;
-    if (task.period === '毎日') {
+    if (period === '毎日') {
       isScheduledToday = true;
-    } else if (task.period === '週次') {
-      const daysSet = normalizeDaysOfWeekToNumbers(task.daysOfWeek);
-      isScheduledToday = daysSet ? daysSet.has(todayIdx) : true; // 後方互換
+    } else if (period === '週次') {
+      const daysSet = normalizeDaysOfWeekToNumbers(raw.daysOfWeek);
+      isScheduledToday = daysSet ? daysSet.has(todayIdx) : true;
     }
 
     let shouldReset = false;
-    if (task.period === '毎日' || task.period === '週次') {
+    if (period === '毎日' || period === '週次') {
       if (isScheduledToday) {
-        if ((completedAtDate && !isDoneToday) || (task.skipped && !isSkippedToday)) {
+        if ((completedAtDate && !isDoneToday) || (skipped && !isSkippedToday)) {
           shouldReset = true;
         }
       }
@@ -111,15 +138,16 @@ export const resetCompletedTasks = async (): Promise<number> => {
 
     if (shouldReset) {
       resetCount++;
-      updates.push(
-        updateDoc(taskRef, {
-          done: false,
-          skipped: false,
-          completedAt: null,
-          completedBy: '',
-          skippedAt: null,
-        } as Partial<TaskLike>)
-      );
+
+      const payload = {
+        done: false,
+        skipped: false,
+        completedAt: null,
+        completedBy: '',
+        skippedAt: null,
+      };
+
+      updates.push(updateDoc(taskRef, payload));
     }
   }
 
