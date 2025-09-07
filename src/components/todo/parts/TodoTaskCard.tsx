@@ -145,6 +145,7 @@ interface Props {
     handleProps?: React.HTMLAttributes<HTMLButtonElement>;
     isDragging?: boolean;
   };
+  isFilteredGlobal?: boolean;
 }
 
 /* ------------------------------- component ------------------------------ */
@@ -164,6 +165,7 @@ export default function TodoTaskCard({
   onOpenNote,
   onReorderTodos,
   groupDnd,
+  isFilteredGlobal = false,
 }: Props) {
   const router = useRouter();
 
@@ -229,6 +231,13 @@ export default function TodoTaskCard({
       return nameHit || ingHit;
     });
   }, [baseFilteredByTab, isCookingCategory, searchQuery]);
+
+  const isFilteredView = useMemo(
+    () => finalFilteredTodos.length < baseFilteredByTab.length,
+    [finalFilteredTodos.length, baseFilteredByTab.length]
+  );
+
+  const shouldExpand = isFilteredGlobal || isFilteredView;
 
   const doneMatchesCount = useMemo(() => {
     if (!isCookingCategory) return 0;
@@ -596,44 +605,44 @@ export default function TodoTaskCard({
         </div>
 
         {/* 旅行カテゴリ＋時間帯が両方ある場合だけタイムラインを表示 */}
-{category === '旅行' && nonEmptyString(todo.timeStart ?? '') && nonEmptyString(todo.timeEnd ?? '') && (
-  <div className="pl-8 pr-2">
-    {/* ベースレール */}
-    <div className="relative h-1.5 rounded-full bg-gray-200/70 overflow-hidden">
-      {(() => {
-        const start = toDayRatio(todo.timeStart);
-        const end = toDayRatio(todo.timeEnd);
-        const left = `${start * 100}%`;
-        const width = `${Math.max(0, end - start) * 100}%`;
+        {category === '旅行' && nonEmptyString(todo.timeStart ?? '') && nonEmptyString(todo.timeEnd ?? '') && (
+          <div className="pl-8 pr-2">
+            {/* ベースレール */}
+            <div className="relative h-1.5 rounded-full bg-gray-200/70 overflow-hidden">
+              {(() => {
+                const start = toDayRatio(todo.timeStart);
+                const end = toDayRatio(todo.timeEnd);
+                const left = `${start * 100}%`;
+                const width = `${Math.max(0, end - start) * 100}%`;
 
-        // (end <= start) の異常系は非表示にして無理やり出さない
-        if (end <= start) return null;
+                // (end <= start) の異常系は非表示にして無理やり出さない
+                if (end <= start) return null;
 
-        return (
-          <div
-            className="absolute top-0 bottom-0 rounded-full"
-            style={{
-              left,
-              width,
-              // 視認性の高いオレンジ系グラデ。必要なら朝/昼/夜で分岐もOK
-              background:
-                'linear-gradient(90deg, rgba(255,163,102,1) 0%, rgba(255,205,125,1) 100%)',
-              boxShadow: '0 0 0 1px rgba(0,0,0,0.05) inset',
-            }}
-            aria-label={`${todo.timeStart} ~ ${todo.timeEnd}`}
-            title={`${todo.timeStart} ~ ${todo.timeEnd}`}
-          />
-        );
-      })()}
-    </div>
+                return (
+                  <div
+                    className="absolute top-0 bottom-0 rounded-full"
+                    style={{
+                      left,
+                      width,
+                      // 視認性の高いオレンジ系グラデ。必要なら朝/昼/夜で分岐もOK
+                      background:
+                        'linear-gradient(90deg, rgba(255,163,102,1) 0%, rgba(255,205,125,1) 100%)',
+                      boxShadow: '0 0 0 1px rgba(0,0,0,0.05) inset',
+                    }}
+                    aria-label={`${todo.timeStart} ~ ${todo.timeEnd}`}
+                    title={`${todo.timeStart} ~ ${todo.timeEnd}`}
+                  />
+                );
+              })()}
+            </div>
 
-    {/* 下部ラベル（任意。数字の桁ブレ防止に tabular-nums） */}
-    <div className="mt-1 text-[10px] text-gray-500 flex justify-between tabular-nums">
-      <span className="text-center">{todo.timeStart}</span>
-      <span className="text-center">{todo.timeEnd}</span>
-    </div>
-  </div>
-)}
+            {/* 下部ラベル（任意。数字の桁ブレ防止に tabular-nums） */}
+            <div className="mt-1 text-[10px] text-gray-500 flex justify-between tabular-nums">
+              <span className="text-center">{todo.timeStart}</span>
+              <span className="text-center">{todo.timeEnd}</span>
+            </div>
+          </div>
+        )}
 
 
         {editingErrors[todo.id] && (
@@ -772,14 +781,27 @@ export default function TodoTaskCard({
         )}
 
         <div className="relative">
+          {/* // 修正：スクロールコンテナの max-height を動的に切り替え */}
           <div
             ref={scrollRef}
             className={clsx(
-              'max-h:[40vh] max-h-[40vh] overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1',
+              'overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1',
+              // 通常時は従来 40vh の上限
+              !shouldExpand && 'max-h-[40vh]',
               isDndDragging && 'touch-none select-none'
             )}
+            // 絞り込み時は画面いっぱい（ヘッダー等差引き）
+  style={
+    shouldExpand
+      ? {
+          height: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
+          maxHeight: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
+        }
+      : undefined
+  }
             onTouchMove={(e) => e.stopPropagation()}
           >
+
             {finalFilteredTodos.length === 0 && tab === 'done' && (
               <div className="text-gray-400 italic pt-4 pl-2">完了したタスクはありません</div>
             )}

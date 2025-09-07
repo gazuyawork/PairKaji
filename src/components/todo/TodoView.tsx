@@ -119,6 +119,11 @@ export default function TodoView() {
   const { plan, isChecking } = useUserPlan();
   const uid = useUserUid();
 
+  const isAnyFilterActive = useMemo(() => {
+    // グループ選択 or テキスト絞り込みのいずれかが有効なら true
+    return Boolean(selectedGroupId) || (filterText.trim() !== '');
+  }, [selectedGroupId, filterText]);
+
   // ★ Portal を SSR 安全にするためのマウント判定
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -337,7 +342,7 @@ export default function TodoView() {
     <>
       {/* 背景：現行の雰囲気を活かした柔らかいグラデ + ほんのり陰影 */}
       <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
-        <main className="main-content flex-1 px-4 py-5 space-y-4 overflow-y-auto pb-54">
+        <main className="main-content flex-1 px-4 pt-1 pb-5 space-y-4 overflow-y-auto pb-54">
           {/* ✅ indexが2（TodoView）である場合のみ表示 */}
           {index === 2 && noteModalTask && noteModalTodo && (
             <TodoNoteModal
@@ -491,6 +496,8 @@ export default function TodoView() {
                               handleProps,
                               isDragging,
                             }}
+
+                            isFilteredGlobal={isAnyFilterActive}
                           />
                         </div>
                       )}

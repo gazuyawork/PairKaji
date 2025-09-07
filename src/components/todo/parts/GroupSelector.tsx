@@ -151,7 +151,7 @@ transition"
             }}
             whileTap={{ scale: 1.05 }}
             transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-            className="h-12 px-3 py-4 mb-1 mr-2 rounded-full
+            className="h-12 px-3 py-4 mb-2 mr-2 rounded-full
 bg-gradient-to-b from-[#fca5a5] to-[#ef4444]
 border border-[#dc2626] text-white flex items-center gap-2
 shadow-[0_10px_22px_rgba(239,68,68,0.35)]
