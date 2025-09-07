@@ -1,4 +1,3 @@
-// src/components/todo/parts/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -107,6 +106,19 @@ const validateTimeRange = (start: string, end: string): string => {
   if (s == null || e == null) return '存在しない時刻です。';
   if (s >= e) return '開始は終了より前にしてください。';
   return '';
+};
+
+// ★ 追加: HH:mm に分を加算して HH:mm に戻す（24時超過は 23:59 にクランプ）
+const clampToDayMinutes = (mins: number) => {
+  return Math.max(0, Math.min(23 * 60 + 59, mins));
+};
+const addMinutesToHHmm = (hhmm: string, deltaMin: number): string => {
+  const base = toMinutes(hhmm);
+  if (base == null || !Number.isFinite(deltaMin)) return '';
+  const next = clampToDayMinutes(base + Math.trunc(deltaMin));
+  const h = Math.floor(next / 60);
+  const m = next % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
 /* ---------------- Image compression ---------------- */
@@ -233,6 +245,8 @@ export default function TodoNoteModal({
   const [timeStart, setTimeStart] = useState<string>('');
   const [timeEnd, setTimeEnd] = useState<string>('');
   const [timeError, setTimeError] = useState<string>('');
+  // ★ 追加: 所要時間（分）— 編集時のみ使用／保存対象外
+  const [durationMin, setDurationMin] = useState<string>(''); // ← 新規
 
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
@@ -410,6 +424,9 @@ export default function TodoNoteModal({
         setTimeStart(isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '');
         setTimeEnd(isString((todo as TodoDoc).timeEnd) ? (todo as TodoDoc).timeEnd! : '');
         setTimeError('');
+
+        // ★ 所要分（編集のみ）— 初期値は空。必要なら推定可（今回は空のまま）
+        setDurationMin('');
       } catch (e) {
         console.error('初期データの取得に失敗:', e);
       } finally {
@@ -810,7 +827,7 @@ export default function TodoNoteModal({
 
         {/* 画像表示エリア：画像がある時だけ枠を出す（Next/Image 使用） */}
         {showMediaFrame && (
-          <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
+          <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg白">
             {/* 高さ予約（4:3） */}
             <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
             {/* 実画像（fill） */}
@@ -927,7 +944,7 @@ export default function TodoNoteModal({
       </div>
       {/* ▲▲▲ 参考URLここまで ▲▲▲ */}
 
-      {/* ★ 旅行カテゴリ：時間帯入力（開始〜終了） */}
+      {/* ★ 旅行カテゴリ：時間帯入力（開始〜終了 + 所要分） */}
       {category === '旅行' && (
         <div className="mt-4 ml-2">
           <h3 className="font-medium">時間帯</h3>
@@ -945,7 +962,16 @@ export default function TodoNoteModal({
                   onChange={(e) => {
                     const v = e.target.value;
                     setTimeStart(v);
-                    setTimeError(validateTimeRange(v, timeEnd));
+
+                    // ★ 修正: 所要分が入っていれば自動で終了を更新
+                    const n = Number.parseInt(durationMin, 10);
+                    if (Number.isFinite(n) && n > 0) {
+                      const autoEnd = addMinutesToHHmm(v, n);
+                      setTimeEnd(autoEnd);
+                      setTimeError(validateTimeRange(v, autoEnd));
+                    } else {
+                      setTimeError(validateTimeRange(v, timeEnd));
+                    }
                   }}
                   className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
                   aria-label="開始時刻"
@@ -976,15 +1002,38 @@ export default function TodoNoteModal({
               )}
             </div>
 
+            {/* ★ 追加: 終了の右隣に「所要（分）」入力 */}
+            {!isPreview && (
+              <div className="flex items-center gap-1 ml-2">
+                <span className="text-gray-500 text-sm">所要</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={durationMin}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    setDurationMin(v);
+                    const n = Number.parseInt(v, 10);
+                    // 開始が妥当 & 所要分が正のとき、終了を自動計算
+                    if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
+                      const autoEnd = addMinutesToHHmm(timeStart, n);
+                      setTimeEnd(autoEnd);
+                      setTimeError(validateTimeRange(timeStart, autoEnd));
+                    } else {
+                      setTimeError(validateTimeRange(timeStart, timeEnd));
+                    }
+                  }}
+                  placeholder="分"
+                  className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
+                  aria-label="所要時間（分）"
+                />
+                <span className="text-gray-500 text-sm">分</span>
+              </div>
+            )}
           </div>
           {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
-
-          {/* プレビュー時：値があれば表示 */}
-          {/* {isPreview && timeStart && timeEnd && !timeError && (
-            <p className="text-md text-gray-700 mt-1">
-              {timeStart} ~ {timeEnd}
-            </p>
-          )} */}
         </div>
       )}
 
