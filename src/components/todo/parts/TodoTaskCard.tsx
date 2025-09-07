@@ -790,7 +790,11 @@ export default function TodoTaskCard({
     prevExpandedRef.current = effectiveExpanded;
 
     if (!was && effectiveExpanded) {
-      const HEADER_OFFSET_PX = 0; // 固定ヘッダーがある場合はその高さに変更
+      // ★ 変更後（例：上に16pxの余白を残したい場合）
+      const STICKY_HEADER_PX = 0;   // 画面上部に固定ヘッダーがあるならその高さ（例: 56）
+      const TOP_GAP_PX = 16;        // ← 少しだけ空けたい余白
+      const HEADER_OFFSET_PX = STICKY_HEADER_PX + TOP_GAP_PX;
+
       // レイアウト確定後に実行（2フレーム待つ）
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -968,9 +972,9 @@ export default function TodoTaskCard({
             style={
               effectiveExpanded
                 ? {
-                    height: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
-                    maxHeight: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
-                  }
+                  height: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
+                  maxHeight: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
+                }
                 : undefined
             }
             onTouchMove={(e) => e.stopPropagation()}
