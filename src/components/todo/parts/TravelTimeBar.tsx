@@ -23,7 +23,7 @@ export default function TravelTimeBar({ start, end }: Props) {
 
   return (
     // 入力欄と同じ開始位置に合わせる（左のアイコン幅ぶんずらす）
-    <div className="ml-8 mr-2">
+    <div className="ml-9 mr-2">
       {/* ラベル（左）＋ バー（右）の横並び */}
       <div className="flex items-center gap-2">
         {/* ラベルは等幅数字で桁ブレしないようにして右寄せ */}
@@ -32,7 +32,7 @@ export default function TravelTimeBar({ start, end }: Props) {
         </div>
 
         {/* タイムバー本体（ラベルの右側で横いっぱい） */}
-        <div className="relative h-2 mr-12 w-full rounded-full bg-gray-200/70 overflow-hidden">
+        <div className="relative h-2 mr-14 w-full rounded-full bg-gray-200/70 overflow-hidden">
           <div
             className="absolute top-0 bottom-0 rounded-full"
             style={{

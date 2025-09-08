@@ -100,7 +100,7 @@ export default function TodoTaskCard({
   );
 
   const OPEN_MAX_VH = 0.84;
-  const OPEN_MAX_VH_FILTERED = 0.60;
+  const OPEN_MAX_VH_FILTERED = 0.58;
 
   const [hasManualOrder, setHasManualOrder] = useState<boolean>(false);
 
@@ -597,7 +597,7 @@ export default function TodoTaskCard({
               disabled={!canAdd}
               aria-disabled={!canAdd}
               className={clsx(
-                'w-[75%] border-b bg-transparent outline-none h-8',
+                'w-[75%] border-b bg-transparent outline-none h-10 pt-2 pb-1',
                 canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed'
               )}
               placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
