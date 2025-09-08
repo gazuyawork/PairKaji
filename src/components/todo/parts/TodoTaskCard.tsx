@@ -37,7 +37,6 @@ import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
 /* ------------------------------ helpers ------------------------------ */
 
-// Headerの「×」ボタン用の軽い揺れアニメ
 const SHAKE_VARIANTS: Variants = {
   shake: {
     x: [0, -6, 6, -4, 4, -2, 2, 0],
@@ -100,6 +99,9 @@ export default function TodoTaskCard({
     [rawTodos]
   );
 
+  const OPEN_MAX_VH = 0.84;
+  const OPEN_MAX_VH_FILTERED = 0.64;
+
   const [hasManualOrder, setHasManualOrder] = useState<boolean>(false);
 
   // カテゴリ
@@ -152,31 +154,47 @@ export default function TodoTaskCard({
     // isExpanded,
     setIsExpanded,
     effectiveExpanded,
-    // expandedHeightPx, // ★ 削除（今回の仕様では使用しない）
+    // expandedHeightPx（未使用）
     cardRef,
   } = useExpandAndMeasure({ shouldExpandByFilter: shouldExpand });
 
   // ★ 追加: 画面の残り高さでクランプするための値を保持
   const [viewportClampPx, setViewportClampPx] = useState<number | null>(null);
 
-  // ★ 追加: 展開時に「画面いっぱいを上限」にするための再計算
+  // ★ 変更: 展開時に「画面いっぱい（フッター考慮）」を上限にするための再計算
   useEffect(() => {
     if (!effectiveExpanded || !cardRef.current) return;
 
+    // ★ 変更後（“画面比率の上限”も併用して高さをさらに抑制）
     const calc = () => {
       const rect = cardRef.current!.getBoundingClientRect();
-      const bottomPadding = 24; // 余白のための下マージン(px) — 必要に応じて調整
-      const avail = Math.max(120, Math.floor(window.innerHeight - rect.top - bottomPadding));
-      setViewportClampPx(avail);
+      const basePadding = 24;
+      const footerReserve = shouldExpand ? 88 : 24;
+
+      // 画面残り高さ（px）
+      const avail = Math.max(
+        120,
+        Math.floor(window.innerHeight - rect.top - (basePadding + footerReserve))
+      );
+
+      // ★ 追加: 画面比率による絶対上限（px）を算出
+      const ratioCap = Math.floor(
+        window.innerHeight * (shouldExpand ? OPEN_MAX_VH_FILTERED : OPEN_MAX_VH)
+      );
+
+      // ★ 追加: “残り高さ” と “画面比率上限” の小さい方を採用
+      const finalClamp = Math.min(avail, ratioCap);
+
+      setViewportClampPx(finalClamp);
     };
+
 
     calc();
     window.addEventListener('resize', calc);
     return () => window.removeEventListener('resize', calc);
-  }, [effectiveExpanded, cardRef]);
+  }, [effectiveExpanded, cardRef, shouldExpand]); // ★ 変更: shouldExpand を依存に追加
 
-  // DnD（旅行カテゴリでは無効）
-  // const dndEnabled = true;
+  // DnD
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 12 } }));
 
   // 表示対象ID（フィルタ後）
@@ -189,9 +207,7 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => {
-    // noop: 行側のドラッグUIは dndEnabled により自動切替
-  };
+  const handleDragStart = () => { };
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -217,7 +233,7 @@ export default function TodoTaskCard({
     });
 
     onReorderTodos(nextFull);
-    setHasManualOrder(true); // ★ 追加: 以後はユーザー並びを優先
+    setHasManualOrder(true); // 以後はユーザー並びを優先
   };
 
   /* ------------------------------ add new todo ----------------------------- */
@@ -345,18 +361,21 @@ export default function TodoTaskCard({
               {task.name}
             </span>
 
-            <motion.span
-              className="ml-2 inline-flex items-center text-gray-400"
-              initial={false}
-              animate={{ y: [0, effectiveExpanded ? -3 : 3, 0] }}
-              transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              {effectiveExpanded ? (
-                <ChevronUp size={16} />
-              ) : (
-                <ChevronDown size={16} />
-              )}
-            </motion.span>
+            {/* ★ 変更: フィルタ絞り込み（shouldExpand=true）時は開閉アイコンを非表示 */}
+            {!shouldExpand && (
+              <motion.span
+                className="ml-2 inline-flex items-center text-gray-400"
+                initial={false}
+                animate={{ y: [0, effectiveExpanded ? -3 : 3, 0] }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                {effectiveExpanded ? (
+                  <ChevronUp size={16} />
+                ) : (
+                  <ChevronDown size={16} />
+                )}
+              </motion.span>
+            )}
           </button>
         </div>
 
@@ -458,7 +477,7 @@ export default function TodoTaskCard({
               // 非展開時は「約3項目」想定
               !effectiveExpanded && 'max-h-[100px]'
             )}
-            // ★ 変更: 展開時は「画面の残り高さ」でクランプ（中身が少なければその分の高さに）
+            // 展開時は「画面の残り高さ」でクランプ（中身が少なければその分の高さに）
             style={
               effectiveExpanded && viewportClampPx
                 ? { maxHeight: `${viewportClampPx}px` }
@@ -524,6 +543,9 @@ export default function TodoTaskCard({
                 })}
               </SortableContext>
             </DndContext>
+
+            {/* ★ 追加: フィルタ絞り込み時はフッターに隠れないよう末尾に余白を確保 */}
+            {/* {shouldExpand && <div aria-hidden className="h-20" />}  */}
           </div>
 
           {showScrollDownHint && (
