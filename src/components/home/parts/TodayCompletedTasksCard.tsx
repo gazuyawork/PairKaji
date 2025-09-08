@@ -236,7 +236,7 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
 
                   {privateFlag ? (
                     <div
-                      className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center"
+                      className="w-6 h-6 rounded-full text-gray-600 flex items-center justify-center"
                       title="プライベート（パートナーには非表示）"
                       aria-label="プライベート（パートナーには非表示）"
                     >
