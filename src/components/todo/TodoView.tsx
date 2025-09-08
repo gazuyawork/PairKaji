@@ -368,14 +368,13 @@ export default function TodoView() {
       <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] text-gray-800 font-sans relative overflow-hidden">
         <main className="main-content flex-1 px-4 pt-1 pb-5 space-y-4 overflow-y-auto pb-54">
           {/* ✅ indexが2（TodoView）である場合のみ表示 */}
-          {index === 2 && (
+          {index === 2 && noteModalTask && noteModalTodo && (
             <TodoNoteModal
               isOpen={noteModalOpen}
               onClose={closeNoteModal}
-              // 値は null セーフに渡す（モーダル内で isOpen=false の間は使われない想定）
-              todoText={noteModalTodo?.text ?? ''}
-              todoId={noteModalTodo?.id ?? ''}
-              taskId={noteModalTask?.id ?? ''}
+              todoText={noteModalTodo.text}
+              todoId={noteModalTodo.id}
+              taskId={noteModalTask.id}
             />
           )}
 
@@ -442,11 +441,11 @@ export default function TodoView() {
                               const updated = tasks.map(t =>
                                 t.id === task.id
                                   ? {
-                                    ...t,
-                                    todos: t.todos.map(todo =>
-                                      todo.id === todoId ? { ...todo, text: value } : todo
-                                    ),
-                                  }
+                                      ...t,
+                                      todos: t.todos.map(todo =>
+                                        todo.id === todoId ? { ...todo, text: value } : todo
+                                      ),
+                                    }
                                   : t
                               );
                               setTasks(updated);
