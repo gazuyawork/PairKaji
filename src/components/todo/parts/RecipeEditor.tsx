@@ -75,7 +75,7 @@ const toHalfWidth = (s: string) =>
 const genId = () => {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch {}
+  } catch { }
   return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 };
 
@@ -532,7 +532,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   // dnd センサー（PC/タッチ対応）
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor,   { activationConstraint: { delay: 120, tolerance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
   );
 
   return (
@@ -563,6 +563,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
           </div>
 
           {/* 編集モード：DnD 有効 */}
+          {/* // （編集後・全貼り替え）材料 編集モードブロック */}
           {!isPreview ? (
             <DndContext
               sensors={sensors}
@@ -597,7 +598,12 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                             <GripVertical size={16} />
                           </button>
 
-                          {/* 材料名（6カラム） */}
+                          {/* ★追加：A, B, C... の表示（ハンドル右横） */}
+                          <div className="col-span-1 pt-1 text-sm text-gray-500 select-none text-center">
+                            {indexToLetters(idx)}.
+                          </div>
+
+                          {/* 材料名（★6→5カラムに変更） */}
                           <input
                             ref={(el) => {
                               nameRefs.current[ing.id] = el;
@@ -620,7 +626,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                             onFocus={() => setEditingId(ing.id)}
                             onBlur={() => setEditingId((curr) => (curr === ing.id ? null : curr))}
                             placeholder="材料名（例：玉ねぎ）"
-                            className="col-span-6 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
+                            className="col-span-5 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
                             readOnly={isPreview}
                             aria-readonly={isPreview}
                           />
@@ -629,10 +635,14 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                           <input
                             inputMode="decimal"
                             value={
-                              (amountText[ing.id] !== undefined)
-                                ? amountText[ing.id]
-                                : (ing.amount != null ? String(ing.amount) : '')
-                            } // ★ 変更: 表示元を安定化
+                              ing.unit === '適量'
+                                ? '-'
+                                : (
+                                  (amountText[ing.id] !== undefined)
+                                    ? amountText[ing.id]
+                                    : (ing.amount != null ? String(ing.amount) : '')
+                                )
+                            }
                             onChange={(e) => onAmountInputChange(ing.id, e.target.value)}
                             onBlur={() => commitAmount(ing.id)}
                             onKeyDown={(e) => onAmountKeyDown(e, ing.id, idx)}
@@ -678,11 +688,10 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
               </SortableContext>
             </DndContext>
           ) : (
-            // プレビューモード：DnDなし・空行除外・A,B,C...表示
+            // ここは既存のプレビューブロック（変更なし）
             <div className="space-y-2">
               {visibleIngredients.map((ing, idx) => (
                 <div key={ing.id} className="grid grid-cols-12 gap-2 items-center">
-                  {/* A, B, C... */}
                   <div className="col-span-1 text-sm text-gray-500 select-none">
                     {indexToLetters(idx)}.
                   </div>
@@ -709,6 +718,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
               ))}
             </div>
           )}
+
         </div>
       )}
 
@@ -733,6 +743,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
           </div>
 
           {/* 編集モード：DnD 有効 */}
+          {/* // （編集後・全貼り替え）手順 編集モードブロック */}
           {!isPreview ? (
             <DndContext
               sensors={sensors}
@@ -765,7 +776,12 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                             <GripVertical size={16} />
                           </button>
 
-                          {/* 手順テキスト */}
+                          {/* ★追加：1, 2, 3... の表示（ハンドル右横） */}
+                          <div className="col-span-1 pt-2 text-sm text-gray-500 select-none text-center">
+                            {idx + 1}.
+                          </div>
+
+                          {/* 手順テキスト（★10→9カラムに変更） */}
                           <AutoResizeTextarea
                             ref={(el) => {
                               stepRefs.current[idx] = el;
@@ -773,7 +789,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                             value={s}
                             onChange={(v) => changeStep(idx, v)}
                             placeholder="手順を入力"
-                            className="col-span-10 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
+                            className="col-span-9 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
                             readOnly={false}
                             onCompositionStart={() => setComposingStepIndex(idx)}
                             onCompositionEnd={() =>
@@ -803,7 +819,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
               </SortableContext>
             </DndContext>
           ) : (
-            // プレビューモード：DnDなし・空行除外・行番号表示
+            // ここは既存のプレビューブロック（変更なし）
             <ol className="space-y-2">
               {visibleSteps.map((s, idx) => (
                 <li key={`pv_${idx}`} className="grid grid-cols-12 gap-2 items-start">
@@ -812,7 +828,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                   </div>
                   <AutoResizeTextarea
                     value={s}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     placeholder="手順を入力"
                     className="col-span-11 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0"
                     readOnly
