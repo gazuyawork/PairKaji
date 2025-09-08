@@ -704,7 +704,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 return <p className="text-center text-gray-500 mt-6">表示するタスクはありません。</p>;
               }
 
-              return periods.map((period) => {
+              return periods.map((period, i) => {
                 const rawTasks = tasksState[period] ?? [];
                 const list = rawTasks.filter(
                   (task) =>
@@ -733,7 +733,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
                 return (
                   <div key={period} className="mx-auto w-full max-w-xl">
-                    <div className="flex items-center justify-between mt-4 mb-2 px-2">
+                    {/* <div className="flex items-center justify-between mt-4 mb-2 px-2"> */}
+                    <div className={`flex items-center justify-between ${i === 0 ? 'mt-0' : 'mt-4'} mb-2 px-2`}>
                       <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
                         <span
                           className={`inline-block rounded-full px-3 py-1 text-sm text-white 
