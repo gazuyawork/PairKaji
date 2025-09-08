@@ -100,7 +100,7 @@ export default function TodoTaskCard({
   );
 
   const OPEN_MAX_VH = 0.84;
-  const OPEN_MAX_VH_FILTERED = 0.64;
+  const OPEN_MAX_VH_FILTERED = 0.60;
 
   const [hasManualOrder, setHasManualOrder] = useState<boolean>(false);
 
