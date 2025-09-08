@@ -94,7 +94,7 @@ type SimpleTodo = {
   price?: number | null;
   quantity?: number | null;
 
-  // ★ 追加（旅行タスクの時間帯）
+  // 旅行タスクの時間帯
   timeStart?: string | null;
   timeEnd?: string | null;
 };
@@ -116,7 +116,7 @@ const toDayRatio = (hhmm?: string | null) => {
   return Math.max(0, Math.min(1, ratio));
 };
 
-// 24h内の“色ステップ”定義（夜→昼→夕方→夜）
+// 24hの色ステップ（夜→昼→夕方→夜）
 const TIME_COLOR_STOPS = [
   { h: 0, color: '#6D28D9' },  // purple-700
   { h: 6, color: '#3B82F6' },  // blue-500
@@ -155,7 +155,7 @@ const lerpColor = (c1: string, c2: string, t: number) => {
   });
 };
 
-// 指定分（0..1440）における色をステップ間で補間して取得
+// 指定分（0..1440）の色を補間して取得
 const pickColorAtMinute = (minute: number) => {
   const h = minute / 60;
   for (let i = 0; i < TIME_COLOR_STOPS.length - 1; i++) {
@@ -169,32 +169,28 @@ const pickColorAtMinute = (minute: number) => {
   return TIME_COLOR_STOPS[TIME_COLOR_STOPS.length - 1].color;
 };
 
-// start..end の区間に沿って、色境界（6h/12h/17h/20h）を含むグラデを生成
+// start..end の区間に沿って、境界（6h/12h/17h/20h）を含むグラデを生成
 const makeTimeRangeGradient = (startHHMM?: string | null, endHHMM?: string | null) => {
   const sMin = toMinutes(startHHMM);
   const eMin = toMinutes(endHHMM);
   if (!(eMin > sMin)) {
-    // 異常系はフェイルセーフのオレンジグラデ
+    // 異常系はフェイルセーフのオレンジ
     return 'linear-gradient(90deg, #FFA366 0%, #FFCD7D 100%)';
   }
 
-  // 区間内に入る境界（分）を抽出（6,12,17,20時）
   const boundariesH = [6, 12, 17, 20];
   const inRangeBoundaries = boundariesH
     .map((h) => h * 60)
     .filter((m) => m > sMin && m < eMin);
 
-  // 配列: [start, ...boundaries..., end]
   const stopsMin = [sMin, ...inRangeBoundaries, eMin];
 
-  // 各点の“区間内比率(%)”を求めて、そこでの色を割り出す
   const span = eMin - sMin;
   const stops = stopsMin.map((m) => {
     const pct = ((m - sMin) / span) * 100;
     return { pct, color: pickColorAtMinute(m) };
   });
 
-  // CSS linear-gradient 文字列へ
   const pieces = stops.map((s) => `${s.color} ${s.pct.toFixed(2)}%`);
   return `linear-gradient(90deg, ${pieces.join(', ')})`;
 };
@@ -313,9 +309,9 @@ export default function TodoTaskCard({
 
   const shouldExpand = isFilteredGlobal || isFilteredView;
 
-  // ★ 手動展開トグル
+  // 手動展開トグル
   const [isExpanded, setIsExpanded] = useState(false);
-  // ★ 実効の展開状態（フィルタで強制展開 or 手動展開）
+  // 実効の展開状態（フィルタで強制展開 or 手動展開）
   const effectiveExpanded = shouldExpand || isExpanded;
 
   const doneMatchesCount = useMemo(() => {
@@ -584,6 +580,7 @@ export default function TodoTaskCard({
       <div
         ref={setNodeRef}
         style={style}
+        data-todo-row
         className={clsx('flex flex-col gap-1', isDragging && 'opacity-60')}
       >
         <div className="flex items-center gap-2">
@@ -686,9 +683,7 @@ export default function TodoTaskCard({
         {/* 旅行カテゴリ＋時間帯が両方ある場合だけタイムラインを表示 */}
         {category === '旅行' && nonEmptyString(todo.timeStart ?? '') && nonEmptyString(todo.timeEnd ?? '') && (
           <div className="pl-8 pr-2">
-            {/* ベースレールの外側ラッパ（overflow を隠さない） */}
             <div className="relative">
-              {/* 内側：実際のレール。丸角クリップのため overflow-hidden はここにだけ付ける */}
               <div className="h-1.5 rounded-full bg-gray-200/70 overflow-hidden relative">
                 {(() => {
                   const start = toDayRatio(todo.timeStart);
@@ -715,7 +710,6 @@ export default function TodoTaskCard({
                 })()}
               </div>
 
-              {/* ラベルは外側ラッパに配置 → overflow で隠れない */}
               {(() => {
                 const start = toDayRatio(todo.timeStart);
                 const end = toDayRatio(todo.timeEnd);
@@ -752,10 +746,10 @@ export default function TodoTaskCard({
 
   /* ----------------------- expand → scroll to top ----------------------- */
 
-  // ★ カードDOM参照
+  // カードDOM参照
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // ★ 最寄りのスクロール親を取得
+  // 最寄りのスクロール親を取得
   const getScrollableParent = (el: HTMLElement | null): HTMLElement | Window => {
     if (!el) return window;
     let p: HTMLElement | null = el.parentElement;
@@ -768,7 +762,7 @@ export default function TodoTaskCard({
     return window;
   };
 
-  // ★ 指定要素のトップをスクロール親の先頭に合わせる
+  // 指定要素のトップをスクロール親の先頭に合わせる
   const scrollToTopOf = (el: HTMLElement | null, offset = 0) => {
     if (!el) return;
     const parent = getScrollableParent(el);
@@ -783,19 +777,17 @@ export default function TodoTaskCard({
     }
   };
 
-  // ★ 前回の展開状態を覚えて、false→true の瞬間にスクロール
+  // false→true の瞬間にスクロール
   const prevExpandedRef = useRef<boolean>(effectiveExpanded);
   useEffect(() => {
     const was = prevExpandedRef.current;
     prevExpandedRef.current = effectiveExpanded;
 
     if (!was && effectiveExpanded) {
-      // ★ 変更後（例：上に16pxの余白を残したい場合）
-      const STICKY_HEADER_PX = 0;   // 画面上部に固定ヘッダーがあるならその高さ（例: 56）
-      const TOP_GAP_PX = 16;        // ← 少しだけ空けたい余白
+      const STICKY_HEADER_PX = 0;
+      const TOP_GAP_PX = 16;
       const HEADER_OFFSET_PX = STICKY_HEADER_PX + TOP_GAP_PX;
 
-      // レイアウト確定後に実行（2フレーム待つ）
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           scrollToTopOf(cardRef.current, HEADER_OFFSET_PX);
@@ -804,13 +796,75 @@ export default function TodoTaskCard({
     }
   }, [effectiveExpanded]);
 
+  /* -------------------- 展開時の“内容そのまま”動的高さ -------------------- */
+
+  // 展開時の実高さ(px)
+  const [expandedHeightPx, setExpandedHeightPx] = useState<number | null>(null);
+
+  // CSS変数 --todo-bottom-ui を取得（未設定なら 160px）
+  const getBottomUiPx = (host: HTMLElement | null) => {
+    if (!host) return 160;
+    const v = getComputedStyle(host).getPropertyValue('--todo-bottom-ui').trim();
+    const n = Number(v.replace('px', '').trim());
+    return Number.isFinite(n) && n > 0 ? n : 160;
+  };
+
+  // 展開時の高さを再計算（内容の総高さをそのまま使い、上限でクリップ）
+  const recalcExpandedHeight = () => {
+    const sc = scrollRef.current;
+    const card = cardRef.current;
+    if (!sc || !card) return;
+
+    // 内容の総高さ（scrollHeight）
+    const content = sc.scrollHeight;
+
+    // 画面上限：100dvh - 固定UIぶん
+    const headerFooterOffset = 185; // 既存ロジック踏襲
+    const bottomUi = getBottomUiPx(card);
+    const viewportCap = Math.max(
+      200,
+      Math.round(window.innerHeight - headerFooterOffset - bottomUi)
+    );
+
+    // 目標高さ：内容そのまま（ただし viewportCap を上限）
+    const target = Math.min(viewportCap, content);
+
+    setExpandedHeightPx(target);
+
+    // スクロール可否も更新
+    const canScroll = content > target + 1;
+    setIsScrollable(canScroll);
+  };
+
+  // 展開状態やリスト変化で再計測
+  useEffect(() => {
+    if (effectiveExpanded) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          recalcExpandedHeight();
+        });
+      });
+    } else {
+      setExpandedHeightPx(null);
+    }
+  }, [effectiveExpanded, finalFilteredTodos.length]);
+
+  // リサイズでも再計測
+  useEffect(() => {
+    const onResize = () => {
+      if (effectiveExpanded) recalcExpandedHeight();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [effectiveExpanded]);
+
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
     <div
       ref={(el) => {
-        cardRef.current = el;       // ★ 追加：自カードへの参照
-        groupDnd?.setNodeRef?.(el); // 既存のDND参照は維持
+        cardRef.current = el;
+        groupDnd?.setNodeRef?.(el);
       }}
       style={groupDnd?.style}
       className={clsx('relative mb-2.5', groupDnd?.isDragging && 'opacity-70')}
@@ -834,13 +888,12 @@ export default function TodoTaskCard({
             <Grip size={18} />
           </button>
 
-          {/* ヘッダー押下で開閉トグル＋誘導アニメーション */}
+          {/* タスク名クリックで開閉 */}
           <button
             className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text-left"
             type="button"
             aria-label="タスク名"
             onClick={() => {
-              // フィルタの自動展開中は高さ制御を壊さないように手動トグル無効
               if (!shouldExpand) setIsExpanded((v) => !v);
             }}
           >
@@ -853,7 +906,6 @@ export default function TodoTaskCard({
               {task.name}
             </span>
 
-            {/* 開閉を促す小さなシェブロンのアニメーション */}
             <motion.span
               className="ml-2 inline-flex items-center text-gray-400"
               initial={false}
@@ -964,17 +1016,16 @@ export default function TodoTaskCard({
             ref={scrollRef}
             className={clsx(
               'overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1',
-              // デフォルトは「約3項目」だけ見える高さ
-              !effectiveExpanded && 'max-h-[160px]',
+              // 非展開時は「約3項目」想定
+              !effectiveExpanded && 'max-h-[100px]',
               isDndDragging && 'touch-none select-none'
             )}
-            // 展開時は画面縦いっぱい（ヘッダー/フッター分を控除）
+            // 展開時：内容の総高さをそのまま適用（ただし画面いっぱいを上限）
             style={
               effectiveExpanded
-                ? {
-                  height: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
-                  maxHeight: 'calc(100dvh - 185px - var(--todo-bottom-ui, 160px))',
-                }
+                ? expandedHeightPx
+                  ? { height: `${expandedHeightPx}px`, maxHeight: `${expandedHeightPx}px` }
+                  : undefined
                 : undefined
             }
             onTouchMove={(e) => e.stopPropagation()}
