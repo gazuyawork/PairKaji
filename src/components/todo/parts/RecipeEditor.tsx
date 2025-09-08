@@ -245,6 +245,9 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   const [steps, setSteps] = useState<string[]>(value.steps);
   const [userEditedUnitIds, setUserEditedUnitIds] = useState<Set<string>>(new Set());
 
+  // ★ 変更: 直近で親に送った値を保持して、重複送信や往復更新を抑止
+  const lastSentRef = useRef<Recipe>({ ingredients: value.ingredients, steps: value.steps }); // ★ 変更
+
   // 数量：入力中の表示専用テキスト（id -> text）
   const [amountText, setAmountText] = useState<Record<string, string>>({});
 
@@ -287,11 +290,23 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     });
   }, [value.steps, editingStepIndex, composingStepIndex]);
 
-  // 親へ伝播
+  // ★ 変更: 親へ伝播（差分がある時だけ・直前送信値と同一なら送らない）
   useEffect(() => {
-    onChange({ ingredients, steps });
+    const sameAsProp =
+      shallowEqualIngredients(ingredients, value.ingredients) &&
+      shallowEqualSteps(steps, value.steps);
+    if (sameAsProp) return;
+
+    const sameAsLastSent =
+      shallowEqualIngredients(ingredients, lastSentRef.current.ingredients) &&
+      shallowEqualSteps(steps, lastSentRef.current.steps);
+    if (sameAsLastSent) return;
+
+    const outgoing: Recipe = { ingredients, steps };
+    onChange(outgoing);
+    lastSentRef.current = outgoing;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingredients, steps]);
+  }, [ingredients, steps, value.ingredients, value.steps /*, onChange*/]); // onChangeは親でuseCallback推奨
 
   // 数量テキストの初期化・同期（ingredients の増減や id 変化に追従）
   useEffect(() => {
@@ -353,6 +368,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   const removeIngredient = (id: string) => {
     if (isPreview) return;
     setIngredients((prev) => prev.filter((i) => i.id !== id));
+    // ★ 変更: Setの更新を明示化
     setUserEditedUnitIds((prev) => {
       const n = new Set(prev);
       n.delete(id);
@@ -404,7 +420,12 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     setIngredients((prev) =>
       prev.map((i) => (i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i))
     );
-    setUserEditedUnitIds((prev) => new Set(prev).add(id));
+    // ★ 変更: Setの更新を明示化（可読性・一貫性）
+    setUserEditedUnitIds((prev) => {
+      const n = new Set(prev);
+      n.add(id);
+      return n;
+    });
     if (unit === '適量') {
       setAmountText((m) => ({ ...m, [id]: '' }));
     }
@@ -447,8 +468,10 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     setSteps((prev) => prev.filter((_, i) => i !== idx));
     setStepIds((prev) => prev.filter((_, i) => i !== idx));
   };
+
+  // ★ 変更: 無駄な2重mapを1回に最適化
   const changeStep = (idx: number, val: string) =>
-    setSteps((prev) => prev.map((s) => s).map((s, i) => (i === idx ? val : s)));
+    setSteps((prev) => prev.map((s, i) => (i === idx ? val : s))); // ★ 変更
 
   // Enterで連続追加（材料名）
   const onIngredientNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
@@ -605,7 +628,11 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                           {/* 数量（2カラム、約4桁幅 6ch・右寄せ） */}
                           <input
                             inputMode="decimal"
-                            value={amountText[ing.id] ?? (ing.amount ?? '').toString()}
+                            value={
+                              (amountText[ing.id] !== undefined)
+                                ? amountText[ing.id]
+                                : (ing.amount != null ? String(ing.amount) : '')
+                            } // ★ 変更: 表示元を安定化
                             onChange={(e) => onAmountInputChange(ing.id, e.target.value)}
                             onBlur={() => commitAmount(ing.id)}
                             onKeyDown={(e) => onAmountKeyDown(e, ing.id, idx)}

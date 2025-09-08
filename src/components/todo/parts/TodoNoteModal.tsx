@@ -250,6 +250,12 @@ export default function TodoNoteModal({
   const [isPreview, setIsPreview] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
 
+  // ★ compareQuantity の現在値をエフェクト外で参照するための Ref（依存配列回避）
+  const compareQuantityRef = useRef<string>('');
+  useEffect(() => {
+    compareQuantityRef.current = compareQuantity;
+  }, [compareQuantity]);
+
   // ★ 旅行時間帯の状態とエラー
   const [timeStart, setTimeStart] = useState<string>('');
   const [timeEnd, setTimeEnd] = useState<string>('');
@@ -400,7 +406,8 @@ export default function TodoNoteModal({
         setQuantity(isNumber(todo.quantity) ? String(todo.quantity) : '');
         setUnit(todo.unit ?? 'g');
 
-        if (!compareQuantity && isNumber(todo.quantity)) {
+        // ★ 修正: compareQuantity の初期反映は Ref を使って依存配列を汚さない
+        if ((!compareQuantityRef.current || compareQuantityRef.current === '') && isNumber(todo.quantity)) {
           setCompareQuantity(String(todo.quantity));
         }
 
@@ -452,7 +459,8 @@ export default function TodoNoteModal({
       }
     };
     fetchTodoData();
-  }, [taskId, todoId, updateHints, compareQuantity]);
+    // ★ compareQuantity を依存に入れず、Ref 経由で参照することで再フェッチループを回避
+  }, [taskId, todoId, updateHints]);
 
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
