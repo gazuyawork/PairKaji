@@ -549,7 +549,7 @@ export default function TodoTaskCard({
           </div>
 
           {showScrollDownHint && (
-            <div className="pointer-events-none absolute bottom-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+            <div className="pointer-events-none absolute bottom-4.5 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
               <ChevronDown size={16} className="text-white" />
             </div>
           )}
@@ -568,7 +568,7 @@ export default function TodoTaskCard({
 
         {/* add input (undone only) */}
         <div className="absolute left-4 right-4 bottom-3">
-          <div className="flex items-center gap-2 bg-white">
+          <div className="flex items-center gap-2 bg-white pt-2">
             <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
             <input
               ref={inputRef}
@@ -597,7 +597,7 @@ export default function TodoTaskCard({
               disabled={!canAdd}
               aria-disabled={!canAdd}
               className={clsx(
-                'w-[75%] border-b bg-transparent outline-none h-10 pt-2 pb-1',
+                'w-[75%] border-b bg-transparent outline-none h-9 pb-1',
                 canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed'
               )}
               placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
