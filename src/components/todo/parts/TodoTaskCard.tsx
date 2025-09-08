@@ -152,9 +152,28 @@ export default function TodoTaskCard({
     // isExpanded,
     setIsExpanded,
     effectiveExpanded,
-    expandedHeightPx,
+    // expandedHeightPx, // ★ 削除（今回の仕様では使用しない）
     cardRef,
   } = useExpandAndMeasure({ shouldExpandByFilter: shouldExpand });
+
+  // ★ 追加: 画面の残り高さでクランプするための値を保持
+  const [viewportClampPx, setViewportClampPx] = useState<number | null>(null);
+
+  // ★ 追加: 展開時に「画面いっぱいを上限」にするための再計算
+  useEffect(() => {
+    if (!effectiveExpanded || !cardRef.current) return;
+
+    const calc = () => {
+      const rect = cardRef.current!.getBoundingClientRect();
+      const bottomPadding = 24; // 余白のための下マージン(px) — 必要に応じて調整
+      const avail = Math.max(120, Math.floor(window.innerHeight - rect.top - bottomPadding));
+      setViewportClampPx(avail);
+    };
+
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, [effectiveExpanded, cardRef]);
 
   // DnD（旅行カテゴリでは無効）
   // const dndEnabled = true;
@@ -439,12 +458,10 @@ export default function TodoTaskCard({
               // 非展開時は「約3項目」想定
               !effectiveExpanded && 'max-h-[100px]'
             )}
-            // 展開時：内容の総高さをそのまま適用（ただし画面いっぱいを上限）
+            // ★ 変更: 展開時は「画面の残り高さ」でクランプ（中身が少なければその分の高さに）
             style={
-              effectiveExpanded
-                ? expandedHeightPx
-                  ? { height: `${expandedHeightPx}px`, maxHeight: `${expandedHeightPx}px` }
-                  : undefined
+              effectiveExpanded && viewportClampPx
+                ? { maxHeight: `${viewportClampPx}px` }
                 : undefined
             }
             onTouchMove={(e) => e.stopPropagation()}
