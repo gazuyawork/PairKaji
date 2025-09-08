@@ -663,7 +663,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         confirmLabel="OK"
       />
 
-      <main className="main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-57">
+      <main
+        className={
+          "main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-57 " +
+          "[-webkit-overflow-scrolling:touch] touch-pan-y overscroll-contain"
+        }
+      >
         {isLoading ? (
           <div className="flex items-center justify-center text-gray-400 text-sm h-200">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
