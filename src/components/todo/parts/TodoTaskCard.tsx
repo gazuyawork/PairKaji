@@ -1,33 +1,18 @@
+// src/components/todo/parts/TodoTaskCard.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
-import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import type { ComponentType } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
-  CheckCircle,
-  Circle,
-  Trash2,
-  Plus,
-  Notebook,
   ChevronDown,
   ChevronUp,
+  Plus,
   Search,
   X,
-  UtensilsCrossed,
-  ShoppingCart,
-  Dumbbell,
-  Camera,
-  PawPrint,
-  Music,
-  Gamepad2 as Gamepad,
-  Plane,
-  Car,
-  Tag,
   GripVertical as Grip,
 } from 'lucide-react';
-import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import type { Variants } from 'framer-motion';
@@ -41,13 +26,18 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+
+import SortableTodoRow from './SortableTodoRow';
+import { useTodoSearchAndSort, useCategoryIcon, type SimpleTodo } from './hooks/useTodoSearchAndSort';
+import { useScrollMeter } from './hooks/useScrollMeter';
+import { useExpandAndMeasure } from './hooks/useExpandAndMeasure';
+import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
 /* ------------------------------ helpers ------------------------------ */
 
+// Headerの「×」ボタン用の軽い揺れアニメ
 const SHAKE_VARIANTS: Variants = {
   shake: {
     x: [0, -6, 6, -4, 4, -2, 2, 0],
@@ -55,145 +45,9 @@ const SHAKE_VARIANTS: Variants = {
   },
 };
 
-const normalizeJP = (v: unknown): string => {
-  if (typeof v !== 'string') return '';
-  const s = v.normalize('NFKC').toLowerCase();
-  return s.replace(/[\u30a1-\u30f6]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
-};
-
-type CategoryIconConfig = {
-  icon: ComponentType<{ size?: number; className?: string }>;
-  color: string;
-};
-
-const CATEGORY_ICON_MAP: Record<string, CategoryIconConfig> = {
-  料理: { icon: UtensilsCrossed, color: 'text-red-500' },
-  買い物: { icon: ShoppingCart, color: 'text-green-500' },
-  運動: { icon: Dumbbell, color: 'text-blue-500' },
-  写真: { icon: Camera, color: 'text-purple-500' },
-  ペット: { icon: PawPrint, color: 'text-pink-500' },
-  音楽: { icon: Music, color: 'text-indigo-500' },
-  ゲーム: { icon: Gamepad, color: 'text-orange-500' },
-  旅行: { icon: Plane, color: 'text-teal-500' },
-  車: { icon: Car, color: 'text-gray-600' },
-};
-
-type SimpleTodo = {
-  id: string;
-  text: string;
-  done: boolean;
-  recipe?: {
-    ingredients?: Array<{ name?: string | null }>;
-    steps?: string[];
-  };
-  memo?: string | null;
-  imageUrl?: string | null;
-  referenceUrls?: Array<string | null>;
-  price?: number | null;
-  quantity?: number | null;
-
-  // 旅行タスクの時間帯
-  timeStart?: string | null;
-  timeEnd?: string | null;
-};
-
 function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
   return Array.isArray(arr) && arr.every(t => !!t && typeof t === 'object' && 'id' in (t as object));
 }
-
-function nonEmptyString(v: unknown): v is string {
-  return typeof v === 'string' && v.trim() !== '';
-}
-
-/** "HH:MM" を 0〜1 の日内比率へ変換（範囲外はクランプ） */
-const toDayRatio = (hhmm?: string | null) => {
-  if (!hhmm || typeof hhmm !== 'string') return 0;
-  const [h = '0', m = '0'] = hhmm.split(':');
-  const total = Number(h) * 60 + Number(m);
-  const ratio = total / (24 * 60);
-  return Math.max(0, Math.min(1, ratio));
-};
-
-// 24hの色ステップ（夜→昼→夕方→夜）
-const TIME_COLOR_STOPS = [
-  { h: 0, color: '#6D28D9' },  // purple-700
-  { h: 6, color: '#3B82F6' },  // blue-500
-  { h: 12, color: '#60A5FA' }, // blue-400
-  { h: 17, color: '#FB923C' }, // orange-400
-  { h: 20, color: '#8B5CF6' }, // purple-500
-  { h: 24, color: '#491898' }, // loop
-];
-
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
-const toMinutes = (hhmm?: string | null) => {
-  if (!hhmm || typeof hhmm !== 'string') return 0;
-  const [hh = '0', mm = '0'] = hhmm.split(':');
-  const m = Number(hh) * 60 + Number(mm);
-  return Math.max(0, Math.min(24 * 60, isFinite(m) ? m : 0));
-};
-const hexToRgb = (hex: string) => {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!m) return { r: 0, g: 0, b: 0 };
-  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
-};
-const rgbToHex = ({ r, g, b }: { r: number; g: number; b: number }) =>
-  '#' +
-  [r, g, b]
-    .map((v) => Math.round(v))
-    .map((v) => v.toString(16).padStart(2, '0'))
-    .join('');
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const lerpColor = (c1: string, c2: string, t: number) => {
-  const a = hexToRgb(c1);
-  const b = hexToRgb(c2);
-  return rgbToHex({
-    r: lerp(a.r, b.r, t),
-    g: lerp(a.g, b.g, t),
-    b: lerp(a.b, b.b, t),
-  });
-};
-
-// 指定分（0..1440）の色を補間して取得
-const pickColorAtMinute = (minute: number) => {
-  const h = minute / 60;
-  for (let i = 0; i < TIME_COLOR_STOPS.length - 1; i++) {
-    const a = TIME_COLOR_STOPS[i];
-    const b = TIME_COLOR_STOPS[i + 1];
-    if (h >= a.h && h <= b.h) {
-      const t = (h - a.h) / (b.h - a.h || 1);
-      return lerpColor(a.color, b.color, clamp01(t));
-    }
-  }
-  return TIME_COLOR_STOPS[TIME_COLOR_STOPS.length - 1].color;
-};
-
-// start..end の区間に沿って、境界（6h/12h/17h/20h）を含むグラデを生成
-const makeTimeRangeGradient = (startHHMM?: string | null, endHHMM?: string | null) => {
-  const sMin = toMinutes(startHHMM);
-  const eMin = toMinutes(endHHMM);
-  if (!(eMin > sMin)) {
-    // 異常系はフェイルセーフのオレンジ
-    return 'linear-gradient(90deg, #FFA366 0%, #FFCD7D 100%)';
-  }
-
-  const boundariesH = [6, 12, 17, 20];
-  const inRangeBoundaries = boundariesH
-    .map((h) => h * 60)
-    .filter((m) => m > sMin && m < eMin);
-
-  const stopsMin = [sMin, ...inRangeBoundaries, eMin];
-
-  const span = eMin - sMin;
-  const stops = stopsMin.map((m) => {
-    const pct = ((m - sMin) / span) * 100;
-    return { pct, color: pickColorAtMinute(m) };
-  });
-
-  const pieces = stops.map((s) => `${s.color} ${s.pct.toFixed(2)}%`);
-  return `linear-gradient(90deg, ${pieces.join(', ')})`;
-};
 
 /* -------------------------------- props -------------------------------- */
 
@@ -239,135 +93,113 @@ export default function TodoTaskCard({
   groupDnd,
   isFilteredGlobal = false,
 }: Props) {
-  const todos: SimpleTodo[] = useMemo(() => {
-    const raw = (task as unknown as { todos?: unknown }).todos;
-    return isSimpleTodos(raw) ? raw : [];
-  }, [task]);
+  // todos抽出
+  const rawTodos = (task as unknown as { todos?: unknown }).todos;
+  const todos: SimpleTodo[] = useMemo(
+    () => (isSimpleTodos(rawTodos) ? rawTodos : []),
+    [rawTodos]
+  );
 
-  const [isDndDragging, setIsDndDragging] = useState(false);
+  const [hasManualOrder, setHasManualOrder] = useState<boolean>(false);
+
+  // カテゴリ
+  const category: string | null =
+    (task as unknown as { category?: string }).category ?? null;
+  const { CatIcon, catColor } = useCategoryIcon(category);
+
+  // 追加用入力
   const [isComposingAdd, setIsComposingAdd] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [, setInputError] = useState<string | null>(null);
+
+  // 編集中の行のエラー
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
-  const [showScrollDownHint, setShowScrollDownHint] = useState(false);
-  const [showScrollUpHint, setShowScrollUpHint] = useState(false);
 
-  const category: string | null =
-    (task as unknown as { category?: string }).category ?? null;
-  const isCookingCategory = category === '料理';
-
-  const { CatIcon, catColor } = useMemo(() => {
-    const conf = category ? CATEGORY_ICON_MAP[category] : undefined;
-    return {
-      CatIcon: (conf?.icon ?? Tag) as ComponentType<{ size?: number; className?: string }>,
-      catColor: conf?.color ?? 'text-gray-400',
-    };
-  }, [category]);
-
+  // 検索
   const [searchQuery, setSearchQuery] = useState('');
 
-  const canAdd = tab === 'undone';
+  // フィルタ・カテゴリ別ソートなどをフックに委譲
+  const {
+    canAdd,
+    isCookingCategory,
+    // isTravelCategory,
+    undoneCount,
+    doneCount,
+    finalFilteredTodos,
+    isFilteredView,
+    doneMatchesCount,
+  } = useTodoSearchAndSort({
+    todos,
+    tab,
+    category,
+    searchQuery,
+    preferTimeSort: Boolean(category === '旅行' && !hasManualOrder),
+  });
 
-  const { undoneCount, doneCount } = useMemo(() => {
-    let undone = 0;
-    let done = 0;
+  // スクロールメーター（右端の細いバーと上下ヒント）
+  const {
+    scrollRef,
+    scrollRatio,
+    isScrollable,
+    showScrollDownHint,
+    showScrollUpHint,
+  } = useScrollMeter(finalFilteredTodos.length);
 
-    for (const t of todos) {
-      if (t.done) {
-        done++;
-      } else {
-        undone++;
-      }
-    }
-
-    return { undoneCount: undone, doneCount: done };
-  }, [todos]);
-
-  const baseFilteredByTab = useMemo(
-    () => (tab === 'done' ? todos.filter(t => t.done) : todos.filter(t => !t.done)),
-    [todos, tab]
-  );
-
-  const finalFilteredTodos = useMemo(() => {
-    if (!isCookingCategory) return baseFilteredByTab;
-    const q = normalizeJP(searchQuery.trim());
-    if (q === '') return baseFilteredByTab;
-    return baseFilteredByTab.filter((todo) => {
-      const nameHit = normalizeJP(todo.text).includes(q);
-      const ingHit =
-        Array.isArray(todo.recipe?.ingredients) &&
-        todo.recipe?.ingredients?.some((ing) => normalizeJP(ing?.name ?? '').includes(q));
-      return nameHit || ingHit;
-    });
-  }, [baseFilteredByTab, isCookingCategory, searchQuery]);
-
-  const isFilteredView = useMemo(
-    () => finalFilteredTodos.length < baseFilteredByTab.length,
-    [finalFilteredTodos.length, baseFilteredByTab.length]
-  );
-
+  // 展開・高さ計測・展開時スクロール
   const shouldExpand = isFilteredGlobal || isFilteredView;
+  const {
+    // isExpanded,
+    setIsExpanded,
+    effectiveExpanded,
+    expandedHeightPx,
+    cardRef,
+  } = useExpandAndMeasure({ shouldExpandByFilter: shouldExpand });
 
-  // 手動展開トグル
-  const [isExpanded, setIsExpanded] = useState(false);
-  // 実効の展開状態（フィルタで強制展開 or 手動展開）
-  const effectiveExpanded = shouldExpand || isExpanded;
+  // DnD（旅行カテゴリでは無効）
+  // const dndEnabled = true;
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 12 } }));
 
-  const doneMatchesCount = useMemo(() => {
-    if (!isCookingCategory) return 0;
-    const q = normalizeJP(searchQuery.trim());
-    if (q === '') return 0;
-    return todos.filter((t) => {
-      if (!t.done) return false;
-      const nameHit = normalizeJP(t.text).includes(q);
-      const ingHit =
-        Array.isArray(t.recipe?.ingredients) &&
-        t.recipe?.ingredients?.some((ing) => normalizeJP(ing?.name ?? '').includes(q));
-      return nameHit || ingHit;
-    }).length;
-  }, [todos, isCookingCategory, searchQuery]);
+  // 表示対象ID（フィルタ後）
+  const visibleIds = useMemo(() => finalFilteredTodos.map(t => t.id), [finalFilteredTodos]);
 
-  /* --------------------------- scroll side meter --------------------------- */
+  function arrayMove<T>(arr: T[], from: number, to: number): T[] {
+    const copy = arr.slice();
+    const [item] = copy.splice(from, 1);
+    copy.splice(to, 0, item);
+    return copy;
+  }
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [scrollRatio, setScrollRatio] = useState(0);
-  const [isScrollable, setIsScrollable] = useState(false);
+  const handleDragStart = () => {
+    // noop: 行側のドラッグUIは dndEnabled により自動切替
+  };
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
 
-    const handleScroll = () => {
-      const denom = el.scrollHeight - el.clientHeight || 1;
-      const ratio = el.scrollTop / denom;
-      setScrollRatio(Math.min(1, Math.max(0, ratio)));
-      const canScroll = el.scrollHeight > el.clientHeight + 1;
-      const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-      const notAtTop = el.scrollTop > 1;
-      setShowScrollDownHint(canScroll && notAtBottom);
-      setShowScrollUpHint(canScroll && notAtTop);
-    };
+    const fromIdx = visibleIds.indexOf(String(active.id));
+    const toIdx = visibleIds.indexOf(String(over.id));
+    if (fromIdx === -1 || toIdx === -1) return;
 
-    const checkScrollable = () => {
-      const canScroll = el.scrollHeight > el.clientHeight + 1;
-      setIsScrollable(canScroll);
-      if (canScroll) handleScroll();
-      else {
-        setScrollRatio(0);
-        setShowScrollDownHint(false);
-        setShowScrollUpHint(false);
+    const newVisible = arrayMove(visibleIds, fromIdx, toIdx);
+
+    const fullIds = todos.map(t => t.id);
+    const visibleSet = new Set(visibleIds);
+    let cursor = 0;
+
+    const nextFull = fullIds.map(id => {
+      if (visibleSet.has(id)) {
+        const nextId = newVisible[cursor];
+        cursor += 1;
+        return nextId;
       }
-    };
+      return id;
+    });
 
-    el.addEventListener('scroll', handleScroll);
-    checkScrollable();
-    window.addEventListener('resize', checkScrollable);
-    return () => {
-      el.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', checkScrollable);
-    };
-  }, [finalFilteredTodos.length]);
+    onReorderTodos(nextFull);
+    setHasManualOrder(true); // ★ 追加: 以後はユーザー並びを優先
+  };
 
   /* ------------------------------ add new todo ----------------------------- */
 
@@ -431,27 +263,9 @@ export default function TodoTaskCard({
     }
   };
 
+  // 行削除の2タップ確認用
   const [confirmTodoDeletes, setConfirmTodoDeletes] = useState<Record<string, boolean>>({});
   const todoDeleteTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  const handleTodoDeleteClick = (todoId: string) => {
-    if (confirmTodoDeletes[todoId]) {
-      const t = todoDeleteTimeouts.current[todoId];
-      if (t) {
-        clearTimeout(t);
-        delete todoDeleteTimeouts.current[todoId];
-      }
-      setConfirmTodoDeletes(prev => ({ ...prev, [todoId]: false }));
-      onDeleteTodo(todoId);
-    } else {
-      setConfirmTodoDeletes(prev => ({ ...prev, [todoId]: true }));
-      const timeout = setTimeout(() => {
-        setConfirmTodoDeletes(prev => ({ ...prev, [todoId]: false }));
-        delete todoDeleteTimeouts.current[todoId];
-      }, 2000);
-      todoDeleteTimeouts.current[todoId] = timeout;
-    }
-  };
 
   useEffect(() => {
     return () => {
@@ -463,400 +277,6 @@ export default function TodoTaskCard({
       todoDeleteTimeouts.current = {};
     };
   }, []);
-
-  /* ------------------------------- dnd (rows) ------------------------------ */
-
-  const visibleIds = useMemo(() => finalFilteredTodos.map(t => t.id), [finalFilteredTodos]);
-
-  function arrayMove<T>(arr: T[], from: number, to: number): T[] {
-    const copy = arr.slice();
-    const [item] = copy.splice(from, 1);
-    copy.splice(to, 0, item);
-    return copy;
-  }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 12 } })
-  );
-
-  const handleDragStart = () => setIsDndDragging(true);
-
-  const handleDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e;
-    setIsDndDragging(false);
-    if (!over || active.id === over.id) return;
-
-    const fromIdx = visibleIds.indexOf(String(active.id));
-    const toIdx = visibleIds.indexOf(String(over.id));
-    if (fromIdx === -1 || toIdx === -1) return;
-
-    const newVisible = arrayMove(visibleIds, fromIdx, toIdx);
-
-    const fullIds = todos.map(t => t.id);
-    const visibleSet = new Set(visibleIds);
-    let cursor = 0;
-
-    const nextFull = fullIds.map(id => {
-      if (visibleSet.has(id)) {
-        const nextId = newVisible[cursor];
-        cursor += 1;
-        return nextId;
-      }
-      return id;
-    });
-
-    onReorderTodos(nextFull);
-  };
-
-  /* ---------------------------- Sortable row ---------------------------- */
-
-  function SortableRow({
-    todo,
-    hasContentForIcon,
-  }: {
-    todo: SimpleTodo;
-    hasContentForIcon: boolean;
-  }) {
-    const [isEditingRow, setIsEditingRow] = useState(false);
-    const [text, setText] = useState<string>(todo.text ?? '');
-    const [isComposingRow, setIsComposingRow] = useState(false);
-
-    useEffect(() => {
-      if (!isEditingRow) setText(todo.text ?? '');
-    }, [todo.text, isEditingRow]);
-
-    const { setNodeRef, attributes, listeners, transform, transition, isDragging } =
-      useSortable({
-        id: todo.id,
-        disabled: isEditingRow,
-      });
-
-    const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-
-    const commit = () => {
-      setIsEditingRow(false);
-
-      const newText = text.trim();
-      const original = todo.text;
-
-      if (!newText) {
-        toast.info('削除する場合はゴミ箱アイコンで消してください');
-        setText(original);
-        return;
-      }
-
-      const isDuplicate = todos.some(
-        t => t.id !== todo.id && t.text === newText && !t.done
-      );
-      if (isDuplicate) {
-        setEditingErrors(prev => ({ ...prev, [todo.id]: '既に登録済みです' }));
-        setText(original);
-        return;
-      }
-
-      const matchDone = todos.find(
-        t => t.id !== todo.id && t.text === newText && t.done
-      );
-      if (matchDone) {
-        setEditingErrors(prev => ({ ...prev, [todo.id]: '完了タスクに存在しています' }));
-        setText(original);
-        return;
-      }
-
-      setEditingErrors(prev => {
-        const next = { ...prev };
-        delete next[todo.id];
-        return next;
-      });
-
-      onChangeTodo(todo.id, newText);
-      onBlurTodo(todo.id, newText);
-    };
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        data-todo-row
-        className={clsx('flex flex-col gap-1', isDragging && 'opacity-60')}
-      >
-        <div className="flex items-center gap-2">
-          <span
-            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
-            title="ドラッグで並び替え"
-            {...(attributes as React.HTMLAttributes<HTMLSpanElement>)}
-            {...(listeners as unknown as React.DOMAttributes<HTMLSpanElement>)}
-          >
-            <Grip size={18} aria-label="並び替え" />
-          </span>
-
-          <motion.div
-            key={todo.id + String(!!todo.done)}
-            className="cursor-pointer"
-            onClick={() => {
-              setTimeout(() => onToggleDone(todo.id), 0);
-            }}
-            initial={{ rotate: 0 }}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-          >
-            {todo.done ? (
-              <CheckCircle className="text-yellow-500" />
-            ) : (
-              <Circle className="text-gray-400" />
-            )}
-          </motion.div>
-
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onKeyDownCapture={(e) => e.stopPropagation()}
-            onKeyUpCapture={(e) => e.stopPropagation()}
-            onFocus={() => setIsEditingRow(true)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                setIsEditingRow(false);
-                setText(todo.text ?? '');
-                (e.currentTarget as HTMLInputElement).blur();
-                return;
-              }
-              if (e.key !== 'Enter') return;
-              if (isComposingRow) return; // IME確定中は確定させない
-              e.preventDefault();
-              (e.currentTarget as HTMLInputElement).blur(); // onBlur で commit
-            }}
-            onBlur={commit}
-            onCompositionStart={() => setIsComposingRow(true)}
-            onCompositionEnd={() => setIsComposingRow(false)}
-            ref={(el) => {
-              if (el) {
-                todoRefs.current[todo.id] = el;
-                if (focusedTodoId === todo.id) el.focus();
-              }
-            }}
-            className={clsx(
-              'flex-1 border-b bg-transparent outline-none border-gray-200 h-8',
-              todo.done ? 'text-gray-400 line-through' : 'text-black'
-            )}
-            placeholder="TODOを入力"
-          />
-
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.85, rotate: -10 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-            className={clsx(
-              'mr-1 active:scale-90',
-              hasContentForIcon
-                ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
-                : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600'
-            )}
-            onClick={() => onOpenNote(todo.text)}
-          >
-            <Notebook size={22} />
-          </motion.button>
-
-          <motion.button
-            type="button"
-            onClick={() => handleTodoDeleteClick(todo.id)}
-            animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
-            variants={SHAKE_VARIANTS}
-          >
-            <Trash2
-              size={22}
-              className={clsx(
-                'hover:text-red-500',
-                confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400'
-              )}
-            />
-          </motion.button>
-        </div>
-
-        {/* 旅行カテゴリ＋時間帯が両方ある場合だけタイムラインを表示 */}
-        {category === '旅行' && nonEmptyString(todo.timeStart ?? '') && nonEmptyString(todo.timeEnd ?? '') && (
-          <div className="pl-8 pr-2">
-            <div className="relative">
-              <div className="h-1.5 rounded-full bg-gray-200/70 overflow-hidden relative">
-                {(() => {
-                  const start = toDayRatio(todo.timeStart);
-                  const end = toDayRatio(todo.timeEnd);
-
-                  if (end <= start) return null;
-
-                  const leftPct = start * 100;
-                  const widthPct = Math.max(0, end - start) * 100;
-
-                  return (
-                    <div
-                      className="absolute top-0 bottom-0 rounded-full"
-                      style={{
-                        left: `${leftPct}%`,
-                        width: `${widthPct}%`,
-                        background: makeTimeRangeGradient(todo.timeStart, todo.timeEnd),
-                        boxShadow: '0 0 0 1px rgba(0,0,0,0.05) inset',
-                      }}
-                      aria-label={`${(todo.timeStart ?? '').trim()} ~ ${(todo.timeEnd ?? '').trim()}`}
-                      title={`${(todo.timeStart ?? '').trim()} ~ ${(todo.timeEnd ?? '').trim()}`}
-                    />
-                  );
-                })()}
-              </div>
-
-              {(() => {
-                const start = toDayRatio(todo.timeStart);
-                const end = toDayRatio(todo.timeEnd);
-                if (end <= start) return null;
-
-                const leftPct = start * 100;
-                const widthPct = Math.max(0, end - start) * 100;
-
-                return (
-                  <div
-                    className="absolute mt-1 text-xs text-gray-600 tabular-nums whitespace-nowrap z-10"
-                    style={{
-                      left: `calc(${leftPct}% + ${widthPct / 2}%)`,
-                      top: '100%',
-                      transform: 'translateX(-50%)',
-                    }}
-                  >
-                    {`${(todo.timeStart ?? '').trim()} ~ ${(todo.timeEnd ?? '').trim()}`}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {editingErrors[todo.id] && (
-          <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
-            {editingErrors[todo.id]}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  /* ----------------------- expand → scroll to top ----------------------- */
-
-  // カードDOM参照
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  // 最寄りのスクロール親を取得（useCallback化）
-  const getScrollableParent = useCallback((el: HTMLElement | null): HTMLElement | Window => {
-    if (!el) return window;
-    let p: HTMLElement | null = el.parentElement;
-    const regex = /(auto|scroll)/;
-    while (p && p !== document.body) {
-      const style = getComputedStyle(p);
-      if (regex.test(style.overflowY) || regex.test(style.overflow)) return p;
-      p = p.parentElement;
-    }
-    return window;
-  }, []);
-
-  // 指定要素のトップをスクロール親の先頭に合わせる（useCallback化）
-  const scrollToTopOf = useCallback((el: HTMLElement | null, offset = 0) => {
-    if (!el) return;
-    const parent = getScrollableParent(el);
-    if (parent === window) {
-      const top = window.scrollY + el.getBoundingClientRect().top - offset;
-      window.scrollTo({ top, behavior: 'smooth' });
-    } else {
-      const p = parent as HTMLElement;
-      const top =
-        p.scrollTop + el.getBoundingClientRect().top - p.getBoundingClientRect().top - offset;
-      p.scrollTo({ top, behavior: 'smooth' });
-    }
-  }, [getScrollableParent]);
-
-  // false→true の瞬間にスクロール
-  const prevExpandedRef = useRef<boolean>(effectiveExpanded);
-  useEffect(() => {
-    const was = prevExpandedRef.current;
-    prevExpandedRef.current = effectiveExpanded;
-
-    if (!was && effectiveExpanded) {
-      const STICKY_HEADER_PX = 0;
-      const TOP_GAP_PX = 16;
-      const HEADER_OFFSET_PX = STICKY_HEADER_PX + TOP_GAP_PX;
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          scrollToTopOf(cardRef.current, HEADER_OFFSET_PX);
-        });
-      });
-    }
-  }, [effectiveExpanded, scrollToTopOf]);
-
-  /* -------------------- 展開時の“内容そのまま”動的高さ -------------------- */
-
-  // 展開時の実高さ(px)
-  const [expandedHeightPx, setExpandedHeightPx] = useState<number | null>(null);
-
-  // 展開時の高さを再計算（useCallback化）
-  const recalcExpandedHeight = useCallback(() => {
-    const sc = scrollRef.current;
-    const card = cardRef.current;
-    if (!sc || !card) return;
-
-    // CSS変数 --todo-bottom-ui を取得（未設定なら 160px）
-    const getBottomUiPx = (host: HTMLElement | null) => {
-      if (!host) return 160;
-      const v = getComputedStyle(host).getPropertyValue('--todo-bottom-ui').trim();
-      const n = Number(v.replace('px', '').trim());
-      return Number.isFinite(n) && n > 0 ? n : 160;
-    };
-
-    // 内容の総高さ（scrollHeight）
-    const content = sc.scrollHeight;
-
-    // 画面上限：100dvh - 固定UIぶん
-    const headerFooterOffset = 185; // 既存ロジック踏襲
-    const bottomUi = getBottomUiPx(card);
-    const viewportCap = Math.max(
-      200,
-      Math.round(window.innerHeight - headerFooterOffset - bottomUi)
-    );
-
-    // 目標高さ：内容そのまま（ただし viewportCap を上限）
-    const target = Math.min(viewportCap, content);
-
-    setExpandedHeightPx(target);
-
-    // スクロール可否も更新
-    const canScroll = content > target + 1;
-    setIsScrollable(canScroll);
-  }, []);
-
-  // 展開状態やリスト変化で再計測（依存に recalcExpandedHeight を追加）
-  useEffect(() => {
-    if (effectiveExpanded) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          recalcExpandedHeight();
-        });
-      });
-    } else {
-      setExpandedHeightPx(null);
-    }
-  }, [effectiveExpanded, finalFilteredTodos.length, recalcExpandedHeight]);
-
-  // リサイズでも再計測（依存に recalcExpandedHeight を追加）
-  useEffect(() => {
-    const onResize = () => {
-      if (effectiveExpanded) recalcExpandedHeight();
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [effectiveExpanded, recalcExpandedHeight]);
 
   /* ---------------------------- render (card) ---------------------------- */
 
@@ -907,7 +327,7 @@ export default function TodoTaskCard({
             </span>
 
             <motion.span
-              className="ml-2 inline-flex items中心 text-gray-400"
+              className="ml-2 inline-flex items-center text-gray-400"
               initial={false}
               animate={{ y: [0, effectiveExpanded ? -3 : 3, 0] }}
               transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
@@ -1017,8 +437,7 @@ export default function TodoTaskCard({
             className={clsx(
               'overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-5 pt-2 pb-1',
               // 非展開時は「約3項目」想定
-              !effectiveExpanded && 'max-h-[100px]',
-              isDndDragging && 'touch-none select-none'
+              !effectiveExpanded && 'max-h-[100px]'
             )}
             // 展開時：内容の総高さをそのまま適用（ただし画面いっぱいを上限）
             style={
@@ -1040,34 +459,49 @@ export default function TodoTaskCard({
             <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
               <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
                 {finalFilteredTodos.map((todo) => {
-                  const hasMemo = nonEmptyString(todo.memo);
+                  const hasMemo = typeof todo.memo === 'string' && todo.memo.trim() !== '';
                   const hasShopping =
                     category === '買い物' &&
                     ((typeof todo.price === 'number' && Number.isFinite(todo.price) && (todo.price ?? 0) > 0) ||
                       (typeof todo.quantity === 'number' && Number.isFinite(todo.quantity) && (todo.quantity ?? 0) > 0));
-                  const hasImage = nonEmptyString(todo.imageUrl);
+                  const hasImage = typeof todo.imageUrl === 'string' && todo.imageUrl.trim() !== '';
                   const hasRecipe =
                     category === '料理' &&
                     ((Array.isArray(todo.recipe?.ingredients) &&
-                      todo.recipe?.ingredients?.some((i) => nonEmptyString(i?.name ?? ''))) ||
+                      todo.recipe?.ingredients?.some((i) => typeof i?.name === 'string' && i.name.trim() !== '')) ||
                       (Array.isArray(todo.recipe?.steps) &&
-                        todo.recipe?.steps?.some((s) => nonEmptyString(s))));
+                        todo.recipe?.steps?.some((s) => typeof s === 'string' && s.trim() !== '')));
                   const hasReferenceUrls =
                     Array.isArray(todo.referenceUrls) &&
-                    todo.referenceUrls.some((u) => nonEmptyString(u ?? ''));
+                    todo.referenceUrls.some((u) => typeof u === 'string' && u.trim() !== '');
 
                   const hasTravelTime =
                     category === '旅行' &&
-                    (nonEmptyString(todo.timeStart ?? '') || nonEmptyString(todo.timeEnd ?? ''));
+                    ((todo.timeStart ?? '').trim() !== '' || (todo.timeEnd ?? '').trim() !== '');
 
                   const hasContentForIcon =
                     hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls || hasTravelTime;
 
                   return (
-                    <SortableRow
+                    <SortableTodoRow
                       key={todo.id}
                       todo={todo}
+                      dndEnabled={true}
+                      focusedTodoId={focusedTodoId}
+                      todoRefs={todoRefs}
+                      todos={todos}
+                      editingErrors={editingErrors}
+                      setEditingErrors={setEditingErrors}
+                      onToggleDone={onToggleDone}
+                      onChangeTodo={onChangeTodo}
+                      onBlurTodo={onBlurTodo}
+                      onOpenNote={onOpenNote}
+                      onDeleteTodo={onDeleteTodo}
                       hasContentForIcon={hasContentForIcon}
+                      category={category}
+                      confirmTodoDeletes={confirmTodoDeletes}
+                      setConfirmTodoDeletes={setConfirmTodoDeletes}
+                      todoDeleteTimeouts={todoDeleteTimeouts}
                     />
                   );
                 })}
@@ -1081,7 +515,7 @@ export default function TodoTaskCard({
             </div>
           )}
           {showScrollUpHint && (
-            <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg黒/50 animate-pulse">
+            <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
               <ChevronUp size={16} className="text-white" />
             </div>
           )}
