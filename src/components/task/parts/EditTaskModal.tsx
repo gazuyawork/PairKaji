@@ -254,13 +254,14 @@ export default function EditTaskModal({
     });
   }, [isOpen, resizeTextarea]);
 
+
   useEffect(() => {
     if (!editedTask) return;
     requestAnimationFrame(() => {
       resizeTextarea();
       requestAnimationFrame(resizeTextarea);
     });
-  }, [editedTask?.note, resizeTextarea]);
+  }, [editedTask, resizeTextarea]);
 
   useEffect(() => {
     const onResize = () => resizeTextarea();
@@ -420,11 +421,10 @@ export default function EditTaskModal({
                   onClick={() => toggleCategory(key)}
                   aria-pressed={selected}
                   data-cat={key}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-full border transition ${
-                    selected
-                      ? 'border-[#FFCB7D] bg-yellow-500 text-white'
-                      : 'border-gray-300 text-gray-600 opacity-80'
-                  }`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-full border transition ${selected
+                    ? 'border-[#FFCB7D] bg-yellow-500 text-white'
+                    : 'border-gray-300 text-gray-600 opacity-80'
+                    }`}
                   title={label}
                 >
                   <Icon size={18} />
@@ -476,11 +476,10 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-7 h-7 rounded-full text-xs font-bold ${
-                    editedTask.daysOfWeek.includes(day)
-                      ? 'bg-[#5E5E5E] text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
+                  className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
+                    ? 'bg-[#5E5E5E] text-white'
+                    : 'bg-gray-200 text-gray-600'
+                    }`}
                 >
                   {day}
                 </button>
@@ -603,9 +602,8 @@ export default function EditTaskModal({
                         key={user.id}
                         type="button"
                         onClick={() => toggleUser(user.id)}
-                        className={`w-12 h-12 rounded-full border overflow-hidden ${
-                          isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
-                        }`}
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                          }`}
                         title={`${user.name}`}
                       >
                         <Image
@@ -630,14 +628,12 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isPrivate}
                 onClick={() => setIsPrivate((v) => !v)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
-                }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isPrivate ? 'translate-x-6' : ''
-                  }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : ''
+                    }`}
                 />
               </button>
             </div>
@@ -660,14 +656,12 @@ export default function EditTaskModal({
                     (!isVisible) as unknown as TaskWithNote[keyof TaskWithNote]
                   )
                 }
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isVisible ? 'bg-yellow-500' : 'bg-gray-300'
-                }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isVisible ? 'bg-yellow-500' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isVisible ? 'translate-x-6' : ''
-                  }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isVisible ? 'translate-x-6' : ''
+                    }`}
                 />
               </button>
             </div>
@@ -697,9 +691,8 @@ export default function EditTaskModal({
           </div>
           <div className="mt-1 pr-1 flex justify-end">
             <span
-              className={`${
-                (editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'
-              } text-xs`}
+              className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'
+                } text-xs`}
             >
               {(editedTask.note?.length ?? 0)}/{NOTE_MAX}
             </span>

@@ -1,3 +1,4 @@
+// ./src/components/common/SubscribeConfirm.tsx
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -12,6 +13,17 @@ type Plan = 'lite' | 'premium';
 type Props = {
   plan: Plan;
 };
+
+type CheckoutOk = { url: string };
+type CheckoutErr = { error: string };
+
+function hasUrl(v: unknown): v is CheckoutOk {
+  return typeof v === 'object' && v !== null && typeof (v as { url?: unknown }).url === 'string';
+}
+
+function hasError(v: unknown): v is CheckoutErr {
+  return typeof v === 'object' && v !== null && typeof (v as { error?: unknown }).error === 'string';
+}
 
 export default function SubscribeConfirm({ plan }: Props) {
   const router = useRouter();
@@ -60,24 +72,30 @@ export default function SubscribeConfirm({ plan }: Props) {
     }
     try {
       setLoading(true);
-       console.log('checkout uid:', uid); // ★ 送信直前に確認
+      console.log('checkout uid:', uid); // ★ 送信直前に確認
       const res = await fetch('/api/billing/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: meta.apiPlan, next, uid }),
       });
+
+      const data: unknown = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error ?? '決済セッションの作成に失敗しました。時間をおいて再度お試しください。');
+        const message = hasError(data)
+          ? data.error
+          : '決済セッションの作成に失敗しました。時間をおいて再度お試しください。';
+        throw new Error(message);
       }
-      const { url } = await res.json();
-      if (typeof url === 'string' && url.startsWith('http')) {
-        window.location.href = url; // Stripe Hosted Checkout へ
-      } else {
-        throw new Error('遷移先URLが不正です。');
+
+      if (hasUrl(data) && data.url.startsWith('http')) {
+        window.location.href = data.url; // Stripe Hosted Checkout へ
+        return;
       }
-    } catch (e: any) {
-      setErr(e?.message ?? '不明なエラーが発生しました。');
+
+      throw new Error('遷移先URLが不正です。');
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : '不明なエラーが発生しました。');
       setLoading(false);
     }
   };
@@ -152,7 +170,7 @@ export default function SubscribeConfirm({ plan }: Props) {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
               onClick={handleCheckout}
-              disabled={loading || !uid}  // ★ uid が確定するまで押せない
+              disabled={loading || !uid}
               className="rounded-md px-6 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition duration-300"
               style={{
                 backgroundImage: `linear-gradient(90deg, ${meta.gradientFrom}, ${meta.gradientTo})`,

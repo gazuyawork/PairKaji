@@ -48,6 +48,8 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  // type DraggableAttributes, // ← 未使用なのでimportしない
+  // type SyntheticListenerMap, // ← 存在しない環境があるため使用しない
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -56,6 +58,7 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import type React from 'react';
 
 // ★ 配列移動ヘルパ
 const moveItem = <T,>(arr: T[], from: number, to: number) => {
@@ -64,6 +67,16 @@ const moveItem = <T,>(arr: T[], from: number, to: number) => {
   copy.splice(to, 0, it);
   return copy;
 };
+
+// ★ TodoOnlyTask に存在しない可能性がある order を安全に読む
+const getOrderOrInf = (t: { order?: number } | TodoOnlyTask) =>
+  typeof (t as { order?: number }).order === 'number'
+    ? (t as { order?: number }).order as number
+    : Number.POSITIVE_INFINITY;
+
+// ★ error の code / message を安全に読むための型ガード
+const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown } =>
+  typeof e === 'object' && e !== null && ('code' in e || 'message' in e);
 
 // ★ タスクカード（グループ）を包む Sortable ラッパ
 function SortableTask({
@@ -74,7 +87,7 @@ function SortableTask({
   children: (args: {
     setNodeRef: (el: HTMLDivElement | null) => void;
     style: React.CSSProperties | undefined;
-    handleProps: Record<string, any>;
+    handleProps: React.HTMLAttributes<HTMLElement>;
     isDragging: boolean;
   }) => React.ReactNode;
 }) {
@@ -92,12 +105,18 @@ function SortableTask({
     transition,
   };
 
+  // listeners は undefined のことがあるため、空オブジェクトをマージ
+  const handleProps: React.HTMLAttributes<HTMLElement> = {
+    ...attributes,
+    ...(listeners ?? {}),
+  };
+
   return (
     <>
       {children({
         setNodeRef,
         style,
-        handleProps: { ...attributes, ...listeners },
+        handleProps,
         isDragging,
       })}
     </>
@@ -209,10 +228,10 @@ export default function TodoView() {
       );
 
       const userIds = new Set<string>([uid]);
-      pairsSnap.forEach(doc => {
-        const data = doc.data();
+      pairsSnap.forEach(docSnap => {
+        const data = docSnap.data();
         if (Array.isArray(data.userIds)) {
-          data.userIds.forEach((id: string) => userIds.add(id));
+          (data.userIds as string[]).forEach((id: string) => userIds.add(id));
         }
       });
 
@@ -222,10 +241,10 @@ export default function TodoView() {
       const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
       unsubscribe = onSnapshot(q, (snapshot) => {
         if (!isMounted) return;
-        const rawTasks: TodoOnlyTask[] = snapshot.docs.map(doc => {
-          const data = doc.data() as Omit<TodoOnlyTask, 'id'> & { order?: number };
+        const rawTasks: TodoOnlyTask[] = snapshot.docs.map(d => {
+          const data = d.data() as Omit<TodoOnlyTask, 'id'> & { order?: number };
           return {
-            id: doc.id,
+            id: d.id,
             ...data,
             todos: Array.isArray(data.todos) ? data.todos : [],
           };
@@ -235,8 +254,8 @@ export default function TodoView() {
         const newTasks = rawTasks
           .slice()
           .sort((a, b) => {
-            const ao = typeof (a as any).order === 'number' ? (a as any).order : Number.POSITIVE_INFINITY;
-            const bo = typeof (b as any).order === 'number' ? (b as any).order : Number.POSITIVE_INFINITY;
+            const ao = getOrderOrInf(a as { order?: number });
+            const bo = getOrderOrInf(b as { order?: number });
             if (ao !== bo) return ao - bo;
             return (a.name ?? '').localeCompare(b.name ?? '');
           });
@@ -320,9 +339,14 @@ export default function TodoView() {
       return id; // フィルタ外は相対順を保持
     });
 
-    // 5) state 楽観更新
-    const idToTask = Object.fromEntries(tasks.map(t => [t.id, t]));
-    const newTasks = newAllOrder.map(id => idToTask[id]).filter(Boolean) as TodoOnlyTask[];
+    // 5) state 楽観更新（fromEntries で any が出ないように reduce で型付け）
+    const idToTask = tasks.reduce<Record<string, TodoOnlyTask>>((acc, t) => {
+      acc[t.id] = t;
+      return acc;
+    }, {});
+    const newTasks = newAllOrder
+      .map(id => idToTask[id])
+      .filter((t): t is TodoOnlyTask => Boolean(t));
     setTasks(newTasks);
 
     // 6) Firestore の order を一括更新
@@ -417,11 +441,11 @@ export default function TodoView() {
                               const updated = tasks.map(t =>
                                 t.id === task.id
                                   ? {
-                                    ...t,
-                                    todos: t.todos.map(todo =>
-                                      todo.id === todoId ? { ...todo, text: value } : todo
-                                    ),
-                                  }
+                                      ...t,
+                                      todos: t.todos.map(todo =>
+                                        todo.id === todoId ? { ...todo, text: value } : todo
+                                      ),
+                                    }
                                   : t
                               );
                               setTasks(updated);
@@ -442,13 +466,17 @@ export default function TodoView() {
 
                               try {
                                 await updateTodoTextInTask(task.id, todoId, trimmed);
-                              } catch (e: any) {
-                                if (e?.code === 'DUPLICATE_TODO' || e?.message === 'DUPLICATE_TODO') {
-                                  toast.error('既に登録されています。');
-                                } else {
-                                  toast.error('保存に失敗しました');
-                                  console.error(e);
+                              } catch (e: unknown) {
+                                if (hasCodeOrMessage(e)) {
+                                  const code = typeof e.code === 'string' ? e.code : undefined;
+                                  const message = typeof e.message === 'string' ? e.message : undefined;
+                                  if (code === 'DUPLICATE_TODO' || message === 'DUPLICATE_TODO') {
+                                    toast.error('既に登録されています。');
+                                    return;
+                                  }
                                 }
+                                toast.error('保存に失敗しました');
+                                console.error(e);
                               }
                             }}
                             onDeleteTodo={async (todoId) => {
@@ -469,7 +497,10 @@ export default function TodoView() {
                             focusedTodoId={focusedTodoId}
                             onReorderTodos={async (orderedIds) => {
                               // 楽観的更新
-                              const idToTodo = Object.fromEntries(task.todos.map(td => [td.id, td]));
+                              const idToTodo = task.todos.reduce<Record<string, typeof task.todos[number]>>((acc, td) => {
+                                acc[td.id] = td;
+                                return acc;
+                              }, {});
                               const newTodos = orderedIds
                                 .map(id => idToTodo[id])
                                 .filter((v): v is typeof task.todos[number] => Boolean(v));

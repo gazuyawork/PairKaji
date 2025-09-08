@@ -242,11 +242,12 @@ export default function ProfilePage() {
         setLinePictureUrl(data.linePictureUrl ?? null);
 
         // ★ 追加：Stripe カスタマーIDの反映
-        if (typeof (data as any).stripeCustomerId === 'string' && (data as any).stripeCustomerId.trim() !== '') {
-          setStripeCustomerId((data as any).stripeCustomerId as string);
-        } else {
-          setStripeCustomerId(null);
-        }
+if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
+  setStripeCustomerId(data.stripeCustomerId);
+} else {
+  setStripeCustomerId(null);
+}
+
       },
       (error) => {
         handleFirestoreError(error);

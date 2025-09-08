@@ -43,8 +43,12 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (e: any) {
-    console.error('[create-portal] error:', e);
-    return NextResponse.json({ error: e?.message ?? 'failed to create portal session' }, { status: 500 });
+  } catch (e: unknown) {
+    if (e instanceof Error) {
+      console.error('[create-portal] error:', e.message);
+      return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+    console.error('[create-portal] unexpected error:', e);
+    return NextResponse.json({ error: 'failed to create portal session' }, { status: 500 });
   }
 }

@@ -15,7 +15,7 @@ export default function LandingAnimations() {
     // IntersectionObserver で可視化
     const io = 'IntersectionObserver' in window
       ? new IntersectionObserver(
-          (entries) => {
+          (entries: IntersectionObserverEntry[]) => {
             entries.forEach((entry) => {
               if (entry.isIntersecting) {
                 entry.target.classList.add('is-inview'); // ← 既存クラス名をそのまま利用
@@ -38,13 +38,14 @@ export default function LandingAnimations() {
       }
     });
 
-    // ✅ 追加: BFCache 復帰（iOS/Safari で発生）時も全表示にする安全弁
-    const onPageShow = (e: Event) => {
-      if (e && 'persisted' in e && e.persisted) {
+    // ✅ 追加(① any除去): BFCache 復帰（iOS/Safari で発生）時も全表示にする安全弁
+    // 'pageshow' は PageTransitionEvent（lib.dom）で型が提供されている
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
         els.forEach((el) => el.classList.add('is-inview'));
       }
     };
-    window.addEventListener('pageshow', onPageShow as any);
+    window.addEventListener('pageshow', onPageShow);
 
     // ✅ 追加: フォールバック（300ms 後も誰も可視化されていなければ全表示）
     const fallbackTimer = window.setTimeout(() => {
@@ -72,7 +73,8 @@ export default function LandingAnimations() {
 
     return () => {
       window.clearTimeout(fallbackTimer);
-      window.removeEventListener('pageshow', onPageShow as any);
+      // ✅ 変更(② any除去): 明示型を付けたハンドラをそのまま渡す
+      window.removeEventListener('pageshow', onPageShow);
       if (p) window.removeEventListener('scroll', onScroll);
       io?.disconnect();
       // js-animate は外さず残してOK（戻り時の初期表示維持のため）

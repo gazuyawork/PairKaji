@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import type { ComponentType } from 'react';
 import {
   CheckCircle,
@@ -749,8 +749,8 @@ export default function TodoTaskCard({
   // カードDOM参照
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // 最寄りのスクロール親を取得
-  const getScrollableParent = (el: HTMLElement | null): HTMLElement | Window => {
+  // 最寄りのスクロール親を取得（useCallback化）
+  const getScrollableParent = useCallback((el: HTMLElement | null): HTMLElement | Window => {
     if (!el) return window;
     let p: HTMLElement | null = el.parentElement;
     const regex = /(auto|scroll)/;
@@ -760,10 +760,10 @@ export default function TodoTaskCard({
       p = p.parentElement;
     }
     return window;
-  };
+  }, []);
 
-  // 指定要素のトップをスクロール親の先頭に合わせる
-  const scrollToTopOf = (el: HTMLElement | null, offset = 0) => {
+  // 指定要素のトップをスクロール親の先頭に合わせる（useCallback化）
+  const scrollToTopOf = useCallback((el: HTMLElement | null, offset = 0) => {
     if (!el) return;
     const parent = getScrollableParent(el);
     if (parent === window) {
@@ -775,7 +775,7 @@ export default function TodoTaskCard({
         p.scrollTop + el.getBoundingClientRect().top - p.getBoundingClientRect().top - offset;
       p.scrollTo({ top, behavior: 'smooth' });
     }
-  };
+  }, [getScrollableParent]);
 
   // false→true の瞬間にスクロール
   const prevExpandedRef = useRef<boolean>(effectiveExpanded);
@@ -794,26 +794,26 @@ export default function TodoTaskCard({
         });
       });
     }
-  }, [effectiveExpanded]);
+  }, [effectiveExpanded, scrollToTopOf]);
 
   /* -------------------- 展開時の“内容そのまま”動的高さ -------------------- */
 
   // 展開時の実高さ(px)
   const [expandedHeightPx, setExpandedHeightPx] = useState<number | null>(null);
 
-  // CSS変数 --todo-bottom-ui を取得（未設定なら 160px）
-  const getBottomUiPx = (host: HTMLElement | null) => {
-    if (!host) return 160;
-    const v = getComputedStyle(host).getPropertyValue('--todo-bottom-ui').trim();
-    const n = Number(v.replace('px', '').trim());
-    return Number.isFinite(n) && n > 0 ? n : 160;
-  };
-
-  // 展開時の高さを再計算（内容の総高さをそのまま使い、上限でクリップ）
-  const recalcExpandedHeight = () => {
+  // 展開時の高さを再計算（useCallback化）
+  const recalcExpandedHeight = useCallback(() => {
     const sc = scrollRef.current;
     const card = cardRef.current;
     if (!sc || !card) return;
+
+    // CSS変数 --todo-bottom-ui を取得（未設定なら 160px）
+    const getBottomUiPx = (host: HTMLElement | null) => {
+      if (!host) return 160;
+      const v = getComputedStyle(host).getPropertyValue('--todo-bottom-ui').trim();
+      const n = Number(v.replace('px', '').trim());
+      return Number.isFinite(n) && n > 0 ? n : 160;
+    };
 
     // 内容の総高さ（scrollHeight）
     const content = sc.scrollHeight;
@@ -834,9 +834,9 @@ export default function TodoTaskCard({
     // スクロール可否も更新
     const canScroll = content > target + 1;
     setIsScrollable(canScroll);
-  };
+  }, []);
 
-  // 展開状態やリスト変化で再計測
+  // 展開状態やリスト変化で再計測（依存に recalcExpandedHeight を追加）
   useEffect(() => {
     if (effectiveExpanded) {
       requestAnimationFrame(() => {
@@ -847,16 +847,16 @@ export default function TodoTaskCard({
     } else {
       setExpandedHeightPx(null);
     }
-  }, [effectiveExpanded, finalFilteredTodos.length]);
+  }, [effectiveExpanded, finalFilteredTodos.length, recalcExpandedHeight]);
 
-  // リサイズでも再計測
+  // リサイズでも再計測（依存に recalcExpandedHeight を追加）
   useEffect(() => {
     const onResize = () => {
       if (effectiveExpanded) recalcExpandedHeight();
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [effectiveExpanded]);
+  }, [effectiveExpanded, recalcExpandedHeight]);
 
   /* ---------------------------- render (card) ---------------------------- */
 
@@ -907,7 +907,7 @@ export default function TodoTaskCard({
             </span>
 
             <motion.span
-              className="ml-2 inline-flex items-center text-gray-400"
+              className="ml-2 inline-flex items中心 text-gray-400"
               initial={false}
               animate={{ y: [0, effectiveExpanded ? -3 : 3, 0] }}
               transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
@@ -1081,7 +1081,7 @@ export default function TodoTaskCard({
             </div>
           )}
           {showScrollUpHint && (
-            <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+            <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg黒/50 animate-pulse">
               <ChevronUp size={16} className="text-white" />
             </div>
           )}

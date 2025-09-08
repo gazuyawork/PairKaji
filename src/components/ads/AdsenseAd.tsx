@@ -41,7 +41,6 @@ export default function AdsenseAd({
       if (isThisInsInitialized) return;
 
       // ▼ 変更③: ドキュメント全体にも「未初期化の adsbygoogle 枠」があるか確認
-      //   これが無い状態で push すると、質問にある TagError が必ず出ます。
       const hasUninitializedAny =
         !!document.querySelector('ins.adsbygoogle:not([data-adsbygoogle-status="done"])');
       if (!hasUninitializedAny) return;
@@ -53,7 +52,6 @@ export default function AdsenseAd({
       // @ts-expect-error: provided by AdSense runtime
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.debug('AdSense push error (non-fatal):', e);
     }
   }, [isReady]);
