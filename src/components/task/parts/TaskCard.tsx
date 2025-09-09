@@ -296,7 +296,7 @@ export default function TaskCard({
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
           'border-[#e5e5e5] bg-white',
-          'touch-pan-y'
+          '[touch-action:pan-y]'
         )}
       >
         {/* TODOバッジ（左上） */}
