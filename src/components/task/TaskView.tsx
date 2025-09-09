@@ -597,251 +597,252 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     // <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
     // <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 overflow-hidden">
     <div className="h-dvh min-h-0 flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
-      {/* キーボード喚起用のダミー input */}
-      <input
-        ref={keyboardSummonerRef}
-        type="text"
-        className="fixed bottom-[4rem] left-2 w-px h-px"
-        style={{ opacity: 0.001 }}
-        aria-hidden="true"
-        tabIndex={-1}
-      />
-      {editTargetTask && (
-        <EditTaskModal
-          key={editTargetTask.id}
-          isOpen={!!editTargetTask}
-          task={editTargetTask}
-          onClose={() => setEditTargetTask(null)}
-          onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
-          users={userList}
-          isPairConfirmed={pairStatus === 'confirmed'}
-          existingTasks={Object.values(tasksState).flat()}
+      <main className="overflow-y-auto px-4 py-5">
+        {/* キーボード喚起用のダミー input */}
+        <input
+          ref={keyboardSummonerRef}
+          type="text"
+          className="fixed bottom-[4rem] left-2 w-px h-px"
+          style={{ opacity: 0.001 }}
+          aria-hidden="true"
+          tabIndex={-1}
         />
-      )}
+        {editTargetTask && (
+          <EditTaskModal
+            key={editTargetTask.id}
+            isOpen={!!editTargetTask}
+            task={editTargetTask}
+            onClose={() => setEditTargetTask(null)}
+            onSave={(updated) => updateTask(editTargetTask?.period ?? '毎日', updated)}
+            users={userList}
+            isPairConfirmed={pairStatus === 'confirmed'}
+            existingTasks={Object.values(tasksState).flat()}
+          />
+        )}
 
-      {/* 完了→未処理 へ戻す確認 */}
-      <ConfirmModal
-        isOpen={confirmOpen}
-        title=""
-        message={
-          pairStatus === 'confirmed' ? (
-            <>
-              <div className="text-xl font-semibold mb-2">タスクを未処理に戻しますか？</div>
-              <div className="text-sm text-gray-600">※パートナーが完了したタスクのポイントは減算されません。</div>
-            </>
-          ) : (
-            <div className="text-base font-semibold">タスクを未処理に戻しますか？</div>
-          )
-        }
-        onConfirm={() => {
-          setConfirmOpen(false);
-          pendingConfirmResolver.current?.(true);
-          pendingConfirmResolver.current = null;
-        }}
-        onCancel={() => {
-          setConfirmOpen(false);
-          pendingConfirmResolver.current?.(false);
-          pendingConfirmResolver.current = null;
-        }}
-        confirmLabel="OK"
-        cancelLabel="キャンセル"
-      />
-
-      {/* ペア解除後の孤児データ削除案内 */}
-      <ConfirmModal
-        isOpen={showOrphanConfirm}
-        title=""
-        message={<div className="text-base font-semibold">パートナーを解消したため、不要なデータを削除します。</div>}
-        onConfirm={async () => {
-          if (!uid) return;
-          await removeOrphanSharedTasksIfPairMissing();
-          try {
-            await updateDoc(doc(db, 'users', uid), { sharedTasksCleaned: true });
-          } catch (err) {
-            console.error('[OrphanCheck] フラグ保存に失敗:', err);
-          }
-          setShowOrphanConfirm(false);
-        }}
-        confirmLabel="OK"
-      />
-
-      <main
-        className={
-          "main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-57 " +
-          "[-webkit-overflow-scrolling:touch] [touch-action:pan-y] overscroll-contain"
-        }
-      >
-        {isLoading ? (
-          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
-            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-            {!isChecking && plan === 'premium' && (
+        {/* 完了→未処理 へ戻す確認 */}
+        <ConfirmModal
+          isOpen={confirmOpen}
+          title=""
+          message={
+            pairStatus === 'confirmed' ? (
               <>
-                <div className="sticky top-0 bg-transparent z-999">
-                  <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
-                    {isSearchVisible && (
-                      <div className="mb-3">
-                        <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">{/* フィルタ群は必要に応じて復活 */}</div>
-                  </div>
-                </div>
+                <div className="text-xl font-semibold mb-2">タスクを未処理に戻しますか？</div>
+                <div className="text-sm text-gray-600">※パートナーが完了したタスクのポイントは減算されません。</div>
               </>
-            )}
+            ) : (
+              <div className="text-base font-semibold">タスクを未処理に戻しますか？</div>
+            )
+          }
+          onConfirm={() => {
+            setConfirmOpen(false);
+            pendingConfirmResolver.current?.(true);
+            pendingConfirmResolver.current = null;
+          }}
+          onCancel={() => {
+            setConfirmOpen(false);
+            pendingConfirmResolver.current?.(false);
+            pendingConfirmResolver.current = null;
+          }}
+          confirmLabel="OK"
+          cancelLabel="キャンセル"
+        />
 
-            {(() => {
-              const allFilteredTasks = periods
-                .flatMap((period) => tasksState[period] ?? [])
-                .filter(
-                  (task) =>
-                    uid &&
-                    task.userIds?.includes(uid) &&
-                    (!periodFilter || periodFilter === task.period) &&
-                    (!personFilter || task.users.includes(personFilter)) &&
-                    (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
-                    (!privateFilter || getOpt(task, 'private') === true) &&
-                    (!flaggedFilter || getOpt(task, 'flagged') === true)
-                );
+        {/* ペア解除後の孤児データ削除案内 */}
+        <ConfirmModal
+          isOpen={showOrphanConfirm}
+          title=""
+          message={<div className="text-base font-semibold">パートナーを解消したため、不要なデータを削除します。</div>}
+          onConfirm={async () => {
+            if (!uid) return;
+            await removeOrphanSharedTasksIfPairMissing();
+            try {
+              await updateDoc(doc(db, 'users', uid), { sharedTasksCleaned: true });
+            } catch (err) {
+              console.error('[OrphanCheck] フラグ保存に失敗:', err);
+            }
+            setShowOrphanConfirm(false);
+          }}
+          confirmLabel="OK"
+        />
 
-              if (allFilteredTasks.length === 0) {
-                return <p className="text-center text-gray-500 mt-6">表示するタスクはありません。</p>;
-              }
-
-              return periods.map((period, i) => {
-                const rawTasks = tasksState[period] ?? [];
-                const list = rawTasks.filter(
-                  (task) =>
-                    uid &&
-                    task.userIds?.includes(uid) &&
-                    (!periodFilter || periodFilter === period) &&
-                    (!personFilter || task.users.includes(personFilter)) &&
-                    (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
-                    (!privateFilter || getOpt(task, 'private') === true) &&
-                    (!flaggedFilter || getOpt(task, 'flagged') === true)
-                );
-                const remaining = list.filter((t) => !t.done).length;
-
-                if (!uid) {
-                  return (
-                    <div key={period} className="p-4 text-gray-400">
-                      ユーザー情報を取得中...
-                    </div>
-                  );
-                }
-
-                if (list.length === 0) {
-                  return <div key={period} />;
-                }
-
-                return (
-                  <div key={period} className="mx-auto w-full max-w-xl">
-                    {/* <div className="flex items-center justify-between mt-4 mb-2 px-2"> */}
-                    <div className={`flex items-center justify-between ${i === 0 ? 'mt-0' : 'mt-4'} mb-2 px-2`}>
-                      <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
-                        <span
-                          className={`inline-block rounded-full px-3 py-1 text-sm text-white 
-      ${remaining === 0
-                              ? 'bg-gradient-to-b from-[#b0b0b0] to-[#8c8c8c] shadow-md shadow-black/20'
-                              : 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] shadow-md shadow-black/20'} 
-      shadow-inner`}
-                        >
-                          {period}
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
-                        </span>
-                      </h2>
-
-                      {list.some((t) => t.done) && (
-                        <button
-                          onClick={() => setShowCompletedMap((prev) => ({ ...prev, [period]: !prev[period] }))}
-                          title={
-                            showCompletedMap[period]
-                              ? '完了タスクを表示中（クリックで非表示）'
-                              : '完了タスクを非表示中（クリックで表示）'
-                          }
-                          className={`p-1 mr-3 rounded-full border transition-all duration-300
-                              ${showCompletedMap[period]
-                              ? 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
-                              : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'
-                            }`}
-                        >
-                          {showCompletedMap[period] ? (
-                            <Lightbulb size={20} className="fill-yellow-500" />
-                          ) : (
-                            <LightbulbOff size={20} className="fill-gray-100" />
-                          )}
-                        </button>
+        {/* <main
+          className={
+            "main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-57 " +
+            "[-webkit-overflow-scrolling:touch] [touch-action:pan-y] overscroll-contain"
+          }
+        > */}
+          {isLoading ? (
+            <div className="flex items-center justify-center text-gray-400 text-sm h-200">
+              <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              {!isChecking && plan === 'premium' && (
+                <>
+                  <div className="sticky top-0 bg-transparent z-999">
+                    <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
+                      {isSearchVisible && (
+                        <div className="mb-3">
+                          <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
+                        </div>
                       )}
+                      <div className="flex items-center gap-2">{/* フィルタ群は必要に応じて復活 */}</div>
                     </div>
+                  </div>
+                </>
+              )}
 
-                    <ul className="space-y-1.5 [touch-action:pan-y]">
-                      <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
-                        ※ スクロールテスト
-                      </li>
-                      {/* {list
+              {(() => {
+                const allFilteredTasks = periods
+                  .flatMap((period) => tasksState[period] ?? [])
+                  .filter(
+                    (task) =>
+                      uid &&
+                      task.userIds?.includes(uid) &&
+                      (!periodFilter || periodFilter === task.period) &&
+                      (!personFilter || task.users.includes(personFilter)) &&
+                      (!searchTerm || task.name.includes(searchTerm)) &&
+                      (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
+                      (!privateFilter || getOpt(task, 'private') === true) &&
+                      (!flaggedFilter || getOpt(task, 'flagged') === true)
+                  );
+
+                if (allFilteredTasks.length === 0) {
+                  return <p className="text-center text-gray-500 mt-6">表示するタスクはありません。</p>;
+                }
+
+                return periods.map((period, i) => {
+                  const rawTasks = tasksState[period] ?? [];
+                  const list = rawTasks.filter(
+                    (task) =>
+                      uid &&
+                      task.userIds?.includes(uid) &&
+                      (!periodFilter || periodFilter === period) &&
+                      (!personFilter || task.users.includes(personFilter)) &&
+                      (!searchTerm || task.name.includes(searchTerm)) &&
+                      (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
+                      (!privateFilter || getOpt(task, 'private') === true) &&
+                      (!flaggedFilter || getOpt(task, 'flagged') === true)
+                  );
+                  const remaining = list.filter((t) => !t.done).length;
+
+                  if (!uid) {
+                    return (
+                      <div key={period} className="p-4 text-gray-400">
+                        ユーザー情報を取得中...
+                      </div>
+                    );
+                  }
+
+                  if (list.length === 0) {
+                    return <div key={period} />;
+                  }
+
+                  return (
+                    <div key={period} className="mx-auto w-full max-w-xl">
+                      {/* <div className="flex items-center justify-between mt-4 mb-2 px-2"> */}
+                      <div className={`flex items-center justify-between ${i === 0 ? 'mt-0' : 'mt-4'} mb-2 px-2`}>
+                        <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
+                          <span
+                            className={`inline-block rounded-full px-3 py-1 text-sm text-white 
+      ${remaining === 0
+                                ? 'bg-gradient-to-b from-[#b0b0b0] to-[#8c8c8c] shadow-md shadow-black/20'
+                                : 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] shadow-md shadow-black/20'} 
+      shadow-inner`}
+                          >
+                            {period}
+                          </span>
+                          <span className="text-sm text-gray-600">
+                            {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
+                          </span>
+                        </h2>
+
+                        {list.some((t) => t.done) && (
+                          <button
+                            onClick={() => setShowCompletedMap((prev) => ({ ...prev, [period]: !prev[period] }))}
+                            title={
+                              showCompletedMap[period]
+                                ? '完了タスクを表示中（クリックで非表示）'
+                                : '完了タスクを非表示中（クリックで表示）'
+                            }
+                            className={`p-1 mr-3 rounded-full border transition-all duration-300
+                              ${showCompletedMap[period]
+                                ? 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
+                                : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'
+                              }`}
+                          >
+                            {showCompletedMap[period] ? (
+                              <Lightbulb size={20} className="fill-yellow-500" />
+                            ) : (
+                              <LightbulbOff size={20} className="fill-gray-100" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      <ul className="space-y-1.5 [touch-action:pan-y]">
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                          ※ スクロールテスト
+                        </li>
+                        {/* {list
                         .slice()
                         .sort((a, b) => {
                           // ① フラグ付きタスクを優先
@@ -892,23 +893,23 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             onSkip={handleSkip}
                           />
                         ))} */}
-                    </ul>
-                  </div>
-                );
-              });
-            })()}
-          </motion.div>
-        )}
-        {!isLoading && !isChecking && plan === 'free' && <AdCard />}
-      </main>
+                      </ul>
+                    </div>
+                  );
+                });
+              })()}
+            </motion.div>
+          )}
+          {!isLoading && !isChecking && plan === 'free' && <AdCard />}
+        {/* </main> */}
 
-      {/* 左下のフローティング列（虫眼鏡は右端） */}
-      {!editTargetTask && index === 1 &&
-        typeof window !== 'undefined' &&
-        createPortal(
-          <div className="w-full pointer-events-none">
-            <div
-              className="
+        {/* 左下のフローティング列（虫眼鏡は右端） */}
+        {!editTargetTask && index === 1 &&
+          typeof window !== 'undefined' &&
+          createPortal(
+            <div className="w-full pointer-events-none">
+              <div
+                className="
           fixed
           bottom-[calc(env(safe-area-inset-bottom)+5rem)]
           left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
@@ -916,138 +917,138 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           pointer-events-auto
           mb-4
         "
-            >
-              <div className="flex items-center gap-2">
-                {/* 本日フィルター */}
-                <motion.button
-                  onClick={() => setTodayFilter((prev) => !prev)}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  aria-pressed={todayFilter}
-                  aria-label="本日のタスクに絞り込む"
-                  title="本日のタスクに絞り込む"
-                  className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-              ${todayFilter
-                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner ring-2 ring-white'
-                      : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D] ring-2 ring-white'}
-            `}
-                >
-                  <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
-                  <span
-                    className={`absolute text-[14px] font-bold top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${todayFilter ? 'text-white' : 'text-gray-600'}`}
-                  >
-                    {todayDate}
-                  </span>
-                </motion.button>
-
-                {/* プライベート（ペア確定時のみ表示） */}
-                {pairStatus === 'confirmed' && (
+              >
+                <div className="flex items-center gap-2">
+                  {/* 本日フィルター */}
                   <motion.button
-                    onClick={() => setPrivateFilter((prev) => !prev)}
+                    onClick={() => setTodayFilter((prev) => !prev)}
                     whileTap={{ scale: 1.2 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    aria-pressed={privateFilter}
-                    aria-label="プライベートタスクのみ表示"
-                    title="プライベートタスク"
+                    aria-pressed={todayFilter}
+                    aria-label="本日のタスクに絞り込む"
+                    title="本日のタスクに絞り込む"
                     className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-                ${privateFilter
-                        ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[#059669] shadow-inner ring-2 ring-white'
-                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185] ring-2 ring-white'}
-              `}
-                  >
-                    <SquareUser className="w-7 h-7" />
-                  </motion.button>
-                )}
-
-                {/* フラグ */}
-                <motion.button
-                  onClick={() => setFlaggedFilter((prev) => !prev)}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  aria-pressed={flaggedFilter}
-                  aria-label="フラグ付きタスクのみ表示"
-                  title="フラグ付きタスク"
-                  className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-              ${flaggedFilter
-                      ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] border-[#f43f5e] text-white shadow-inner ring-2 ring-white'
-                      : 'bg-white border-gray-300 text-[#5E5E5E] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:border-[#fb7185] hover:text-white ring-2 ring-white'}
+              ${todayFilter
+                        ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner ring-2 ring-white'
+                        : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D] ring-2 ring-white'}
             `}
-                >
-                  <Flag className="w-6 h-6" />
-                </motion.button>
+                  >
+                    <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
+                    <span
+                      className={`absolute text-[14px] font-bold top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${todayFilter ? 'text-white' : 'text-gray-600'}`}
+                    >
+                      {todayDate}
+                    </span>
+                  </motion.button>
 
-                {/* 検索（虫眼鏡） */}
-                <motion.button
-                  onMouseDown={() => {
-                    keyboardSummonerRef.current?.focus();
-                    setShowSearchBox(true);
-                    requestAnimationFrame(() => {
-                      requestAnimationFrame(() => {
-                        const real = searchInputRef.current;
-                        if (real) {
-                          try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { /* noop */ }
-                          real.focus({ preventScroll: true });
-                        }
-                        keyboardSummonerRef.current?.blur();
-                      });
-                    });
-                  }}
-                  onTouchStart={() => {
-                    keyboardSummonerRef.current?.focus();
-                    setShowSearchBox(true);
-                    requestAnimationFrame(() => {
-                      requestAnimationFrame(() => {
-                        const real = searchInputRef.current;
-                        if (real) {
-                          try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { /* noop */ }
-                          real.focus({ preventScroll: true });
-                        }
-                        keyboardSummonerRef.current?.blur();
-                      });
-                    });
-                  }}
-                  whileTap={{ scale: 1.2 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  aria-pressed={isSearchVisible}
-                  aria-label="検索ボックスを表示/非表示"
-                  title="検索"
-                  className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-                    ${isSearchVisible
-                      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner ring-2 ring-white'
-                      : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] ring-2 ring-white'
-                    }`}
-                >
-                  <Search className={`w-7 h-7 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
-                </motion.button>
+                  {/* プライベート（ペア確定時のみ表示） */}
+                  {pairStatus === 'confirmed' && (
+                    <motion.button
+                      onClick={() => setPrivateFilter((prev) => !prev)}
+                      whileTap={{ scale: 1.2 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      aria-pressed={privateFilter}
+                      aria-label="プライベートタスクのみ表示"
+                      title="プライベートタスク"
+                      className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+                ${privateFilter
+                          ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[#059669] shadow-inner ring-2 ring-white'
+                          : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185] ring-2 ring-white'}
+              `}
+                    >
+                      <SquareUser className="w-7 h-7" />
+                    </motion.button>
+                  )}
 
-                {/* クリア */}
-                {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
+                  {/* フラグ */}
                   <motion.button
-                    onClick={() => {
-                      setPeriodFilter(null);
-                      setPersonFilter(null);
-                      setSearchTerm('');
-                      setTodayFilter(false);
-                      setPrivateFilter(false);
-                      setShowSearchBox(false);
-                      setFlaggedFilter(false);
+                    onClick={() => setFlaggedFilter((prev) => !prev)}
+                    whileTap={{ scale: 1.2 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    aria-pressed={flaggedFilter}
+                    aria-label="フラグ付きタスクのみ表示"
+                    title="フラグ付きタスク"
+                    className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+              ${flaggedFilter
+                        ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] border-[#f43f5e] text-white shadow-inner ring-2 ring-white'
+                        : 'bg-white border-gray-300 text-[#5E5E5E] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:border-[#fb7185] hover:text-white ring-2 ring-white'}
+            `}
+                  >
+                    <Flag className="w-6 h-6" />
+                  </motion.button>
+
+                  {/* 検索（虫眼鏡） */}
+                  <motion.button
+                    onMouseDown={() => {
+                      keyboardSummonerRef.current?.focus();
+                      setShowSearchBox(true);
+                      requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                          const real = searchInputRef.current;
+                          if (real) {
+                            try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { /* noop */ }
+                            real.focus({ preventScroll: true });
+                          }
+                          keyboardSummonerRef.current?.blur();
+                        });
+                      });
+                    }}
+                    onTouchStart={() => {
+                      keyboardSummonerRef.current?.focus();
+                      setShowSearchBox(true);
+                      requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                          const real = searchInputRef.current;
+                          if (real) {
+                            try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { /* noop */ }
+                            real.focus({ preventScroll: true });
+                          }
+                          keyboardSummonerRef.current?.blur();
+                        });
+                      });
                     }}
                     whileTap={{ scale: 1.2 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                    className="w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner"
-                    title="すべてのフィルターを解除"
-                    aria-label="すべてのフィルターを解除"
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    aria-pressed={isSearchVisible}
+                    aria-label="検索ボックスを表示/非表示"
+                    title="検索"
+                    className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
+                    ${isSearchVisible
+                        ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner ring-2 ring-white'
+                        : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] ring-2 ring-white'
+                      }`}
                   >
-                    <X className="w-5 h-5" />
+                    <Search className={`w-7 h-7 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
                   </motion.button>
-                )}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )
-      }
 
+                  {/* クリア */}
+                  {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
+                    <motion.button
+                      onClick={() => {
+                        setPeriodFilter(null);
+                        setPersonFilter(null);
+                        setSearchTerm('');
+                        setTodayFilter(false);
+                        setPrivateFilter(false);
+                        setShowSearchBox(false);
+                        setFlaggedFilter(false);
+                      }}
+                      whileTap={{ scale: 1.2 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                      className="w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner"
+                      title="すべてのフィルターを解除"
+                      aria-label="すべてのフィルターを解除"
+                    >
+                      <X className="w-5 h-5" />
+                    </motion.button>
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        }
+      </main>
     </div>
   );
 }
