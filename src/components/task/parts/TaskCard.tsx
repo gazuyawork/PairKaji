@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
-// import { useSwipeable } from 'react-swipeable';
+import { useSwipeable } from 'react-swipeable';
 import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, SkipForward, Notebook, X, SquareUser } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
@@ -71,7 +71,7 @@ export default function TaskCard({
   userList,
   isPairConfirmed,
   onEdit,
-  // onSwipeLeft,
+  onSwipeLeft,
   deletingTaskId,
   onSkip,
 }: Props) {
@@ -145,18 +145,18 @@ export default function TaskCard({
     }
   };
 
-  // const swipeable = useSwipeable({
-  //   onSwipedLeft: () => {
-  //     setSwipeDirection('left');
-  //     setShowActions(false);
-  //     onSwipeLeft(task.id);
-  //   },
-  //   onSwipedRight: () => {
-  //     setSwipeDirection('right');
-  //     setShowActions(false);
-  //   },
-  //   trackTouch: true,
-  // });
+  const swipeable = useSwipeable({
+    onSwipedLeft: () => {
+      setSwipeDirection('left');
+      setShowActions(false);
+      onSwipeLeft(task.id);
+    },
+    onSwipedRight: () => {
+      setSwipeDirection('right');
+      setShowActions(false);
+    },
+    trackTouch: true,
+  });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -285,7 +285,7 @@ export default function TaskCard({
       )}
 
       <motion.div
-        // {...swipeable}
+        {...swipeable}
         onClick={() => {
           setSwipeDirection(null);
           setShowActions(true);
