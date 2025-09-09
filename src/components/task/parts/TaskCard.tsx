@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, SkipForward, Notebook, X, SquareUser } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, Notebook, X, SquareUser } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
