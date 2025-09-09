@@ -1,3 +1,4 @@
+// src/components/todo/parts/GroupSelector.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -6,7 +7,17 @@ import { useEffect, useState, useMemo, useImperativeHandle, forwardRef } from 'r
 import { createPortal } from 'react-dom';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, LayoutGrid } from 'lucide-react';
+import {
+  X,
+  Search,
+  LayoutGrid,
+  ShoppingCart,
+  Utensils,
+  MapPin,
+  Briefcase,
+  Home,
+  Tag,
+} from 'lucide-react';
 import { useUserUid } from '@/hooks/useUserUid';
 
 /* =========================
@@ -33,6 +44,62 @@ function getCategoryLabel(t: TodoOnlyTask): string {
   return (c?.categoryName ?? c?.categoryLabel ?? c?.category ?? '未分類') ?? '未分類';
 }
 
+/** ★拡張: カテゴリ → アイコン/色/ラベル/チップのアクティブ配色 */
+function getCategoryMeta(raw?: string | null) {
+  const category = (raw ?? '').trim() || '未分類';
+  switch (category) {
+    case '買い物':
+      return {
+        Icon: ShoppingCart,
+        colorClass: 'text-emerald-500',
+        label: '買い物',
+        chipActiveClass:
+          'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
+      };
+    case '料理':
+      return {
+        Icon: Utensils,
+        colorClass: 'text-orange-500',
+        label: '料理',
+        chipActiveClass:
+          'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
+      };
+    case '旅行':
+      return {
+        Icon: MapPin,
+        colorClass: 'text-sky-500',
+        label: '旅行',
+        chipActiveClass:
+          'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
+      };
+    case '仕事':
+      return {
+        Icon: Briefcase,
+        colorClass: 'text-indigo-500',
+        label: '仕事',
+        chipActiveClass:
+          'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-indigo-600',
+      };
+    case '家事':
+      return {
+        Icon: Home,
+        colorClass: 'text-rose-500',
+        label: '家事',
+        chipActiveClass:
+          'bg-gradient-to-b from-rose-500 to-rose-600 text-white border-rose-600',
+      };
+    case '未分類':
+    default:
+      return {
+        Icon: Tag,
+        colorClass: 'text-gray-400',
+        label: category,
+        chipActiveClass:
+          'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
+      };
+  }
+}
+
 type Props = {
   tasks: TodoOnlyTask[];
   selectedGroupId: string | null;
@@ -40,15 +107,12 @@ type Props = {
 };
 
 /* ------------------------------
-   ★ 追加: 親から呼べるハンドル型
+   親から呼べるハンドル型
    ------------------------------ */
 export type GroupSelectorHandle = {
   reset: () => void;
 };
 
-/* -------------------------------------------------------
-   ★ 変更: forwardRef 化して reset() を useImperativeHandle で公開
-   ------------------------------------------------------- */
 const GroupSelector = forwardRef<GroupSelectorHandle, Props>(
   ({ tasks, selectedGroupId, onSelectGroup }: Props, ref) => {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -71,7 +135,7 @@ const GroupSelector = forwardRef<GroupSelectorHandle, Props>(
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
     const totalCount = baseFilteredTasks.length;
 
-    // ★ 追加: 親から内部状態をリセットできるようにする
+    // 親から内部状態をリセットできるようにする
     useImperativeHandle(
       ref,
       () => ({
@@ -293,25 +357,27 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                             すべて
                           </button>
 
-                          {/* 動的カテゴリ */}
+                          {/* 動的カテゴリ（★アクティブ時はカテゴリ固有色） */}
                           {sheetCategories.map((c) => {
                             const active = selectedCategoryId === c.id;
+                            const { Icon, colorClass, chipActiveClass } = getCategoryMeta(c.label);
                             return (
                               <button
                                 key={c.id}
                                 type="button"
                                 onClick={() => setSelectedCategoryId(c.id)}
-                                className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
+                                className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1
   ${
     active
-      ? 'bg-gradient-to-b from-orange-400 to-orange-500 text-white border-orange-500 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+      ? `${chipActiveClass} shadow-[0_2px_2px_rgba(0,0,0,0.1)]`
       : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
   }
   active:translate-y-[1px]`}
                                 aria-pressed={active}
                                 title={c.label}
                               >
-                                {c.label}
+                                <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
+                                <span>{c.label}</span>
                               </button>
                             );
                           })}
@@ -329,11 +395,15 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                     {/* 一覧 */}
                     <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
                       {sheetFiltered.length === 0 ? (
-                        <div className="text-center text-sm text-gray-500 py-10">一致するToDoが見つかりませんでした。</div>
+                        <div className="text-center text-sm text-gray-500 py-10">
+                          一致するToDoが見つかりませんでした。
+                        </div>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {sheetFiltered.map((task) => {
                             const isActive = selectedGroupId === task.id;
+                            const { Icon, colorClass, label } = getCategoryMeta(getCategoryLabel(task));
+
                             return (
                               <button
                                 key={task.id}
@@ -349,10 +419,14 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                                 type="button"
                               >
                                 <span className="line-clamp-2">{task.name}</span>
-                                {/* 補助: カテゴリ名（任意表示。不要なら削除可） */}
+
+                                {/* カテゴリ名の前にアイコン + 指定色 */}
                                 {getCategoryId(task) && (
                                   <span className="mt-1 block text-[11px] text-gray-500">
-                                    {getCategoryLabel(task)}
+                                    <span className="inline-flex items-center gap-1">
+                                      <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
+                                      <span>{label}</span>
+                                    </span>
                                   </span>
                                 )}
                               </button>

@@ -206,9 +206,9 @@ export default function TaskCard({
     <div className="relative" ref={cardRef}>
 
       {swipeDirection === 'left' && deletingTaskId === task.id && !showActions && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-md bg-gradient-to-b from-indigo-300 to-indigo-600 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
+            className="w-16 h-11 text-sm font-bold text-white flex items-center justify-center rounded-xl bg-gradient-to-b from-indigo-300 to-indigo-600 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
             onClick={(e) => {
               e.stopPropagation();
               onSkip?.(task.id);
@@ -216,7 +216,8 @@ export default function TaskCard({
             }}
             title="スキップ（ポイント加算なし）"
           >
-            <SkipForward className="w-5 h-5 text-white [text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]" />
+            {/* <SkipForward className="w-5 h-5 text-white [text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]" /> */}
+            <span className="[text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]">SKIP</span>
           </button>
         </div>
       )}
@@ -224,7 +225,7 @@ export default function TaskCard({
       {swipeDirection === 'right' && task.visible && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-14 h-8 text-xs font-bold text-white rounded-md bg-gradient-to-b from-blue-300 to-blue-500 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
+            className="w-16 h-11 text-sm font-bold text-white rounded-xl bg-gradient-to-b from-blue-300 to-blue-500 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
             onClick={handleTodoClick}
           >
             <span className="[text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]">TODO</span>
