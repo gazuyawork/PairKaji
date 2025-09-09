@@ -119,6 +119,18 @@ const GroupSelector = forwardRef<GroupSelectorHandle, Props>(
     const [mounted, setMounted] = useState(false); // Portal用（SSR対策）
     const uid = useUserUid();
 
+    // ★ 追加: モバイル判定（SPではautoFocus無効にする）
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+      const checkMobile = () => {
+        setIsMobile(window.innerWidth < 768); // Tailwind md未満をSPと判定
+      };
+      checkMobile();
+      window.addEventListener('resize', checkMobile);
+      return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     useEffect(() => {
       setMounted(true);
     }, []);
@@ -325,7 +337,7 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                           onChange={(e) => setSheetQuery(e.target.value)}
                           placeholder="キーワードで検索"
                           className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
-                          autoFocus
+                          autoFocus={!isMobile} // ★ PCでは有効, SPでは無効
                         />
                         {sheetQuery && (
                           <button
