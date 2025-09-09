@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import TaskCard from '@/components/task/parts/TaskCard';
+// import TaskCard from '@/components/task/parts/TaskCard';
 import EditTaskModal from '@/components/task/parts/EditTaskModal';
 import SearchBox from '@/components/task/parts/SearchBox';
 import {
@@ -11,7 +11,7 @@ import {
   query,
   where,
   updateDoc,
-  deleteDoc,
+  // deleteDoc,
   doc,
   getDocs,
   serverTimestamp,
@@ -23,7 +23,7 @@ import {
 import { db } from '@/lib/firebase';
 import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
-import { toggleTaskDoneStatus, saveSingleTask, removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
+import { saveSingleTask, removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
@@ -37,7 +37,7 @@ import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import { createPortal } from 'react-dom';
 import { useView } from '@/context/ViewContext';
-import { skipTaskWithoutPoints } from '@/lib/taskUtils';
+// import { skipTaskWithoutPoints } from '@/lib/taskUtils';
 
 /* =========================================================
  * 任意プロパティを型安全に読むための補助
@@ -77,99 +77,99 @@ const INITIAL_TASK_GROUPS: Record<Period, Task[]> = { 毎日: [], 週次: [], �
  * =======================================================*/
 
 // "HH:mm" → 分に変換。不正は null。
-const parseTimeToMinutes = (s?: unknown): number | null => {
-  if (typeof s !== 'string') return null;
-  const m = s.match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (Number.isNaN(h) || Number.isNaN(min)) return null;
-  return h * 60 + min;
-};
+// const parseTimeToMinutes = (s?: unknown): number | null => {
+//   if (typeof s !== 'string') return null;
+//   const m = s.match(/^(\d{1,2}):(\d{2})$/);
+//   if (!m) return null;
+//   const h = Number(m[1]);
+//   const min = Number(m[2]);
+//   if (Number.isNaN(h) || Number.isNaN(min)) return null;
+//   return h * 60 + min;
+// };
 
 // Firestore Timestamp / Date / ISO文字列 / number(ms) をミリ秒へ。なければ 0。
-const toMillis = (v: unknown): number => {
-  if (!v) return 0;
-  if (v instanceof Date) return v.getTime();
-  if (typeof v === 'number') return v;
-  if (typeof v === 'string') {
-    const t = Date.parse(v);
-    return Number.isNaN(t) ? 0 : t;
-  }
-  if (hasToDate(v)) {
-    try {
-      return v.toDate().getTime();
-    } catch {
-      return 0;
-    }
-  }
-  return 0;
-};
+// const toMillis = (v: unknown): number => {
+//   if (!v) return 0;
+//   if (v instanceof Date) return v.getTime();
+//   if (typeof v === 'number') return v;
+//   if (typeof v === 'string') {
+//     const t = Date.parse(v);
+//     return Number.isNaN(t) ? 0 : t;
+//   }
+//   if (hasToDate(v)) {
+//     try {
+//       return v.toDate().getTime();
+//     } catch {
+//       return 0;
+//     }
+//   }
+//   return 0;
+// };
 
 // タスクから比較に用いる日時情報を抽出
-type MinimalForCompare = Pick<
-  TaskOptionalFields,
-  'scheduledAt' | 'datetime' | 'dates' | 'time' | 'scheduledTime' | 'timeString'
->;
+// type MinimalForCompare = Pick<
+//   TaskOptionalFields,
+//   'scheduledAt' | 'datetime' | 'dates' | 'time' | 'scheduledTime' | 'timeString'
+// >;
 
-const getComparableDateTimeMs = (
-  task: Task
-): { hasDate: boolean; hasTimeOnly: boolean; ms: number | null } => {
-  const today = new Date();
-  const todayY = today.getFullYear();
-  const todayM = today.getMonth();
-  const todayD = today.getDate();
+// const getComparableDateTimeMs = (
+//   task: Task
+// ): { hasDate: boolean; hasTimeOnly: boolean; ms: number | null } => {
+//   const today = new Date();
+//   const todayY = today.getFullYear();
+//   const todayM = today.getMonth();
+//   const todayD = today.getDate();
 
-  const t = task as unknown as MinimalForCompare;
+//   const t = task as unknown as MinimalForCompare;
 
-  const explicitDateMsCandidates: number[] = [];
-  const scheduledAtMs = toMillis(t?.scheduledAt);
-  const datetimeMs = toMillis(t?.datetime);
-  if (scheduledAtMs) explicitDateMsCandidates.push(scheduledAtMs);
-  if (datetimeMs) explicitDateMsCandidates.push(datetimeMs);
+//   const explicitDateMsCandidates: number[] = [];
+//   const scheduledAtMs = toMillis(t?.scheduledAt);
+//   const datetimeMs = toMillis(t?.datetime);
+//   if (scheduledAtMs) explicitDateMsCandidates.push(scheduledAtMs);
+//   if (datetimeMs) explicitDateMsCandidates.push(datetimeMs);
 
-  const dates: string[] = Array.isArray(t?.dates) ? t!.dates! : [];
+//   const dates: string[] = Array.isArray(t?.dates) ? t!.dates! : [];
 
-  const timeStr = t?.time ?? t?.scheduledTime ?? t?.timeString ?? null;
-  const timeMin = parseTimeToMinutes(timeStr);
+//   const timeStr = t?.time ?? t?.scheduledTime ?? t?.timeString ?? null;
+//   const timeMin = parseTimeToMinutes(timeStr);
 
-  for (const d of dates) {
-    const baseMs = Date.parse(d);
-    if (!Number.isNaN(baseMs)) {
-      const base = new Date(baseMs);
-      const composed = new Date(
-        base.getFullYear(),
-        base.getMonth(),
-        base.getDate(),
-        timeMin != null ? Math.floor(timeMin / 60) : 0,
-        timeMin != null ? timeMin % 60 : 0,
-        0,
-        0
-      ).getTime();
-      explicitDateMsCandidates.push(composed);
-    }
-  }
+//   for (const d of dates) {
+//     const baseMs = Date.parse(d);
+//     if (!Number.isNaN(baseMs)) {
+//       const base = new Date(baseMs);
+//       const composed = new Date(
+//         base.getFullYear(),
+//         base.getMonth(),
+//         base.getDate(),
+//         timeMin != null ? Math.floor(timeMin / 60) : 0,
+//         timeMin != null ? timeMin % 60 : 0,
+//         0,
+//         0
+//       ).getTime();
+//       explicitDateMsCandidates.push(composed);
+//     }
+//   }
 
-  if (explicitDateMsCandidates.length > 0) {
-    explicitDateMsCandidates.sort((a, b) => a - b);
-    return { hasDate: true, hasTimeOnly: false, ms: explicitDateMsCandidates[0] };
-  }
+//   if (explicitDateMsCandidates.length > 0) {
+//     explicitDateMsCandidates.sort((a, b) => a - b);
+//     return { hasDate: true, hasTimeOnly: false, ms: explicitDateMsCandidates[0] };
+//   }
 
-  if (timeMin != null) {
-    const ms = new Date(
-      todayY,
-      todayM,
-      todayD,
-      Math.floor(timeMin / 60),
-      timeMin % 60,
-      0,
-      0
-    ).getTime();
-    return { hasDate: false, hasTimeOnly: true, ms };
-  }
+//   if (timeMin != null) {
+//     const ms = new Date(
+//       todayY,
+//       todayM,
+//       todayD,
+//       Math.floor(timeMin / 60),
+//       timeMin % 60,
+//       0,
+//       0
+//     ).getTime();
+//     return { hasDate: false, hasTimeOnly: true, ms };
+//   }
 
-  return { hasDate: false, hasTimeOnly: false, ms: null };
-};
+//   return { hasDate: false, hasTimeOnly: false, ms: null };
+// };
 
 type Props = {
   initialSearch?: string;
@@ -202,15 +202,15 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     不定期: false,
   });
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  // const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
+  // const [, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(true);
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index } = useView();
-  const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
+  // const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
 
   const isSameOrBeforeToday = (ymd: string): boolean => {
     if (typeof ymd !== 'string') return false;
@@ -360,61 +360,61 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, []);
 
   // Done トグル時のロジック
-  const toggleDone = async (period: Period, taskId: string) => {
-    const target = tasksState[period].find((t) => t.id === taskId);
-    if (!target) {
-      console.warn('[toggleDone] 対象タスクが見つかりません:', taskId);
-      return;
-    }
-    if (!uid) {
-      console.warn('[toggleDone] 未ログイン状態です');
-      return;
-    }
+  // const toggleDone = async (period: Period, taskId: string) => {
+  //   const target = tasksState[period].find((t) => t.id === taskId);
+  //   if (!target) {
+  //     console.warn('[toggleDone] 対象タスクが見つかりません:', taskId);
+  //     return;
+  //   }
+  //   if (!uid) {
+  //     console.warn('[toggleDone] 未ログイン状態です');
+  //     return;
+  //   }
 
-    if (target.done) {
-      const proceed = await new Promise<boolean>((resolve) => {
-        pendingConfirmResolver.current = resolve;
-        setConfirmOpen(true);
-      });
-      if (!proceed) return;
-    }
+  //   if (target.done) {
+  //     const proceed = await new Promise<boolean>((resolve) => {
+  //       pendingConfirmResolver.current = resolve;
+  //       setConfirmOpen(true);
+  //     });
+  //     if (!proceed) return;
+  //   }
 
-    await toggleTaskDoneStatus(
-      target.id,
-      uid,
-      !target.done,
-      target.name,
-      target.point,
-      getOpt(target, 'person') ?? ''
-    );
-  };
+  //   await toggleTaskDoneStatus(
+  //     target.id,
+  //     uid,
+  //     !target.done,
+  //     target.name,
+  //     target.point,
+  //     getOpt(target, 'person') ?? ''
+  //   );
+  // };
 
   // スキップ（ポイント加算なし）
-  const handleSkip = useCallback(
-    async (taskId: string) => {
-      try {
-        if (!uid) {
-          toast.error('ログインしていません');
-          return;
-        }
-        await skipTaskWithoutPoints(taskId, uid);
-        toast.success('タスクをスキップしました（ポイント加算なし）');
-      } catch (e) {
-        console.error('[handleSkip] スキップ失敗:', e);
-        toast.error('スキップに失敗しました');
-      }
-    },
-    [uid]
-  );
+  // const handleSkip = useCallback(
+  //   async (taskId: string) => {
+  //     try {
+  //       if (!uid) {
+  //         toast.error('ログインしていません');
+  //         return;
+  //       }
+  //       await skipTaskWithoutPoints(taskId, uid);
+  //       toast.success('タスクをスキップしました（ポイント加算なし）');
+  //     } catch (e) {
+  //       console.error('[handleSkip] スキップ失敗:', e);
+  //       toast.error('スキップに失敗しました');
+  //     }
+  //   },
+  //   [uid]
+  // );
 
   // タスク削除
-  const deleteTask = async (_period: Period, id: string) => {
-    try {
-      await deleteDoc(doc(db, 'tasks', id));
-    } catch (error) {
-      console.error('タスクの削除に失敗しました:', error);
-    }
-  };
+  // const deleteTask = async (_period: Period, id: string) => {
+  //   try {
+  //     await deleteDoc(doc(db, 'tasks', id));
+  //   } catch (error) {
+  //     console.error('タスクの削除に失敗しました:', error);
+  //   }
+  // };
 
   // タスク更新
   const updateTask = async (_oldPeriod: Period, updated: Task) => {
@@ -780,7 +780,67 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     </div>
 
                     <ul className="space-y-1.5 [touch-action:pan-y]">
-                      {list
+                      <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                                            <li className="text-xs text-gray-400 mb-1 ml-2 select-none">
+                        ※ スクロールテスト
+                      </li>
+                      {/* {list
                         .slice()
                         .sort((a, b) => {
                           // ① フラグ付きタスクを優先
@@ -830,7 +890,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             onSwipeLeft={(taskId) => setDeletingTaskId(taskId)}
                             onSkip={handleSkip}
                           />
-                        ))}
+                        ))} */}
                     </ul>
                   </div>
                 );
