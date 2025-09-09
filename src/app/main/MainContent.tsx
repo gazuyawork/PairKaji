@@ -78,6 +78,7 @@ export default function MainContent() {
     delta: 50,
     trackTouch: true,
     trackMouse: true,
+    touchEventOptions: { passive: true },
   });
 
   if (!authReady || showQuickSplash) {
@@ -98,9 +99,9 @@ export default function MainContent() {
       >
         <div className="w-full h-full overflow-hidden">
           <motion.div
-            className="flex w-[300vw] h-full"
+            className="relative flex w-[300vw] h-full"
             initial={false}
-            animate={{ x: `-${index * 100}vw` }}
+            animate={{ left: `-${index * 100}vw` }}  // ← transformではなくleftでスライド
             transition={{
               type: 'tween',
               ease: [0.25, 0.1, 0.25, 1],
@@ -110,10 +111,10 @@ export default function MainContent() {
             <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
               <HomeView />
             </div>
-            <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+            <div className="w-screen h-full flex-shrink-0 overflow-y-auto [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
               <TaskView initialSearch={searchKeyword} />
             </div>
-            <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+            <div className="w-screen h-full flex-shrink-0 overflow-y-auto [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
               <TodoView />
             </div>
           </motion.div>
