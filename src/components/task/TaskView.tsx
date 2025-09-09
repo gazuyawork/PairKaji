@@ -595,7 +595,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   return (
     // <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
-    <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 overflow-hidden">
+    // <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 overflow-hidden">
+    <div className="h-dvh min-h-0 flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20">
       {/* キーボード喚起用のダミー input */}
       <input
         ref={keyboardSummonerRef}
