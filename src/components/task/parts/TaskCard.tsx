@@ -191,7 +191,8 @@ export default function TaskCard({
   };
 
   const handleTodoClick = () => {
-    setSelectedTaskName(task.name);
+    // タスクIDを渡して、Todo側で「詳細を直接開く」挙動にする
+    setSelectedTaskName(task.id); // ★ ここを name → id に
     setIndex(2);
   };
 
