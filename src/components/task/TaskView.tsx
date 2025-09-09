@@ -667,7 +667,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       <main
         className={
           "main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-57 " +
-          "[-webkit-overflow-scrolling:touch] touch-pan-y overscroll-contain"
+          "[-webkit-overflow-scrolling:touch] [touch-action:pan-y] overscroll-contain"
         }
       >
         {isLoading ? (
@@ -779,7 +779,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       )}
                     </div>
 
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-1.5 [touch-action:pan-y]">
                       {list
                         .slice()
                         .sort((a, b) => {
