@@ -285,7 +285,7 @@ export default function TaskCard({
       )}
 
       <motion.div
-        {...swipeable}
+        // {...swipeable}
         onClick={() => {
           setSwipeDirection(null);
           setShowActions(true);
