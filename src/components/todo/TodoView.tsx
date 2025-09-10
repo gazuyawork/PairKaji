@@ -1,3 +1,4 @@
+// src/components/todo/parts/TodoView.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -7,7 +8,7 @@ import {
   useRef,
   useEffect,
   useMemo,
-  useCallback, // ★ 追加
+  useCallback,
 } from 'react';
 import {
   collection,
@@ -24,36 +25,22 @@ import { db } from '@/lib/firebase';
 import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
-import GroupSelector, { GroupSelectorHandle } from '@/components/todo/parts/GroupSelector'; // ★ 変更: ハンドル型をimport
+import GroupSelector, { GroupSelectorHandle } from '@/components/todo/parts/GroupSelector';
 import { useView } from '@/context/ViewContext';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
-
+import { getCategoryIconInfo } from '@/components/todo/parts/utils/categoryIcon';
+import SortableTaskRow from '@/components/todo/parts/SortableTaskRow';
 // 同じIDのtext置換保存
 import { updateTodoTextInTask } from '@/lib/taskUtils';
-
 // Portal
 import { createPortal } from 'react-dom';
-
 // UI
 import { motion, AnimatePresence } from 'framer-motion';
-// 上部のアイコンimportに追加
-import {
-  Eye,
-  X,
-  Search,
-  GripVertical as Grip,
-  Tag,
-  ShoppingCart,
-  Utensils,
-  MapPin,
-  Briefcase,
-  Home,
-  EyeOff, // ★ 追加：非表示アイコン
-} from 'lucide-react';
-
+// ★ 変更: カテゴリアイコンを追加（絞り込みチップで使用）
+import { Eye, X, Search, ShoppingCart, Utensils, MapPin, Briefcase, Home, Tag } from 'lucide-react';
 // dnd-kit
 import {
   DndContext,
@@ -65,37 +52,10 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  useSortable,
   verticalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import type React from 'react';
-
-// ★★★ 純関数でカテゴリ→アイコン/色/ラベルを返す（ループ内で安全） ★★★
-type IconComp = React.ComponentType<{ size?: number; className?: string }>;
-function getCategoryIconInfo(raw: string | null | undefined): {
-  Icon: IconComp;
-  colorClass: string;
-  label: string;
-} {
-  const category = (raw ?? '').trim() || '未分類';
-  switch (category) {
-    case '買い物':
-      return { Icon: ShoppingCart, colorClass: 'text-emerald-500', label: '買い物' };
-    case '料理':
-      return { Icon: Utensils, colorClass: 'text-orange-500', label: '料理' };
-    case '旅行':
-      return { Icon: MapPin, colorClass: 'text-sky-500', label: '旅行' };
-    case '仕事':
-      return { Icon: Briefcase, colorClass: 'text-indigo-500', label: '仕事' };
-    case '家事':
-      return { Icon: Home, colorClass: 'text-rose-500', label: '家事' };
-    case '未分類':
-    default:
-      return { Icon: Tag, colorClass: 'text-gray-400', label: category };
-  }
-}
 
 // 配列移動
 const moveItem = <T,>(arr: T[], from: number, to: number) => {
@@ -115,32 +75,56 @@ const getOrderOrInf = (t: { order?: number } | TodoOnlyTask) =>
 const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown } =>
   typeof e === 'object' && e !== null && ('code' in e || 'message' in e);
 
-// Sortable ラッパ
-function SortableTask({
-  id,
-  children,
-}: {
-  id: string;
-  children: (args: {
-    setNodeRef: (el: HTMLDivElement | null) => void;
-    style: React.CSSProperties | undefined;
-    handleProps: React.HTMLAttributes<HTMLElement>;
-    isDragging: boolean;
-  }) => React.ReactNode;
-}) {
-  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const handleProps: React.HTMLAttributes<HTMLElement> = {
-    ...attributes,
-    ...(listeners ?? {}),
-  };
-
-  return children({ setNodeRef, style, handleProps, isDragging });
+/* =========================
+   ★ 追加: カテゴリメタ（GroupSelectorと同等）
+   ========================= */
+function getCategoryMeta(raw?: string | null) {
+  const category = (raw ?? '').trim() || '未分類';
+  switch (category) {
+    case '買い物':
+      return {
+        Icon: ShoppingCart,
+        colorClass: 'text-emerald-500',
+        label: '買い物',
+        chipActiveClass: 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
+      };
+    case '料理':
+      return {
+        Icon: Utensils,
+        colorClass: 'text-orange-500',
+        label: '料理',
+        chipActiveClass: 'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
+      };
+    case '旅行':
+      return {
+        Icon: MapPin,
+        colorClass: 'text-sky-500',
+        label: '旅行',
+        chipActiveClass: 'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
+      };
+    case '仕事':
+      return {
+        Icon: Briefcase,
+        colorClass: 'text-indigo-500',
+        label: '仕事',
+        chipActiveClass: 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-indigo-600',
+      };
+    case '家事':
+      return {
+        Icon: Home,
+        colorClass: 'text-rose-500',
+        label: '家事',
+        chipActiveClass: 'bg-gradient-to-b from-rose-500 to-rose-600 text-white border-rose-600',
+      };
+    case '未分類':
+    default:
+      return {
+        Icon: Tag,
+        colorClass: 'text-gray-400',
+        label: category,
+        chipActiveClass: 'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
+      };
+  }
 }
 
 export default function TodoView() {
@@ -151,54 +135,38 @@ export default function TodoView() {
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const groupSelectorRef = useRef<GroupSelectorHandle | null>(null); // ★ 追加: GroupSelectorを制御
+  const groupSelectorRef = useRef<GroupSelectorHandle | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
   const { plan, isChecking } = useUserPlan();
   const uid = useUserUid();
-
-  // 一覧→詳細
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-
-  // const isAnyFilterActive = useMemo(() => {
-  //   return Boolean(selectedGroupId) || filterText.trim() !== '';
-  // }, [selectedGroupId, filterText]);
-
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
-
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState('');
+  // ★ 追加: 再表示シート用 カテゴリ選択（null = すべて）
+  const [addSelectedCategoryId, setAddSelectedCategoryId] = useState<string | null>(null);
+
+  // ★ 追加: メモモーダル開閉ハンドラ
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
     setNoteModalTodo(todo);
     setNoteModalOpen(true);
   };
+
   const closeNoteModal = () => {
     setNoteModalOpen(false);
     setNoteModalTask(null);
     setNoteModalTodo(null);
   };
 
-  // 右下＋の候補
-  const taskNameOptions = useMemo(() => {
-    const names = tasks
-      .filter(
-        (task) =>
-          !task.visible &&
-          (task.userId === uid || task.private !== true)
-      )
-      .map((task) => task.name)
-      .filter(Boolean);
-    return Array.from(new Set(names));
-  }, [tasks, uid]);
-
-  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
-  const [addQuery, setAddQuery] = useState('');
 
   // 背景スクロール制御（追加シート or 詳細オーバーレイ）
   useEffect(() => {
@@ -238,7 +206,11 @@ export default function TodoView() {
 
     (async () => {
       const pairsSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
+        query(
+          collection(db, 'pairs'),
+          where('userIds', 'array-contains', uid),
+          where('status', '==', 'confirmed')
+        )
       );
 
       const userIds = new Set<string>([uid]);
@@ -296,39 +268,41 @@ export default function TodoView() {
     }
   }, [focusedTodoId]);
 
-  // 外部からのselectedTaskName
-  // 変更後（★ 変更：ID優先で詳細を開く／フィルタ解除）
+  /* -------------------------------------------------
+     外部からのselectedTaskName
+     変更後：ID優先で詳細を開く／フィルタ解除
+     ------------------------------------------------- */
   useEffect(() => {
     if (!selectedTaskName) return;
 
-    // 1) まずは「ID完全一致」を試す（TaskCardからはIDを渡すように変更済み）
-    let matched = tasks.find(t => t.id === selectedTaskName);
+    // 1) まずはID一致
+    let matched = tasks.find((t) => t.id === selectedTaskName);
 
-    // 2) 見つからなければ、後方互換で「名前一致」も試す
+    // 2) なければ名前一致（後方互換）
     if (!matched) {
-      matched = tasks.find(t => t.name === selectedTaskName);
+      matched = tasks.find((t) => t.name === selectedTaskName);
     }
 
     if (matched) {
       // 詳細オーバーレイを開く
       setSelectedTaskId(matched.id);
 
-      // 一覧のフィルタは解除（「対象カードの詳細を表示」の要件）
+      // 一覧フィルタ解除（カテゴリ/テキスト/GroupSelector）
       setSelectedGroupId(null);
       setFilterText('');
-
-      // （必要に応じて）GroupSelector の一時状態もリセット
+      setSelectedCategoryId(null); // ★ 追加: カテゴリも解除
       // groupSelectorRef?.current?.reset?.();
     } else {
-      // どちらでも見つからない場合のフォールバック：従来通りテキストフィルタにかける
+      // フォールバック：テキストフィルタにかける
       setFilterText(selectedTaskName);
+      setSelectedCategoryId(null); // 一貫性重視：テキスト検索に絞るためカテゴリは解除
     }
 
-    // 1サイクルで消費
+    // 消費
     setSelectedTaskName('');
   }, [selectedTaskName, setSelectedTaskName, tasks]);
 
-
+  // GroupSelectorの対象が消えたら解除
   useEffect(() => {
     if (selectedGroupId && !tasks.some((task) => task.id === selectedGroupId)) {
       setSelectedGroupId(null);
@@ -391,24 +365,70 @@ export default function TodoView() {
     [selectedTaskId, tasks]
   );
 
-  // ★ 閉じる時に詳細を閉じてフィルタも解除（GroupSelector内の一時状態もリセット）
+  // ★ 変更: 詳細を閉じたらフィルタも解除（カテゴリ含む）
   const handleCloseDetail = useCallback(() => {
-    setSelectedTaskId(null); // 詳細を閉じる
-    setSelectedGroupId(null); // GroupSelector の選択解除
-    setFilterText(''); // テキストフィルタ解除
-    groupSelectorRef.current?.reset(); // ★ 追加: GroupSelectorの一時状態もクリア
+    setSelectedTaskId(null);
+    setSelectedGroupId(null);
+    setFilterText('');
+    setSelectedCategoryId(null); // ★ 追加
+    groupSelectorRef.current?.reset();
     // 必要ならタブも初期化: setActiveTabs({})
   }, []);
 
-  // ★ カテゴリごとにグループ化（表示用）
+  /* =========================
+     ★ 追加: 一覧側カテゴリ選択 state
+     ========================= */
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  /* ===========================================
+     ★ 追加: 表示用カテゴリ一覧（重複排除＋昇順）
+     =========================================== */
+  const availableCategories = useMemo(() => {
+    type TaskCategoryShape = {
+      categoryId?: string | null;
+      categoryName?: string | null;
+      categoryLabel?: string | null;
+      category?: string | null;
+    };
+
+    const map = new Map<string, string>();
+    for (const t of tasks) {
+      if (!t.visible) continue;
+      if (!(t.userId === uid || t.private !== true)) continue;
+
+      const c = t as TaskCategoryShape;
+      const id = (c?.categoryId ?? c?.category ?? null) ?? null;
+      if (!id) continue;
+      const label = (c?.categoryName ?? c?.categoryLabel ?? c?.category ?? '未分類') ?? '未分類';
+      if (!map.has(id)) map.set(id, label);
+    }
+
+    return Array.from(map.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ja'));
+  }, [tasks, uid]);
+
+  /* ===========================================
+     ★ 変更: カテゴリ・テキスト・Group選択を反映した一覧
+     =========================================== */
   const categorized = useMemo(() => {
-    const filtered = tasks.filter(
-      (task) =>
-        task.visible &&
-        (!selectedGroupId || task.id === selectedGroupId) &&
-        (filterText.trim() === '' || (task.name ?? '').includes(filterText)) &&
-        (task.userId === uid || task.private !== true)
-    );
+    const filtered = tasks.filter((task) => {
+      const visibleOk = task.visible;
+      const ownerOk = task.userId === uid || task.private !== true;
+      const groupOk = !selectedGroupId || task.id === selectedGroupId;
+
+      // テキストマッチ
+      const text = filterText.trim();
+      const textOk = text === '' ? true : (task.name ?? '').includes(text);
+
+      // カテゴリマッチ
+      type WithCategory = { categoryId?: string | null; category?: string | null };
+      const c = task as WithCategory;
+      const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
+      const catOk = selectedCategoryId === null ? true : catId === selectedCategoryId;
+
+      return visibleOk && ownerOk && groupOk && textOk && catOk;
+    });
 
     const map = new Map<string, TodoOnlyTask[]>();
     for (const t of filtered) {
@@ -423,10 +443,38 @@ export default function TodoView() {
     const entries = Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
 
     return entries.map(([cat, arr]) => ({ category: cat, items: arr }));
-  }, [tasks, selectedGroupId, filterText, uid]);
+  }, [tasks, selectedGroupId, filterText, selectedCategoryId, uid]);
 
   // 一覧で使う全表示ID（DnD用）
   const allVisibleIds = useMemo(() => categorized.flatMap((g) => g.items.map((t) => t.id)), [categorized]);
+
+  /* ===========================================
+     ★ 追加: 再表示シート用の「非表示タスク」カテゴリ一覧
+     =========================================== */
+  const addAvailableCategories = useMemo(() => {
+    type TaskCategoryShape = {
+      categoryId?: string | null;
+      categoryName?: string | null;
+      categoryLabel?: string | null;
+      category?: string | null;
+    };
+
+    const map = new Map<string, string>();
+    for (const t of tasks) {
+      if (t.visible) continue; // 非表示のみ
+      if (!(t.userId === uid || t.private !== true)) continue;
+
+      const c = t as TaskCategoryShape;
+      const id = (c?.categoryId ?? c?.category ?? null) ?? null;
+      if (!id) continue;
+      const label = (c?.categoryName ?? c?.categoryLabel ?? c?.category ?? '未分類') ?? '未分類';
+      if (!map.has(id)) map.set(id, label);
+    }
+
+    return Array.from(map.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ja'));
+  }, [tasks, uid]);
 
   return (
     <>
@@ -443,9 +491,77 @@ export default function TodoView() {
             />
           )}
 
-          {/* Sticky土台（将来の検索等） */}
+          {/* ★ 変更: Sticky 検索＋カテゴリチップ（一覧側） */}
           <div className="sticky top-0 z-[999] w-full bg-transparent">
-            <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3" />
+            <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3 px-2 pt-2 pb-3">
+              {/* キーワード検索 */}
+              <div
+                className="flex items-center gap-2 rounded-xl px-3 py-2
+                           bg-gradient-to-b from-white to-gray-50
+                           border border-gray-200
+                           shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
+              >
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  placeholder="キーワードで検索"
+                  className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400 bg-transparent"
+                />
+                {filterText && (
+                  <button
+                    type="button"
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                    onClick={() => setFilterText('')}
+                  >
+                    クリア
+                  </button>
+                )}
+              </div>
+
+              {/* カテゴリチップ */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+                {/* すべて */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryId(null)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
+                    ${selectedCategoryId === null
+                      ? 'bg-gray-900 text-white border-gray-900 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                      : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-gray-50 hover:to-white'
+                    }
+                    active:translate-y-[1px]`}
+                  aria-pressed={selectedCategoryId === null}
+                >
+                  すべて
+                </button>
+
+                {/* 動的カテゴリ */}
+                {availableCategories.map((c) => {
+                  const active = selectedCategoryId === c.id;
+                  const { Icon, colorClass, chipActiveClass } = getCategoryMeta(c.label);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setSelectedCategoryId(c.id)}
+                      className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1
+                        ${active
+                          ? `${chipActiveClass} shadow-[0_2px_2px_rgba(0,0,0,0.1)]`
+                          : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white'
+                        }
+                        active:translate-y-[1px]`}
+                      aria-pressed={active}
+                      title={c.label}
+                    >
+                      <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
+                      <span>{c.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* ▼ 一覧：カテゴリ見出しでグループ分け（カードにカテゴリアイコン＆名も表示） */}
@@ -471,94 +587,32 @@ export default function TodoView() {
 
                           {/* タイトルカード群 */}
                           <div className="space-y-2">
-                            {items.map((task) => {
-                              // const undoneCount = (task.todos ?? []).filter((td) => !td.done).length;
-                              // const doneCount = (task.todos ?? []).filter((td) => td.done).length;
-
-                              type WithCategory = { category?: string | null };
-                              const { Icon: RowIcon, colorClass: rowColor, label: rowLabel } =
-                                getCategoryIconInfo((task as WithCategory).category ?? null);
-
-                              return (
-                                <SortableTask key={task.id} id={task.id}>
-                                  {({ setNodeRef, style, handleProps, isDragging }) => (
-                                    <div
-                                      ref={setNodeRef}
-                                      style={style}
-                                      className={`rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition
-                                                  ${isDragging ? 'opacity-70' : ''}`}
-                                    >
-                                      <div className="flex items-center justify-between px-3 py-2">
-                                        {/* 左: 並び替え + カテゴリアイコン名 + タイトル */}
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          {/* 並び替えハンドル */}
-                                          <button
-                                            type="button"
-                                            title="ドラッグで並び替え"
-                                            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
-                                            {...handleProps}
-                                          >
-                                            <Grip size={18} />
-                                          </button>
-
-                                          {/* カテゴリアイコン＋カテゴリ名（カード内表示） */}
-                                          <div className="flex items-center gap-1.5 shrink-0">
-                                            <RowIcon
-                                              size={16}
-                                              className={rowColor}
-                                              aria-label={`${rowLabel} カテゴリ`}
-                                            />
-                                            <span className="text-xs text-gray-500">{rowLabel}</span>
-                                          </div>
-
-                                          {/* タスクタイトル（選択で詳細オーバーレイ） */}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setSelectedTaskId(task.id);
-                                              setSelectedGroupId(task.id); // 任意: GroupSelector連動
-                                            }}
-                                            className="text-left min-w-0"
-                                            aria-label={`${task.name} を開く`}
-                                          >
-                                            <div className="font-bold text-[#5E5E5E] truncate">{task.name}</div>
-                                          </button>
-                                        </div>
-
-                                        {/* 件数バッジ（必要なら復活） */}
-                                        {/* ... */}
-
-                                        <button
-                                          type="button"
-                                          aria-label="このToDoカードを非表示にする"
-                                          title="非表示（データは残ります）"
-                                          className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600 transition"
-                                          onClick={async (e) => {
-                                            e.stopPropagation();
-                                            const ok = window.confirm(
-                                              'このToDoグループを一覧から非表示にします。\n（データは削除されません）よろしいですか？'
-                                            );
-                                            if (!ok) return;
-                                            try {
-                                              await updateDoc(doc(db, 'tasks', task.id), {
-                                                visible: false,
-                                                updatedAt: serverTimestamp(),
-                                              });
-                                              toast.success('カードを非表示にしました。');
-                                            } catch (err) {
-                                              console.error(err);
-                                              toast.error('非表示にできませんでした');
-                                            }
-                                          }}
-                                        >
-                                          <EyeOff className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </SortableTask>
-                              );
-                            })}
+                            {items.map((task) => (
+                              <SortableTaskRow
+                                key={task.id}
+                                task={task}
+                                onClickTitle={(taskId) => {
+                                  setSelectedTaskId(taskId);
+                                  setSelectedGroupId(taskId); // 任意：GroupSelector連動の現状維持
+                                }}
+                                onHide={async (taskId) => {
+                                  const ok = window.confirm(
+                                    'このToDoグループを一覧から非表示にします。\n（データは削除されません）よろしいですか？'
+                                  );
+                                  if (!ok) return;
+                                  try {
+                                    await updateDoc(doc(db, 'tasks', taskId), {
+                                      visible: false,
+                                      updatedAt: serverTimestamp(),
+                                    });
+                                    toast.success('カードを非表示にしました。');
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error('非表示にできませんでした');
+                                  }
+                                }}
+                              />
+                            ))}
                           </div>
                         </section>
                       );
@@ -580,7 +634,12 @@ export default function TodoView() {
         createPortal(
           <button
             type="button"
-            onClick={() => setIsAddSheetOpen(true)}
+            onClick={() => {
+              // ★ 追加: 前回の再表示シート条件を初期化
+              setAddSelectedCategoryId(null);
+              setAddQuery('');
+              setIsAddSheetOpen(true);
+            }}
             className="fixed bottom-24 right-5 z-[1100] w-14 h-14 rounded-full
                      bg-gradient-to-b from-[#FFC25A] to-[#FFA726]
                      shadow-[0_12px_24px_rgba(0,0,0,0.18)]
@@ -596,7 +655,7 @@ export default function TodoView() {
           document.body
         )}
 
-      {/* 追加用シート */}
+      {/* 追加用シート（非表示のToDo再表示） */}
       {mounted &&
         index === 2 &&
         createPortal(
@@ -610,7 +669,10 @@ export default function TodoView() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setIsAddSheetOpen(false)} />
+                <div
+                  className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+                  onClick={() => setIsAddSheetOpen(false)}
+                />
                 <motion.div
                   className="relative mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full
                            bg-gradient-to-b from-white to-gray-50
@@ -625,14 +687,39 @@ export default function TodoView() {
                 >
                   <div className="mx-auto mt-2 mb-1 h-1.5 w-12 rounded-full bg-gray-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" />
                   <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-2 flex items-center gap-2 shadow-[0_6px_12px_rgba(0,0,0,0.06)]">
-                    <button className="p-2 rounded-full hover:bg-gray-100" onClick={() => setIsAddSheetOpen(false)} aria-label="閉じる">
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100"
+                      onClick={() => setIsAddSheetOpen(false)}
+                      aria-label="閉じる"
+                    >
                       <X className="w-5 h-5 text-red-600" />
                     </button>
                     <h2 className="text-base font-semibold text-[#5E5E5E]">非表示のTodoを再表示</h2>
                     <span className="ml-auto text-xs text-gray-500">
-                      {addQuery
-                        ? `一致: ${taskNameOptions.filter((n) => (n ?? '').toLowerCase().includes(addQuery.trim().toLowerCase())).length}件`
-                        : `候補: ${taskNameOptions.length}件`}
+                      {/* ★ 変更: キーワード＆カテゴリでフィルタ後の件数を表示 */}
+                      {(() => {
+                        const q = addQuery.trim().toLowerCase();
+                        // 非表示の中からカテゴリでフィルタ
+                        const hidden = tasks.filter(
+                          (t) => !t.visible && (t.userId === uid || t.private !== true)
+                        );
+
+                        type WithCategory = { categoryId?: string | null; category?: string | null };
+                        const filteredByCategory = hidden.filter((t) => {
+                          const c = t as WithCategory;
+                          const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
+                          return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
+                        });
+
+                        // キーワード（name に対して）
+                        const filtered = filteredByCategory.filter((t) =>
+                          q ? (t.name ?? '').toLowerCase().includes(q) : true
+                        );
+
+                        return q || addSelectedCategoryId !== null
+                          ? `一致: ${filtered.length}件`
+                          : `候補: ${hidden.length}件`;
+                      })()}
                     </span>
                   </div>
 
@@ -653,52 +740,141 @@ export default function TodoView() {
                         autoFocus
                       />
                       {addQuery && (
-                        <button className="text-sm text-gray-600 hover:text-gray-800" onClick={() => setAddQuery('')}>
+                        <button
+                          className="text-sm text-gray-600 hover:text-gray-800"
+                          onClick={() => setAddQuery('')}
+                        >
                           クリア
                         </button>
                       )}
                     </div>
-                    {!addQuery && taskNameOptions.length === 0 && (
-                      <div className="mt-2 text-xs text-gray-500">非表示のToDoはありません。</div>
-                    )}
+
+                    {/* ★ 追加: カテゴリチップ（再表示シート） */}
+                    <div className="mt-3">
+                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+                        {/* すべて */}
+                        <button
+                          type="button"
+                          onClick={() => setAddSelectedCategoryId(null)}
+                          className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
+                            ${addSelectedCategoryId === null
+                              ? 'bg-gray-900 text-white border-gray-900 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                              : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-gray-50 hover:to-white'}
+                            active:translate-y-[1px]`}
+                          aria-pressed={addSelectedCategoryId === null}
+                        >
+                          すべて
+                        </button>
+
+                        {/* 動的カテゴリ */}
+                        {addAvailableCategories.map((c) => {
+                          const active = addSelectedCategoryId === c.id;
+                          const { Icon, colorClass, chipActiveClass } = getCategoryMeta(c.label);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setAddSelectedCategoryId(c.id)}
+                              className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1
+                                ${active
+                                  ? `${chipActiveClass} shadow-[0_2px_2px_rgba(0,0,0,0.1)]`
+                                  : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white'}
+                                active:translate-y-[1px]`}
+                              aria-pressed={active}
+                              title={c.label}
+                            >
+                              <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
+                              <span>{c.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
                     {(() => {
                       const q = addQuery.trim().toLowerCase();
-                      const options = q ? taskNameOptions.filter((n) => (n ?? '').toLowerCase().includes(q)) : taskNameOptions;
-                      if (options.length === 0) {
-                        return <div className="text-center text-sm text-gray-500 py-10">一致するToDoが見つかりませんでした。</div>;
+
+                      // 1) 非表示タスクのみ抽出
+                      const hidden = tasks.filter(
+                        (t) => !t.visible && (t.userId === uid || t.private !== true)
+                      );
+
+                      // 2) カテゴリでフィルタ
+                      type WithCategory = {
+                        categoryId?: string | null;
+                        category?: string | null;
+                        categoryName?: string | null;
+                        categoryLabel?: string | null;
+                      };
+                      const byCategory = hidden.filter((t) => {
+                        const c = t as WithCategory;
+                        const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
+                        return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
+                      });
+
+                      // 3) キーワード（name）でフィルタ
+                      const byKeyword = byCategory.filter((t) =>
+                        q ? (t.name ?? '').toLowerCase().includes(q) : true
+                      );
+
+                      if (byKeyword.length === 0) {
+                        return (
+                          <div className="text-center text-sm text-gray-500 py-10">
+                            一致するToDoが見つかりませんでした。
+                          </div>
+                        );
                       }
+
+                      // 4) 表示（カテゴリメタも表示）
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {options.map((name) => {
-                            const matched = tasks.find(
-                              (t) => t.name === name && !t.visible && (t.userId === uid || t.private !== true)
-                            );
+                          {byKeyword.map((t) => {
+                            // カテゴリメタ
+                            const catLabel =
+                              ((t as WithCategory).categoryName ??
+                                (t as WithCategory).categoryLabel ??
+                                (t as WithCategory).category ??
+                                '未分類') ?? '未分類';
+                            const { Icon, colorClass, label } = getCategoryMeta(catLabel);
+
                             return (
                               <button
-                                key={name}
+                                key={t.id}
                                 onClick={async () => {
-                                  if (!matched) return;
-                                  await updateDoc(doc(db, 'tasks', matched.id), {
+                                  await updateDoc(doc(db, 'tasks', t.id), {
                                     visible: true,
                                     updatedAt: serverTimestamp(),
                                   });
                                   toast.success('非表示のタスクを再表示しました。');
-                                  setSelectedGroupId(matched.id);
+
+                                  // ▼ 一覧は絞り込まずに、詳細オーバーレイを開く
+                                  setSelectedGroupId(null);
                                   setFilterText('');
+                                  setSelectedCategoryId(null);      // 一覧側カテゴリ解除
+                                  setAddSelectedCategoryId(null);   // ★ 追加: 再表示シート側カテゴリも解除
+                                  setSelectedTaskId(t.id);
+                                  groupSelectorRef.current?.reset?.();
+
                                   setAddQuery('');
                                   setIsAddSheetOpen(false);
                                 }}
                                 className="w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition
-                                         bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
-                                         shadow-[0_2px_1px_rgba(0,0,0,0.1)]
-                                         hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
-                                         hover:border-[#FFCB7D] active:translate-y-[1px]"
-                                title={name}
+                                           bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
+                                           shadow-[0_2px_1px_rgba(0,0,0,0.1)]
+                                           hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
+                                           hover:border-[#FFCB7D] active:translate-y-[1px]"
+                                title={t.name ?? ''}
                               >
-                                <span className="line-clamp-2">{name}</span>
+                                <span className="line-clamp-2">{t.name}</span>
+                                {/* ★ 追加: カテゴリ名の前にアイコン＋色 */}
+                                <span className="mt-1 block text-[11px] text-gray-500">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
+                                    <span>{label}</span>
+                                  </span>
+                                </span>
                               </button>
                             );
                           })}
@@ -723,12 +899,14 @@ export default function TodoView() {
           >
             <div className="pointer-events-auto rounded-sm">
               <GroupSelector
+                ref={groupSelectorRef}
                 tasks={tasks}
                 selectedGroupId={selectedGroupId}
                 onSelectGroup={(groupId) => {
                   // 一覧は絞り込まず（= フィルタは使わない）
                   setSelectedGroupId(null);
                   setFilterText('');
+                  setSelectedCategoryId(null); // ★ 追加: カテゴリも解除
 
                   // 選択されたらそのまま詳細オーバーレイを開く
                   if (groupId) {
@@ -738,7 +916,6 @@ export default function TodoView() {
                   }
                 }}
               />
-
             </div>
           </div>,
           document.body
@@ -765,7 +942,7 @@ export default function TodoView() {
                 <button
                   type="button"
                   aria-label="閉じる"
-                  onClick={handleCloseDetail} // ★ 変更: 詳細を閉じてフィルタも解除
+                  onClick={handleCloseDetail}
                   className="p-2 rounded-full hover:bg-gray-100"
                 >
                   <X />
@@ -780,7 +957,7 @@ export default function TodoView() {
                     setTab={(tab) => setActiveTabs((prev) => ({ ...prev, [selectedTask.id]: tab }))}
                     onOpenNote={(text) => {
                       const todo = selectedTask.todos.find((t) => t.text === text);
-                      if (todo) openNoteModal(selectedTask, todo);
+                      if (todo) openNoteModal(selectedTask, todo); // ★ 変更
                     }}
                     onAddTodo={async (todoId, text) => {
                       const newTodos = [...selectedTask.todos, { id: todoId, text, done: false }];
@@ -869,7 +1046,6 @@ export default function TodoView() {
                         toast.error('並び替えの保存に失敗しました');
                       }
                     }}
-                  // isFilteredGlobal={false}
                   />
                 </div>
               </div>
