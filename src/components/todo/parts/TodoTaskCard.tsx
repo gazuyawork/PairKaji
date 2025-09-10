@@ -249,7 +249,6 @@ export default function TodoTaskCard({
     }
   };
 
-  // 行削除の2タップ確認用
   const [confirmTodoDeletes, setConfirmTodoDeletes] = useState<Record<string, boolean>>({});
   const todoDeleteTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -277,7 +276,7 @@ export default function TodoTaskCard({
       )}
     >
       {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100vh */}
-      <div className="flex h-full flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
+      <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
         {/* header */}
         <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center">
           <div className="flex items-center gap-1 sm:gap-2 flex-[1_1_72%] min-w-0 py-1">
@@ -366,8 +365,8 @@ export default function TodoTaskCard({
           </div>
         </div>
 
-        {/* body（スクロール領域） */}
-        <div className="relative flex-1">
+        {/* body（スクロール領域 + 固定フッター） */}
+        <div className="relative flex-1 min-h-0 flex flex-col">
           {/* スクロールメーター（右端） */}
           {isScrollable && (
             <div
@@ -377,7 +376,7 @@ export default function TodoTaskCard({
             />
           )}
 
-          <div className="pt-3 pl-4 pr-2 space-y-2 h-full">
+          <div className="pt-3 pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col">
             {isCookingCategory && (
               <div className="px-1 pr-5">
                 <div className="relative">
@@ -412,7 +411,7 @@ export default function TodoTaskCard({
             <div
               ref={scrollRef}
               className={clsx(
-                'overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2 pb-6 h-[calc(80vh)]'
+                'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2'
               )}
               onTouchMove={(e) => e.stopPropagation()}
             >
@@ -493,10 +492,12 @@ export default function TodoTaskCard({
                 済に{doneMatchesCount}件見つかりました。
               </div>
             )}
+          </div>
 
-            {/* add input (undone only) */}
-            <div className="absolute left-4 right-4 bottom-3">
-              <div className="flex items-center gap-2 bg-white pt-2">
+          {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
+          <div className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200">
+            <div className="px-4 py-2">
+              <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
                 <input
                   ref={inputRef}
