@@ -28,9 +28,20 @@ export default function SortableTaskRow({ task, onClickTitle, onHide }: Props) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition ${
-        isDragging ? 'opacity-70' : ''
-      }`}
+      className={`
+        group
+        rounded-xl
+        border border-gray-200
+        bg-gradient-to-b from-white to-gray-50
+        text-[#5E5E5E]
+        shadow-[0_2px_1px_rgba(0,0,0,0.08)]
+        hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
+        transition-all duration-300
+        will-change-transform
+        active:translate-y-[1px]
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCB7D]/50
+       ${isDragging ? 'opacity-70' : ''
+        }`}
     >
       <div className="flex items-center justify-between px-3 py-2">
         {/* 左: 並び替え + カテゴリアイコン名 + タイトル */}

@@ -32,6 +32,7 @@ import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import { getCategoryIconInfo } from '@/components/todo/parts/utils/categoryIcon';
 import SortableTaskRow from '@/components/todo/parts/SortableTaskRow';
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
 // 同じIDのtext置換保存
 import { updateTodoTextInTask } from '@/lib/taskUtils';
 // Portal
@@ -159,6 +160,15 @@ export default function TodoView() {
 
   // ★ 追加: 検索ボックスの表示切替（左下パネルの虫眼鏡でトグル）
   const [showSearch, setShowSearch] = useState(false);
+
+  // 追加するstate（※ 既存のuseState群の近くに追記してください）
+  const [confirmHide, setConfirmHide] = useState<{ open: boolean; taskId: string | null; source: 'list' | 'detail' | null }>({
+    open: false,
+    taskId: null,
+    source: null,
+  });
+  const [isConfirmProcessing, setIsConfirmProcessing] = useState(false);
+
 
   // ★ 追加: メモモーダル開閉ハンドラ
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
@@ -545,22 +555,10 @@ export default function TodoView() {
                                 onClickTitle={(taskId) => {
                                   setSelectedTaskId(taskId);
                                 }}
-                                onHide={async (taskId) => {
-                                  const ok = window.confirm(
-                                    'このToDoグループを一覧から非表示にします。\n（データは削除されません）よろしいですか？'
-                                  );
-                                  if (!ok) return;
-                                  try {
-                                    await updateDoc(doc(db, 'tasks', taskId), {
-                                      visible: false,
-                                      updatedAt: serverTimestamp(),
-                                    });
-                                    toast.success('カードを非表示にしました。');
-                                  } catch (err) {
-                                    console.error(err);
-                                    toast.error('非表示にできませんでした');
-                                  }
+                                onHide={(taskId) => {
+                                  setConfirmHide({ open: true, taskId, source: 'list' });
                                 }}
+
                               />
                             ))}
                           </div>
@@ -610,12 +608,17 @@ export default function TodoView() {
         index === 2 &&
         createPortal(
           <div
-            className="fixed bottom-22 left-4 z-[1100]
-                       rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200
-                       shadow-[0_8px_24px_rgba(0,0,0,0.16)]
-                       px-2 py-2"
-            style={{ maxWidth: 'min(calc(100vw - 32px), 800px)' }}
+            className="
+    fixed
+    bottom-[calc(env(safe-area-inset-bottom)+5.5rem)]
+    left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
+    z-[1100]
+    rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200
+    shadow-[0_8px_24px_rgba(0,0,0,0.16)]
+    px-2 py-2
+  "
           >
+
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {/* 動的カテゴリ（アイコンのみ・横並び） */}
               {availableCategories.map((c) => {
@@ -629,12 +632,14 @@ export default function TodoView() {
                       setSelectedCategoryId((prev) => (prev === c.id ? null : c.id))
                     }
                     className={[
-                      'w-12 h-12 rounded-full border flex items-center justify-center transition',
-                      'active:translate-y-[1px] shrink-0',
+                      'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                      'shrink-0',
                       isActive
-                        ? `text-white border-transparent bg-gradient-to-b ${activeBg} shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                        ? `bg-gradient-to-b ${activeBg} text-white border-[2px] border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
+                        : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D]/10 hover:border-[#FFCB7D]',
                     ].join(' ')}
+
+
                     aria-pressed={isActive}
                     aria-label={c.label}
                     title={c.label}
@@ -650,13 +655,22 @@ export default function TodoView() {
               {/* 検索表示トグル（虫眼鏡） */}
               <button
                 type="button"
-                onClick={() => setShowSearch((v) => !v)}
+                onClick={() =>
+                  setShowSearch((prev) => {
+                    const next = !prev;
+                    if (!next) {
+                      // 検索OFFにする瞬間にテキストもクリア
+                      setFilterText('');
+                    }
+                    return next;
+                  })
+                }
                 className={[
-                  'w-12 h-12 rounded-full border flex items-center justify-center transition',
-                  'active:translate-y-[1px] shrink-0',
+                  'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                  'shrink-0',
                   showSearch
-                    ? 'text-white border-transparent bg-gray-900 shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                    ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-[2px] border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                    : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
                 ].join(' ')}
                 aria-pressed={showSearch}
                 aria-label={showSearch ? '検索を隠す' : '検索を表示'}
@@ -664,6 +678,7 @@ export default function TodoView() {
               >
                 <Search className={`w-6 h-6 ${showSearch ? 'text-white' : 'text-gray-600'}`} />
               </button>
+
             </div>
           </div>,
           document.body
@@ -950,9 +965,9 @@ export default function TodoView() {
                         prev.map((t) =>
                           t.id === selectedTask.id
                             ? {
-                                ...t,
-                                todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
-                              }
+                              ...t,
+                              todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
+                            }
                             : t
                         )
                       );
@@ -993,12 +1008,7 @@ export default function TodoView() {
                       });
                     }}
                     onDeleteTask={async () => {
-                      await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                        visible: false,
-                        groupId: null,
-                        updatedAt: serverTimestamp(),
-                      });
-                      setSelectedTaskId(null);
+                      setConfirmHide({ open: true, taskId: selectedTask.id, source: 'detail' });
                     }}
                     todoRefs={todoRefs}
                     focusedTodoId={focusedTodoId}
@@ -1032,6 +1042,55 @@ export default function TodoView() {
           </AnimatePresence>,
           document.body
         )}
+
+      {/* === ConfirmModal（画面末尾に1つだけ） === */}
+      {mounted && index === 2 && createPortal(
+        <ConfirmModal
+          isOpen={confirmHide.open}
+          title="確認"
+          message={
+            <div className="space-y-2 text-left">
+              <p>このToDoグループを<strong>一覧から非表示</strong>にします。</p>
+              <p className="text-xs text-gray-500">※ データは削除されません。再表示から戻すことができます。</p>
+            </div>
+          }
+          confirmLabel="非表示にする"
+          cancelLabel="キャンセル"
+          isProcessing={isConfirmProcessing}
+          onCancel={() => {
+            if (isConfirmProcessing) return;
+            setConfirmHide({ open: false, taskId: null, source: null });
+          }}
+          onConfirm={async () => {
+            const taskId = confirmHide.taskId;
+            if (!taskId) return;
+            try {
+              setIsConfirmProcessing(true);
+
+              const payload =
+                confirmHide.source === 'detail'
+                  ? { visible: false, groupId: null, updatedAt: serverTimestamp() }
+                  : { visible: false, updatedAt: serverTimestamp() };
+
+              await updateDoc(doc(db, 'tasks', taskId), payload);
+
+              if (confirmHide.source === 'detail') {
+                setSelectedTaskId(null);
+              }
+
+              toast.success('カードを非表示にしました。');
+            } catch (err) {
+              console.error(err);
+              toast.error('非表示にできませんでした');
+            } finally {
+              setIsConfirmProcessing(false);
+              setConfirmHide({ open: false, taskId: null, source: null });
+            }
+          }}
+        />,
+        document.body
+      )}
+
     </>
   );
 }

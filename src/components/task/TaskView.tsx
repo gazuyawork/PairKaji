@@ -28,7 +28,7 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { X, Lightbulb, LightbulbOff, SquareUser, Calendar, Flag, Search } from 'lucide-react';
+import { Lightbulb, LightbulbOff, SquareUser, Calendar, Flag, Search } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import AdCard from '@/components/home/parts/AdCard';
@@ -187,8 +187,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(INITIAL_TASK_GROUPS);
-  const [periodFilter, setPeriodFilter] = useState<Period | null>(null);
-  const [personFilter, setPersonFilter] = useState<string | null>(null);
+  // const [periodFilter, setPeriodFilter] = useState<Period | null>(null);
+  // const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
   const [partnerUserId, setPartnerUserId] = useState<string | null>(null);
@@ -593,6 +593,35 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     ];
   }, [uid, partnerUserId, profileImage, partnerImage]);
 
+  // ▼ 追加：虫眼鏡ボタンで検索UIをトグル（閉じる時は検索語をクリア）
+  const handleToggleSearch = useCallback(() => {
+    if (isSearchVisible) {
+      // すでに表示中 → 非表示にして検索語をクリア
+      setShowSearchBox(false);
+      setSearchTerm('');
+      try { searchInputRef.current?.blur(); } catch { }
+      try { keyboardSummonerRef.current?.blur(); } catch { }
+    } else {
+      // 非表示 → 表示＆フォーカス
+      keyboardSummonerRef.current?.focus();
+      setShowSearchBox(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const real = searchInputRef.current;
+          if (real) {
+            try {
+              const end = real.value?.length ?? 0;
+              real.setSelectionRange(end, end);
+            } catch { }
+            real.focus({ preventScroll: true });
+          }
+          keyboardSummonerRef.current?.blur();
+        });
+      });
+    }
+  }, [isSearchVisible]);
+
+
   return (
     // <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] overflow-hidden">
@@ -699,8 +728,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   (task) =>
                     uid &&
                     task.userIds?.includes(uid) &&
-                    (!periodFilter || periodFilter === task.period) &&
-                    (!personFilter || task.users.includes(personFilter)) &&
+                    // (!periodFilter || periodFilter === task.period) &&
+                    // (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
                     (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
@@ -717,8 +746,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   (task) =>
                     uid &&
                     task.userIds?.includes(uid) &&
-                    (!periodFilter || periodFilter === period) &&
-                    (!personFilter || task.users.includes(personFilter)) &&
+                    // (!periodFilter || periodFilter === period) &&
+                    // (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
                     (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
@@ -850,137 +879,130 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               <div
                 className="
           fixed
-          bottom-[calc(env(safe-area-inset-bottom)+5rem)]
+          bottom-[calc(env(safe-area-inset-bottom)+5.5rem)]
           left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
-          z-[9999]
+          z-[1100]
           pointer-events-auto
-          mb-4
         "
               >
-                <div className="flex items-center gap-2">
-                  {/* 本日フィルター */}
-                  <motion.button
-                    onClick={() => setTodayFilter((prev) => !prev)}
-                    whileTap={{ scale: 1.2 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    aria-pressed={todayFilter}
-                    aria-label="本日のタスクに絞り込む"
-                    title="本日のタスクに絞り込む"
-                    className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-              ${todayFilter
-                        ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner ring-2 ring-white'
-                        : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D] ring-2 ring-white'}
-            `}
+                {/* ▼ Todoの左下フィルタと同じガラス風コンテナ */}
+                <div className="rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-2 py-2">
+                  {/* 横スクロール行 */}
+                  <div
+                    className="flex items-center gap-2 overflow-x-auto no-scrollbar pr-1 pl-1"
+                    style={{ WebkitOverflowScrolling: 'touch' }}
                   >
-                    <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
-                    <span
-                      className={`absolute text-[14px] font-bold top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${todayFilter ? 'text-white' : 'text-gray-600'}`}
+                    {/* 📅 本日フィルター */}
+                    <button
+                      onClick={() => setTodayFilter((prev) => !prev)}
+                      aria-pressed={todayFilter}
+                      aria-label="本日のタスクに絞り込む"
+                      title="本日のタスクに絞り込む"
+                      className={[
+                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'shrink-0', // ← active:translate-y を削除
+                        todayFilter
+                          ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[2px] border-[#f0a93a] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                          : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
+                      ].join(' ')}
                     >
-                      {todayDate}
-                    </span>
-                  </motion.button>
+                      <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
+                      <span
+                        className={[
+                          'absolute text-[12px] font-bold top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
+                          todayFilter ? 'text-white' : 'text-gray-600',
+                        ].join(' ')}
+                      >
+                        {todayDate}
+                      </span>
+                    </button>
 
-                  {/* プライベート（ペア確定時のみ表示） */}
-                  {pairStatus === 'confirmed' && (
-                    <motion.button
-                      onClick={() => setPrivateFilter((prev) => !prev)}
-                      whileTap={{ scale: 1.2 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                      aria-pressed={privateFilter}
-                      aria-label="プライベートタスクのみ表示"
-                      title="プライベートタスク"
-                      className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-                ${privateFilter
-                          ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[#059669] shadow-inner ring-2 ring-white'
-                          : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185] ring-2 ring-white'}
-              `}
+                    {/* 仕切り */}
+                    {pairStatus === 'confirmed' && <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />}
+
+                    {/* 🔒 プライベート（ペア確定時のみ） */}
+                    {pairStatus === 'confirmed' && (
+                      <button
+                        onClick={() => setPrivateFilter((prev) => !prev)}
+                        aria-pressed={privateFilter}
+                        aria-label="プライベートタスクのみ表示"
+                        title="プライベートタスク"
+                        className={[
+                          'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                          'shrink-0',
+                          privateFilter
+                            ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[2px] border-[#059669] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                            : 'bg-white text-[#5E5E5E] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#059669] hover:text-white hover:border-[#059669]',
+                        ].join(' ')}
+                      >
+                        <SquareUser className="w-7 h-7" />
+                      </button>
+                    )}
+
+                    {/* 仕切り */}
+                    <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+
+                    {/* 🚩 フラグ */}
+                    <button
+                      onClick={() => setFlaggedFilter((prev) => !prev)}
+                      aria-pressed={flaggedFilter}
+                      aria-label="フラグ付きタスクのみ表示"
+                      title="フラグ付きタスク"
+                      className={[
+                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'shrink-0',
+                        flaggedFilter
+                          ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] text-white border-[2px] border-[#f43f5e] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                          : 'bg-white text-[#5E5E5E] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]',
+                      ].join(' ')}
                     >
-                      <SquareUser className="w-7 h-7" />
-                    </motion.button>
-                  )}
+                      <Flag className="w-6 h-6" />
+                    </button>
 
-                  {/* フラグ */}
-                  <motion.button
-                    onClick={() => setFlaggedFilter((prev) => !prev)}
-                    whileTap={{ scale: 1.2 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    aria-pressed={flaggedFilter}
-                    aria-label="フラグ付きタスクのみ表示"
-                    title="フラグ付きタスク"
-                    className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-              ${flaggedFilter
-                        ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] border-[#f43f5e] text-white shadow-inner ring-2 ring-white'
-                        : 'bg-white border-gray-300 text-[#5E5E5E] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:border-[#fb7185] hover:text-white ring-2 ring-white'}
-            `}
-                  >
-                    <Flag className="w-6 h-6" />
-                  </motion.button>
+                    {/* 仕切り */}
+                    <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
 
-                  {/* 検索（虫眼鏡） */}
-                  <motion.button
-                    onMouseDown={() => {
-                      keyboardSummonerRef.current?.focus();
-                      setShowSearchBox(true);
-                      requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                          const real = searchInputRef.current;
-                          if (real) {
-                            try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { /* noop */ }
-                            real.focus({ preventScroll: true });
-                          }
-                          keyboardSummonerRef.current?.blur();
-                        });
-                      });
-                    }}
-                    onTouchStart={() => {
-                      keyboardSummonerRef.current?.focus();
-                      setShowSearchBox(true);
-                      requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                          const real = searchInputRef.current;
-                          if (real) {
-                            try { const end = real.value?.length ?? 0; real.setSelectionRange(end, end); } catch { /* noop */ }
-                            real.focus({ preventScroll: true });
-                          }
-                          keyboardSummonerRef.current?.blur();
-                        });
-                      });
-                    }}
-                    whileTap={{ scale: 1.2 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    aria-pressed={isSearchVisible}
-                    aria-label="検索ボックスを表示/非表示"
-                    title="検索"
-                    className={`w-13 h-13 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300
-                    ${isSearchVisible
-                        ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-inner ring-2 ring-white'
-                        : 'bg-white text-gray-600 border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D] ring-2 ring-white'
-                      }`}
-                  >
-                    <Search className={`w-7 h-7 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
-                  </motion.button>
+                    {/* 🔎 検索（虫眼鏡） */}
+                    <button
+                      onPointerDown={handleToggleSearch}
+                      aria-pressed={isSearchVisible}
+                      aria-label="検索ボックスを表示/非表示"
+                      title="検索"
+                      className={[
+                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'shrink-0',
+                        isSearchVisible
+                          ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-[2px] border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                          : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
 
-                  {/* クリア */}
-                  {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
-                    <motion.button
-                      onClick={() => {
-                        setPeriodFilter(null);
-                        setPersonFilter(null);
-                        setSearchTerm('');
-                        setTodayFilter(false);
-                        setPrivateFilter(false);
-                        setShowSearchBox(false);
-                        setFlaggedFilter(false);
-                      }}
-                      whileTap={{ scale: 1.2 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                      className="w-10 aspect-square rounded-full border-2 text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-inner"
-                      title="すべてのフィルターを解除"
-                      aria-label="すべてのフィルターを解除"
+                      ].join(' ')}
                     >
-                      <X className="w-5 h-5" />
-                    </motion.button>
-                  )}
+                      <Search className={`w-7 h-7 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
+                    </button>
+
+
+                    {/* ❌ クリア（いずれかフィルタが有効時） */}
+                    {/* {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
+                      <motion.button
+                        onClick={() => {
+                          setPeriodFilter(null);
+                          setPersonFilter(null);
+                          setSearchTerm('');
+                          setTodayFilter(false);
+                          setPrivateFilter(false);
+                          setShowSearchBox(false);
+                          setFlaggedFilter(false);
+                        }}
+                        whileTap={{ scale: 1.2 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                        className="w-12 h-12 rounded-full border-[2px] text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-[0_6px_14px_rgba(0,0,0,0.18)]"
+                        title="すべてのフィルターを解除"
+                        aria-label="すべてのフィルターを解除"
+                      >
+                        <X className="w-5 h-5" />
+                      </motion.button>
+                    )} */}
+                  </div>
                 </div>
               </div>
             </div>,
