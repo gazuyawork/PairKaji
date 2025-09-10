@@ -330,7 +330,7 @@ export default function TaskCard({
                   animate={{ rotate: 360, scale: [1, 1.3, 1] }}
                   transition={{ duration: 0.3, ease: 'easeInOut' }}
                 >
-                  <CheckCircle className="text-yellow-500 w-6 h-6" />
+                  <CheckCircle className="text-emerald-500 w-6 h-6" />
                 </motion.div>
               ) : (
                 <Circle className="text-gray-400 w-6 h-6" />
