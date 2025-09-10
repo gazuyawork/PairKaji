@@ -583,18 +583,17 @@ export default function TodoView() {
           <button
             type="button"
             onClick={() => {
-              // ★ 追加: 前回の再表示シート条件を初期化
               setAddSelectedCategoryId(null);
               setAddQuery('');
               setIsAddSheetOpen(true);
             }}
-            className="fixed bottom-24 right-5 z-[1100] w-14 h-14 rounded-full
-                     bg-gradient-to-b from-[#FFC25A] to-[#FFA726]
-                     shadow-[0_12px_24px_rgba(0,0,0,0.18)]
-                     ring-2 ring-white text-white flex items-center justify-center
-                     active:translate-y-[1px]
-                     hover:shadow-[0_16px_30px_rgba(0,0,0,0.22)]
-                     transition"
+            className="fixed bottom-24 right-[calc((100vw_-_min(100vw,_38rem))/_2_+_1rem)] z-[1100] w-14 h-14 rounded-full
+                 bg-gradient-to-b from-[#FFC25A] to-[#FFA726]
+                 shadow-[0_12px_24px_rgba(0,0,0,0.18)]
+                 ring-2 ring-white text-white flex items-center justify-center
+                 active:translate-y-[1px]
+                 hover:shadow-[0_16px_30px_rgba(0,0,0,0.22)]
+                 transition"
             aria-label="非表示のTodoを再表示"
             title="非表示のTodoを再表示"
           >
@@ -602,6 +601,7 @@ export default function TodoView() {
           </button>,
           document.body
         )}
+
 
       {/* ★ 修正：左下固定のカテゴリフィルタ（横並び・アイコンのみ・真円）＋ 検索トグル */}
       {mounted &&
@@ -931,16 +931,20 @@ export default function TodoView() {
               exit={{ opacity: 0, y: 24 }}
               transition={{ type: 'spring', stiffness: 280, damping: 26 }}
             >
-              <div className="h-14 flex items-center justify-between px-3 bg-white">
-                <div className="font-bold pl-4 truncate text-[#5E5E5E]">{selectedTask.name}</div>
-                <button
-                  type="button"
-                  aria-label="閉じる"
-                  onClick={handleCloseDetail}
-                  className="p-2 rounded-full hover:bg-gray-100"
-                >
-                  <X />
-                </button>
+              <div className="h-14 bg-white">
+                <div className="mx-auto w-full max-w-xl h-full flex items-center justify-between px-3">
+                  <div className="font-bold pl-4 truncate text-[#5E5E5E]">
+                    {selectedTask.name}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="閉じる"
+                    onClick={handleCloseDetail}
+                    className="p-2 rounded-full hover:bg-gray-100"
+                  >
+                    <X />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto">

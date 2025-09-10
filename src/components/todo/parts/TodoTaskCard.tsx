@@ -321,7 +321,7 @@ export default function TodoTaskCard({
                     onClick={() => setTab(type)}
                     className={clsx(
                       'relative pl-5 py-1 text-[13px] sm:text-sm font-bold border border-gray-300',
-                      'rounded-t-md w-24 sm:w-16 flex items-center justify-center',
+                      'rounded-t-md w-24 sm:w-24 flex items-center justify-center',
                       type === tab
                         ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
                         : 'bg-gray-100 text-gray-400 z-0'
@@ -496,7 +496,7 @@ export default function TodoTaskCard({
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
           <div className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200">
-            <div className="px-4 py-2">
+            <div className="px-4 py-4">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
                 <input
