@@ -21,7 +21,7 @@ import {
   QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
+// import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
 import { toggleTaskDoneStatus, saveSingleTask, removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
@@ -433,26 +433,26 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   };
 
   // 日次の自動リセット
-  useEffect(() => {
-    let mounted = true;
+  // useEffect(() => {
+  //   let mounted = true;
 
-    (async () => {
-      try {
-        const count = await resetCompletedTasks();
-        if (!mounted) return;
+  //   (async () => {
+  //     try {
+  //       const count = await resetCompletedTasks();
+  //       if (!mounted) return;
 
-        if (count > 0) {
-          toast.success('タスクのリセットが完了しました。今日も1日がんばりましょう！');
-        }
-      } catch (e) {
-        console.error('resetCompletedTasks 実行時にエラー', e);
-      }
-    })();
+  //       if (count > 0) {
+  //         toast.success('タスクのリセットが完了しました。今日も1日がんばりましょう！');
+  //       }
+  //     } catch (e) {
+  //       console.error('resetCompletedTasks 実行時にエラー', e);
+  //     }
+  //   })();
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  //   return () => {
+  //     mounted = false;
+  //   };
+  // }, []);
 
   // タスク購読
   useEffect(() => {
