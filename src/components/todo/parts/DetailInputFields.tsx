@@ -27,23 +27,24 @@ export default function DetailInputFields({
     <div>
       <div className="space-y-2 ml-2 mt-6 flex">
         <div className="flex gap-2 items-end mb-4">
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => onChangePrice(e.target.value)}
-            placeholder="価格 (円)"
-            className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-2xl text-center"
-          />
-          <p className="pl-1">円</p>
+<input
+  type="number"
+  value={price}
+  onChange={(e) => onChangePrice(e.target.value)}
+  placeholder="価格"
+  className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-2xl text-center placeholder:text-[17px]"
+/>
+          <p className="pl-1">円<span className="text-sm">（税込）</span></p>
         </div>
         <div className="flex gap-2 items-end mb-4">
-          <input
-            type="number"
-            value={quantity}
-            onChange={(e) => onChangeQuantity(e.target.value)}
-            placeholder="内容量"
-            className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-2xl text-center"
-          />
+<input
+  type="number"
+  value={quantity}
+  onChange={(e) => onChangeQuantity(e.target.value)}
+  placeholder="内容量"
+  className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-2xl text-center placeholder:text-[17px]"
+/>
+
           <select
             value={unit}
             onChange={(e) => onChangeUnit(e.target.value)}

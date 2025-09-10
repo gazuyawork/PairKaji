@@ -16,6 +16,18 @@ const SHAKE_VARIANTS: Variants = {
   shake: { x: [0, -6, 6, -4, 4, -2, 2, 0], transition: { duration: 0.4 } },
 };
 
+/* ==== グローバル・トグルロック（アニメ中は他行のチェック禁止） ==== */
+type ToggleLockDetail = { locked: boolean; id: string | null };
+let GLOBAL_TOGGLE_LOCK = false;
+let GLOBAL_ANIMATING_ID: string | null = null;
+const LOCK_EVENT_NAME = 'pk-todo-toggle-lock';
+
+function emitToggleLock(locked: boolean, id: string | null) {
+  if (typeof window === 'undefined') return;
+  const ev = new CustomEvent<ToggleLockDetail>(LOCK_EVENT_NAME, { detail: { locked, id } });
+  window.dispatchEvent(ev);
+}
+
 type Props = {
   todo: SimpleTodo;
   dndEnabled: boolean;
@@ -35,8 +47,6 @@ type Props = {
   setConfirmTodoDeletes: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   todoDeleteTimeouts: React.MutableRefObject<Record<string, ReturnType<typeof setTimeout>>>;
 };
-
-// const nonEmptyString = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
 export default function SortableTodoRow({
   todo,
@@ -60,6 +70,19 @@ export default function SortableTodoRow({
   const [isEditingRow, setIsEditingRow] = useState(false);
   const [text, setText] = useState<string>(todo.text ?? '');
   const [isComposingRow, setIsComposingRow] = useState(false);
+
+  // グローバルロック購読（他行も含めてアニメ中はチェック禁止）
+  const [isLocked, setIsLocked] = useState<boolean>(GLOBAL_TOGGLE_LOCK);
+  const [animatingId, setAnimatingId] = useState<string | null>(GLOBAL_ANIMATING_ID);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<ToggleLockDetail>;
+      setIsLocked(!!ce.detail?.locked);
+      setAnimatingId(ce.detail?.id ?? null);
+    };
+    window.addEventListener(LOCK_EVENT_NAME, handler as EventListener);
+    return () => window.removeEventListener(LOCK_EVENT_NAME, handler as EventListener);
+  }, []);
 
   useEffect(() => {
     if (!isEditingRow) setText(todo.text ?? '');
@@ -126,6 +149,29 @@ export default function SortableTodoRow({
     }
   };
 
+  // 未処理→完了のときだけ、チェック真上に緑のアニメを出し、アニメ中は全行ロック
+  const handleToggleClick = () => {
+    if (isLocked) return;
+    if (!todo.done) {
+      // 未処理 → 完了（アニメ）
+      GLOBAL_TOGGLE_LOCK = true;
+      GLOBAL_ANIMATING_ID = todo.id;
+      emitToggleLock(true, todo.id);
+      setTimeout(() => {
+        onToggleDone(todo.id);
+        // 余韻
+        setTimeout(() => {
+          GLOBAL_TOGGLE_LOCK = false;
+          GLOBAL_ANIMATING_ID = null;
+          emitToggleLock(false, null);
+        }, 50);
+      }, 500); // アニメ時間
+    } else {
+      // 完了 → 未処理（アニメなし即時）
+      onToggleDone(todo.id);
+    }
+  };
+
   return (
     <div ref={setNodeRef} style={style} data-todo-row className={clsx('flex flex-col', isDragging && 'opacity-60')}>
       <div className="flex items-center gap-2">
@@ -142,16 +188,35 @@ export default function SortableTodoRow({
           <Grip size={18} aria-label="並び替え" />
         </span>
 
-        <motion.div
-          key={todo.id + String(!!todo.done)}
-          className="cursor-pointer"
-          onClick={() => setTimeout(() => onToggleDone(todo.id), 0)}
-          initial={{ rotate: 0 }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
-        >
-          {todo.done ? <CheckCircle className="text-yellow-500" /> : <Circle className="text-gray-400" />}
-        </motion.div>
+        {/* チェックボックス（相対ラップ：真上にアニメを重ねる） */}
+        <div className="relative inline-flex items-center justify-center w-6 h-6">
+          <button
+            type="button"
+            onClick={handleToggleClick}
+            disabled={isLocked}
+            className={clsx(
+              'relative z-10 inline-flex items-center justify-center w-6 h-6 rounded-full',
+              isLocked && 'cursor-not-allowed opacity-70'
+            )}
+            aria-label={todo.done ? '未処理に戻す' : '完了にする'}
+            title={todo.done ? '未処理に戻す' : '完了にする'}
+          >
+            {todo.done ? <CheckCircle className="text-emerald-500" /> : <Circle className="text-gray-400" />}
+          </button>
+
+          {/* 未処理→完了のアニメ：チェック直上 / 緑色 */}
+          {isLocked && animatingId === todo.id && (
+            <motion.div
+              className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+              initial={{ scale: 0.8, rotate: 0, opacity: 0 }}
+              animate={{ scale: 1.25, rotate: 360, opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
+            >
+              <CheckCircle size={22} className="text-emerald-500" />
+            </motion.div>
+          )}
+        </div>
 
         <input
           type="text"
@@ -185,21 +250,36 @@ export default function SortableTodoRow({
               if (focusedTodoId === todo.id) el.focus();
             }
           }}
-          className={clsx('flex-1 border-b bg-transparent outline-none border-gray-200 h-8', todo.done ? 'text-gray-400 line-through' : 'text-black')}
+          disabled={isLocked}
+          className={clsx(
+            'flex-1 border-b bg-transparent outline-none border-gray-200 h-8',
+            todo.done ? 'text-gray-400 line-through' : 'text-black',
+            isLocked && 'cursor-not-allowed opacity-70'
+          )}
           placeholder="TODOを入力"
         />
 
-        <motion.button
+        <button
           type="button"
-          whileTap={{ scale: 0.85, rotate: -10 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-          className={clsx('mr-1 active:scale-90', hasContentForIcon ? 'text-orange-400 hover:text-orange-500 active:text-orange-600' : 'text-gray-400 hover:text-yellow-500 active:text-yellow-600')}
+          className={clsx(
+            'mr-1',
+            hasContentForIcon ? 'text-orange-400 hover:text-orange-500 active:text-orange-600' : 'text-gray-400 hover:text-emerald-500 active:text-yellow-600',
+            isLocked && 'cursor-not-allowed opacity-70'
+          )}
           onClick={() => onOpenNote(todo.text)}
+          disabled={isLocked}
         >
           <Notebook size={22} />
-        </motion.button>
+        </button>
 
-        <motion.button type="button" onClick={() => handleTodoDeleteClick(todo.id)} animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined} variants={SHAKE_VARIANTS}>
+        <motion.button
+          type="button"
+          onClick={() => handleTodoDeleteClick(todo.id)}
+          animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
+          variants={SHAKE_VARIANTS}
+          disabled={isLocked}
+          className={clsx(isLocked && 'cursor-not-allowed opacity-70')}
+        >
           <Trash2 size={22} className={clsx('hover:text-red-500', confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400')} />
         </motion.button>
       </div>

@@ -292,7 +292,7 @@ export default function TodoTaskCard({
 
             {/* タスク名（開閉トグルは削除） */}
             <div
-              className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text-left"
+              className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text左"
               aria-label="タスク名"
             >
               <CatIcon
@@ -483,7 +483,7 @@ export default function TodoTaskCard({
               </div>
             )}
             {showScrollUpHint && (
-              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg黒/50 animate-pulse">
                 <ChevronUp size={16} className="text-white" />
               </div>
             )}
