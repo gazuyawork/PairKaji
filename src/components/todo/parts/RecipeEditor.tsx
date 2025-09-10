@@ -75,7 +75,7 @@ const toHalfWidth = (s: string) =>
 const genId = () => {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch { }
+  } catch {}
   return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 };
 
@@ -113,6 +113,17 @@ const indexToLetters = (idx: number) => {
   }
   return s;
 };
+
+/* =========================================================
+   ★ 追加: 中身が同じなら前回の参照を返す安定化フック
+   ========================================================= */
+function useStableArray<T>(value: T[], equal: (a: T[], b: T[]) => boolean) {
+  const ref = useRef<T[]>(value);
+  if (!equal(ref.current, value)) {
+    ref.current = value;
+  }
+  return ref.current;
+}
 
 /**
  * useSortable の戻り値から listeners 型を推論し、
@@ -268,33 +279,40 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   const nameRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const stepRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
 
+  /* ---------------------------------------------------------
+     ★ 追加: 親 props の配列参照を「中身ベースで」安定化させる
+     --------------------------------------------------------- */
+  const propIngredients = useStableArray(value.ingredients, shallowEqualIngredients);
+  const propSteps = useStableArray(value.steps, shallowEqualSteps);
+
   // 親→子 同期（編集中は巻き戻さない）
   useEffect(() => {
     if (editingId === null) {
-      setIngredients((prev) => (shallowEqualIngredients(prev, value.ingredients) ? prev : value.ingredients));
+      setIngredients((prev) => (shallowEqualIngredients(prev, propIngredients) ? prev : propIngredients));
     }
     if (editingStepIndex === null && composingStepIndex === null) {
-      setSteps((prev) => (shallowEqualSteps(prev, value.steps) ? prev : value.steps));
+      setSteps((prev) => (shallowEqualSteps(prev, propSteps) ? prev : propSteps));
     }
-  }, [value.ingredients, value.steps, editingId, editingStepIndex, composingStepIndex]);
+    // 依存は安定化した参照に限定
+  }, [propIngredients, propSteps, editingId, editingStepIndex, composingStepIndex]);
 
   // steps と stepIds の長さ同期（編集中は巻き戻さない）
   useEffect(() => {
     if (editingStepIndex !== null || composingStepIndex !== null) return;
     setStepIds((prev) => {
-      if (prev.length === value.steps.length) return prev;
+      if (prev.length === propSteps.length) return prev;
       const next = [...prev];
-      while (next.length < value.steps.length) next.push(`step_${genId()}`);
-      while (next.length > value.steps.length) next.pop();
+      while (next.length < propSteps.length) next.push(`step_${genId()}`);
+      while (next.length > propSteps.length) next.pop();
       return next;
     });
-  }, [value.steps, editingStepIndex, composingStepIndex]);
+  }, [propSteps, editingStepIndex, composingStepIndex]);
 
-  // ★ 変更: 親へ伝播（差分がある時だけ・直前送信値と同一なら送らない）
+  // ★ 親へ伝播（差分がある時だけ・直前送信値と同一なら送らない）
   useEffect(() => {
     const sameAsProp =
-      shallowEqualIngredients(ingredients, value.ingredients) &&
-      shallowEqualSteps(steps, value.steps);
+      shallowEqualIngredients(ingredients, propIngredients) &&
+      shallowEqualSteps(steps, propSteps);
     if (sameAsProp) return;
 
     const sameAsLastSent =
@@ -305,8 +323,8 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     const outgoing: Recipe = { ingredients, steps };
     onChange(outgoing);
     lastSentRef.current = outgoing;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingredients, steps, value.ingredients, value.steps /*, onChange*/]); // onChangeは親でuseCallback推奨
+    // value.ingredients / value.steps を依存に入れない（往復ループ防止）
+  }, [ingredients, steps]); // onChange は親側で useCallback 推奨
 
   // 数量テキストの初期化・同期（ingredients の増減や id 変化に追従）
   useEffect(() => {
@@ -828,7 +846,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                   </div>
                   <AutoResizeTextarea
                     value={s}
-                    onChange={() => { }}
+                    onChange={() => {}}
                     placeholder="手順を入力"
                     className="col-span-11 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0"
                     readOnly
