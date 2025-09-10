@@ -25,7 +25,6 @@ import { db } from '@/lib/firebase';
 import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
-import GroupSelector, { GroupSelectorHandle } from '@/components/todo/parts/GroupSelector';
 import { useView } from '@/context/ViewContext';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard from '@/components/home/parts/AdCard';
@@ -39,7 +38,7 @@ import { updateTodoTextInTask } from '@/lib/taskUtils';
 import { createPortal } from 'react-dom';
 // UI
 import { motion, AnimatePresence } from 'framer-motion';
-// ★ 変更: カテゴリアイコンを追加（絞り込みチップで使用）
+// ★ 変更: カテゴリアイコンを追加（絞り込みボタンで使用）
 import { Eye, X, Search, ShoppingCart, Utensils, MapPin, Briefcase, Home, Tag } from 'lucide-react';
 // dnd-kit
 import {
@@ -87,6 +86,7 @@ function getCategoryMeta(raw?: string | null) {
         colorClass: 'text-emerald-500',
         label: '買い物',
         chipActiveClass: 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
+        activeBg: 'from-emerald-500 to-emerald-600',
       };
     case '料理':
       return {
@@ -94,6 +94,7 @@ function getCategoryMeta(raw?: string | null) {
         colorClass: 'text-orange-500',
         label: '料理',
         chipActiveClass: 'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
+        activeBg: 'from-orange-500 to-orange-600',
       };
     case '旅行':
       return {
@@ -101,6 +102,7 @@ function getCategoryMeta(raw?: string | null) {
         colorClass: 'text-sky-500',
         label: '旅行',
         chipActiveClass: 'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
+        activeBg: 'from-sky-500 to-sky-600',
       };
     case '仕事':
       return {
@@ -108,6 +110,7 @@ function getCategoryMeta(raw?: string | null) {
         colorClass: 'text-indigo-500',
         label: '仕事',
         chipActiveClass: 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-indigo-600',
+        activeBg: 'from-indigo-500 to-indigo-600',
       };
     case '家事':
       return {
@@ -115,6 +118,7 @@ function getCategoryMeta(raw?: string | null) {
         colorClass: 'text-rose-500',
         label: '家事',
         chipActiveClass: 'bg-gradient-to-b from-rose-500 to-rose-600 text-white border-rose-600',
+        activeBg: 'from-rose-500 to-rose-600',
       };
     case '未分類':
     default:
@@ -123,6 +127,7 @@ function getCategoryMeta(raw?: string | null) {
         colorClass: 'text-gray-400',
         label: category,
         chipActiveClass: 'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
+        activeBg: 'from-gray-500 to-gray-600',
       };
   }
 }
@@ -134,8 +139,6 @@ export default function TodoView() {
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const groupSelectorRef = useRef<GroupSelectorHandle | null>(null);
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
@@ -154,6 +157,9 @@ export default function TodoView() {
   // ★ 追加: 再表示シート用 カテゴリ選択（null = すべて）
   const [addSelectedCategoryId, setAddSelectedCategoryId] = useState<string | null>(null);
 
+  // ★ 追加: 検索ボックスの表示切替（左下パネルの虫眼鏡でトグル）
+  const [showSearch, setShowSearch] = useState(false);
+
   // ★ 追加: メモモーダル開閉ハンドラ
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
@@ -166,7 +172,6 @@ export default function TodoView() {
     setNoteModalTask(null);
     setNoteModalTodo(null);
   };
-
 
   // 背景スクロール制御（追加シート or 詳細オーバーレイ）
   useEffect(() => {
@@ -286,28 +291,18 @@ export default function TodoView() {
     if (matched) {
       // 詳細オーバーレイを開く
       setSelectedTaskId(matched.id);
-
-      // 一覧フィルタ解除（カテゴリ/テキスト/GroupSelector）
-      setSelectedGroupId(null);
       setFilterText('');
       setSelectedCategoryId(null); // ★ 追加: カテゴリも解除
-      // groupSelectorRef?.current?.reset?.();
     } else {
       // フォールバック：テキストフィルタにかける
       setFilterText(selectedTaskName);
       setSelectedCategoryId(null); // 一貫性重視：テキスト検索に絞るためカテゴリは解除
+      setShowSearch(true);
     }
 
     // 消費
     setSelectedTaskName('');
   }, [selectedTaskName, setSelectedTaskName, tasks]);
-
-  // GroupSelectorの対象が消えたら解除
-  useEffect(() => {
-    if (selectedGroupId && !tasks.some((task) => task.id === selectedGroupId)) {
-      setSelectedGroupId(null);
-    }
-  }, [tasks, selectedGroupId]);
 
   // dnd sensors
   const sensors = useSensors(
@@ -368,10 +363,8 @@ export default function TodoView() {
   // ★ 変更: 詳細を閉じたらフィルタも解除（カテゴリ含む）
   const handleCloseDetail = useCallback(() => {
     setSelectedTaskId(null);
-    setSelectedGroupId(null);
     setFilterText('');
-    setSelectedCategoryId(null); // ★ 追加
-    groupSelectorRef.current?.reset();
+    setSelectedCategoryId(null);
     // 必要ならタブも初期化: setActiveTabs({})
   }, []);
 
@@ -415,8 +408,6 @@ export default function TodoView() {
     const filtered = tasks.filter((task) => {
       const visibleOk = task.visible;
       const ownerOk = task.userId === uid || task.private !== true;
-      const groupOk = !selectedGroupId || task.id === selectedGroupId;
-
       // テキストマッチ
       const text = filterText.trim();
       const textOk = text === '' ? true : (task.name ?? '').includes(text);
@@ -427,7 +418,7 @@ export default function TodoView() {
       const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
       const catOk = selectedCategoryId === null ? true : catId === selectedCategoryId;
 
-      return visibleOk && ownerOk && groupOk && textOk && catOk;
+      return visibleOk && ownerOk && textOk && catOk;
     });
 
     const map = new Map<string, TodoOnlyTask[]>();
@@ -443,7 +434,7 @@ export default function TodoView() {
     const entries = Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
 
     return entries.map(([cat, arr]) => ({ category: cat, items: arr }));
-  }, [tasks, selectedGroupId, filterText, selectedCategoryId, uid]);
+  }, [tasks, filterText, selectedCategoryId, uid]);
 
   // 一覧で使う全表示ID（DnD用）
   const allVisibleIds = useMemo(() => categorized.flatMap((g) => g.items.map((t) => t.id)), [categorized]);
@@ -478,7 +469,7 @@ export default function TodoView() {
 
   return (
     <>
-      <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]  overflow-hidden">
+      <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] overflow-hidden">
         <main className="overflow-y-auto px-4 pt-5 pb-20">
           {/* メモモーダル */}
           {index === 2 && noteModalTask && noteModalTodo && (
@@ -491,78 +482,38 @@ export default function TodoView() {
             />
           )}
 
-          {/* ★ 変更: Sticky 検索＋カテゴリチップ（一覧側） */}
-          <div className="sticky top-0 z-[999] w-full bg-transparent">
-            <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg space-y-3 px-2 pt-2 pb-3">
-              {/* キーワード検索 */}
-              <div
-                className="flex items-center gap-2 rounded-xl px-3 py-2
-                           bg-gradient-to-b from-white to-gray-50
-                           border border-gray-200
-                           shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
-              >
-                <Search className="w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
-                  placeholder="キーワードで検索"
-                  className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400 bg-transparent"
-                />
-                {filterText && (
-                  <button
-                    type="button"
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                    onClick={() => setFilterText('')}
-                  >
-                    クリア
-                  </button>
-                )}
-              </div>
-
-              {/* カテゴリチップ */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
-                {/* すべて */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategoryId(null)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-                    ${selectedCategoryId === null
-                      ? 'bg-gray-900 text-white border-gray-900 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
-                      : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-gray-50 hover:to-white'
-                    }
-                    active:translate-y-[1px]`}
-                  aria-pressed={selectedCategoryId === null}
+          {/* ★ 変更: Sticky 検索のみ（カテゴリは左下固定に移動） */}
+          {showSearch && (
+            <div className="sticky top-0 z-[999] w-full bg-transparent">
+              <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg px-2 pt-2 pb-3">
+                <div
+                  className="flex items-center gap-2 rounded-xl px-3 py-2
+                             bg-gradient-to-b from-white to-gray-50
+                             border border-gray-200
+                             shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                 >
-                  すべて
-                </button>
-
-                {/* 動的カテゴリ */}
-                {availableCategories.map((c) => {
-                  const active = selectedCategoryId === c.id;
-                  const { Icon, colorClass, chipActiveClass } = getCategoryMeta(c.label);
-                  return (
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    placeholder="キーワードで検索"
+                    className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400 bg-transparent"
+                    autoFocus
+                  />
+                  {filterText && (
                     <button
-                      key={c.id}
                       type="button"
-                      onClick={() => setSelectedCategoryId(c.id)}
-                      className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1
-                        ${active
-                          ? `${chipActiveClass} shadow-[0_2px_2px_rgba(0,0,0,0.1)]`
-                          : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white'
-                        }
-                        active:translate-y-[1px]`}
-                      aria-pressed={active}
-                      title={c.label}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                      onClick={() => setFilterText('')}
                     >
-                      <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
-                      <span>{c.label}</span>
+                      クリア
                     </button>
-                  );
-                })}
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* ▼ 一覧：カテゴリ見出しでグループ分け（カードにカテゴリアイコン＆名も表示） */}
           {(() => {
@@ -593,7 +544,6 @@ export default function TodoView() {
                                 task={task}
                                 onClickTitle={(taskId) => {
                                   setSelectedTaskId(taskId);
-                                  setSelectedGroupId(taskId); // 任意：GroupSelector連動の現状維持
                                 }}
                                 onHide={async (taskId) => {
                                   const ok = window.confirm(
@@ -628,7 +578,7 @@ export default function TodoView() {
         </main>
       </div>
 
-      {/* 右下＋ */}
+      {/* 右下＋（非表示ToDoの再表示シートを開く） */}
       {mounted &&
         index === 2 &&
         createPortal(
@@ -647,11 +597,75 @@ export default function TodoView() {
                      active:translate-y-[1px]
                      hover:shadow-[0_16px_30px_rgba(0,0,0,0.22)]
                      transition"
-            aria-label="Todoを追加"
-            title="Todoを追加"
+            aria-label="非表示のTodoを再表示"
+            title="非表示のTodoを再表示"
           >
             <Eye className="w-7 h-7" />
           </button>,
+          document.body
+        )}
+
+      {/* ★ 修正：左下固定のカテゴリフィルタ（横並び・アイコンのみ・真円）＋ 検索トグル */}
+      {mounted &&
+        index === 2 &&
+        createPortal(
+          <div
+            className="fixed bottom-22 left-4 z-[1100]
+                       rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200
+                       shadow-[0_8px_24px_rgba(0,0,0,0.16)]
+                       px-2 py-2"
+            style={{ maxWidth: 'min(calc(100vw - 32px), 800px)' }}
+          >
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+              {/* 動的カテゴリ（アイコンのみ・横並び） */}
+              {availableCategories.map((c) => {
+                const isActive = selectedCategoryId === c.id;
+                const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedCategoryId((prev) => (prev === c.id ? null : c.id))
+                    }
+                    className={[
+                      'w-12 h-12 rounded-full border flex items-center justify-center transition',
+                      'active:translate-y-[1px] shrink-0',
+                      isActive
+                        ? `text-white border-transparent bg-gradient-to-b ${activeBg} shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                    ].join(' ')}
+                    aria-pressed={isActive}
+                    aria-label={c.label}
+                    title={c.label}
+                  >
+                    <Icon className={`w-6 h-6 ${isActive ? 'text-white' : colorClass}`} />
+                  </button>
+                );
+              })}
+
+              {/* 仕切り（縦線） */}
+              <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+
+              {/* 検索表示トグル（虫眼鏡） */}
+              <button
+                type="button"
+                onClick={() => setShowSearch((v) => !v)}
+                className={[
+                  'w-12 h-12 rounded-full border flex items-center justify-center transition',
+                  'active:translate-y-[1px] shrink-0',
+                  showSearch
+                    ? 'text-white border-transparent bg-gray-900 shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                ].join(' ')}
+                aria-pressed={showSearch}
+                aria-label={showSearch ? '検索を隠す' : '検索を表示'}
+                title={showSearch ? '検索を隠す' : '検索を表示'}
+              >
+                <Search className={`w-6 h-6 ${showSearch ? 'text-white' : 'text-gray-600'}`} />
+              </button>
+            </div>
+          </div>,
           document.body
         )}
 
@@ -850,13 +864,10 @@ export default function TodoView() {
                                   toast.success('非表示のタスクを再表示しました。');
 
                                   // ▼ 一覧は絞り込まずに、詳細オーバーレイを開く
-                                  setSelectedGroupId(null);
                                   setFilterText('');
                                   setSelectedCategoryId(null);      // 一覧側カテゴリ解除
-                                  setAddSelectedCategoryId(null);   // ★ 追加: 再表示シート側カテゴリも解除
+                                  setAddSelectedCategoryId(null);   // 再表示シート側カテゴリも解除
                                   setSelectedTaskId(t.id);
-                                  groupSelectorRef.current?.reset?.();
-
                                   setAddQuery('');
                                   setIsAddSheetOpen(false);
                                 }}
@@ -886,38 +897,6 @@ export default function TodoView() {
               </motion.div>
             )}
           </AnimatePresence>,
-          document.body
-        )}
-
-      {/* 下部 GroupSelector */}
-      {mounted &&
-        index === 2 &&
-        createPortal(
-          <div
-            className="fixed left-1/2 -translate-x-1/2 bottom-22 z-[1000] w-full max-w-xl px-2 pointer-events-none"
-            aria-label="グループセレクタ固定バー"
-          >
-            <div className="pointer-events-auto rounded-sm">
-              <GroupSelector
-                ref={groupSelectorRef}
-                tasks={tasks}
-                selectedGroupId={selectedGroupId}
-                onSelectGroup={(groupId) => {
-                  // 一覧は絞り込まず（= フィルタは使わない）
-                  setSelectedGroupId(null);
-                  setFilterText('');
-                  setSelectedCategoryId(null); // ★ 追加: カテゴリも解除
-
-                  // 選択されたらそのまま詳細オーバーレイを開く
-                  if (groupId) {
-                    setSelectedTaskId(groupId);
-                  } else {
-                    setSelectedTaskId(null);
-                  }
-                }}
-              />
-            </div>
-          </div>,
           document.body
         )}
 
@@ -957,7 +936,7 @@ export default function TodoView() {
                     setTab={(tab) => setActiveTabs((prev) => ({ ...prev, [selectedTask.id]: tab }))}
                     onOpenNote={(text) => {
                       const todo = selectedTask.todos.find((t) => t.text === text);
-                      if (todo) openNoteModal(selectedTask, todo); // ★ 変更
+                      if (todo) openNoteModal(selectedTask, todo);
                     }}
                     onAddTodo={async (todoId, text) => {
                       const newTodos = [...selectedTask.todos, { id: todoId, text, done: false }];
@@ -971,9 +950,9 @@ export default function TodoView() {
                         prev.map((t) =>
                           t.id === selectedTask.id
                             ? {
-                              ...t,
-                              todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
-                            }
+                                ...t,
+                                todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
+                              }
                             : t
                         )
                       );
