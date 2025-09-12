@@ -5,6 +5,7 @@
  * - 通知権限の確認と requestPermission()
  * - Service Worker の登録（ready タイムアウト付き）
  * - PushManager.subscribe() による購読作成（VAPID 公開鍵必須）
+ * - 購読情報をサーバーへ保存
  * - 例外ではなく結果オブジェクトでUIに返す
  * - 充分なログでハング箇所の切り分けを容易に
  */
@@ -79,11 +80,32 @@ async function waitForReady(timeoutMs = 5000): Promise<ServiceWorkerRegistration
   });
 }
 
+/** 購読情報をサーバーに保存 */
+async function saveSubscriptionToServer(uid: string, sub: PushSubscription) {
+  try {
+    const res = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid,
+        subscription: sub.toJSON(),
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to save subscription: ${res.status}`);
+    }
+    console.log('[push] subscription saved to server');
+  } catch (e) {
+    console.error('[push] failed to save subscription', e);
+  }
+}
+
 /**
  * 通知利用の下準備〜Push購読をまとめて行う。
  * 例外は投げず、UIで扱いやすい結果を返す。
+ * @param uid Firestoreなどで管理している現在のユーザーID
  */
-export async function ensureWebPushSubscription(): Promise<EnsureResult> {
+export async function ensureWebPushSubscription(uid: string): Promise<EnsureResult> {
   // ブラウザ対応確認
   if (
     typeof window === 'undefined' ||
@@ -161,6 +183,8 @@ export async function ensureWebPushSubscription(): Promise<EnsureResult> {
     const existing = await reg.pushManager.getSubscription();
     if (existing) {
       console.log('[push] reuse existing subscription');
+      // サーバーに既存購読を保存（更新）
+      await saveSubscriptionToServer(uid, existing);
       return { ok: true, subscription: existing };
     }
   } catch (e) {
@@ -177,12 +201,8 @@ export async function ensureWebPushSubscription(): Promise<EnsureResult> {
     });
     console.log('[push] subscribe OK');
 
-    // ▼ サーバーへ購読情報を送る場合はここで fetch などを実行
-    // await fetch('/api/push/subscribe', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(sub),
-    // });
+    // ✅ サーバーへ購読情報を保存
+    await saveSubscriptionToServer(uid, sub);
 
     return { ok: true, subscription: sub };
   } catch (e) {

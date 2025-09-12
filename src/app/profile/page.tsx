@@ -481,8 +481,11 @@ export default function ProfilePage() {
                 <p className="text-sm text-gray-600 mb-3">
                   通知を受け取るには、下のボタンから通知を許可してください。
                 </p>
-                <RequestPushPermissionButton />
+                {auth.currentUser && (
+                  <RequestPushPermissionButton uid={auth.currentUser.uid} />
+                )}
               </section>
+
             </div>
 
             {plan === 'premium' && !lineLinked && <LineLinkCard />}

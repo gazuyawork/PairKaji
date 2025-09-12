@@ -9,11 +9,14 @@ import {
 } from '@/utils/webPushClient';
 
 type Props = {
+  /** 現在ログイン中のユーザーID（購読をサーバー保存するため必須） */
+  uid: string;
   className?: string;
   label?: string;
 };
 
 export default function RequestPushPermissionButton({
+  uid,
   className,
   label = '通知を許可して受け取る',
 }: Props) {
@@ -21,9 +24,15 @@ export default function RequestPushPermissionButton({
 
   const handleClick = async () => {
     if (loading) return;
+
+    if (!uid) {
+      toast.error('ログインが必要です。再度ログインしてお試しください。');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res: EnsureResult = await ensureWebPushSubscription();
+      const res: EnsureResult = await ensureWebPushSubscription(uid);
 
       if (res.ok) {
         toast.success('通知の受信設定が完了しました');
