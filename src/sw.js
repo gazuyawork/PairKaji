@@ -2,28 +2,46 @@
 
 /* global self, clients */
 
-// =======================
-// Workbox 初期化（InjectManifest 必須）
-// =======================
 import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute } from 'workbox-precaching';
 
+// ---- Workbox 初期化（InjectManifest 必須）----
 self.skipWaiting();
 clientsClaim();
-
-// Build 時に Workbox が __WB_MANIFEST を差し込みます。
 precacheAndRoute(self.__WB_MANIFEST || []);
 
-// =======================
-// Web Push 受信
-// =======================
-// payload 例:
-// {
-//   "title": "タスク更新",
-//   "body": "晩御飯準備にフラグが付きました",
-//   "badgeCount": 3,
-//   "url": "/main"
-// }
+// ---- Badging API ユーティリティ（対応環境のみ実行）----
+async function setBadge(count) {
+  try {
+    // Badging API は一部 OS/ブラウザのみ対応
+    const nav = self.navigator;
+    if (nav && typeof nav.setAppBadge === 'function') {
+      // 0 以下は OS により無視されることがあるため、明示的に clear へ
+      if (typeof count === 'number' && count > 0) {
+        await nav.setAppBadge(count);
+      } else if (typeof nav.clearAppBadge === 'function') {
+        await nav.clearAppBadge();
+      }
+    }
+  } catch {
+    // 対応外/失敗時は黙って無視
+  }
+}
+
+async function clearBadge() {
+  try {
+    const nav = self.navigator;
+    if (nav && typeof nav.clearAppBadge === 'function') {
+      await nav.clearAppBadge();
+    }
+  } catch {
+    // noop
+  }
+}
+
+// ---- Web Push 受信 ----
+// 期待 payload 例:
+// { "title":"タスク更新", "body":"晩御飯準備にフラグが付きました", "badgeCount":3, "url":"/main" }
 self.addEventListener('push', (event) => {
   const data = (() => {
     try {
@@ -41,17 +59,21 @@ self.addEventListener('push', (event) => {
   /** @type {NotificationOptions} */
   const options = {
     body,
-    icon: '/icons/icon-192x192.png',  // public/icons に実ファイルを配置してください
+    // 通知カードの見た目用アイコン（数値バッジではありません）
+    icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-72x72.png',
     data: { url, badgeCount },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  const showNotificationPromise = self.registration.showNotification(title, options);
+  const updateBadgePromise =
+    typeof badgeCount === 'number' ? setBadge(badgeCount) : clearBadge();
+
+  // 通知の表示と Badging API の更新を両方待機
+  event.waitUntil(Promise.all([showNotificationPromise, updateBadgePromise]));
 });
 
-// =======================
-// 通知クリックで該当URLへ
-// =======================
+// ---- 通知クリック：既存タブへフォーカス or 新規オープン ----
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url =
@@ -69,3 +91,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(openOrFocus);
 });
+
+// ---- install / activate（必要なら拡張。未使用引数は置かない）----
+self.addEventListener('install', () => {});
+self.addEventListener('activate', () => {});
