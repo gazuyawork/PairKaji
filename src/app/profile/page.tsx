@@ -30,6 +30,7 @@ import {
 } from '@/lib/firebaseUtils';
 // import { splitSharedTasksOnPairRemoval } from '@/lib/firebaseUtils';
 import LineLinkCard from '@/components/profile/LineLinkCard';
+import RequestPushPermissionButton from '@/components/settings/RequestPushPermissionButton';
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -242,11 +243,11 @@ export default function ProfilePage() {
         setLinePictureUrl(data.linePictureUrl ?? null);
 
         // ★ 追加：Stripe カスタマーIDの反映
-if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
-  setStripeCustomerId(data.stripeCustomerId);
-} else {
-  setStripeCustomerId(null);
-}
+        if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
+          setStripeCustomerId(data.stripeCustomerId);
+        } else {
+          setStripeCustomerId(null);
+        }
 
       },
       (error) => {
@@ -471,6 +472,18 @@ if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !=
               onChangePartnerEmail={setPartnerEmail}
               isRemoving={isRemoving}
             />
+
+            <div className="p-4 space-y-6">
+              {/* 既存のプロフィール編集UI … */}
+
+              <section className="mt-6">
+                <h2 className="text-lg font-semibold mb-2">通知設定</h2>
+                <p className="text-sm text-gray-600 mb-3">
+                  通知を受け取るには、下のボタンから通知を許可してください。
+                </p>
+                <RequestPushPermissionButton />
+              </section>
+            </div>
 
             {plan === 'premium' && !lineLinked && <LineLinkCard />}
 

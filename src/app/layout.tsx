@@ -5,6 +5,9 @@ import ClientLayout from './ClientLayout';
 import Script from 'next/script';
 import type { Metadata, Viewport } from 'next';
 
+// ▼ 追加：起動直後にキャッシュ値でバッジ反映する初期化コンポーネント
+import AppBadgeInitializer from '@/components/system/AppBadgeInitializer';
+
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
   weight: ['400'],
@@ -55,7 +58,6 @@ export const viewport: Viewport = {
   maximumScale: 1, // ← これで user-scalable=no 相当になる
 };
 
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -63,6 +65,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
       <body className="font-sans bg-white text-gray-800 h-full antialiased">
+        {/* ▼ 追加：起動直後にローカルキャッシュの未読数でバッジを即時反映 */}
+        <AppBadgeInitializer />
+
         {/* AdSenseローダーはアプリ全体で1回だけ読み込む */}
         <Script
           id="adsbygoogle-loader"

@@ -1,19 +1,19 @@
-import * as dotenv from 'dotenv';
-dotenv.config();
+// エミュレータ実行時のみ dotenv を読み込む（本番は Firebase Secrets / 環境変数を使用）
+if (process.env.FUNCTIONS_EMULATOR === 'true' || process.env.FUNCTIONS_EMULATOR) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('dotenv').config();
+}
 
-import { sendDailyTaskReminder } from './sendDailyTaskReminder';
-// import { sendUpcomingTaskReminder } from './sendUpcomingTaskReminder.ts';
-import { onTaskDeletedCleanup } from './onTaskDeletedCleanup';
-import { onTodoRemovedCleanup } from './onTodoRemovedCleanup';
+// --- 直接再エクスポート（未使用 import を避ける）---
+export { sendDailyTaskReminder } from './sendDailyTaskReminder';
+// export { sendUpcomingTaskReminder } from './sendUpcomingTaskReminder'; // 使う場合は拡張子 .ts は付けない
+export { onTaskDeletedCleanup } from './onTaskDeletedCleanup';
+export { onTodoRemovedCleanup } from './onTodoRemovedCleanup';
+export { notifyOnTaskFlag } from './notifyOnTaskFlag';
+
+// --- スケジュール関数（v2）---
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { runDailyTaskReset } from './resetTasks';
-
-export {
-  sendDailyTaskReminder,
-  // sendUpcomingTaskReminder,
-  onTaskDeletedCleanup,
-  onTodoRemovedCleanup,
-};
 
 // 05:30 JST 実行
 export const resetTasksAt0530JST = onSchedule(
