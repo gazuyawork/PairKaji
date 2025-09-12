@@ -1,58 +1,52 @@
 // src/app/api/push/subscribe/route.ts
-import { NextResponse, type NextRequest } from 'next/server';
-import { adminDb } from '@/lib/server/firebaseAdmin';
+import { NextRequest, NextResponse } from 'next/server';
+import admin, { adminDb } from '@/lib/server/firebaseAdmin'; // ← default + named import
 import crypto from 'crypto';
 
-type SubscriptionKeys = { p256dh: string; auth: string };
-type SubscriptionBody = {
+type PushSubscriptionJSON = {
   endpoint: string;
   expirationTime: number | null;
-  keys: SubscriptionKeys;
+  keys: { p256dh: string; auth: string };
 };
 
-function isValidSubscription(x: any): x is SubscriptionBody {
-  return (
-    x &&
-    typeof x.endpoint === 'string' &&
-    (x.expirationTime === null || typeof x.expirationTime === 'number') &&
-    x.keys &&
-    typeof x.keys.p256dh === 'string' &&
-    typeof x.keys.auth === 'string'
-  );
-}
-
-/** endpoint から安定した DocID を生成（重複登録防止・上書き用） */
-function docIdFromEndpoint(endpoint: string) {
-  return crypto.createHash('sha256').update(endpoint).digest('hex');
-}
+type Body = {
+  uid: string;
+  subscription: PushSubscriptionJSON;
+};
 
 export async function POST(req: NextRequest) {
   try {
-    const { uid, subscription, userAgent } = await req.json();
+    const body = (await req.json()) as Body;
+    const { uid, subscription } = body;
 
-    if (!uid || typeof uid !== 'string' || !uid.trim()) {
-      return NextResponse.json({ error: 'Missing uid' }, { status: 400 });
-    }
-    if (!isValidSubscription(subscription)) {
-      return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
+    if (!uid || !subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+      return NextResponse.json({ ok: false, error: 'invalid payload' }, { status: 400 });
     }
 
-    const docId = docIdFromEndpoint(subscription.endpoint);
-    const docRef = adminDb.collection('users').doc(uid).collection('subscriptions').doc(docId);
+    // Firestore 参照（adminDb は初期化済み）
+    const db = adminDb;
 
-    const now = new Date();
-    await docRef.set(
-      {
-        ...subscription,
-        updatedAt: now.toISOString(),
-        userAgent: typeof userAgent === 'string' ? userAgent : req.headers.get('user-agent') ?? null,
-      },
-      { merge: true }
-    );
+    // endpoint をハッシュ化して docId に利用
+    const docId = crypto.createHash('sha256').update(subscription.endpoint).digest('hex');
 
-    return NextResponse.json({ ok: true, id: docId });
+    const payload = {
+      endpoint: subscription.endpoint,
+      keys: subscription.keys,
+      expirationTime: subscription.expirationTime ?? null,
+      uid,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    // A) users/{uid}/pushSubscriptions/{docId}
+    await db.collection('users').doc(uid).collection('pushSubscriptions').doc(docId).set(payload, { merge: true });
+
+    // B) push_subscriptions/{docId}
+    await db.collection('push_subscriptions').doc(docId).set(payload, { merge: true });
+
+    return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
-    console.error('[api/push/subscribe] error:', err);
-    return NextResponse.json({ error: 'Failed to save subscription' }, { status: 500 });
+    console.error('[api/push/subscribe] error', err);
+    return NextResponse.json({ ok: false, error: 'internal' }, { status: 500 });
   }
 }

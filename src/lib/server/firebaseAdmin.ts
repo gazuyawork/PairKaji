@@ -10,7 +10,7 @@ function initAdminApp(): admin.app.App {
     return app;
   }
 
-  // 1) JSON文字列（サービスアカウント一式）を直接環境変数に入れているケース
+  // 1) JSON 文字列でサービスアカウント一式を渡すケース
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (serviceAccountJson && serviceAccountJson.trim() !== '') {
     const parsed = JSON.parse(serviceAccountJson);
@@ -23,7 +23,7 @@ function initAdminApp(): admin.app.App {
     return app;
   }
 
-  // 2) 個別の三点セットで指定するケース
+  // 2) 個別指定（projectId / clientEmail / privateKey）
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
@@ -40,7 +40,7 @@ function initAdminApp(): admin.app.App {
     return app;
   }
 
-  // 3) それ以外はデフォルト認証（GOOGLE_APPLICATION_CREDENTIALSなど）に委ねる
+  // 3) それ以外は ADC（GOOGLE_APPLICATION_CREDENTIALS 等）
   app = admin.initializeApp({
     credential: admin.credential.applicationDefault(),
   });
@@ -52,10 +52,13 @@ export function getAdminApp(): admin.app.App {
   return initAdminApp();
 }
 
-/** 非同期取得（Promise返却） */
+/** 非同期取得（Promise 返却） */
 export async function getAdminDb(): Promise<admin.firestore.Firestore> {
   return initAdminApp().firestore();
 }
 
-/** 🔑 追加: 同期で Firestore を扱える変数 */
+/** 同期で扱える Firestore 参照 */
 export const adminDb: admin.firestore.Firestore = initAdminApp().firestore();
+
+/** ✅ default export: admin 名前空間（FieldValue などで使用） */
+export default admin;
