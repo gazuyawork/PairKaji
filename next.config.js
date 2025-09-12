@@ -1,95 +1,35 @@
 // next.config.js
+// @ts-check
 
 const isProd = process.env.NODE_ENV === 'production';
 
-const withPWA = require('next-pwa')({
+/** @type {any} */
+const pwaOptions = {
   dest: 'public',
-  register: isProd,                  // ✅ 本番のみSW登録
+  register: isProd, // ✅ 本番のみ SW 登録
   skipWaiting: true,
-  sw: 'sw.js',
-  scope: '/',
-  disable: !isProd,                  // ✅ dev時は必ず無効化
 
-  // ✅ Webpackチャンク競合対策：一部生成物を除外
+  // ✅ InjectManifest（推奨方式）：カスタム SW を取り込む
+  //   ※ TypeScript (.ts) ではなく .js を指定してください
+  swSrc: 'src/sw.js',
+
+  // ✅ dev は必ず無効化
+  disable: !isProd,
+
+  // ✅ 生成物の一部を precache から除外（存在しない場合の衝突回避）
   buildExcludes: [
     /middleware-manifest\.json$/,
-    /app-build-manifest\.json$/,     // ✅ devで存在しないので除外
+    /app-build-manifest\.json$/, // dev では存在しないことがあるので除外
   ],
 
-  // ✅ 必要であれば fallback ページも指定可能
-  // fallbacks: {
-  //   document: '/offline',
-  // },
+  // ⚠️ InjectManifest では runtimeCaching は使用不可（未指定）
+};
 
-  runtimeCaching: [
-    {
-      urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'firebase-api',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60,
-        },
-      },
-    },
-    {
-      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'images',
-        expiration: {
-          maxEntries: 100,
-          maxAgeSeconds: 7 * 24 * 60 * 60,
-        },
-      },
-    },
-    {
-      urlPattern: /\.(?:js|css)$/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'static-resources',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 7 * 24 * 60 * 60,
-        },
-      },
-    },
-    {
-      urlPattern: /^\/_next\/.*/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'next-js-chunks',
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 30 * 24 * 60 * 60,
-        },
-      },
-    },
-    {
-      urlPattern: /^\/$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'start-url',
-        expiration: {
-          maxEntries: 1,
-          maxAgeSeconds: 60 * 60,
-        },
-      },
-    },
-    {
-      urlPattern: /^\/.+$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'page-data',
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 7 * 24 * 60 * 60,
-        },
-      },
-    },
-  ],
-});
+// next-pwa をインライン適用
+// next-pwa が型を提供していないため、JSDoc で型を明示
+const withPWA =
+  /** @type {(cfg: import('next').NextConfig) => import('next').NextConfig} */
+  (require('next-pwa')(pwaOptions));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -102,7 +42,11 @@ const nextConfig = {
     ],
   },
 
+  // Next.js 15系でも使用可
   transpilePackages: ['framer-motion'],
 };
 
-module.exports = withPWA(nextConfig);
+// エクスポート時にも型を明示して ts-check の誤検知を防止
+module.exports =
+  /** @type {import('next').NextConfig} */
+  (withPWA(nextConfig));

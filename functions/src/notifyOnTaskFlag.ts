@@ -120,8 +120,8 @@ export const notifyOnTaskFlag = onDocumentUpdated(
     const userIds: string[] = Array.isArray(after.userIds)
       ? after.userIds
       : after.userId
-      ? [String(after.userId)]
-      : [];
+        ? [String(after.userId)]
+        : [];
 
     // ▼ 対象ユーザーとタスク名ログ
     console.log('[notifyOnTaskFlag] target users', { count: userIds.length, userIds });
@@ -154,12 +154,8 @@ export const notifyOnTaskFlag = onDocumentUpdated(
     const payload = JSON.stringify({
       title: 'フラグ付きタスク',
       body: `「${taskName}」にフラグが立ちました`,
-      data: {
-        // 通知タップで開く先（必要に応じて変更）
-        url: '/main?view=task&index=2&flagged=true',
-      },
-      icon: '/icons/icon-192.png',
-      badge: '/icons/badge-72.png',
+      url: '/main?view=task&index=2&flagged=true', // ★ トップレベルに
+      badgeCount: 1, // ★ 動作確認用。実際は未読/未完了などの数に置き換え
     });
 
     // 1ユーザー分に送る（無効購読は削除）
@@ -167,7 +163,7 @@ export const notifyOnTaskFlag = onDocumentUpdated(
       const subsSnap = await db
         .collection('users')
         .doc(uid)
-        .collection('pushSubs')
+        .collection('subscriptions') // ★ 保存先に合わせる
         .get();
 
       console.log('[notifyOnTaskFlag] subscriptions fetched', {
@@ -182,14 +178,15 @@ export const notifyOnTaskFlag = onDocumentUpdated(
             uid,
             id: docSnap.id,
           });
-          await docSnap.ref.delete().catch(() => {});
+          await docSnap.ref.delete().catch(() => { });
           return;
         }
 
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           await webpush.sendNotification(sub, payload);
-          console.log('[notifyOnTaskFlag] sent', { uid, endpoint: sub.endpoint });
+          console.log('[notifyOnTaskFlag] subscriptions fetched', { uid, count: subsSnap.size });
+
         } catch (err: unknown) {
           const anyErr = err as { statusCode?: number; status?: number; message?: string };
           const status = anyErr?.statusCode ?? anyErr?.status ?? 0;
@@ -199,7 +196,7 @@ export const notifyOnTaskFlag = onDocumentUpdated(
               id: docSnap.id,
               status,
             });
-            await docSnap.ref.delete().catch(() => {});
+            await docSnap.ref.delete().catch(() => { });
           } else {
             console.error('[notifyOnTaskFlag] sendNotification error', {
               uid,
