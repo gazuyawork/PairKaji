@@ -29,12 +29,12 @@ export const mapFirestoreDocToTask = (
 
   // デバッグログ：category の読取状況を可視化（unknown 経由で安全に）
   try {
-    const rawCat: unknown = (data as { category?: unknown }).category;
-    const cat = normalizeCategory(rawCat);
-    console.groupCollapsed('[taskMappers] mapFirestoreDocToTask');
-    console.log('doc.id:', doc.id);
-    console.log('data.category (raw):', rawCat, '| normalized:', cat);
-    console.groupEnd();
+    // const rawCat: unknown = (data as { category?: unknown }).category;
+    // const cat = normalizeCategory(rawCat);
+    // console.groupCollapsed('[taskMappers] mapFirestoreDocToTask');
+    // console.log('doc.id:', doc.id);
+    // console.log('data.category (raw):', rawCat, '| normalized:', cat);
+    // console.groupEnd();
   } catch (e) {
     // ログはUIに影響しないように握りつぶす
     console.warn('[taskMappers] category logging failed:', e);

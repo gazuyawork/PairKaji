@@ -1,15 +1,20 @@
 // next.config.js
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const withPWA = require('next-pwa')({
   dest: 'public',
-  register: true,
+  register: isProd,                  // ✅ 本番のみSW登録
   skipWaiting: true,
   sw: 'sw.js',
   scope: '/',
-  disable: process.env.NODE_ENV === 'development', // dev時は無効化
+  disable: !isProd,                  // ✅ dev時は必ず無効化
 
   // ✅ Webpackチャンク競合対策：一部生成物を除外
-  buildExcludes: [/middleware-manifest\.json$/],
+  buildExcludes: [
+    /middleware-manifest\.json$/,
+    /app-build-manifest\.json$/,     // ✅ devで存在しないので除外
+  ],
 
   // ✅ 必要であれば fallback ページも指定可能
   // fallbacks: {
@@ -96,11 +101,6 @@ const nextConfig = {
       'profile.line-scdn.net',
     ],
   },
-
-  // ❌ 削除: App Router はデフォルト有効なので不要
-  // experimental: {
-  //   appDir: true,
-  // },
 
   transpilePackages: ['framer-motion'],
 };

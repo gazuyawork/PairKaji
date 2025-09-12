@@ -3,9 +3,10 @@
 /**
  * Web Push のクライアント側ユーティリティ。
  * - 通知権限の確認と requestPermission()
- * - Service Worker の登録
+ * - Service Worker の登録（ready タイムアウト付き）
  * - PushManager.subscribe() による購読作成（VAPID 公開鍵必須）
  * - 例外ではなく結果オブジェクトでUIに返す
+ * - 充分なログでハング箇所の切り分けを容易に
  */
 
 export type EnsureResult =
@@ -44,16 +45,38 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-/**
- * Uint8Array の「実データ部分だけ」を ArrayBuffer として切り出す。
- * - 一部の型定義/環境では applicationServerKey が ArrayBuffer を要求されるため、
- *   ここで厳密に ArrayBuffer を渡す。
- */
+/** Uint8Array の内容だけを新しい ArrayBuffer にコピー（型赤線/領域ズレ対策） */
 function toAppServerKey(u8: Uint8Array): ArrayBuffer {
-  // ArrayBuffer を新しく確保してコピー
   const copied = new Uint8Array(u8.byteLength);
   copied.set(u8);
   return copied.buffer;
+}
+
+/** navigator.serviceWorker.ready をタイムアウト付きで待つ */
+async function waitForReady(timeoutMs = 5000): Promise<ServiceWorkerRegistration> {
+  return new Promise<ServiceWorkerRegistration>((resolve, reject) => {
+    let settled = false;
+    const tid = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error(`SW ready timeout after ${timeoutMs}ms`));
+      }
+    }, timeoutMs);
+
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(tid);
+        resolve(reg);
+      })
+      .catch((e) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(tid);
+        reject(e);
+      });
+  });
 }
 
 /**
@@ -67,18 +90,23 @@ export async function ensureWebPushSubscription(): Promise<EnsureResult> {
     typeof navigator === 'undefined' ||
     !('Notification' in window)
   ) {
+    console.warn('[push] unsupported: no Notification API');
     return { ok: false, reason: 'unsupported' };
   }
   if (!('serviceWorker' in navigator)) {
+    console.warn('[push] unsupported: no ServiceWorker');
     return { ok: false, reason: 'no-sw' };
   }
   if (!('PushManager' in window)) {
+    console.warn('[push] unsupported: no PushManager');
     return { ok: false, reason: 'unsupported' };
   }
 
   // 許可リクエスト（未許可/未選択なら）
   if (Notification.permission !== 'granted') {
+    console.log('[push] requesting Notification permission…');
     const r = await Notification.requestPermission();
+    console.log('[push] permission result:', r);
     if (r === 'denied') return { ok: false, reason: 'denied' };
     if (r === 'default') return { ok: false, reason: 'default' };
     // granted なら続行
@@ -86,35 +114,68 @@ export async function ensureWebPushSubscription(): Promise<EnsureResult> {
 
   // VAPID 公開鍵の確認
   if (!VAPID_PUBLIC_KEY) {
+    console.error('[push] no VAPID public key (NEXT_PUBLIC_VAPID_PUBLIC_KEY)');
     return { ok: false, reason: 'no-vapid' };
   }
 
-  // Service Worker 登録（ready を優先し、必要なら register）
-  let reg: ServiceWorkerRegistration;
+  // まず登録済みを取得してみる
+  let reg: ServiceWorkerRegistration | undefined;
   try {
-    reg = await navigator.serviceWorker.ready.catch(async () => {
-      return navigator.serviceWorker.register('/sw.js', { scope: '/' });
-    });
-    if (!reg?.active) {
+    reg = (await navigator.serviceWorker.getRegistration('/')) || undefined;
+    console.log('[push] getRegistration("/"):', !!reg);
+  } catch (e) {
+    console.warn('[push] getRegistration failed:', e);
+  }
+
+  // 未登録なら register を試みる
+  if (!reg) {
+    try {
+      console.log('[push] registering /sw.js …');
       reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      console.log('[push] register done, active:', !!reg.active);
+    } catch (e) {
+      console.error('[push] register failed:', e);
+      return { ok: false, reason: 'sw-register-failed', error: e };
+    }
+  }
+
+  // ready を待つ（タイムアウト付き）。間に合わなくても reg は利用可なので購読へ進む
+  try {
+    const readyReg = await waitForReady(5000);
+    if (readyReg) {
+      reg = readyReg;
+      console.log('[push] ready resolved, active:', !!reg.active);
     }
   } catch (e) {
-    return { ok: false, reason: 'sw-register-failed', error: e };
+    console.warn('[push] ready timeout or error, proceed anyway:', e);
+    // reg はある前提で続行（初回ロードの“設定中…”固まり対策）
+  }
+
+  if (!reg) {
+    console.error('[push] no registration available after attempts');
+    return { ok: false, reason: 'sw-register-failed' };
   }
 
   // 既存購読があれば再利用
-  const existing = await reg.pushManager.getSubscription();
-  if (existing) {
-    return { ok: true, subscription: existing };
+  try {
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      console.log('[push] reuse existing subscription');
+      return { ok: true, subscription: existing };
+    }
+  } catch (e) {
+    console.warn('[push] getSubscription failed (continue to subscribe):', e);
   }
 
-  // 新規に購読（applicationServerKey を ArrayBuffer で明示）
+  // 新規に購読（applicationServerKey を厳密な ArrayBuffer で）
   try {
-    const keyAsArrayBuffer = toAppServerKey(urlBase64ToUint8Array(VAPID_PUBLIC_KEY));
+    console.log('[push] creating new subscription…');
+    const keyBuf = toAppServerKey(urlBase64ToUint8Array(VAPID_PUBLIC_KEY));
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: keyAsArrayBuffer, // ★ここを厳密な ArrayBuffer に
+      applicationServerKey: keyBuf,
     });
+    console.log('[push] subscribe OK');
 
     // ▼ サーバーへ購読情報を送る場合はここで fetch などを実行
     // await fetch('/api/push/subscribe', {
@@ -125,6 +186,7 @@ export async function ensureWebPushSubscription(): Promise<EnsureResult> {
 
     return { ok: true, subscription: sub };
   } catch (e) {
+    console.error('[push] subscribe failed:', e);
     return { ok: false, reason: 'subscribe-failed', error: e };
   }
 }
