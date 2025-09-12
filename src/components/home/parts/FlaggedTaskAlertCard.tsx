@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 import { Flag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react'; // ▼ 変更: useMemo を追加
+import { useEffect, useMemo, useState, useCallback } from 'react'; // ▼ 変更: useCallback 追加
 import { getViewedFlaggedTaskIds, markTaskAsViewed } from '@/utils/viewedTasks';
 import type { Task } from '@/types/Task';
 import { auth } from '@/lib/firebase';
@@ -15,36 +15,57 @@ import { auth } from '@/lib/firebase';
 const isInstalledPWA = () => {
   try {
     if (typeof window === 'undefined') return false;
-    // @ts-expect-error: legacy iOS Safari property
+    // @ts-expect-error iOS legacy
     const iosStandalone = !!window.navigator.standalone;
-    const standalone =
-      window.matchMedia?.('(display-mode: standalone)')?.matches ?? false;
+    const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches ?? false;
     return iosStandalone || standalone;
   } catch {
     return false;
   }
 };
 
+// ▼ 追加: 通知権限を確保（許可済みなら何もしない）
+const ensureNotificationPermission = async () => {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    try {
+      await Notification.requestPermission();
+    } catch {
+      /* no-op */
+    }
+  }
+};
+
 type Props = {
-  flaggedTasks?: Task[]; // フラグ付きの全タスクを受け取る
+  flaggedTasks?: Task[];
 };
 
 export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
   const router = useRouter();
   const [isNew, setIsNew] = useState(false);
 
-  // ▼ 追加: 未閲覧件数（バッジ数）を算出
+  // ▼ 追加: デバッグ用（?debugBadge=1 のときだけボタン表示）
+  const showBadgeDebug = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('debugBadge') === '1'
+    : false;
+
+  // ▼ 追加: 任意のタイミング（初回やユーザー操作の前後）で通知権限を確保
+  useEffect(() => {
+    if (isInstalledPWA()) {
+      void ensureNotificationPermission();
+    }
+  }, []);
+
+  // ▼ 変更: 未閲覧件数の計算
   const unviewedCount = useMemo(() => {
     const viewed = getViewedFlaggedTaskIds();
     const currentUserId = auth.currentUser?.uid;
 
     return flaggedTasks.reduce((acc, task) => {
       if (!task.flagged) return acc;
-
       const isPrivate = task.private === true;
       const isOwnTask = task.userId === currentUserId;
       const isUnviewed = !viewed.includes(task.id);
-
       if (isPrivate) {
         return acc + (isOwnTask && isUnviewed ? 1 : 0);
       } else {
@@ -53,49 +74,59 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
     }, 0);
   }, [flaggedTasks]);
 
-  // ▼ 追加: New表示の制御を未閲覧件数で行う
   useEffect(() => {
     setIsNew(unviewedCount > 0);
   }, [unviewedCount]);
 
-  // ▼ 追加: アプリアイコンのバッジ反映（対応環境のみ）
+  // ▼ 変更: バッジ反映（PWA起動時のみ）
   useEffect(() => {
-    if (!isInstalledPWA()) return; // インストール/ホーム追加のときだけ
+    if (!isInstalledPWA()) return;
     const navAny = navigator as any;
-
     if (unviewedCount > 0 && typeof navAny?.setAppBadge === 'function') {
-      navAny.setAppBadge(unviewedCount).catch(() => {
-        /* no-op */
-      });
+      navAny.setAppBadge(unviewedCount).catch(() => {});
     } else if (typeof navAny?.clearAppBadge === 'function') {
-      navAny.clearAppBadge().catch(() => {
-        /* no-op */
-      });
+      navAny.clearAppBadge().catch(() => {});
     }
   }, [unviewedCount]);
 
-  const handleClick = () => {
-    // 既読化
+  const handleClick = useCallback(() => {
     flaggedTasks.forEach((task) => {
-      if (task.flagged) {
-        markTaskAsViewed(task.id);
-      }
+      if (task.flagged) markTaskAsViewed(task.id);
     });
     setIsNew(false);
 
-    // ▼ 追加: 既読化直後にアプリアイコンのバッジもクリア（対応環境のみ）
+    // ▼ 変更: 既読化後にバッジクリア
     if (isInstalledPWA()) {
       const navAny = navigator as any;
       if (typeof navAny?.clearAppBadge === 'function') {
-        navAny.clearAppBadge().catch(() => {
-          /* no-op */
-        });
+        navAny.clearAppBadge().catch(() => {});
       }
     }
 
     const timestamp = new Date().getTime();
     router.push(`/main?view=task&index=2&flagged=true&_t=${timestamp}`);
-  };
+  }, [flaggedTasks, router]);
+
+  // ▼ 追加: デバッグUI（?debugBadge=1 で表示）
+  const BadgeDebug = showBadgeDebug ? (
+    <div className="mt-2 text-xs">
+      <button
+        onClick={() => (navigator as any).setAppBadge?.(99)}
+        className="text-blue-600 underline"
+      >
+        setAppBadge(99)
+      </button>
+      <button
+        onClick={() => (navigator as any).clearAppBadge?.()}
+        className="ml-3 text-gray-600 underline"
+      >
+        clearAppBadge()
+      </button>
+      <span className="ml-3 text-gray-500">
+        {'API:'} {String('setAppBadge' in navigator)} / PWA: {String(isInstalledPWA())}
+      </span>
+    </div>
+  ) : null;
 
   return (
     <motion.div
@@ -122,6 +153,9 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
             <p className="text-sm text-gray-500">タスク処理画面で確認しましょう</p>
           </div>
         </div>
+
+        {/* ▼ 追加: デバッグUI */}
+        {BadgeDebug}
       </div>
     </motion.div>
   );
