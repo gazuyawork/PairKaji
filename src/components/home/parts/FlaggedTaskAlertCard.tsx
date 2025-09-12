@@ -1,14 +1,29 @@
+// src/components/.../FlaggedTaskAlertCard.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { Flag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react'; // ▼ 変更: useMemo を追加
 import { getViewedFlaggedTaskIds, markTaskAsViewed } from '@/utils/viewedTasks';
 import type { Task } from '@/types/Task';
-import { auth } from '@/lib/firebase'; // ✅ 追加
+import { auth } from '@/lib/firebase';
+
+// ▼ 追加: PWA（ホーム追加/インストール）判定ヘルパ
+const isInstalledPWA = () => {
+  try {
+    if (typeof window === 'undefined') return false;
+    // @ts-expect-error: legacy iOS Safari property
+    const iosStandalone = !!window.navigator.standalone;
+    const standalone =
+      window.matchMedia?.('(display-mode: standalone)')?.matches ?? false;
+    return iosStandalone || standalone;
+  } catch {
+    return false;
+  }
+};
 
 type Props = {
   flaggedTasks?: Task[]; // フラグ付きの全タスクを受け取る
@@ -18,36 +33,65 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
   const router = useRouter();
   const [isNew, setIsNew] = useState(false);
 
-  useEffect(() => {
+  // ▼ 追加: 未閲覧件数（バッジ数）を算出
+  const unviewedCount = useMemo(() => {
     const viewed = getViewedFlaggedTaskIds();
     const currentUserId = auth.currentUser?.uid;
 
-    const hasUnviewed = flaggedTasks.some((task) => {
-      if (!task.flagged) return false;
+    return flaggedTasks.reduce((acc, task) => {
+      if (!task.flagged) return acc;
 
       const isPrivate = task.private === true;
       const isOwnTask = task.userId === currentUserId;
       const isUnviewed = !viewed.includes(task.id);
 
       if (isPrivate) {
-        // 🔒 プライベートタスクは自分のもので未読なら表示
-        return isOwnTask && isUnviewed;
+        return acc + (isOwnTask && isUnviewed ? 1 : 0);
       } else {
-        // 🤝 共有タスクは未読なら表示
-        return isUnviewed;
+        return acc + (isUnviewed ? 1 : 0);
       }
-    });
-
-    setIsNew(hasUnviewed);
+    }, 0);
   }, [flaggedTasks]);
 
+  // ▼ 追加: New表示の制御を未閲覧件数で行う
+  useEffect(() => {
+    setIsNew(unviewedCount > 0);
+  }, [unviewedCount]);
+
+  // ▼ 追加: アプリアイコンのバッジ反映（対応環境のみ）
+  useEffect(() => {
+    if (!isInstalledPWA()) return; // インストール/ホーム追加のときだけ
+    const navAny = navigator as any;
+
+    if (unviewedCount > 0 && typeof navAny?.setAppBadge === 'function') {
+      navAny.setAppBadge(unviewedCount).catch(() => {
+        /* no-op */
+      });
+    } else if (typeof navAny?.clearAppBadge === 'function') {
+      navAny.clearAppBadge().catch(() => {
+        /* no-op */
+      });
+    }
+  }, [unviewedCount]);
+
   const handleClick = () => {
+    // 既読化
     flaggedTasks.forEach((task) => {
       if (task.flagged) {
         markTaskAsViewed(task.id);
       }
     });
     setIsNew(false);
+
+    // ▼ 追加: 既読化直後にアプリアイコンのバッジもクリア（対応環境のみ）
+    if (isInstalledPWA()) {
+      const navAny = navigator as any;
+      if (typeof navAny?.clearAppBadge === 'function') {
+        navAny.clearAppBadge().catch(() => {
+          /* no-op */
+        });
+      }
+    }
 
     const timestamp = new Date().getTime();
     router.push(`/main?view=task&index=2&flagged=true&_t=${timestamp}`);
@@ -60,11 +104,10 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="mb-3 relative"
     >
-
       <div
         className="relative mx-auto w-full max-w-xl bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 cursor-pointer hover:shadow-lg transition overflow-hidden"
         onClick={handleClick}
-        >
+      >
         {isNew && (
           <div className="absolute top-0 left-0 z-50 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-br-xl shadow">
             New
@@ -83,4 +126,3 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
     </motion.div>
   );
 }
-
