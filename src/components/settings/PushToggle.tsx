@@ -1,25 +1,20 @@
-// src/components/settings/PushToggle.tsx
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 type Props = {
   uid: string;
 };
 
-type Status = 'idle' | 'subscribed' | 'unsubscribed' | 'sending' | 'sent' | 'error';
-
 export default function PushToggle({ uid }: Props) {
-  const [status, setStatus] = useState<Status>('idle');
-  const [subInfo, setSubInfo] = useState<any>(null);
-  const [debug, setDebug] = useState<{ controlled: boolean; scope?: string }>({
-    controlled: false,
-    scope: undefined,
-  });
-  const [hasSub, setHasSub] = useState<boolean>(false);
-  const pollRef = useRef<number | null>(null);
+  // 購読の有無（UI出し分けはコレで行う）
+  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  // 進行状態（テキスト・トースト用途）
+  const [phase, setPhase] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
-  // ---- helpers ----
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
+
   const b64ToU8 = (b64: string) => {
     const pad = '='.repeat((4 - (b64.length % 4)) % 4);
     const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
@@ -29,211 +24,211 @@ export default function PushToggle({ uid }: Props) {
     return out;
   };
 
-  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
-
-  async function pickRegistration(): Promise<ServiceWorkerRegistration | null> {
-    const controlled = !!navigator.serviceWorker.controller;
+  const getRegistration = async (): Promise<ServiceWorkerRegistration | null> => {
     try {
-      const any = await navigator.serviceWorker.getRegistration();
-      const reg =
-        any ??
-        (await navigator.serviceWorker.getRegistration('/')) ??
-        (await navigator.serviceWorker.ready);
-      setDebug({ controlled, scope: reg?.scope });
-      console.log('[PushToggle v4] pickRegistration', { controlled, scope: reg?.scope });
+      const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.ready);
+      console.log('[push] getRegistration:', !!reg, reg?.scope);
       return reg ?? null;
     } catch (e) {
-      console.log('[PushToggle v4] pickRegistration error', e);
-      setDebug({ controlled, scope: undefined });
+      console.error('[push] getRegistration error', e);
       return null;
     }
-  }
+  };
 
-  async function refreshState(from: string) {
+  const refreshSubscribedState = async () => {
     try {
-      const reg = await pickRegistration();
-      if (!reg) {
-        console.log('[PushToggle v4] no registration', { from });
-        setHasSub(false);
-        setStatus((s) => (s === 'idle' ? 'unsubscribed' : s));
-        return;
-    }
-      const sub = await reg.pushManager.getSubscription();
-      const nowHasSub = !!sub;
-      setHasSub(nowHasSub);
-      setSubInfo(sub?.toJSON?.() ?? null);
-      console.log('[PushToggle v4] refreshState', { from, nowHasSub });
-      if (nowHasSub && (status === 'idle' || status === 'unsubscribed' || status === 'error')) {
-        setStatus('subscribed');
-      }
-      if (!nowHasSub && (status === 'idle' || status === 'subscribed')) {
-        setStatus('unsubscribed');
-      }
+      const reg = await getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      console.log('[push] refreshSubscribedState:', !!sub);
+      setIsSubscribed(!!sub);
     } catch (e) {
-      console.log('[PushToggle v4] refreshState error', e);
+      console.error('[push] refreshSubscribedState error', e);
+      setIsSubscribed(false);
     }
-  }
+  };
 
-  // ---- lifecycle ----
+  // 初期購読状態チェック
   useEffect(() => {
-    console.log('[PushToggle v4] init');
-    refreshState('mount');
-
-    // 2秒おきに購読状態を追従（PWA/通常タブ・SW更新直後でもズレにくく）
-    pollRef.current = window.setInterval(() => refreshState('poll'), 2000);
-    return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (async () => {
+      await refreshSubscribedState();
+    })();
   }, []);
 
-  // ---- actions ----
   const subscribe = async () => {
     try {
-      setStatus('sending');
+      if (!('Notification' in window)) {
+        toast.error('このブラウザは通知に対応していません');
+        return;
+      }
+      if (!vapidKey) {
+        toast.error('VAPIDキーが設定されていません');
+        console.error('[push] VAPID key missing (NEXT_PUBLIC_VAPID_PUBLIC_KEY)');
+        return;
+      }
 
-      // 権限リクエスト（granted 以外は要求）
-      if (Notification.permission !== 'granted') {
-        const perm = await Notification.requestPermission();
-        if (perm !== 'granted') {
-          console.log('[PushToggle v4] permission not granted', perm);
-          setStatus('error');
+      // 権限確認
+      if (Notification.permission === 'denied') {
+        toast.error('通知がOS/ブラウザ設定で拒否されています');
+        return;
+      }
+      if (Notification.permission === 'default') {
+        const result = await Notification.requestPermission();
+        if (result !== 'granted') {
+          toast.error('通知の許可が必要です');
           return;
         }
       }
 
-      const reg = await pickRegistration();
+      setPhase('sending');
+
+      const reg = await getRegistration();
       if (!reg) {
-        console.log('[PushToggle v4] subscribe: no registration');
-        setStatus('error');
+        toast.error('Service Worker が準備できていません');
+        setPhase('error');
         return;
       }
 
-      // 既存があればそれを再利用
-      let sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        console.log('[PushToggle v4] reuse existing subscription');
-      } else {
-        sub = await reg.pushManager.subscribe({
+      // 既存があれば流用
+      const existing = await reg.pushManager.getSubscription();
+      const sub =
+        existing ||
+        (await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: b64ToU8(vapidKey),
-        });
-        console.log('[PushToggle v4] created new subscription');
-      }
+        }));
 
-      setSubInfo(sub.toJSON());
-
-      // サーバ保存
+      // サーバへ保存
       const res = await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid, subscription: sub.toJSON() }),
       });
       if (!res.ok) {
-        console.log('[PushToggle v4] save to server failed', await res.text());
-        setStatus('error');
-        return;
+        console.error('[push] /api/push/subscribe failed', await res.text());
+        throw new Error('subscribe api failed');
       }
-      console.log('[PushToggle v4] subscription saved to server');
-      setHasSub(true);
-      setStatus('subscribed');
+
+      await refreshSubscribedState(); // ← 実際の購読状態で更新
+      setPhase('idle');
+      toast.success('通知を許可しました');
     } catch (e) {
-      console.error('[PushToggle v4] subscribe error', e);
-      setStatus('error');
+      console.error('[push] subscribe error', e);
+      setPhase('error');
+      await refreshSubscribedState(); // 念のため再同期
+      toast.error('通知の許可に失敗しました');
     }
   };
 
   const unsubscribe = async () => {
     try {
-      const reg = await pickRegistration();
-      if (!reg) {
-        console.log('[PushToggle v4] unsubscribe: no registration');
-        setStatus('error');
-        return;
+      setPhase('sending');
+      const reg = await getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) {
+        await sub.unsubscribe();
       }
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) await sub.unsubscribe();
-
-      // （必要ならサーバ側も削除するAPIを呼ぶ）
-      setSubInfo(null);
-      setHasSub(false);
-      setStatus('unsubscribed');
-      console.log('[PushToggle v4] unsubscribed');
+      await refreshSubscribedState();
+      setPhase('idle');
+      toast.success('通知を解除しました');
     } catch (e) {
-      console.error('[PushToggle v4] unsubscribe error', e);
-      setStatus('error');
+      console.error('[push] unsubscribe error', e);
+      setPhase('error');
+      await refreshSubscribedState();
+      toast.error('通知の解除に失敗しました');
     }
   };
 
   const sendTest = async () => {
     try {
-      setStatus('sending');
+      setPhase('sending');
       const res = await fetch('/api/push/test-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid,
-          title: 'PWAテスト通知',
-          body: 'Dock版PWA/通常タブの通知テストです',
+          title: '通知テスト',
+          body: 'これはテスト通知です',
           url: '/main',
           badgeCount: 1,
         }),
       });
       if (!res.ok) {
-        console.log('[PushToggle v4] test-send failed', await res.text());
-        setStatus('error');
-        return;
+        console.error('[push] /api/push/test-send failed', await res.text());
+        throw new Error('test-send api failed');
       }
-      setStatus('sent');
-      console.log('[PushToggle v4] test notification requested');
+      // ★ 購読状態は変えない → ボタンは購読中のまま
+      setPhase('sent');
+      toast.success('テスト通知を送信しました');
+      // 表示文言は数秒で通常に戻す
+      setTimeout(() => setPhase('idle'), 2500);
     } catch (e) {
-      console.error('[PushToggle v4] sendTest error', e);
-      setStatus('error');
+      console.error('[push] sendTest error', e);
+      setPhase('error');
+      toast.error('テスト通知の送信に失敗しました');
+      // 念のため購読状態を再同期（誤って解除されていないか確認）
+      await refreshSubscribedState();
     }
   };
 
-  // ---- UI ----
+  // 状態テキスト（ユーザー向け）
+  const statusText = (() => {
+    const base =
+      isSubscribed === null ? '状態を確認中…' : isSubscribed ? '通知は有効です' : '通知は無効です';
+    switch (phase) {
+      case 'sending':
+        return base + '（処理中…）';
+      case 'sent':
+        return base + '（テスト通知を送信しました）';
+      case 'error':
+        return base + '（エラーが発生しました）';
+      default:
+        return base;
+    }
+  })();
+
   return (
-    <div className="border rounded-md p-4 space-y-2">
-      <div className="text-xs text-gray-500">
-        PushToggle v4 / SW controlled: <b>{String(debug.controlled)}</b>
-        {debug.scope ? <> / scope: <code>{debug.scope}</code></> : null}
-      </div>
+    <div className="rounded-xl border border-gray-200 bg-white shadow p-4 space-y-3">
+      <p className="text-sm text-gray-700">{statusText}</p>
 
-      <p>Push通知ステータス: {status}</p>
+      <div className="flex flex-wrap gap-2">
+        {isSubscribed === false && (
+          <button
+            onClick={subscribe}
+            disabled={phase === 'sending'}
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-orange-400 to-pink-400 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
+          >
+            通知を許可する
+          </button>
+        )}
 
-      <div className="flex gap-2">
-        {hasSub ? (
+        {isSubscribed === true && (
           <>
             <button
               onClick={unsubscribe}
-              className="px-3 py-1 bg-gray-600 text-white rounded"
-              disabled={status === 'sending'}
+              disabled={phase === 'sending'}
+              className="px-4 py-2 rounded-lg bg-gray-300 text-gray-800 text-sm shadow hover:bg-gray-400 disabled:opacity-60"
             >
-              解除
+              通知を解除する
             </button>
             <button
               onClick={sendTest}
-              className="px-3 py-1 bg-blue-600 text-white rounded"
-              disabled={status === 'sending'}
+              disabled={phase === 'sending'}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
             >
-              テスト送信
+              テスト通知を送信
             </button>
           </>
-        ) : (
+        )}
+
+        {isSubscribed === null && (
           <button
-            onClick={subscribe}
-            className="px-3 py-1 bg-green-600 text-white rounded"
-            disabled={status === 'sending'}
+            onClick={refreshSubscribedState}
+            className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm shadow hover:bg-gray-300"
           >
-            通知を許可して受け取る
+            状態を再取得
           </button>
         )}
       </div>
-
-      {subInfo && (
-        <pre className="text-xs overflow-x-auto">{JSON.stringify(subInfo, null, 2)}</pre>
-      )}
     </div>
   );
 }
