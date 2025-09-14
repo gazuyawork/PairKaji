@@ -40,3 +40,6 @@ export const resetTasksFallbackAt0545JST = onSchedule(
     console.log('[resetTasksFallbackAt0545JST] processed:', res.processed, 'skipped:', res.skipped);
   }
 );
+
+
+export { sendUpcomingTaskReminderPush } from './sendUpcomingTaskReminderPush';
