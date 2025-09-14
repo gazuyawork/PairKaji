@@ -41,5 +41,4 @@ export const resetTasksFallbackAt0545JST = onSchedule(
   }
 );
 
-
 export { sendUpcomingTaskReminderPush } from './sendUpcomingTaskReminderPush';

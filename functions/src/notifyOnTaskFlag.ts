@@ -1,216 +1,282 @@
-// functions/src/notifyOnTaskFlag.ts
-
-import { setGlobalOptions } from 'firebase-functions/v2';
+/* eslint-disable no-console */
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { defineSecret } from 'firebase-functions/params';
-import * as admin from 'firebase-admin';
+import { admin } from './lib/firebaseAdmin';
+import webpush, { PushSubscription, WebPushError } from 'web-push';
 
-// ------------------------------------------------------------
-// web-push の読み込み
-// - 型パッケージ未導入環境でも赤線/型エラーを出さないために require + any で読み込み
-// - すでに @types/web-push を導入済みでも問題ありません
-// ------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment
-// @ts-ignore 型定義が無い環境でもビルドを通すために any 扱い
-const webpush: any = require('web-push');
-
-setGlobalOptions({ region: 'asia-northeast1' });
-
-// ------------------------------------------------------------
-// Secrets（CLI で事前登録してください）
-//   firebase functions:secrets:set VAPID_PUBLIC_KEY
-//   firebase functions:secrets:set VAPID_PRIVATE_KEY
-// ------------------------------------------------------------
-const VAPID_PUBLIC_KEY = defineSecret('VAPID_PUBLIC_KEY');
-const VAPID_PRIVATE_KEY = defineSecret('VAPID_PRIVATE_KEY');
-
-// ------------------------------------------------------------
-// Admin 初期化
-// ------------------------------------------------------------
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
 const db = admin.firestore();
 
-// ------------------------------------------------------------
-// Firestore に保存している購読ドキュメントの想定形（緩い型）
-// ------------------------------------------------------------
-type PushSubscriptionDoc = {
-  endpoint?: unknown;
-  expirationTime?: unknown;
-  keys?: {
-    p256dh?: unknown;
-    auth?: unknown;
-  };
-};
-
-// web-push に渡す最小構造（独自定義）
-type ValidPushSubscription = {
-  endpoint: string;
-  keys: {
-    p256dh: string;
-    auth: string;
-  };
-};
-
-// 生データ → 厳密な購読型へ変換（欠損時は null）
-const toValidPushSubscription = (
-  docData: FirebaseFirestore.DocumentData
-): ValidPushSubscription | null => {
-  const raw = docData as PushSubscriptionDoc;
-  const endpoint = typeof raw.endpoint === 'string' ? raw.endpoint : '';
-  const p256dh =
-    raw?.keys && typeof raw.keys.p256dh === 'string' ? raw.keys.p256dh : '';
-  const auth =
-    raw?.keys && typeof raw.keys.auth === 'string' ? raw.keys.auth : '';
-
-  if (!endpoint || !p256dh || !auth) return null;
-
-  return {
-    endpoint,
-    keys: { p256dh, auth },
-  };
-};
-
-/**
- * tasks/{taskId} の flagged が false→true になったら、対象ユーザーの pushSubs へ WebPush を送る
- * - 対象: after.userIds（配列） or after.userId（単一）に含まれるユーザー
- * - 無効な購読（404/410）は自動クリーンアップ
+/** ===== Secrets =====
+ *  firebase functions:secrets:set VAPID_PUBLIC_KEY
+ *  firebase functions:secrets:set VAPID_PRIVATE_KEY
+ *  （Safari向けに別鍵を使う場合のみ）
+ *  firebase functions:secrets:set VAPID_PUBLIC_KEY_SAFARI
+ *  firebase functions:secrets:set VAPID_PRIVATE_KEY_SAFARI
  */
+const VAPID_PUBLIC_KEY = defineSecret('VAPID_PUBLIC_KEY');
+const VAPID_PRIVATE_KEY = defineSecret('VAPID_PRIVATE_KEY');
+const VAPID_PUBLIC_KEY_SAFARI = defineSecret('VAPID_PUBLIC_KEY_SAFARI');
+const VAPID_PRIVATE_KEY_SAFARI = defineSecret('VAPID_PRIVATE_KEY_SAFARI');
+
+/* =========================
+ * 型（必要最小限）
+ * ========================= */
+type TaskDoc = {
+  name?: string;
+  userId?: string;         // 旧スキーマ（作成者/本人）
+  userIds?: string[];      // 共有者（本人＋パートナー全員）
+  lastUpdatedBy?: string;  // 操作ユーザー（存在すれば送信先から除外）
+};
+
+type UserSubscriptionDoc = {
+  webPushEnabled?: boolean;
+  webPushSubscription?: PushSubscription;
+  updatedAt?: admin.firestore.Timestamp;
+};
+
+type SubRow = { id: string; enabled: boolean; sub: PushSubscription };
+
+/* =========================
+ * VAPID 切り替え（Safari/既定）
+ * ========================= */
+const setVapid = (
+  which: 'default' | 'safari',
+  email = 'mailto:support@example.com',
+  keys: { defPub: string; defPri: string; safPub: string | null; safPri: string | null }
+) => {
+  if (which === 'safari') {
+    if (keys.safPub && keys.safPri) {
+      webpush.setVapidDetails(email, keys.safPub, keys.safPri);
+      return 'safari';
+    }
+  }
+  webpush.setVapidDetails(email, keys.defPub, keys.defPri);
+  return 'default';
+};
+
+const sendWithAutoVapid = async (
+  subscription: PushSubscription,
+  payload: string,
+  keys: { defPub: string; defPri: string; safPub: string | null; safPri: string | null }
+) => {
+  const endpoint = subscription.endpoint || '';
+  const isSafari = endpoint.includes('web.push.apple.com');
+
+  let current = setVapid(isSafari ? 'safari' : 'default', 'mailto:support@example.com', keys);
+  try {
+    return await webpush.sendNotification(subscription, payload, { TTL: 60 * 30 });
+  } catch (e) {
+    const err = e as WebPushError;
+    if (
+      err instanceof Error &&
+      (err as WebPushError).statusCode === 400 &&
+      typeof (err as WebPushError).body === 'string' &&
+      (err as WebPushError).body.includes('VapidPkHashMismatch')
+    ) {
+      const next = current === 'default' ? 'safari' : 'default';
+      setVapid(next, 'mailto:support@example.com', keys);
+      return await webpush.sendNotification(subscription, payload, { TTL: 60 * 30 });
+    }
+    throw err;
+  }
+};
+
+/* =========================
+ * 購読取得（あなたの既存仕様に準拠）
+ * ========================= */
+const fetchSubscriptions = async (uid: string): Promise<SubRow[]> => {
+  const result: SubRow[] = [];
+
+  // サブコレクション優先
+  const subsSnap = await db.collection('users').doc(uid).collection('subscriptions').get();
+  subsSnap.forEach((doc) => {
+    const d = doc.data() as UserSubscriptionDoc;
+    if (d.webPushEnabled && d.webPushSubscription) {
+      result.push({ id: doc.id, enabled: true, sub: d.webPushSubscription });
+    }
+  });
+  if (result.length > 0) return result;
+
+  // ルート直下（旧式）フォールバック
+  const userSnap = await db.collection('users').doc(uid).get();
+  if (userSnap.exists) {
+    const u = userSnap.data() as UserSubscriptionDoc;
+    if (u.webPushEnabled && u.webPushSubscription) {
+      result.push({ id: 'root', enabled: true, sub: u.webPushSubscription });
+    }
+  }
+
+  return result;
+};
+
+/* =========================
+ * ペイロード（Web Push）
+ * ========================= */
+// ▼ 変更: taskId と type を含め、URL にディープリンクを付与
+const buildFlagPayload = (taskId: string, taskName: string, raisedBy?: string) => {
+  const title = '🚩 フラグが付きました';
+  const body = `${taskName} にフラグが付きました${raisedBy ? `（by ${raisedBy}）` : ''}`;
+  const url = `/main?task=${encodeURIComponent(taskId)}&from=flag`; // 任意のディープリンク
+  const badgeCount = 1;
+  const type = 'flag';
+  return JSON.stringify({ type, taskId, title, body, url, badgeCount });
+};
+
+/* =========================
+ * 冪等性（同イベント重複送信の抑止）
+ * ========================= */
+const wasAlreadyHandled = async (uid: string, eventId: string): Promise<boolean> => {
+  const ref = db.collection('users').doc(uid).collection('notifyLogsFlags').doc(eventId);
+  const snap = await ref.get();
+  return snap.exists;
+};
+
+const markHandled = async (uid: string, eventId: string) => {
+  const ref = db.collection('users').doc(uid).collection('notifyLogsFlags').doc(eventId);
+  await ref.set(
+    { eventId, sentAt: admin.firestore.FieldValue.serverTimestamp() },
+    { merge: true }
+  );
+};
+
+/* =========================
+ * メイン：フラグ通知（flagged 専用）＋アプリ内メッセージ作成
+ *  - tasks/{taskId}.flagged が falsy → true になった時だけ送信
+ *  - 送信先は userIds 全員（無ければ userId）。lastUpdatedBy があれば除外
+ *  - users/{uid}/messages/{eventId} にメッセージを保存（重複防止）
+ * ========================= */
 export const notifyOnTaskFlag = onDocumentUpdated(
   {
     document: 'tasks/{taskId}',
     region: 'asia-northeast1',
-    secrets: [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY],
+    secrets: [
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY,
+      VAPID_PUBLIC_KEY_SAFARI,
+      VAPID_PRIVATE_KEY_SAFARI,
+    ],
+    retry: false,
   },
   async (event) => {
-    const before = event.data?.before.data();
-    const after = event.data?.after.data();
+    const taskId = event.params.taskId as string;
+    const eventId = event.id;
 
-    // ▼ 起動ログ（必ず最初に出す）
-    console.log('[notifyOnTaskFlag] triggered', {
-      taskId: event.params?.taskId,
-      beforeExists: !!before,
-      afterExists: !!after,
+    // flagged を厳密に取得（トップレベル想定。ネストの場合は key を 'status.flagged' などに変更）
+    const beforeFlagRaw = event.data?.before.get('flagged');
+    const afterFlagRaw  = event.data?.after.get('flagged');
+    const beforeFlag = beforeFlagRaw === true; // boolean 判定
+    const afterFlag  = afterFlagRaw === true;
+
+    console.info('[notifyOnTaskFlag] triggered flagged', {
+      taskId, beforeFlagRaw, afterFlagRaw, beforeFlag, afterFlag,
     });
 
-    if (!before || !after) {
-      console.warn('[notifyOnTaskFlag] skip: before/after missing');
+    // falsy → true の時だけ送る
+    if (!(beforeFlag === false && afterFlag === true)) {
+      console.info('[notifyOnTaskFlag] skip: flagged not raised', { beforeFlagRaw, afterFlagRaw });
       return;
     }
 
-    const beforeFlagged = !!before.flagged;
-    const afterFlagged = !!after.flagged;
+    // 通知先決定用に after の他フィールドを読む
+    const after = event.data?.after.data() as Partial<TaskDoc> | undefined;
+    const taskName = String(after?.name ?? 'タスク');
+    const raisedBy = typeof after?.lastUpdatedBy === 'string' ? after!.lastUpdatedBy : undefined;
 
-    // ▼ 遷移ログ
-    console.log('[notifyOnTaskFlag] flag transition', {
-      beforeFlagged,
-      afterFlagged,
+    const baseUserIds = Array.isArray(after?.userIds)
+      ? (after!.userIds as unknown[]).filter((x): x is string => typeof x === 'string')
+      : (typeof after?.userId === 'string' ? [after!.userId] : []);
+    const targetUserIds = baseUserIds.filter((uid) => !raisedBy || uid !== raisedBy);
+
+    console.info('[notifyOnTaskFlag] target resolution', {
+      taskId, raisedBy, baseUserIds, targetUserIds,
     });
 
-    // false -> true のときだけ通知
-    if (beforeFlagged || !afterFlagged) {
-      console.log('[notifyOnTaskFlag] skip: no raise (not false->true)');
+    if (targetUserIds.length === 0) {
+      console.info('[notifyOnTaskFlag] skip: no target users');
       return;
     }
 
-    const taskName: string = typeof after.name === 'string' ? after.name : 'タスク';
-
-    // 対象ユーザーを抽出
-    const userIds: string[] = Array.isArray(after.userIds)
-      ? after.userIds
-      : after.userId
-        ? [String(after.userId)]
-        : [];
-
-    // ▼ 対象ユーザーとタスク名ログ
-    console.log('[notifyOnTaskFlag] target users', { count: userIds.length, userIds });
-    console.log('[notifyOnTaskFlag] task', { name: taskName });
-
-    if (!userIds.length) {
-      console.warn('[notifyOnTaskFlag] skip: no userIds');
-      return;
-    }
-
-    // VAPID 設定
-    const publicKey = VAPID_PUBLIC_KEY.value();
-    const privateKey = VAPID_PRIVATE_KEY.value();
-
-    // ▼ VAPID presence ログ（値は出さない）
-    console.log('[notifyOnTaskFlag] VAPID presence', {
-      hasPublic: !!publicKey,
-      hasPrivate: !!privateKey,
-    });
-
-    if (!publicKey || !privateKey) {
-      console.error('[notifyOnTaskFlag] skip: VAPID keys missing');
-      return;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    webpush.setVapidDetails('mailto:notify@example.com', publicKey, privateKey);
-
-    // 通知ペイロード
-    const payload = JSON.stringify({
-      title: 'フラグ付きタスク',
-      body: `「${taskName}」にフラグが立ちました`,
-      url: '/main?view=task&index=2&flagged=true', // ★ トップレベルに
-      badgeCount: 1, // ★ 動作確認用。実際は未読/未完了などの数に置き換え
-    });
-
-    // 1ユーザー分に送る（無効購読は削除）
-    const sendToUser = async (uid: string) => {
-      const subsSnap = await db
-        .collection('users')
-        .doc(uid)
-        .collection('subscriptions') // ★ 保存先に合わせる
-        .get();
-
-      console.log('[notifyOnTaskFlag] subscriptions fetched', {
-        uid,
-        count: subsSnap.size,
-      });
-
-      const sends = subsSnap.docs.map(async (docSnap) => {
-        const sub = toValidPushSubscription(docSnap.data());
-        if (!sub) {
-          console.warn('[notifyOnTaskFlag] invalid subscription removed', {
-            uid,
-            id: docSnap.id,
-          });
-          await docSnap.ref.delete().catch(() => { });
-          return;
-        }
-
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-          await webpush.sendNotification(sub, payload);
-          console.log('[notifyOnTaskFlag] subscriptions fetched', { uid, count: subsSnap.size });
-
-        } catch (err: unknown) {
-          const anyErr = err as { statusCode?: number; status?: number; message?: string };
-          const status = anyErr?.statusCode ?? anyErr?.status ?? 0;
-          if (status === 404 || status === 410) {
-            console.warn('[notifyOnTaskFlag] stale subscription removed', {
-              uid,
-              id: docSnap.id,
-              status,
-            });
-            await docSnap.ref.delete().catch(() => { });
-          } else {
-            console.error('[notifyOnTaskFlag] sendNotification error', {
-              uid,
-              endpoint: sub.endpoint,
-              status,
-              message: anyErr?.message || String(anyErr),
-            });
-          }
-        }
-      });
-
-      await Promise.all(sends);
+    // VAPID セット
+    const keys = {
+      defPub: VAPID_PUBLIC_KEY.value(),
+      defPri: VAPID_PRIVATE_KEY.value(),
+      safPub: VAPID_PUBLIC_KEY_SAFARI.value() || null,
+      safPri: VAPID_PRIVATE_KEY_SAFARI.value() || null,
     };
 
-    await Promise.all(userIds.map(sendToUser));
+    // ▼ 変更: taskId を渡して type/URL 付きの Push ペイロードを生成
+    const pushPayload = buildFlagPayload(taskId, taskName, raisedBy);
+
+    // アプリ内メッセージ（全ユーザー共通テキスト）
+    const messageTitle = '🚩 フラグが付きました';
+    const messageBody  = `${taskName} にフラグが付きました${raisedBy ? `（by ${raisedBy}）` : ''}`;
+
+    // 各ユーザーへ送信（購読があれば）＋ メッセージ作成
+    for (const uid of targetUserIds) {
+      if (await wasAlreadyHandled(uid, eventId)) {
+        console.info('[notifyOnTaskFlag] already handled', { uid, eventId });
+        continue;
+      }
+
+      // 1) アプリ内メッセージを作成（eventId を docId に使って重複防止）
+      try {
+        const msgRef = db.collection('users').doc(uid).collection('messages').doc(eventId);
+        await msgRef.set(
+          {
+            type: 'flag',               // 種別
+            taskId,                     // どのタスクか
+            title: messageTitle,
+            body: messageBody,
+            from: raisedBy ?? 'system', // 誰が立てたか（不明なら system）
+            url: `/main?task=${encodeURIComponent(taskId)}&from=flag`, // ▼ 変更: 同期したURL
+            read: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        console.info('[notifyOnTaskFlag] in-app message created', { uid, eventId });
+      } catch (e) {
+        console.warn('[notifyOnTaskFlag] failed to create in-app message', { uid, eventId, error: e });
+        // メッセージ作成失敗でも Push は続行
+      }
+
+      // 2) Web Push 送信
+      const subs = await fetchSubscriptions(uid);
+      console.info('[notifyOnTaskFlag] subscriptions', { uid, count: subs.length });
+
+      if (subs.length === 0) {
+        // 購読が無い場合も「処理済み」にしてリトライ抑止
+        await markHandled(uid, eventId);
+        continue;
+      }
+
+      let sent = 0;
+      for (const row of subs) {
+        try {
+          await sendWithAutoVapid(row.sub, pushPayload, keys);
+          sent += 1;
+
+          const nowTs = admin.firestore.FieldValue.serverTimestamp();
+          if (row.id === 'root') {
+            await db.collection('users').doc(uid).set({ webPushLastSentAt: nowTs }, { merge: true });
+          } else {
+            await db.collection('users').doc(uid).collection('subscriptions').doc(row.id).set({ updatedAt: nowTs }, { merge: true });
+          }
+        } catch (e) {
+          const err = e as WebPushError;
+          console.warn(
+            `[notifyOnTaskFlag] push send failed to ${row.sub.endpoint} ${
+              (err as any)?.statusCode ? `(status ${(err as any).statusCode})` : ''
+            }`,
+            err
+          );
+        }
+      }
+
+      console.info('[notifyOnTaskFlag] result', { uid, sent, total: subs.length });
+
+      // 3) 冪等ログ
+      await markHandled(uid, eventId);
+    }
   }
 );

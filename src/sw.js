@@ -13,10 +13,8 @@ precacheAndRoute(self.__WB_MANIFEST || []);
 // ---- Badging API ユーティリティ（対応環境のみ実行）----
 async function setBadge(count) {
   try {
-    // Badging API は一部 OS/ブラウザのみ対応
     const nav = self.navigator;
     if (nav && typeof nav.setAppBadge === 'function') {
-      // 0 以下は OS により無視されることがあるため、明示的に clear へ
       if (typeof count === 'number' && count > 0) {
         await nav.setAppBadge(count);
       } else if (typeof nav.clearAppBadge === 'function') {
@@ -41,7 +39,7 @@ async function clearBadge() {
 
 // ---- Web Push 受信 ----
 // 期待 payload 例:
-// { "title":"タスク更新", "body":"晩御飯準備にフラグが付きました", "badgeCount":3, "url":"/main" }
+// { "type":"flag", "taskId":"...", "title":"...", "body":"...", "badgeCount":3, "url":"/main?task=...&from=flag" }
 self.addEventListener('push', (event) => {
   const data = (() => {
     try {
@@ -51,7 +49,11 @@ self.addEventListener('push', (event) => {
     }
   })();
 
-  const title = data.title || '通知';
+  // ▼ 追加: 種別と taskId を取り出しておく（UI 側へ渡す用途）
+  const type = data.type || 'generic';         // ← 'flag' など
+  const taskId = data.taskId || null;
+
+  const title = data.title || (type === 'flag' ? '🚩 フラグ' : '通知');
   const body = data.body || '';
   const url = data.url || '/';
   const badgeCount = Number.isFinite(data.badgeCount) ? data.badgeCount : undefined;
@@ -62,19 +64,18 @@ self.addEventListener('push', (event) => {
     // 通知カードの見た目用アイコン（数値バッジではありません）
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-72x72.png',
-    data: { url, badgeCount },
-    requireInteraction: true, // ユーザーが閉じるまで残す（OS裁量あり）
-    silent: false,            // OSが許可していれば音を鳴らす（OS裁量あり）
-    tag: 'pairkaji-default',  // ← 同一タグで通知を識別
-    renotify: true,           // ← 同一タグでも再通知（バナー再表示）を要求
-    timestamp: Date.now(),    // ← 並び順が分かりやすくなる（任意）
+    data: { url, badgeCount, type, taskId }, // ▼ 変更: type と taskId を渡す
+    requireInteraction: true,
+    silent: false,
+    tag: 'pairkaji-default',
+    renotify: true,
+    timestamp: Date.now(),
   };
 
   const showNotificationPromise = self.registration.showNotification(title, options);
   const updateBadgePromise =
     typeof badgeCount === 'number' ? setBadge(badgeCount) : clearBadge();
 
-  // 通知の表示と Badging API の更新を両方待機
   event.waitUntil(Promise.all([showNotificationPromise, updateBadgePromise]));
 });
 
@@ -88,6 +89,13 @@ self.addEventListener('notificationclick', (event) => {
     const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
     const matched = windowClients.find((c) => c.url && c.url.includes(url));
     if (matched && 'focus' in matched) {
+      // ▼ 追加: クリック情報をフロントへ渡す（必要なら利用）
+      try {
+        matched.postMessage({
+          type: 'notification-click',
+          payload: event.notification.data || {},
+        });
+      } catch {}
       await matched.focus();
     } else {
       await clients.openWindow(url);
@@ -97,6 +105,6 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(openOrFocus);
 });
 
-// ---- install / activate（必要なら拡張。未使用引数は置かない）----
+// ---- install / activate（必要なら拡張）----
 self.addEventListener('install', () => { });
 self.addEventListener('activate', () => { });
