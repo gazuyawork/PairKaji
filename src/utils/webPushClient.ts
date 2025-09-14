@@ -13,17 +13,17 @@
 export type EnsureResult =
   | { ok: true; subscription?: PushSubscription | null }
   | {
-      ok: false;
-      reason:
-        | 'unsupported' // Notification/Push/API未対応
-        | 'no-sw' // ServiceWorker未対応
-        | 'denied' // 通知ブロック
-        | 'default' // ダイアログ閉じ等で未確定
-        | 'no-vapid' // VAPID公開鍵が未設定
-        | 'sw-register-failed' // SW登録失敗
-        | 'subscribe-failed'; // 購読作成に失敗
-      error?: unknown;
-    };
+    ok: false;
+    reason:
+    | 'unsupported' // Notification/Push/API未対応
+    | 'no-sw' // ServiceWorker未対応
+    | 'denied' // 通知ブロック
+    | 'default' // ダイアログ閉じ等で未確定
+    | 'no-vapid' // VAPID公開鍵が未設定
+    | 'sw-register-failed' // SW登録失敗
+    | 'subscribe-failed'; // 購読作成に失敗
+    error?: unknown;
+  };
 
 /** VAPID 公開鍵（環境変数） */
 const VAPID_PUBLIC_KEY =
@@ -195,6 +195,7 @@ export async function ensureWebPushSubscription(uid: string): Promise<EnsureResu
   try {
     console.log('[push] creating new subscription…');
     const keyBuf = toAppServerKey(urlBase64ToUint8Array(VAPID_PUBLIC_KEY));
+    console.log('[vapid][client]', (VAPID_PUBLIC_KEY || '').slice(0, 12), '...', (VAPID_PUBLIC_KEY || '').slice(-12));
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: keyBuf,

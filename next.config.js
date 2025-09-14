@@ -35,10 +35,21 @@ const withPWA =
 const nextConfig = {
   reactStrictMode: true,
 
+  // ❗️images.domains は非推奨なので、remotePatterns に移行
   images: {
-    domains: [
-      'firebasestorage.googleapis.com',
-      'profile.line-scdn.net',
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/**', // 例: /v0/b/<bucket>/o/** を包括
+      },
+      {
+        protocol: 'https',
+        hostname: 'profile.line-scdn.net',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 

@@ -30,7 +30,9 @@ import {
 } from '@/lib/firebaseUtils';
 // import { splitSharedTasksOnPairRemoval } from '@/lib/firebaseUtils';
 import LineLinkCard from '@/components/profile/LineLinkCard';
-import RequestPushPermissionButton from '@/components/settings/RequestPushPermissionButton';
+
+import PushToggle from '@/components/settings/PushToggle'; // ★ 変更: PushToggle を使用
+import { useUserUid } from '@/hooks/useUserUid';           // ★ 変更: uid を React state として取得
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -64,6 +66,8 @@ export default function ProfilePage() {
   // ★ 追加：Stripe カスタマーポータル用状態
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [isPortalOpening, setIsPortalOpening] = useState(false);
+
+  const uid = useUserUid(); // ★ 変更: auth.currentUser ではなく React state な uid を利用
 
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
@@ -481,11 +485,9 @@ export default function ProfilePage() {
                 <p className="text-sm text-gray-600 mb-3">
                   通知を受け取るには、下のボタンから通知を許可してください。
                 </p>
-                {auth.currentUser && (
-                  <RequestPushPermissionButton uid={auth.currentUser.uid} />
-                )}
+                {/* ★ 変更: auth.currentUser 依存をやめ、React state な uid 判定で確実に表示 */}
+                {uid && <PushToggle uid={uid} />}
               </section>
-
             </div>
 
             {plan === 'premium' && !lineLinked && <LineLinkCard />}
@@ -510,9 +512,11 @@ export default function ProfilePage() {
               </div>
             )}
 
-
             <div className="text-center mt-auto">
-              <Link href="/delete-account" className="text-xs text-gray-400 hover:underline underline decoration-gray-400">
+              <Link
+                href="/delete-account"
+                className="text-xs text-gray-400 hover:underline underline decoration-gray-400"
+              >
                 アカウントを削除する
               </Link>
             </div>

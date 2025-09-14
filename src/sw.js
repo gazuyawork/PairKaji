@@ -63,6 +63,11 @@ self.addEventListener('push', (event) => {
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-72x72.png',
     data: { url, badgeCount },
+    requireInteraction: true, // ユーザーが閉じるまで残す（OS裁量あり）
+    silent: false,            // OSが許可していれば音を鳴らす（OS裁量あり）
+    tag: 'pairkaji-default',  // ← 同一タグで通知を識別
+    renotify: true,           // ← 同一タグでも再通知（バナー再表示）を要求
+    timestamp: Date.now(),    // ← 並び順が分かりやすくなる（任意）
   };
 
   const showNotificationPromise = self.registration.showNotification(title, options);
@@ -93,5 +98,5 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // ---- install / activate（必要なら拡張。未使用引数は置かない）----
-self.addEventListener('install', () => {});
-self.addEventListener('activate', () => {});
+self.addEventListener('install', () => { });
+self.addEventListener('activate', () => { });
