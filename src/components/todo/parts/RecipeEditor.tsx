@@ -47,23 +47,6 @@ export type RecipeEditorHandle = {
 
 const UNIT_OPTIONS = ['g', 'kg', 'ml', 'L', '個', '本', '丁', '枚', '合', '大さじ', '小さじ', '少々', '適量'] as const;
 
-// 単位推定ルール
-const SUGGESTED_UNIT_RULES: Array<{ test: RegExp; unit: (typeof UNIT_OPTIONS)[number] }> = [
-  { test: /(牛乳|豆乳|水|湯|スープ|だし|だし汁|みりん|日本酒|酒|めんつゆ|つゆ|ポン酢|酢|オリーブオイル|ごま油|サラダ油|油|しょうゆ|醤油)/, unit: 'ml' },
-  { test: /(砂糖|上白糖|グラニュー糖|塩|こしょう|コショウ|胡椒|小麦粉|薄力粉|片栗粉|味噌|だしの素)/, unit: '小さじ' },
-  { test: /(米|無洗米|白米)/, unit: '合' },
-  { test: /(卵|玉子|玉ねぎ|たまねぎ|にんじん|人参|じゃがいも|じゃが芋|じゃが|ねぎ|長ねぎ|白ねぎ|きゅうり|胡瓜|トマト|なす|ナス|ピーマン|大根|白菜|レタス|ほうれん草|キャベツ)/, unit: '個' },
-  { test: /(豆腐)/, unit: '丁' },
-  { test: /(豚肉|鶏肉|鶏ささみ|鶏もも|鶏むね|牛こま|牛薄切り|牛肉|ひき肉|合いびき肉|合挽き肉|ベーコン|ハム|ウインナー|鮭|さけ|サーモン|鯖|さば|サバ|刺身)/, unit: 'g' },
-];
-
-const normalizeName = (s: string) => s.trim().normalize('NFKC');
-const suggestUnit = (name: string): string => {
-  const n = normalizeName(name);
-  const hit = SUGGESTED_UNIT_RULES.find(({ test }) => test.test(n));
-  return hit ? hit.unit : '適量';
-};
-
 // 全角→半角
 const toHalfWidth = (s: string) =>
   s
@@ -75,7 +58,7 @@ const toHalfWidth = (s: string) =>
 const genId = () => {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch {}
+  } catch { }
   return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 };
 
@@ -254,7 +237,6 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
 ) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(value.ingredients);
   const [steps, setSteps] = useState<string[]>(value.steps);
-  const [userEditedUnitIds, setUserEditedUnitIds] = useState<Set<string>>(new Set());
 
   // ★ 変更: 直近で親に送った値を保持して、重複送信や往復更新を抑止
   const lastSentRef = useRef<Recipe>({ ingredients: value.ingredients, steps: value.steps }); // ★ 変更
@@ -263,7 +245,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   const [amountText, setAmountText] = useState<Record<string, string>>({});
 
   // 材料：IME／編集中
-  const [composingId, setComposingId] = useState<string | null>(null);
+  // const [composingId, setComposingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // 手順：IME／編集中
@@ -383,30 +365,20 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     }, 0);
   }, [isPreview]);
 
-  const removeIngredient = (id: string) => {
-    if (isPreview) return;
-    setIngredients((prev) => prev.filter((i) => i.id !== id));
-    // ★ 変更: Setの更新を明示化
-    setUserEditedUnitIds((prev) => {
-      const n = new Set(prev);
-      n.delete(id);
-      return n;
-    });
-    setAmountText((m) => {
-      const n = { ...m };
-      delete n[id];
-      return n;
-    });
-    setComposingId((curr) => (curr === id ? null : curr));
-  };
+const removeIngredient = (id: string) => {
+  if (isPreview) return;
+  setIngredients((prev) => prev.filter((i) => i.id !== id));
+  setAmountText((m) => {
+    const n: Record<string, string> = { ...m };
+    delete n[id];
+    return n;
+  });
+  // setComposingId((curr) => (curr === id ? null : curr));
+};
 
   const changeIngredientName = (id: string, name: string) => {
     setIngredients((prev) =>
-      prev.map((i) => {
-        if (i.id !== id) return i;
-        const shouldAuto = !userEditedUnitIds.has(id) && composingId === null;
-        return { ...i, name, unit: shouldAuto ? suggestUnit(name) : i.unit };
-      })
+      prev.map((i) => (i.id === id ? { ...i, name } : i))
     );
   };
 
@@ -434,20 +406,14 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     }));
   };
 
-  const changeIngredientUnit = (id: string, unit: string) => {
-    setIngredients((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i))
-    );
-    // ★ 変更: Setの更新を明示化（可読性・一貫性）
-    setUserEditedUnitIds((prev) => {
-      const n = new Set(prev);
-      n.add(id);
-      return n;
-    });
-    if (unit === '適量') {
-      setAmountText((m) => ({ ...m, [id]: '' }));
-    }
-  };
+const changeIngredientUnit = (id: string, unit: string) => {
+  setIngredients((prev) =>
+    prev.map((i) => (i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i))
+  );
+  if (unit === '適量') {
+    setAmountText((m) => ({ ...m, [id]: '' }));
+  }
+};
 
   const addStepAt = useCallback(
     (index: number) => {
@@ -629,18 +595,10 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                             value={ing.name}
                             onChange={(e) => changeIngredientName(ing.id, e.target.value)}
                             onKeyDown={(e) => onIngredientNameKeyDown(e, idx)}
-                            onCompositionStart={() => setComposingId(ing.id)}
-                            onCompositionEnd={(e) => {
-                              setComposingId((curr) => (curr === ing.id ? null : curr));
-                              if (!userEditedUnitIds.has(ing.id)) {
-                                const finalName = e.currentTarget.value;
-                                setIngredients((prev) =>
-                                  prev.map((i) =>
-                                    i.id === ing.id ? { ...i, unit: suggestUnit(finalName) } : i
-                                  )
-                                );
-                              }
-                            }}
+                            // onCompositionStart={() => setComposingId(ing.id)}
+                            // onCompositionEnd={() => {
+                            //   setComposingId((curr) => (curr === ing.id ? null : curr));
+                            // }}
                             onFocus={() => setEditingId(ing.id)}
                             onBlur={() => setEditingId((curr) => (curr === ing.id ? null : curr))}
                             placeholder="材料名（例：玉ねぎ）"
@@ -846,7 +804,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                   </div>
                   <AutoResizeTextarea
                     value={s}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     placeholder="手順を入力"
                     className="col-span-11 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0"
                     readOnly
