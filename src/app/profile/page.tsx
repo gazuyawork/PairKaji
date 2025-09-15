@@ -13,9 +13,8 @@ import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
 import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, getDoc, getDocs, type Query, type QuerySnapshot, updateDoc, type Unsubscribe } from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
-import { getDocs, doc, getDoc, Query, QuerySnapshot, updateDoc } from 'firebase/firestore';
 import {
   getUserProfile,
   createUserProfile,
@@ -31,8 +30,9 @@ import {
 // import { splitSharedTasksOnPairRemoval } from '@/lib/firebaseUtils';
 import LineLinkCard from '@/components/profile/LineLinkCard';
 
-import PushToggle from '@/components/settings/PushToggle'; // ★ 変更: PushToggle を使用
-import { useUserUid } from '@/hooks/useUserUid';           // ★ 変更: uid を React state として取得
+import PushToggle from '@/components/settings/PushToggle'; // ★ PushToggle を使用
+import { useUserUid } from '@/hooks/useUserUid';           // ★ uid を React state として取得
+import { onAuthStateChanged } from 'firebase/auth';        // ★ 追加
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -63,11 +63,11 @@ export default function ProfilePage() {
   const [lineDisplayName, setLineDisplayName] = useState<string | null>(null);
   const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
 
-  // ★ 追加：Stripe カスタマーポータル用状態
+  // ★ Stripe カスタマーポータル用状態
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [isPortalOpening, setIsPortalOpening] = useState(false);
 
-  const uid = useUserUid(); // ★ 変更: auth.currentUser ではなく React state な uid を利用
+  const uid = useUserUid(); // ★ auth.currentUser ではなく React state な uid を利用
 
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
@@ -98,50 +98,72 @@ export default function ProfilePage() {
     setIsPasswordModalOpen(true);
   };
 
+  // ★ 追加: リロード直後の auth.currentUser=null を吸収し、email / provider を安定取得
   useEffect(() => {
-    const fetchProfile = async () => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setEmail('');
+        setIsGoogleUser(false);
+        return;
+      }
+      setEmail(user.email ?? '');
+      setIsGoogleUser(user.providerData.some((p) => p.providerId === 'google.com'));
+    });
+    return () => unsub();
+  }, []);
+
+  // ★ 再構成: uid と email が確定してから Firestore 初期取得 & 購読を開始
+  useEffect(() => {
+    if (!uid) return; // uid 未確定なら何もしない
+
+    setIsLoading(true);
+    setIsPairLoading(true);
+
+    let unsubscribePairs: Unsubscribe | null = null;
+    let unsubscribeUser: Unsubscribe | null = null;
+
+    (async () => {
       try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        await user.reload();
-        const refreshedUser = auth.currentUser;
-
-        setIsGoogleUser(
-          refreshedUser?.providerData.some((p) => p.providerId === 'google.com') ?? false
-        );
-
-        const snap = await getUserProfile(user.uid);
-
+        // ------- プロフィール（users/{uid}）初期読込 -------
+        const snap = await getUserProfile(uid);
         if (snap.exists()) {
           const data = snap.data();
-          setName(data.name || user.email?.split('@')[0] || '');
 
-          if (data.plan) {
-            setPlan(data.plan);
-          }
+          setName(data.name || (email ? email.split('@')[0] : '') || '');
+
+          if (data.plan) setPlan(data.plan);
 
           if (data.imageUrl) {
             setProfileImage(data.imageUrl);
-            localStorage.setItem('profileImage', data.imageUrl);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('profileImage', data.imageUrl);
+            }
           }
 
-          // ▼ LINE連携フィールドを反映
+          // LINE 連携
           setLineLinked(Boolean(data.lineLinked));
           setLineDisplayName(data.lineDisplayName ?? null);
           setLinePictureUrl(data.linePictureUrl ?? null);
+
+          // Stripe
+          if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
+            setStripeCustomerId(data.stripeCustomerId);
+          } else {
+            setStripeCustomerId(null);
+          }
         } else {
-          await createUserProfile(user.uid, user.email?.split('@')[0] || '');
-          setName(user.email?.split('@')[0] || '');
+          // プロフィールが無ければ作成
+          const fallbackName = email ? email.split('@')[0] : '';
+          await createUserProfile(uid, fallbackName);
+          setName(fallbackName);
         }
 
-        setEmail(user.email ?? '');
-
-        const pairQuery = query(
+        // ------- pairs 初期読込 -------
+        const pairQueryRef = query(
           collection(db, 'pairs'),
-          where('userIds', 'array-contains', user.uid)
+          where('userIds', 'array-contains', uid)
         ) as Query<Pair>;
-        const pairSnap: QuerySnapshot<Pair> = await getDocs(pairQuery);
+        const pairSnap: QuerySnapshot<Pair> = await getDocs(pairQueryRef);
 
         if (!pairSnap.empty) {
           const pairDoc = pairSnap.docs[0];
@@ -154,28 +176,48 @@ export default function ProfilePage() {
 
           if (pair.partnerImageUrl) {
             setPartnerImage(pair.partnerImageUrl);
-            localStorage.setItem('partnerImage', pair.partnerImageUrl);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('partnerImage', pair.partnerImageUrl);
+            }
           } else {
             setPartnerImage(null);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('partnerImage');
+            }
+          }
+        } else {
+          setInviteCode('');
+          setPartnerEmail('');
+          setPairDocId(null);
+          setIsPairConfirmed(false);
+          setPartnerImage(null);
+          if (typeof window !== 'undefined') {
             localStorage.removeItem('partnerImage');
           }
         }
 
-        if (!user.email) {
-          console.warn('[WARN] user.email が null です。pending ペア検索をスキップします');
-          return;
-        }
-        const pendingSnap = await getPendingPairByEmail(user.email);
-        if (!pendingSnap.empty) {
-          const docRef = pendingSnap.docs[0];
-          const pair = docRef.data();
-          if (pair.status === 'pending' && !pair.userBId && pair.userAId && pair.emailB && pair.inviteCode) {
-            setPendingApproval({
-              pairId: docRef.id,
-              inviterUid: pair.userAId,
-              emailB: pair.emailB,
-              inviteCode: pair.inviteCode,
-            });
+        // ------- pending 承認の確認（email が取れている場合のみ） -------
+        if (email) {
+          const pendingSnap = await getPendingPairByEmail(email);
+          if (!pendingSnap.empty) {
+            const docRef = pendingSnap.docs[0];
+            const pair = docRef.data();
+            if (
+              pair.status === 'pending' &&
+              !pair.userBId &&
+              pair.userAId &&
+              pair.emailB &&
+              pair.inviteCode
+            ) {
+              setPendingApproval({
+                pairId: docRef.id,
+                inviterUid: pair.userAId,
+                emailB: pair.emailB,
+                inviteCode: pair.inviteCode,
+              });
+            } else {
+              setPendingApproval(null);
+            }
           } else {
             setPendingApproval(null);
           }
@@ -186,18 +228,15 @@ export default function ProfilePage() {
         setIsLoading(false);
         setIsPairLoading(false);
       }
-    };
+    })();
 
-    fetchProfile();
-
-    // ▼ リアルタイム購読（pairs）
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', user.uid));
-
-    const unsubscribePairs = onSnapshot(
-      q,
+    // ------- リアルタイム購読（pairs） -------
+    const pairsQ = query(
+      collection(db, 'pairs'),
+      where('userIds', 'array-contains', uid)
+    );
+    unsubscribePairs = onSnapshot(
+      pairsQ,
       (snapshot) => {
         if (!snapshot.empty) {
           const pairDoc = snapshot.docs[0];
@@ -209,10 +248,14 @@ export default function ProfilePage() {
 
           if (pair.partnerImageUrl) {
             setPartnerImage(pair.partnerImageUrl);
-            localStorage.setItem('partnerImage', pair.partnerImageUrl);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('partnerImage', pair.partnerImageUrl);
+            }
           } else {
             setPartnerImage(null);
-            localStorage.removeItem('partnerImage');
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('partnerImage');
+            }
           }
         } else {
           setInviteCode('');
@@ -220,7 +263,9 @@ export default function ProfilePage() {
           setPairDocId(null);
           setIsPairConfirmed(false);
           setPartnerImage(null);
-          localStorage.removeItem('partnerImage');
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('partnerImage');
+          }
         }
       },
       (error) => {
@@ -228,9 +273,9 @@ export default function ProfilePage() {
       }
     );
 
-    // ▼ リアルタイム購読（users/{uid}：LINE連携・画像・プランなど）
-    const unsubscribeUser = onSnapshot(
-      doc(db, 'users', user.uid),
+    // ------- リアルタイム購読（users/{uid}：LINE連携・画像・プランなど） -------
+    unsubscribeUser = onSnapshot(
+      doc(db, 'users', uid),
       (snap) => {
         const data = snap.data();
         if (!data) return;
@@ -239,20 +284,21 @@ export default function ProfilePage() {
 
         if (typeof data.imageUrl === 'string') {
           setProfileImage(data.imageUrl);
-          localStorage.setItem('profileImage', data.imageUrl);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('profileImage', data.imageUrl);
+          }
         }
 
         setLineLinked(Boolean(data.lineLinked));
         setLineDisplayName(data.lineDisplayName ?? null);
         setLinePictureUrl(data.linePictureUrl ?? null);
 
-        // ★ 追加：Stripe カスタマーIDの反映
+        // Stripe カスタマーIDの反映
         if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
           setStripeCustomerId(data.stripeCustomerId);
         } else {
           setStripeCustomerId(null);
         }
-
       },
       (error) => {
         handleFirestoreError(error);
@@ -260,10 +306,10 @@ export default function ProfilePage() {
     );
 
     return () => {
-      unsubscribePairs();
-      unsubscribeUser();
+      unsubscribePairs?.();
+      unsubscribeUser?.();
     };
-  }, []);
+  }, [uid, email]);
 
   const handleSendInvite = async () => {
     const user = auth.currentUser;
@@ -403,7 +449,7 @@ export default function ProfilePage() {
     }
   };
 
-  // ★ 追加：Stripe カスタマーポータルを開く
+  // ★ Stripe カスタマーポータルを開く
   const handleOpenStripePortal = async () => {
     if (!stripeCustomerId) {
       toast.error('決済情報が見つかりません。決済完了後にお試しください。');
@@ -443,7 +489,7 @@ export default function ProfilePage() {
         ) : (
           <>
             <ProfileCard
-              // ▼ ここを修正：Auth user ではなく Firestore の値を渡す
+              // ▼ Auth user ではなく Firestore の値を渡す
               isLineLinked={lineLinked}
               lineDisplayName={lineDisplayName}
               linePictureUrl={linePictureUrl}
@@ -477,24 +523,16 @@ export default function ProfilePage() {
               isRemoving={isRemoving}
             />
 
-            <div className="p-4 space-y-6">
-              {/* 既存のプロフィール編集UI … */}
-
-              <section className="mt-6">
-                <h2 className="text-lg font-semibold mb-2">通知設定</h2>
-                <p className="text-sm text-gray-600 mb-3">
-                  通知を受け取るには、下のボタンから通知を許可してください。
-                </p>
-                {/* ★ 変更: auth.currentUser 依存をやめ、React state な uid 判定で確実に表示 */}
-                {uid && <PushToggle uid={uid} />}
-              </section>
-            </div>
+            <section className="mt-6">
+              {/* ★ auth.currentUser 依存をやめ、uid 判定で確実に表示 */}
+              {uid && <PushToggle uid={uid} />}
+            </section>
 
             {plan === 'premium' && !lineLinked && <LineLinkCard />}
 
             {plan !== 'free' && (
               <div className="flex flex-col items-center gap-2">
-                {/* ★ 変更：Stripe カスタマーポータルへ遷移 */}
+                {/* ★ Stripe カスタマーポータルへ遷移 */}
                 <button
                   onClick={handleOpenStripePortal}
                   disabled={isPortalOpening}

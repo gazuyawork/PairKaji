@@ -43,7 +43,7 @@ export default function SortableTaskRow({ task, onClickTitle, onHide }: Props) {
        ${isDragging ? 'opacity-70' : ''
         }`}
     >
-      <div className="flex items-center justify-between px-3 py-2">
+      <div className="flex items-center justify-between px-3 py-3">
         {/* 左: 並び替え + カテゴリアイコン名 + タイトル */}
         <div className="flex items-center gap-2 min-w-0">
           {/* 並び替えハンドル */}

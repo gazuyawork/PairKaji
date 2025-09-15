@@ -706,7 +706,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-            {!isChecking && plan === 'premium' && (
+            {!isChecking && (
               <>
                 <div className="sticky top-0 bg-transparent z-999">
                   <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">

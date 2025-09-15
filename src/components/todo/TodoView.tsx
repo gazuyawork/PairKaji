@@ -133,6 +133,17 @@ function getCategoryMeta(raw?: string | null) {
   }
 }
 
+/* =========================================================
+   ★追加: 特定カテゴリを末尾へ送るための優先度マップ
+   値が大きいほど後ろに並ぶ。未指定は 0（通常の五十音順）
+   今回は「未分類」を末尾へ。
+   複数末尾送りしたい場合は同様に 1 を指定可。
+   例) { '未分類': 1, '買い物': 1 }
+   ========================================================= */
+const CATEGORY_ORDER: Record<string, number> = {
+  '未分類': 1,
+};
+
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName, index } = useView();
   const [filterText, setFilterText] = useState('');
@@ -413,6 +424,7 @@ export default function TodoView() {
 
   /* ===========================================
      ★ 変更: カテゴリ・テキスト・Group選択を反映した一覧
+     カテゴリ見出しのソートを「優先度→五十音順」に変更
      =========================================== */
   const categorized = useMemo(() => {
     const filtered = tasks.filter((task) => {
@@ -441,7 +453,15 @@ export default function TodoView() {
       map.set(key, arr);
     }
 
-    const entries = Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
+    // ★変更: 優先度（CATEGORY_ORDER）→ 同一優先度内は五十音
+    const entries = Array.from(map.entries()).sort((a, b) => {
+      const aKey = a[0];
+      const bKey = b[0];
+      const aPrio = CATEGORY_ORDER[aKey] ?? 0;
+      const bPrio = CATEGORY_ORDER[bKey] ?? 0;
+      if (aPrio !== bPrio) return aPrio - bPrio;
+      return aKey.localeCompare(bKey, 'ja');
+    });
 
     return entries.map(([cat, arr]) => ({ category: cat, items: arr }));
   }, [tasks, filterText, selectedCategoryId, uid]);
