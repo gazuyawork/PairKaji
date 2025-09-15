@@ -271,7 +271,7 @@ export default function TodoTaskCard({
       style={groupDnd?.style}
       className={clsx(
         // ▼ 画面の縦幅いっぱいにする
-        'relative mb-2.5 scroll-mt-4 h-[calc(90vh)]',
+        'relative mb-2.5 scroll-mt-4 h-[calc(88vh)]',
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
