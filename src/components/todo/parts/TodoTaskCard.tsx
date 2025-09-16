@@ -47,6 +47,40 @@ function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
   return Array.isArray(arr) && arr.every(t => !!t && typeof t === 'object' && 'id' in (t as object));
 }
 
+/* ▼ 追加: モバイルキーボード検知フック（VisualViewport があれば使用） */
+function useKeyboardOffset() {
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const vv = window.visualViewport;
+    if (!vv) {
+      // VisualViewport がないブラウザはオフセット 0 に固定
+      const onResize = () => setOffset(0);
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
+    }
+
+    const calc = () => {
+      // キーボード出現時は innerHeight と visualViewport.height の差分が大きくなる
+      const heightDiff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const next = heightDiff > 0 ? Math.round(heightDiff) : 0;
+      setOffset(next);
+    };
+
+    calc();
+    vv.addEventListener('resize', calc);
+    vv.addEventListener('scroll', calc);
+    return () => {
+      vv.removeEventListener('resize', calc);
+      vv.removeEventListener('scroll', calc);
+    };
+  }, []);
+
+  return offset;
+}
+
 /* -------------------------------- props -------------------------------- */
 
 interface Props {
@@ -263,6 +297,12 @@ export default function TodoTaskCard({
     };
   }, []);
 
+  /* ▼ 追加: キーボードオフセット（px） */
+  const kbOffset = useKeyboardOffset();
+
+  /* ▼ 追加: フッター高さ（px）— 余白計算に使用 */
+  const FOOTER_H = 64; // おおよそ h-16（実測に合わせて適宜調整可）
+
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
@@ -270,14 +310,14 @@ export default function TodoTaskCard({
       ref={groupDnd?.setNodeRef}
       style={groupDnd?.style}
       className={clsx(
-        // ▼ 画面の縦幅いっぱいにする
+        // ▼ 画面の縦幅いっぱいにする（既存維持）
         'relative mb-2.5 scroll-mt-4 h-[calc(88vh)]',
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
       {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100vh */}
       <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
-        {/* header */}
+        {/* header（固定） */}
         <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center">
           <div className="flex items-center gap-1 sm:gap-2 flex-[1_1_72%] min-w-0 py-1">
             {/* <button
@@ -414,6 +454,10 @@ export default function TodoTaskCard({
                 'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2'
               )}
               onTouchMove={(e) => e.stopPropagation()}
+              // ▼ 追加: キーボード分だけ下余白を可変で確保
+              style={{
+                paddingBottom: `${FOOTER_H + kbOffset}px`,
+              }}
             >
               {finalFilteredTodos.length === 0 && tab === 'done' && (
                 <div className="text-gray-400 italic pl-2">完了したタスクはありません</div>
@@ -482,7 +526,8 @@ export default function TodoTaskCard({
               </div>
             )}
             {showScrollUpHint && (
-              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg黒/50 animate-pulse">
+              // ▼ 修正: Tailwind 無効クラスを修正（bg黒/50 → bg-black/50）
+              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
                 <ChevronUp size={16} className="text-white" />
               </div>
             )}
@@ -495,7 +540,15 @@ export default function TodoTaskCard({
           </div>
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
-          <div className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200">
+          {/* ▲ 変更: div → motion.div に変更してキーボードに追従 */}
+          <motion.div
+            className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200"
+            // ▼ 追加: キーボード高さに応じて上にスライド
+            animate={{ y: -kbOffset }}
+            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+            // ▼ 追加: iOS セーフエリア対応
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
             <div className="px-4 py-4">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
@@ -533,7 +586,7 @@ export default function TodoTaskCard({
                 />
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
