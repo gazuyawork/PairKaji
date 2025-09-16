@@ -1,4 +1,3 @@
-// src/components/todo/parts/TodoTaskCard.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -263,14 +262,50 @@ export default function TodoTaskCard({
     };
   }, []);
 
+  /* ------------------------------ keyboard対応（SPのソフトキーボード） ------------------------------ */
+  const [vvHeight, setVvHeight] = useState<number | null>(null);
+  const [isKbOpen, setIsKbOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const update = () => {
+      const vv = window.visualViewport;
+      const currentVvHeight = vv?.height ?? window.innerHeight;
+      const base = window.innerHeight;
+      const kbDelta = Math.max(0, base - currentVvHeight);
+      const opened = kbDelta > 120; // しきい値（端末差吸収）
+
+      setVvHeight(currentVvHeight);
+      setIsKbOpen(opened);
+    };
+
+    update();
+
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+
+    return () => {
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
     <div
       ref={groupDnd?.setNodeRef}
-      style={groupDnd?.style}
+      style={{
+        ...(groupDnd?.style ?? {}),
+        // ▼ キーボード表示中のみ、VisualViewport 高さに 0.88 を掛けた実寸を使用
+        height: isKbOpen && vvHeight ? Math.round(vvHeight * 0.88) : undefined,
+      }}
       className={clsx(
-        // ▼ 画面の縦幅いっぱいにする
+        // ▼ 画面の縦幅いっぱいにする（通常時はこちらが効く。style.height 指定時はそちらが優先）
         'relative mb-2.5 scroll-mt-4 h-[calc(88vh)]',
         groupDnd?.isDragging && 'opacity-70'
       )}
