@@ -47,38 +47,6 @@ function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
   return Array.isArray(arr) && arr.every(t => !!t && typeof t === 'object' && 'id' in (t as object));
 }
 
-/* ▼ 追加: モバイルキーボード検知フック（VisualViewport があれば使用） */
-function useKeyboardOffset() {
-  const [offset, setOffset] = useState(0);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const vv = window.visualViewport;
-    if (!vv) {
-      const onResize = () => setOffset(0);
-      window.addEventListener('resize', onResize);
-      return () => window.removeEventListener('resize', onResize);
-    }
-
-    const calc = () => {
-      const heightDiff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      const next = heightDiff > 0 ? Math.round(heightDiff) : 0;
-      setOffset(next);
-    };
-
-    calc();
-    vv.addEventListener('resize', calc);
-    vv.addEventListener('scroll', calc);
-    return () => {
-      vv.removeEventListener('resize', calc);
-      vv.removeEventListener('scroll', calc);
-    };
-  }, []);
-
-  return offset;
-}
-
 /* -------------------------------- props -------------------------------- */
 
 interface Props {
@@ -121,6 +89,7 @@ export default function TodoTaskCard({
   onOpenNote,
   onReorderTodos,
   groupDnd,
+  // isFilteredGlobal = false,
 }: Props) {
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
@@ -130,6 +99,7 @@ export default function TodoTaskCard({
   );
 
   const [hasManualOrder, setHasManualOrder] = useState<boolean>(false);
+  // const hasAnyTodo = todos.length > 0;
 
   // カテゴリ
   const category: string | null =
@@ -156,6 +126,7 @@ export default function TodoTaskCard({
     undoneCount,
     doneCount,
     finalFilteredTodos,
+    // isFilteredView,
     doneMatchesCount,
   } = useTodoSearchAndSort({
     todos,
@@ -165,7 +136,7 @@ export default function TodoTaskCard({
     preferTimeSort: Boolean(category === '旅行' && !hasManualOrder),
   });
 
-  /* ▼ 変更: スクロール対象を「body コンテナ」に変更するため、ref は body に付け替える */
+  // スクロールメーター
   const {
     scrollRef,
     scrollRatio,
@@ -292,12 +263,6 @@ export default function TodoTaskCard({
     };
   }, []);
 
-  /* ▼ 追加: キーボードオフセット（px） */
-  const kbOffset = useKeyboardOffset();
-
-  /* ▼ 追加: フッター高さ（px）— 余白計算に使用 */
-  const FOOTER_H = 64; // おおよそ h-16（実測に合わせて適宜調整可）
-
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
@@ -305,17 +270,26 @@ export default function TodoTaskCard({
       ref={groupDnd?.setNodeRef}
       style={groupDnd?.style}
       className={clsx(
+        // ▼ 画面の縦幅いっぱいにする
         'relative mb-2.5 scroll-mt-4 h-[calc(88vh)]',
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
-      {/* カード全体（ヘッダー＋本文） */}
+      {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100vh */}
       <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
-        {/* ▲ 変更: ヘッダーを sticky 固定（カード内の最上部に常時表示） */}
-        <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center sticky top-0 z-40">
+        {/* header */}
+        <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center">
           <div className="flex items-center gap-1 sm:gap-2 flex-[1_1_72%] min-w-0 py-1">
-            {/* <button ... /> */}
+            {/* <button
+              type="button"
+              title="ドラッグでカードを並び替え"
+              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
+              {...(groupDnd?.handleProps ?? {})}
+            >
+              <Grip size={18} />
+            </button> */}
 
+            {/* タスク名（開閉トグルは削除） */}
             <div
               className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text左"
               aria-label="タスク名"
@@ -325,9 +299,15 @@ export default function TodoTaskCard({
                 className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)}
                 aria-label={`${categoryLabel}カテゴリ`}
               />
+              {/* ▼ 追加：カテゴリ名 */}
               <span className="text-[12px] sm:text-sm text-gray-500 shrink-0">
                 {categoryLabel}
               </span>
+
+              {/* タスク名 */}
+              {/* <span className="font-bold text-[15px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
+                {task.name}
+              </span> */}
             </div>
           </div>
 
@@ -385,16 +365,8 @@ export default function TodoTaskCard({
           </div>
         </div>
 
-        {/* ▲ 変更: body をスクロールコンテナに変更（ヘッダーは固定のまま） */}
-        <div
-          ref={scrollRef} // ▼ 追加: スクロール監視対象を body に
-          className="relative flex-1 min-h-0 flex flex-col overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-          onTouchMove={(e) => e.stopPropagation()} // ▼ 追加: 画面全体のスクロール抑止
-          style={{
-            // ▼ 追加: 入力行とキーボード分の下余白を確保
-            paddingBottom: `${FOOTER_H + kbOffset}px`,
-          }}
-        >
+        {/* body（スクロール領域 + 固定フッター） */}
+        <div className="relative flex-1 min-h-0 flex flex-col">
           {/* スクロールメーター（右端） */}
           {isScrollable && (
             <div
@@ -404,7 +376,6 @@ export default function TodoTaskCard({
             />
           )}
 
-          {/* コンテンツ（検索 + 一覧） */}
           <div className="pt-3 pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col">
             {isCookingCategory && (
               <div className="px-1 pr-5">
@@ -436,8 +407,14 @@ export default function TodoTaskCard({
               </div>
             )}
 
-            {/* ▼ 修正: ここは body がスクロールするため overflow は外す */}
-            <div className="flex-1 min-h-0 space-y-4 pr-2 pt-2">
+            {/* ▼ スクロール対象。カードは常に全高、ここだけ内部スクロール */}
+            <div
+              ref={scrollRef}
+              className={clsx(
+                'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2'
+              )}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               {finalFilteredTodos.length === 0 && tab === 'done' && (
                 <div className="text-gray-400 italic pl-2">完了したタスクはありません</div>
               )}
@@ -505,8 +482,7 @@ export default function TodoTaskCard({
               </div>
             )}
             {showScrollUpHint && (
-              // ▼ 修正: Tailwind 無効クラスを修正（bg黒/50 → bg-black/50）
-              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg黒/50 animate-pulse">
                 <ChevronUp size={16} className="text-white" />
               </div>
             )}
@@ -519,13 +495,7 @@ export default function TodoTaskCard({
           </div>
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
-          {/* 変更なし（キーボード追従） */}
-          <motion.div
-            className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200"
-            animate={{ y: -kbOffset }}
-            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-          >
+          <div className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200">
             <div className="px-4 py-4">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
@@ -563,7 +533,7 @@ export default function TodoTaskCard({
                 />
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>
