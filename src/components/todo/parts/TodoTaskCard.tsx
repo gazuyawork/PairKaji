@@ -56,14 +56,12 @@ function useKeyboardOffset() {
 
     const vv = window.visualViewport;
     if (!vv) {
-      // VisualViewport がないブラウザはオフセット 0 に固定
       const onResize = () => setOffset(0);
       window.addEventListener('resize', onResize);
       return () => window.removeEventListener('resize', onResize);
     }
 
     const calc = () => {
-      // キーボード出現時は innerHeight と visualViewport.height の差分が大きくなる
       const heightDiff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       const next = heightDiff > 0 ? Math.round(heightDiff) : 0;
       setOffset(next);
@@ -123,7 +121,6 @@ export default function TodoTaskCard({
   onOpenNote,
   onReorderTodos,
   groupDnd,
-  // isFilteredGlobal = false,
 }: Props) {
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
@@ -133,7 +130,6 @@ export default function TodoTaskCard({
   );
 
   const [hasManualOrder, setHasManualOrder] = useState<boolean>(false);
-  // const hasAnyTodo = todos.length > 0;
 
   // カテゴリ
   const category: string | null =
@@ -160,7 +156,6 @@ export default function TodoTaskCard({
     undoneCount,
     doneCount,
     finalFilteredTodos,
-    // isFilteredView,
     doneMatchesCount,
   } = useTodoSearchAndSort({
     todos,
@@ -170,7 +165,7 @@ export default function TodoTaskCard({
     preferTimeSort: Boolean(category === '旅行' && !hasManualOrder),
   });
 
-  // スクロールメーター
+  /* ▼ 変更: スクロール対象を「body コンテナ」に変更するため、ref は body に付け替える */
   const {
     scrollRef,
     scrollRatio,
@@ -310,26 +305,17 @@ export default function TodoTaskCard({
       ref={groupDnd?.setNodeRef}
       style={groupDnd?.style}
       className={clsx(
-        // ▼ 画面の縦幅いっぱいにする（既存維持）
         'relative mb-2.5 scroll-mt-4 h-[calc(88vh)]',
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
-      {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100vh */}
+      {/* カード全体（ヘッダー＋本文） */}
       <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
-        {/* header（固定） */}
-        <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center">
+        {/* ▲ 変更: ヘッダーを sticky 固定（カード内の最上部に常時表示） */}
+        <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center sticky top-0 z-40">
           <div className="flex items-center gap-1 sm:gap-2 flex-[1_1_72%] min-w-0 py-1">
-            {/* <button
-              type="button"
-              title="ドラッグでカードを並び替え"
-              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
-              {...(groupDnd?.handleProps ?? {})}
-            >
-              <Grip size={18} />
-            </button> */}
+            {/* <button ... /> */}
 
-            {/* タスク名（開閉トグルは削除） */}
             <div
               className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text左"
               aria-label="タスク名"
@@ -339,15 +325,9 @@ export default function TodoTaskCard({
                 className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)}
                 aria-label={`${categoryLabel}カテゴリ`}
               />
-              {/* ▼ 追加：カテゴリ名 */}
               <span className="text-[12px] sm:text-sm text-gray-500 shrink-0">
                 {categoryLabel}
               </span>
-
-              {/* タスク名 */}
-              {/* <span className="font-bold text-[15px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
-                {task.name}
-              </span> */}
             </div>
           </div>
 
@@ -405,8 +385,16 @@ export default function TodoTaskCard({
           </div>
         </div>
 
-        {/* body（スクロール領域 + 固定フッター） */}
-        <div className="relative flex-1 min-h-0 flex flex-col">
+        {/* ▲ 変更: body をスクロールコンテナに変更（ヘッダーは固定のまま） */}
+        <div
+          ref={scrollRef} // ▼ 追加: スクロール監視対象を body に
+          className="relative flex-1 min-h-0 flex flex-col overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+          onTouchMove={(e) => e.stopPropagation()} // ▼ 追加: 画面全体のスクロール抑止
+          style={{
+            // ▼ 追加: 入力行とキーボード分の下余白を確保
+            paddingBottom: `${FOOTER_H + kbOffset}px`,
+          }}
+        >
           {/* スクロールメーター（右端） */}
           {isScrollable && (
             <div
@@ -416,6 +404,7 @@ export default function TodoTaskCard({
             />
           )}
 
+          {/* コンテンツ（検索 + 一覧） */}
           <div className="pt-3 pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col">
             {isCookingCategory && (
               <div className="px-1 pr-5">
@@ -447,18 +436,8 @@ export default function TodoTaskCard({
               </div>
             )}
 
-            {/* ▼ スクロール対象。カードは常に全高、ここだけ内部スクロール */}
-            <div
-              ref={scrollRef}
-              className={clsx(
-                'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2'
-              )}
-              onTouchMove={(e) => e.stopPropagation()}
-              // ▼ 追加: キーボード分だけ下余白を可変で確保
-              style={{
-                paddingBottom: `${FOOTER_H + kbOffset}px`,
-              }}
-            >
+            {/* ▼ 修正: ここは body がスクロールするため overflow は外す */}
+            <div className="flex-1 min-h-0 space-y-4 pr-2 pt-2">
               {finalFilteredTodos.length === 0 && tab === 'done' && (
                 <div className="text-gray-400 italic pl-2">完了したタスクはありません</div>
               )}
@@ -540,13 +519,11 @@ export default function TodoTaskCard({
           </div>
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
-          {/* ▲ 変更: div → motion.div に変更してキーボードに追従 */}
+          {/* 変更なし（キーボード追従） */}
           <motion.div
             className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200"
-            // ▼ 追加: キーボード高さに応じて上にスライド
             animate={{ y: -kbOffset }}
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-            // ▼ 追加: iOS セーフエリア対応
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="px-4 py-4">
