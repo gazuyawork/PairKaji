@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
-import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -45,44 +45,6 @@ const SHAKE_VARIANTS: Variants = {
 
 function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
   return Array.isArray(arr) && arr.every(t => !!t && typeof t === 'object' && 'id' in (t as object));
-}
-
-/* ------------------------------ ★ 追加: キーボード下端オフセット計算 ------------------------------ */
-// SPでキーボードが出た時に、フッターのbottomに与える値（px）を返す。
-// visualViewportの高さとオフセットから、画面下に生じる「隠れ領域（=キーボード高さ相当）」を推定。
-function useKeyboardBottomInset() {
-  const [inset, setInset] = useState(0);
-
-  const update = useCallback(() => {
-    if (typeof window === 'undefined') return setInset(0);
-    const vv = (window as any).visualViewport as VisualViewport | undefined;
-    if (!vv) {
-      // visualViewport非対応環境では0にしておく
-      setInset(0);
-      return;
-    }
-    // 一般的に: 画面の実高(window.innerHeight) - 表示領域(vv.height) - 上オフセット(vv.offsetTop) がキーボード相当
-    const raw = window.innerHeight - vv.height - vv.offsetTop;
-    setInset(Math.max(0, Math.round(raw)));
-  }, []);
-
-  useEffect(() => {
-    update();
-    const vv = (window as any).visualViewport as VisualViewport | undefined;
-    if (!vv) return;
-
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    window.addEventListener('orientationchange', update);
-
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      window.removeEventListener('orientationchange', update);
-    };
-  }, [update]);
-
-  return inset;
 }
 
 /* -------------------------------- props -------------------------------- */
@@ -150,9 +112,6 @@ export default function TodoTaskCard({
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [, setInputError] = useState<string | null>(null);
-
-  // ★ 追加: キーボード下端オフセット（px）
-  const keyboardBottom = useKeyboardBottomInset();
 
   // 編集中の行のエラー
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
@@ -304,41 +263,6 @@ export default function TodoTaskCard({
     };
   }, []);
 
-  /* ------------------------------ ★ 追加: フッター高さの監視とスクロール領域の下余白 ------------------------------ */
-  const footerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const el = footerRef.current;
-    const sc = scrollRef.current;
-    if (!el || !sc) return;
-
-    const apply = () => {
-      const h = el.getBoundingClientRect().height;
-      // フッター高さ + キーボード下端分 + 少しマージン
-      sc.style.paddingBottom = `${Math.max(0, h + keyboardBottom + 12)}px`;
-    };
-
-    apply();
-
-    let ro: ResizeObserver | null = null;
-    if ('ResizeObserver' in window) {
-      ro = new ResizeObserver(apply);
-      ro.observe(el);
-    }
-
-    // visualViewport変化にも追従
-    const vv = (window as any).visualViewport as VisualViewport | undefined;
-    const onVV = () => apply();
-    vv?.addEventListener('resize', onVV);
-    vv?.addEventListener('scroll', onVV);
-
-    return () => {
-      ro?.disconnect();
-      vv?.removeEventListener('resize', onVV);
-      vv?.removeEventListener('scroll', onVV);
-    };
-  }, [scrollRef, keyboardBottom]);
-
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
@@ -346,12 +270,12 @@ export default function TodoTaskCard({
       ref={groupDnd?.setNodeRef}
       style={groupDnd?.style}
       className={clsx(
-        // ▼ 画面の縦幅いっぱいにする（★ 変更: dvh採用でキーボード即時反映）
-        'relative mb-2.5 scroll-mt-4 h-[100dvh]', // ★ 変更
+        // ▼ 画面の縦幅いっぱいにする
+        'relative mb-2.5 scroll-mt-4 h-[calc(88vh)]',
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
-      {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100dvh */}
+      {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100vh */}
       <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
         {/* header */}
         <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center">
@@ -441,7 +365,7 @@ export default function TodoTaskCard({
           </div>
         </div>
 
-        {/* body（スクロール領域 + 固定/Stickyフッター） */}
+        {/* body（スクロール領域 + 固定フッター） */}
         <div className="relative flex-1 min-h-0 flex flex-col">
           {/* スクロールメーター（右端） */}
           {isScrollable && (
@@ -571,21 +495,7 @@ export default function TodoTaskCard({
           </div>
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
-          {/* ★ 変更: SPは固定配置 + bottomをキーボード分だけ持ち上げ。md以上は従来通りsticky */}
-          <div
-            ref={footerRef}
-            className={clsx(
-              'shrink-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200',
-              'fixed md:sticky', // ★ 変更
-              'md:bottom-0' // md以上はstickyでbottom-0相当
-            )}
-            style={{
-              // ★ SP時のみ有効: キーボード分だけ持ち上げ（safe-area下端も考慮）
-              bottom: keyboardBottom,
-              // iOSセーフエリア余白をわずかに足す（対応環境ではenvが効く）
-              paddingBottom: 'max(0px, env(safe-area-inset-bottom, 0px))',
-            }}
-          >
+          <div className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200">
             <div className="px-4 py-4">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
@@ -596,16 +506,6 @@ export default function TodoTaskCard({
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
-                  onFocus={() => {
-                    // ★ 追加: フォーカス直後に視界中央付近へ
-                    requestAnimationFrame(() => {
-                      try {
-                        inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                      } catch {
-                        // no-op
-                      }
-                    });
-                  }}
                   onChange={(e) => {
                     setNewTodoText(e.target.value);
                     setInputError(null);
