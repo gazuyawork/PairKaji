@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { toast } from 'sonner';
@@ -94,6 +95,90 @@ export default function TodoTaskCard({
   onClose,
   groupDnd,
 }: Props) {
+
+  /* =================== 追加: Portal化したキーボード直上フッター =================== */
+  type FooterProps = {
+    vvBottom: number;
+    canAdd: boolean;
+    value: string;
+    onChange: (v: string) => void;
+    onEnter: () => void;
+    // フォーカス時の安定化用ハンドラ（既存ロジックをそのまま利用）
+    onPointerDown: (e: React.PointerEvent<HTMLInputElement>) => void;
+    onMouseDown: (e: React.MouseEvent<HTMLInputElement>) => void;
+    onTouchStart: (e: React.TouchEvent<HTMLInputElement>) => void;
+    onFocus: () => void;
+    onBlur: () => void;
+    // useRef<HTMLInputElement | null>(null) をそのまま渡せるようにする
+    inputRef: React.MutableRefObject<HTMLInputElement | null>;
+  };
+
+  const KeyboardAwareFooter = React.memo(function KeyboardAwareFooter({
+    vvBottom,
+    canAdd,
+    value,
+    onChange,
+    onEnter,
+    onPointerDown,
+    onMouseDown,
+    onTouchStart,
+    onFocus,
+    onBlur,
+    inputRef,
+  }: FooterProps) {
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div
+        className="fixed left-0 right-0 z-[9999] bg-transparent"
+        style={{
+          bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))`,
+          paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
+          paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
+        }}
+      >
+        <div
+          className="
+            w-full max-w-screen-sm mx-auto
+            px-4 py-3
+            bg-white/95 backdrop-blur
+            rounded-2xl shadow-lg
+            ring-1 ring-gray-200
+          "
+        >
+          <div className="flex items-center gap-3">
+            <Plus className={clsx('shrink-0', canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
+            <input
+              ref={inputRef}
+              type="text"
+              value={value}
+              onPointerDown={onPointerDown}
+              onMouseDown={onMouseDown}
+              onTouchStart={onTouchStart}
+              onFocus={onFocus}
+              onBlur={onBlur}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (!canAdd) return;
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                onEnter();
+              }}
+              disabled={!canAdd}
+              aria-disabled={!canAdd}
+              className={clsx(
+                'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px] border-b',
+                canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed',
+              )}
+              placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
+            />
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  });
+  /* =================== 追加ここまで =================== */
+
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
   const todos: SimpleTodo[] = useMemo(() => (isSimpleTodos(rawTodos) ? rawTodos : []), [rawTodos]);
@@ -107,7 +192,7 @@ export default function TodoTaskCard({
   const categoryLabel = (category ?? '').trim() || '未分類';
 
   // 追加用入力
-  const [isComposingAdd, setIsComposingAdd] = useState(false);
+  const [isComposingAdd, ] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [, setInputError] = useState<string | null>(null);
@@ -146,7 +231,7 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => {};
+  const handleDragStart = () => { };
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -486,8 +571,8 @@ export default function TodoTaskCard({
                         count === 0
                           ? 'bg-gray-300'
                           : type === 'undone'
-                          ? 'bg-gradient-to-b from-red-300 to-red-500'
-                          : 'bg-gradient-to-b from-blue-300 to-blue-500',
+                            ? 'bg-gradient-to-b from-red-300 to-red-500'
+                            : 'bg-gradient-to-b from-blue-300 to-blue-500',
                       )}
                     >
                       {count}
@@ -609,7 +694,7 @@ export default function TodoTaskCard({
                           hasContentForIcon={hasContentForIcon}
                           category={category}
                           confirmTodoDeletes={{}} // EyeOff 削除のため no-op
-                          setConfirmTodoDeletes={() => {}} // no-op
+                          setConfirmTodoDeletes={() => { }} // no-op
                         />
                       </div>
                     );
@@ -634,65 +719,26 @@ export default function TodoTaskCard({
             )}
           </div>
 
-          {/* 固定フッター：浮遊入力カード */}
-          <div
-            ref={footerRef}
-            className="fixed left-0 right-0 z-50 bg-transparent" // ★ 修正: z をヘッダーと同等/上に & 透明
-            // キーボード直上に吸着（セーフエリアも考慮）
-            style={{
-              bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))`,
-              // ★ 修正: 左右の安全域を確保（ノッチ端末）
-              paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
-              paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
+          {/* 入力フッターは Portal で body 直下に描画し、常にキーボード直上へ */}
+          <KeyboardAwareFooter
+            vvBottom={vvBottom}
+            canAdd={canAdd}
+            value={newTodoText}
+            onChange={(v) => {
+              setNewTodoText(v);
+              setInputError(null);
             }}
-          >
-            <div
-              className="
-                w-full max-w-screen-sm mx-auto
-                px-4 py-3
-                bg-white/95 backdrop-blur
-                rounded-2xl shadow-lg
-                ring-1 ring-gray-200
-              "
-              // ★ 修正: 余計な margin-bottom は付けない（vvBottom と二重でズレるのを防ぐ）
-            >
-              <div className="flex items-center gap-3">
-                <Plus className={clsx('shrink-0', canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={newTodoText}
-                  onPointerDown={handlePointerDown} // ★ 修正: 直前イベントで即時計算
-                  onMouseDown={handleMouseDown}
-                  onTouchStart={handleTouchStart}
-                  onFocus={handleInputFocus}       // ★ 修正: フォーカス時も即時計算＋スクロール抑制
-                  onBlur={handleInputBlur}         // ★ 修正: キーボードクローズ時の高さズレ抑制
-                  onChange={(e) => {
-                    setNewTodoText(e.target.value);
-                    setInputError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (!canAdd) return;
-                    if (e.key !== 'Enter') return;
-                    if (isComposingAdd) return;
-                    e.preventDefault();
-                    handleAdd();
-                  }}
-                  onCompositionStart={() => setIsComposingAdd(true)}
-                  onCompositionEnd={() => setIsComposingAdd(false)}
-                  disabled={!canAdd}
-                  aria-disabled={!canAdd}
-                  className={clsx(
-                    // ★ 修正: フレックスで自然に広げる（w-[95%] は破綻の元）
-                    'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px] border-b',
-                    canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed',
-                  )}
-                  placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
-                />
-              </div>
-            </div>
-          </div>
-          {/* 固定フッターここまで */}
+            onEnter={() => {
+              if (isComposingAdd) return;
+              handleAdd();
+            }}
+            onPointerDown={handlePointerDown}
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            inputRef={inputRef}
+          />
         </div>
       </div>
     </div>
