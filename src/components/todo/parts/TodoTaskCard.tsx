@@ -305,7 +305,7 @@ export default function TodoTaskCard({
   // 下方向の重なり（キーボード分）
   const [vvBottom, setVvBottom] = useState(0);
 
-  // ★ 修正: visualViewport 重なり量を即時計算して反映する関数を追加
+  // ★ 修正: visualViewport 重なり量を即時計算するユーティリティ
   const recalcVvBottom = useCallback(() => {
     if (typeof window === 'undefined') return;
     const vv = window.visualViewport;
@@ -321,15 +321,13 @@ export default function TodoTaskCard({
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
 
-    // ★ 修正: 初期マウント時にも即時計算（初回表示のズレ防止）
+    // ★ 修正: 初期マウントでも即時計算
     recalcVvBottom();
 
     const update = () => {
       recalcVvBottom();
-      // ブラウザが勝手にページ全体をスクロールしてしまうのを抑制
-      if (typeof window.scrollTo === 'function') {
-        window.scrollTo(0, 0);
-      }
+      // iOS Safari が勝手にページ全体をスクロールしないよう抑制
+      if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     };
 
     const raf = requestAnimationFrame(update);
@@ -378,7 +376,7 @@ export default function TodoTaskCard({
     return () => ro.disconnect();
   }, []);
 
-  // ★ ヘッダーの実高さを測定して本文を押し下げる（fixed ヘッダー用）
+  // ヘッダーの実高さを測定して本文を押し下げる（fixed ヘッダー用）
   const headerRef = useRef<HTMLDivElement | null>(null);
   const [headerH, setHeaderH] = useState<number>(56);
   useEffect(() => {
@@ -389,32 +387,23 @@ export default function TodoTaskCard({
       }
     });
     ro.observe(headerRef.current);
-  return () => ro.disconnect();
+    return () => ro.disconnect();
   }, []);
 
-  // ★ 修正: フォーカス/タップの直前・直後に即時計算して反映
+  // ★ 修正: フォーカス/タップの直前・直後に即時計算して初回フレームの取りこぼしを防ぐ
   const handleInputFocus = () => {
-    // まず即時計算（初回フレームを外さない）
     recalcVvBottom();
-    // iOS の初回フォーカスでページ全体が勝手にスクロールするのを戻す
     requestAnimationFrame(() => {
       if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
-      // 念のため 2フレーム目でもう一度計算（端末差対策）
       requestAnimationFrame(() => recalcVvBottom());
     });
   };
-
-  // キーボードを閉じた時に縦幅がズレるのを最小化（vvBottom の即時更新）
   const handleInputBlur = () => {
-    // ほんの少し後に再計測（端末により resize イベントが遅れるため）
     setTimeout(() => {
       recalcVvBottom();
-      // ページスクロールを原点へ
       if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     }, 50);
   };
-
-  // ★ 修正: タップ/マウスダウンの時点でも即時計算（初回タップ時の取りこぼし防止）
   const handlePointerDown = (e: React.PointerEvent<HTMLInputElement>) => {
     e.stopPropagation();
     recalcVvBottom();
@@ -437,12 +426,11 @@ export default function TodoTaskCard({
       style={{
         ...(groupDnd?.style ?? {}),
         minHeight: '100dvh',
-        // ページ全体のスクロール連鎖を断ち、ヘッダーが画面外へ押し出されるのを防止
-        overscrollBehaviorY: 'contain',
+        overscrollBehaviorY: 'contain', // ページ全体のスクロール連鎖を断つ
       }}
       className={clsx('relative scroll-mt-4', groupDnd?.isDragging && 'opacity-70')}
     >
-      {/* カード全体（ヘッダー＋本文）を縦flexで構成 */}
+      {/* カード全体（ヘッダー＋本文） */}
       <div className="flex h-full min-h-0 flex-col bg-white overflow-hidden">
         {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン） ===== */}
         <div
@@ -451,7 +439,6 @@ export default function TodoTaskCard({
             'fixed left-0 right-0 z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
             'pl-2 pr-2',
           )}
-          // safe-area ぶんだけ上に
           style={{ top: 'env(safe-area-inset-top, 0px)' }}
         >
           {/* 1段目：カテゴリ＆タスク名＆× */}
@@ -463,7 +450,7 @@ export default function TodoTaskCard({
               </span>
             </div>
 
-            {/* ×ボタン（画面を閉じる） */}
+            {/* ×ボタン */}
             <motion.button
               onClick={handleClose}
               className="px-2 shrink-0 text-gray-500 hover:text-red-500"
@@ -477,7 +464,7 @@ export default function TodoTaskCard({
             </motion.button>
           </div>
 
-          {/* 2段目：タブ（未処理/処理済） */}
+          {/* 2段目：タブ */}
           <div className="flex items-center justify-between pb-1">
             <div className="flex space-x-0 h-10 shrink-0">
               {(['undone', 'done'] as const).map((type) => {
@@ -510,12 +497,11 @@ export default function TodoTaskCard({
                 );
               })}
             </div>
-            {/* EyeOff ボタンは削除 */}
           </div>
         </div>
         {/* ===== 固定ヘッダー ここまで ===== */}
 
-        {/* ★ ヘッダー分のスペーサー（本文が隠れないように） */}
+        {/* ヘッダー分のスペーサー */}
         <div aria-hidden style={{ height: headerH }} />
 
         {/* body（スクロール領域 + 固定フッター） */}
@@ -529,10 +515,7 @@ export default function TodoTaskCard({
             />
           )}
 
-          <div
-            className="pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col"
-            style={{ paddingTop: 8 }} // 見た目の余白を少し足す
-          >
+          <div className="pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col" style={{ paddingTop: 8 }}>
             {isCookingCategory && (
               <div className="px-1 pr-5">
                 <div className="relative">
@@ -563,7 +546,7 @@ export default function TodoTaskCard({
               </div>
             )}
 
-            {/* ▼ スクロール対象。カードは常に全高、ここだけ内部スクロール */}
+            {/* ▼ スクロール対象（内部スクロール専用） */}
             <div
               ref={scrollRef}
               className={clsx(
@@ -651,26 +634,39 @@ export default function TodoTaskCard({
             )}
           </div>
 
-          {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
+          {/* 固定フッター：浮遊入力カード */}
           <div
             ref={footerRef}
-            className="fixed left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200"
+            className="fixed left-0 right-0 z-50 bg-transparent" // ★ 修正: z をヘッダーと同等/上に & 透明
             // キーボード直上に吸着（セーフエリアも考慮）
-            style={{ bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))` }}
+            style={{
+              bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))`,
+              // ★ 修正: 左右の安全域を確保（ノッチ端末）
+              paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
+              paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
+            }}
           >
-            <div className="px-4 py-4 max-w-screen-sm mx-auto">
-              <div className="flex items-center gap-2">
-                <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
+            <div
+              className="
+                w-full max-w-screen-sm mx-auto
+                px-4 py-3
+                bg-white/95 backdrop-blur
+                rounded-2xl shadow-lg
+                ring-1 ring-gray-200
+              "
+              // ★ 修正: 余計な margin-bottom は付けない（vvBottom と二重でズレるのを防ぐ）
+            >
+              <div className="flex items-center gap-3">
+                <Plus className={clsx('shrink-0', canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
                 <input
                   ref={inputRef}
                   type="text"
                   value={newTodoText}
-                  // ★ 修正: 直前イベントで即時計算
-                  onPointerDown={handlePointerDown}
+                  onPointerDown={handlePointerDown} // ★ 修正: 直前イベントで即時計算
                   onMouseDown={handleMouseDown}
                   onTouchStart={handleTouchStart}
-                  onFocus={handleInputFocus}   // ★ 初回フォーカス時も即時計算＋スクロール抑制
-                  onBlur={handleInputBlur}     // ★ キーボードクローズ時の高さズレ抑制
+                  onFocus={handleInputFocus}       // ★ 修正: フォーカス時も即時計算＋スクロール抑制
+                  onBlur={handleInputBlur}         // ★ 修正: キーボードクローズ時の高さズレ抑制
                   onChange={(e) => {
                     setNewTodoText(e.target.value);
                     setInputError(null);
@@ -687,8 +683,8 @@ export default function TodoTaskCard({
                   disabled={!canAdd}
                   aria-disabled={!canAdd}
                   className={clsx(
-                    // iOS の自動ズーム抑止（初回タップで隠れる/ズームする問題対策）
-                    'w-[75%] border-b bg-transparent outline-none h-9 pb-1 text-[16px]',
+                    // ★ 修正: フレックスで自然に広げる（w-[95%] は破綻の元）
+                    'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px] border-b',
                     canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed',
                   )}
                   placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
@@ -696,6 +692,7 @@ export default function TodoTaskCard({
               </div>
             </div>
           </div>
+          {/* 固定フッターここまで */}
         </div>
       </div>
     </div>
