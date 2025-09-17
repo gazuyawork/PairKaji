@@ -98,7 +98,8 @@ export default function TodoTaskCard({
 
   /* =================== 追加: Portal化したキーボード直上フッター =================== */
   type FooterProps = {
-    vvBottom: number;
+    // vvBottom: number;
+    deltaBottom: number;
     canAdd: boolean;
     value: string;
     onChange: (v: string) => void;
@@ -114,7 +115,8 @@ export default function TodoTaskCard({
   };
 
   const KeyboardAwareFooter = React.memo(function KeyboardAwareFooter({
-    vvBottom,
+    // vvBottom,
+    deltaBottom,
     canAdd,
     value,
     onChange,
@@ -129,9 +131,10 @@ export default function TodoTaskCard({
     if (typeof document === 'undefined') return null;
     return createPortal(
       <div
+        ref={footerPortalRef}
         className="fixed left-0 right-0 z-[9999] bg-transparent"
         style={{
-          bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))`,
+          bottom: `calc(${deltaBottom}px + env(safe-area-inset-bottom, 0px))`,
           paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
           paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
         }}
@@ -398,8 +401,10 @@ export default function TodoTaskCard({
 
   /* --------- SPキーボード対策：可視領域変動・初回タップで隠れる問題 --------- */
 
-  // 下方向の重なり（キーボード分）
+  // 実測のキーボード重なり量
   const [vvBottom, setVvBottom] = useState(0);
+  // キーボード未表示時の基準値
+  const [vvBaseline, setVvBaseline] = useState(0);
 
   // ★ 修正: visualViewport 重なり量を即時計算するユーティリティ
   const recalcVvBottom = useCallback(() => {
@@ -410,7 +415,9 @@ export default function TodoTaskCard({
       return;
     }
     const overlap = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
-    setVvBottom(Math.ceil(overlap));
+    // 端末差で 1〜6px 程度のノイズが出ることがあるので四捨五入＋閾値で丸める
+    const rounded = Math.round(overlap);
+    setVvBottom(rounded);
   }, []);
 
   // visualViewport に追従し、キーボード重なり量を反映
@@ -422,6 +429,17 @@ export default function TodoTaskCard({
 
     const update = () => {
       recalcVvBottom();
+      // キーボード未表示（≒ 視覚ビューポートがほぼ全高）のときに基準を更新
+      const vv = window.visualViewport!;
+      const ratio = (vv.height + vv.offsetTop) / window.innerHeight;
+      // UIバーの表示/非表示で 1 に満たないことがあるため、ゆるめのしきい値にする
+      if (ratio > 0.98) {
+        // 小さな差分（〜6px）は 0 とみなす
+        setVvBaseline((prev) => {
+          const next = vvBottom <= 6 ? 0 : vvBottom;
+          return next !== prev ? next : prev;
+        });
+      }
     };
 
     const raf = requestAnimationFrame(update);
@@ -435,7 +453,10 @@ export default function TodoTaskCard({
       window.visualViewport?.removeEventListener('scroll', update);
       window.removeEventListener('orientationchange', update);
     };
-  }, [recalcVvBottom]);
+  },  [recalcVvBottom, vvBottom]);
+
+  // 実際に反映する下オフセット（基準値を引いた差分）
+  const deltaBottom = Math.max(0, vvBottom - vvBaseline);
 
   // visualViewport の高さ変動時にスクロール位置をクランプ（白画面防止）
   useEffect(() => {
@@ -457,17 +478,22 @@ export default function TodoTaskCard({
   }, [scrollRef]);
 
   // フッター（入力行）の実高さを監視し、スクロール領域の下余白に反映
-  const footerRef = useRef<HTMLDivElement | null>(null);
+  const footerPortalRef = useRef<HTMLDivElement | null>(null);
   const [footerH, setFooterH] = useState<number>(64);
   useEffect(() => {
-    if (!footerRef.current) return;
+    if (!footerPortalRef.current) return;
+    const el = footerPortalRef.current;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
+        // 外枠（fixed）の高さ＝実際に占有している入力カードの高さ
         setFooterH(Math.max(48, Math.round(entry.contentRect.height)));
       }
     });
-    ro.observe(footerRef.current);
-    return () => ro.disconnect();
+    ro.observe(el);
+    return () => {
+      try { ro.unobserve(el); } catch { }
+      ro.disconnect();
+    };
   }, []);
 
   // ヘッダーの実高さを測定して本文を押し下げる（fixed ヘッダー用）
@@ -682,7 +708,7 @@ export default function TodoTaskCard({
                 'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2',
               )}
               // フッター実高 + キーボード重なり分を確保（入力欄が隠れない）
-              style={{ paddingBottom: footerH + 16 + vvBottom }}
+              style={{ paddingBottom: footerH + 16 + deltaBottom }}
               onTouchMove={(e) => e.stopPropagation()}
             >
               {finalFilteredTodos.length === 0 && tab === 'done' && (
@@ -765,7 +791,8 @@ export default function TodoTaskCard({
 
           {/* 入力フッターは Portal で body 直下に描画し、常にキーボード直上へ */}
           <KeyboardAwareFooter
-            vvBottom={vvBottom}
+            // vvBottom={vvBottom}
+            deltaBottom={deltaBottom}
             canAdd={canAdd}
             value={newTodoText}
             onChange={(v) => {
