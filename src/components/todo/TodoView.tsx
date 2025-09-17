@@ -951,7 +951,7 @@ export default function TodoView() {
               exit={{ opacity: 0, y: 24 }}
               transition={{ type: 'spring', stiffness: 280, damping: 26 }}
             >
-              <div className="h-14 bg-white">
+              {/* <div className="h-14 bg-white">
                 <div className="mx-auto w-full max-w-xl h-full flex items-center justify-between px-3">
                   <div className="font-bold pl-4 truncate text-[#5E5E5E]">
                     {selectedTask.name}
@@ -965,7 +965,7 @@ export default function TodoView() {
                     <X />
                   </button>
                 </div>
-              </div>
+              </div> */}
 
               <div className="flex-1 overflow-y-auto">
                 <div className="mx-auto w-full max-w-xl px-3 pb-3">

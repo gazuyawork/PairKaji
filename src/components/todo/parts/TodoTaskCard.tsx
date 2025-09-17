@@ -11,8 +11,7 @@ import {
   Plus,
   Search,
   X,
-  // GripVertical as Grip,
-  EyeOff, // ▼ 追加：非表示アイコン
+  EyeOff, // 既存：非表示アイコン（処理は流用、見た目はXも併用）
 } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { toast } from 'sonner';
@@ -69,7 +68,6 @@ interface Props {
     handleProps?: React.HTMLAttributes<HTMLButtonElement>;
     isDragging?: boolean;
   };
-  // isFilteredGlobal?: boolean;
 }
 
 /* ------------------------------- component ------------------------------ */
@@ -89,7 +87,6 @@ export default function TodoTaskCard({
   onOpenNote,
   onReorderTodos,
   groupDnd,
-  // isFilteredGlobal = false,
 }: Props) {
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
@@ -99,7 +96,6 @@ export default function TodoTaskCard({
   );
 
   const [hasManualOrder, setHasManualOrder] = useState<boolean>(false);
-  // const hasAnyTodo = todos.length > 0;
 
   // カテゴリ
   const category: string | null =
@@ -126,7 +122,6 @@ export default function TodoTaskCard({
     undoneCount,
     doneCount,
     finalFilteredTodos,
-    // isFilteredView,
     doneMatchesCount,
   } = useTodoSearchAndSort({
     todos,
@@ -263,6 +258,31 @@ export default function TodoTaskCard({
     };
   }, []);
 
+  /* ------------------------- keyboard-safe viewport ------------------------ */
+  // SPキーボード表示時の被り回避用ギャップ（px）
+  const [kbGap, setKbGap] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('visualViewport' in window)) return;
+    const vv = window.visualViewport as VisualViewport;
+
+    const updateGap = () => {
+      // キーボードで縮んだ分（上部オフセットも考慮）
+      const gap = Math.max(0, Math.round(window.innerHeight - (vv.height ?? window.innerHeight) - (vv.offsetTop ?? 0)));
+      setKbGap(gap);
+    };
+
+    updateGap();
+    vv.addEventListener('resize', updateGap);
+    vv.addEventListener('scroll', updateGap);
+    window.addEventListener('orientationchange', updateGap);
+    return () => {
+      vv.removeEventListener('resize', updateGap);
+      vv.removeEventListener('scroll', updateGap);
+      window.removeEventListener('orientationchange', updateGap);
+    };
+  }, []);
+
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
@@ -270,28 +290,25 @@ export default function TodoTaskCard({
       ref={groupDnd?.setNodeRef}
       style={groupDnd?.style}
       className={clsx(
-        // ▼ 画面の縦幅いっぱいにする
-        'relative mb-2.5 scroll-mt-4 h-[calc(88vh)]',
+        // ▼ 端末の可視領域に追従（アドレスバー/キーボード対応）
+        'relative mb-2.5 scroll-mt-4 h-[100dvh]',
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
-      {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100vh */}
+      {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100dvh */}
       <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
-        {/* header */}
-        <div className="bg-gray-100 pl-2 pr-2 border-b border-gray-300 flex justify-between items-center">
-          <div className="flex items-center gap-1 sm:gap-2 flex-[1_1_72%] min-w-0 py-1">
-            {/* <button
-              type="button"
-              title="ドラッグでカードを並び替え"
-              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
-              {...(groupDnd?.handleProps ?? {})}
-            >
-              <Grip size={18} />
-            </button> */}
-
-            {/* タスク名（開閉トグルは削除） */}
+        {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン） ===== */}
+        <div
+          className={clsx(
+            'sticky z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
+            'pl-2 pr-2'
+          )}
+          style={{ top: 'env(safe-area-inset-top, 0px)' }}
+        >
+          {/* 1段目：カテゴリ＆タスク名＆× */}
+          <div className="flex justify-between items-center py-1">
             <div
-              className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text左"
+              className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0"
               aria-label="タスク名"
             >
               <CatIcon
@@ -299,19 +316,32 @@ export default function TodoTaskCard({
                 className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)}
                 aria-label={`${categoryLabel}カテゴリ`}
               />
-              {/* ▼ 追加：カテゴリ名 */}
-              <span className="text-[12px] sm:text-sm text-gray-500 shrink-0">
-                {categoryLabel}
+              <span className="text-[12px] sm:text-sm text-gray-500 shrink-0">{categoryLabel}</span>
+              <span className="font-bold text-[15px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2">
+                {(task as unknown as { name?: string }).name ?? ''}
               </span>
-
-              {/* タスク名 */}
-              {/* <span className="font-bold text-[15px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden">
-                {task.name}
-              </span> */}
             </div>
+
+            {/* ×ボタン（非表示処理・確認あり） */}
+            <motion.button
+              onClick={handleDeleteClick}
+              animate={isDeleteAnimating ? 'shake' : undefined}
+              variants={SHAKE_VARIANTS}
+              className={clsx(
+                'px-2 shrink-0',
+                confirmDelete ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
+              )}
+              type="button"
+              title={confirmDelete ? 'もう一度押すと非表示にします' : 'このカードを非表示にする'}
+              aria-label="このカードを非表示にする"
+              whileTap={{ scale: 0.98 }}
+            >
+              <X size={20} />
+            </motion.button>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0 pt-1 pb-[-2px]">
+          {/* 2段目：タブ（未処理/処理済） */}
+          <div className="flex items-center justify-between pb-1">
             <div className="flex space-x-0 h-10 shrink-0">
               {(['undone', 'done'] as const).map((type) => {
                 const count = type === 'undone' ? undoneCount : doneCount;
@@ -346,7 +376,7 @@ export default function TodoTaskCard({
               })}
             </div>
 
-            {/* ▼ 非表示ボタン（EyeOff） */}
+            {/* 既存のEyeOffは残しておく（仕様上×で動かすが非表示機能は同じ） */}
             <motion.button
               onClick={handleDeleteClick}
               animate={isDeleteAnimating ? 'shake' : undefined}
@@ -364,6 +394,7 @@ export default function TodoTaskCard({
             </motion.button>
           </div>
         </div>
+        {/* ===== 固定ヘッダー ここまで ===== */}
 
         {/* body（スクロール領域 + 固定フッター） */}
         <div className="relative flex-1 min-h-0 flex flex-col">
@@ -413,6 +444,8 @@ export default function TodoTaskCard({
               className={clsx(
                 'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2'
               )}
+              // キーボード分だけ下余白を足して、最下部入力が見切れないように
+              style={{ paddingBottom: Math.max(16, kbGap + 16) }}
               onTouchMove={(e) => e.stopPropagation()}
             >
               {finalFilteredTodos.length === 0 && tab === 'done' && (
@@ -482,7 +515,7 @@ export default function TodoTaskCard({
               </div>
             )}
             {showScrollUpHint && (
-              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg黒/50 animate-pulse">
+              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
                 <ChevronUp size={16} className="text-white" />
               </div>
             )}
@@ -495,7 +528,11 @@ export default function TodoTaskCard({
           </div>
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
-          <div className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200">
+          <div
+            className="shrink-0 sticky left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200"
+            // キーボード表示時は下に持ち上げる
+            style={{ bottom: `calc(${kbGap}px + env(safe-area-inset-bottom, 0px))` }}
+          >
             <div className="px-4 py-4">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
