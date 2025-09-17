@@ -1059,6 +1059,14 @@ export default function TodoView() {
                         toast.error('並び替えの保存に失敗しました');
                       }
                     }}
+                    onClose={() => {
+                      // ★ これで × ボタンでモーダルが閉じます
+                      setSelectedTaskId(null);
+
+                      // もし閉じるときに検索やカテゴリもリセットしたいなら以下も
+                      // setFilterText('');
+                      // setSelectedCategoryId(null);
+                    }}
                   />
                 </div>
               </div>
