@@ -145,7 +145,7 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => {};
+  const handleDragStart = () => { };
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -451,7 +451,7 @@ export default function TodoTaskCard({
           </div>
 
           {/* 2段目：タブ（未処理/処理済） */}
-          <div className="flex items-center justify-between pb-1">
+          <div className="flex items-center justify-between">
             <div className="flex space-x-0 h-10 shrink-0">
               {(['undone', 'done'] as const).map((type) => {
                 const count = type === 'undone' ? undoneCount : doneCount;
@@ -472,8 +472,8 @@ export default function TodoTaskCard({
                         count === 0
                           ? 'bg-gray-300'
                           : type === 'undone'
-                          ? 'bg-gradient-to-b from-red-300 to-red-500'
-                          : 'bg-gradient-to-b from-blue-300 to-blue-500',
+                            ? 'bg-gradient-to-b from-red-300 to-red-500'
+                            : 'bg-gradient-to-b from-blue-300 to-blue-500',
                       )}
                     >
                       {count}
@@ -599,7 +599,7 @@ export default function TodoTaskCard({
                           hasContentForIcon={hasContentForIcon}
                           category={category}
                           confirmTodoDeletes={{}} // EyeOff 削除のため no-op
-                          setConfirmTodoDeletes={() => {}} // no-op
+                          setConfirmTodoDeletes={() => { }} // no-op
                         />
                       </div>
                     );
@@ -627,11 +627,15 @@ export default function TodoTaskCard({
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
           <div
             ref={footerRef}
-            className="fixed left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200"
+            className="fixed left-0 right-0 z-40 bg-white/95 backdrop-blur"
             // キーボード直上に吸着（セーフエリアも考慮）
             style={{ bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))` }}
           >
-            <div className="px-4 py-4 max-w-screen-sm mx-auto">
+            <div 
+              className="px-4 py-4 max-w-screen-sm mx-4 mb-8
+                          bg-white rounded-xl shadow-md
+                          ring-1 ring-gray-200"
+            >
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
                 <input
@@ -660,7 +664,7 @@ export default function TodoTaskCard({
                   aria-disabled={!canAdd}
                   className={clsx(
                     // iOS の自動ズーム抑止（初回タップで隠れる/ズームする問題対策）
-                    'w-[75%] border-b bg-transparent outline-none h-9 pb-1 text-[16px]',
+                    'w-[95%] border-b bg-transparent outline-none h-9 pb-1 text-[16px]',
                     canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed',
                   )}
                   placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
