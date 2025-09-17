@@ -1,4 +1,3 @@
-// src/components/todo/parts/SortableTodoRow.tsx
 'use client';
 
 import clsx from 'clsx';
@@ -43,9 +42,6 @@ type Props = {
   onDeleteTodo: (id: string) => void;
   hasContentForIcon: boolean;
   category: string | null | undefined;
-  confirmTodoDeletes: Record<string, boolean>;
-  setConfirmTodoDeletes: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  // todoDeleteTimeouts: React.MutableRefObject<Record<string, ReturnType<typeof setTimeout>>>;
 };
 
 export default function SortableTodoRow({
@@ -60,12 +56,9 @@ export default function SortableTodoRow({
   onChangeTodo,
   onBlurTodo,
   onOpenNote,
-  // onDeleteTodo,
+  onDeleteTodo,
   hasContentForIcon,
   category,
-  confirmTodoDeletes,
-  // setConfirmTodoDeletes,
-  // todoDeleteTimeouts,
 }: Props) {
   const [isEditingRow, setIsEditingRow] = useState(false);
   const [text, setText] = useState<string>(todo.text ?? '');
@@ -130,26 +123,28 @@ export default function SortableTodoRow({
     onBlurTodo(todo.id, newText);
   };
 
-  // const handleTodoDeleteClick = (todoId: string) => {
-  //   if (confirmTodoDeletes[todoId]) {
-  //     // const t = todoDeleteTimeouts.current[todoId];
-  //     if (t) {
-  //       clearTimeout(t);
-  //       // delete todoDeleteTimeouts.current[todoId];
-  //     }
-  //     setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: false }));
-  //     onDeleteTodo(todoId);
-  //   } else {
-  //     setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: true }));
-  //     const timeout = setTimeout(() => {
-  //       setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: false }));
-  //       // delete todoDeleteTimeouts.current[todoId];
-  //     }, 2000);
-  //     // todoDeleteTimeouts.current[todoId] = timeout;
-  //   }
-  // };
+  /* =============== 削除（1回クリック → 確認ダイアログ） =============== */
+  const handleTodoDeleteClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isLocked) return;
 
-  // 未処理→完了のときだけ、チェック真上に緑のアニメを出し、アニメ中は全行ロック
+    const ok =
+      typeof window === 'undefined'
+        ? true
+        : window.confirm('このTODOを削除します。よろしいですか？（元に戻せません）');
+    if (!ok) return;
+
+    try {
+      onDeleteTodo(todo.id);
+      toast.success('削除しました');
+    } catch (err) {
+      toast.error('削除に失敗しました');
+      console.error(err);
+    }
+  };
+
+  /* ================= トグル（完了/未完） ================= */
   const handleToggleClick = () => {
     if (isLocked) return;
     if (!todo.done) {
@@ -173,8 +168,14 @@ export default function SortableTodoRow({
   };
 
   return (
-    <div ref={setNodeRef} style={style} data-todo-row className={clsx('flex flex-col', isDragging && 'opacity-60')}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-todo-row
+      className={clsx('flex flex-col', isDragging && 'opacity-60')}
+    >
       <div className="flex items-center gap-2">
+        {/* Drag handle（ドラッグ専用。ゴミ箱には付けない） */}
         <span
           className={clsx(
             'cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none',
@@ -218,6 +219,7 @@ export default function SortableTodoRow({
           )}
         </div>
 
+        {/* テキスト入力 */}
         <input
           type="text"
           value={text}
@@ -257,8 +259,10 @@ export default function SortableTodoRow({
             isLocked && 'cursor-not-allowed opacity-70'
           )}
           placeholder="TODOを入力"
+          aria-label="TODOを入力"
         />
 
+        {/* メモ開く */}
         <button
           type="button"
           className={clsx(
@@ -268,25 +272,39 @@ export default function SortableTodoRow({
           )}
           onClick={() => onOpenNote(todo.text)}
           disabled={isLocked}
+          aria-label="メモを開く"
+          title="メモを開く"
         >
           <Notebook size={22} />
         </button>
 
+        {/* ゴミ箱（1回クリック→確認ダイアログ） */}
         <motion.button
           type="button"
-          // onClick={() => handleTodoDeleteClick(todo.id)}
-          animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
-          variants={SHAKE_VARIANTS}
+          onClick={handleTodoDeleteClick}  // ★ 変更: 1回クリックで確認→削除
+          variants={SHAKE_VARIANTS}        // （今後使う可能性に備え残すが、animateは指定しない）
           disabled={isLocked}
-          className={clsx(isLocked && 'cursor-not-allowed opacity-70')}
+          className={clsx(
+            'p-1 rounded-md',
+            isLocked && 'cursor-not-allowed opacity-70'
+          )}
+          aria-label="削除"
+          title="削除"
         >
-          <Trash2 size={22} className={clsx('hover:text-red-500', confirmTodoDeletes[todo.id] ? 'text-red-500' : 'text-gray-400')} />
+          <Trash2
+            size={22}
+            className="text-gray-400 hover:text-red-500 transition-colors"
+          />
         </motion.button>
       </div>
 
       {category === '旅行' && <TravelTimeBar start={todo.timeStart} end={todo.timeEnd} />}
 
-      {editingErrors[todo.id] && <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">{editingErrors[todo.id]}</div>}
+      {editingErrors[todo.id] && (
+        <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">
+          {editingErrors[todo.id]}
+        </div>
+      )}
     </div>
   );
 }
