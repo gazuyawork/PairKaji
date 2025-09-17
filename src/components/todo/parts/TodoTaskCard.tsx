@@ -68,13 +68,13 @@ interface Props {
   onToggleDone: (todoId: string) => void;
   onBlurTodo: (todoId: string, text: string) => void;
   onDeleteTodo: (todoId: string) => void;
-  onDeleteTask: () => void;
+  // onDeleteTask: () => void;
   todoRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
   focusedTodoId: string | null;
   onOpenNote: (text: string) => void;
   onReorderTodos: (orderedIds: string[]) => void;
   /** モーダルを閉じるためのコールバック（×ボタン専用） */
-  onClose: () => void;
+  onClose?: () => void;
   groupDnd?: {
     setNodeRef: (el: HTMLDivElement | null) => void;
     style?: React.CSSProperties;
@@ -99,10 +99,9 @@ export default function TodoTaskCard({
   focusedTodoId,
   onOpenNote,
   onReorderTodos,
-  onClose, // ★ 追加
+  onClose, // ★ 追加：×ボタンで親に閉じる通知
   groupDnd,
 }: Props) {
-
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
   const todos: SimpleTodo[] = useMemo(
@@ -310,33 +309,47 @@ export default function TodoTaskCard({
     onClose?.();
   };
 
-  /* ------------------------- keyboard-safe viewport ------------------------ */
-  // SPキーボード表示時の被り回避用ギャップ（px）
-  const [kbGap, setKbGap] = useState<number>(0);
-  const bottomOffset = useMemo<string>(
-    () => `calc(${kbGap}px + env(safe-area-inset-bottom, 0px))`,
-    [kbGap]
-  );
+  /* ------------------ ★ SPキーボード対応：可視領域に追従 ------------------ */
+  // visualViewport で可視領域の高さを監視し、コンテナ自体の高さを調整
+// 変更後（★ 高さと上オフセットを別stateで管理）
+const [vvh, setVvh] = useState<number | null>(null);     // 可視領域の高さのみ
+const [vvTop, setVvTop] = useState<number>(0);           // 上方向のオフセット
 
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  const vv = window.visualViewport;
+
+  const update = () => {
+    const h = Math.round(vv?.height ?? window.innerHeight);     // ★ 高さのみ
+    const t = Math.max(0, Math.round(vv?.offsetTop ?? 0));      // ★ 上オフセット
+    setVvh(h);
+    setVvTop(t);
+  };
+
+  update();
+  vv?.addEventListener('resize', update);
+  vv?.addEventListener('scroll', update);
+  window.addEventListener('orientationchange', update);
+  return () => {
+    vv?.removeEventListener('resize', update);
+    vv?.removeEventListener('scroll', update);
+    window.removeEventListener('orientationchange', update);
+  };
+}, []);
+
+
+  // フッターの実高さを監視し、スクロール領域の下余白に反映（入力欄が隠れないように）
+  const footerRef = useRef<HTMLDivElement | null>(null); // ★ 追加
+  const [footerH, setFooterH] = useState<number>(64);    // ★ 追加
   useEffect(() => {
-    if (typeof window === 'undefined' || !('visualViewport' in window)) return;
-    const vv = window.visualViewport as VisualViewport;
-
-    const updateGap = () => {
-      // キーボードで縮んだ分（上部オフセットも考慮）
-      const gap = Math.max(0, Math.round(window.innerHeight - (vv.height ?? window.innerHeight) - (vv.offsetTop ?? 0)));
-      setKbGap(gap);
-    };
-
-    updateGap();
-    vv.addEventListener('resize', updateGap);
-    vv.addEventListener('scroll', updateGap);
-    window.addEventListener('orientationchange', updateGap);
-    return () => {
-      vv.removeEventListener('resize', updateGap);
-      vv.removeEventListener('scroll', updateGap);
-      window.removeEventListener('orientationchange', updateGap);
-    };
+    if (!footerRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setFooterH(Math.max(48, Math.round(entry.contentRect.height)));
+      }
+    });
+    ro.observe(footerRef.current);
+    return () => ro.disconnect();
   }, []);
 
   /* ---------------------------- render (card) ---------------------------- */
@@ -344,13 +357,14 @@ export default function TodoTaskCard({
   return (
     <div
       ref={groupDnd?.setNodeRef}
-      style={groupDnd?.style}
+      /* ★ visualViewport の実測高さを優先。非対応端末は 100svh フォールバック */
+      style={{ ...(groupDnd?.style ?? {}), height: vvh ? `${vvh}px` : undefined }} // ★ 変更
       className={clsx(
-        'relative scroll-mt-4 h-[100dvh]',
+        'relative scroll-mt-4 h-[100svh]', // ★ 変更: 100dvh → 100svh（アドレスバー対策）
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
-      {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100dvh */}
+      {/* カード全体（ヘッダー＋本文）を縦flexで構成 */}
       <div className="flex h-full min-h-0 flex-col border border-gray-300 shadow-sm bg-white overflow-hidden">
         {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン） ===== */}
         <div
@@ -358,7 +372,7 @@ export default function TodoTaskCard({
             'sticky z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
             'pl-2 pr-2'
           )}
-          style={{ top: 'env(safe-area-inset-top, 0px)' }}
+          style={{ top: `calc(${vvTop}px + env(safe-area-inset-top, 0px))` }}
         >
           {/* 1段目：カテゴリ＆タスク名＆× */}
           <div className="flex justify-between items-center py-1">
@@ -371,7 +385,6 @@ export default function TodoTaskCard({
                 className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)}
                 aria-label={`${categoryLabel}カテゴリ`}
               />
-              {/* <span className="text-[12px] sm:text-sm text-gray-500 shrink-0">{categoryLabel}</span> */}
               <span className="font-bold text-[18px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2">
                 {(task as unknown as { name?: string }).name ?? ''}
               </span>
@@ -426,7 +439,6 @@ export default function TodoTaskCard({
                 );
               })}
             </div>
-
             {/* EyeOff ボタンは削除 */}
           </div>
         </div>
@@ -480,8 +492,8 @@ export default function TodoTaskCard({
               className={clsx(
                 'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2'
               )}
-              // キーボード分だけ下余白を足して、最下部入力が見切れないように
-              style={{ paddingBottom: Math.max(16, kbGap + 16) }}
+              /* ★ フッター実高に応じて最下部に余白を追加（入力欄が隠れない） */
+              style={{ paddingBottom: footerH + 16 }} // ★ 変更
               onTouchMove={(e) => e.stopPropagation()}
             >
               {finalFilteredTodos.length === 0 && tab === 'done' && (
@@ -534,9 +546,9 @@ export default function TodoTaskCard({
                           onDeleteTodo={onDeleteTodo}
                           hasContentForIcon={hasContentForIcon}
                           category={category}
-                          confirmTodoDeletes={{}} // 既存の型によっては元の状態を渡す実装に戻してください
-                          setConfirmTodoDeletes={() => { }}
-                          todoDeleteTimeouts={{} as any}
+                          confirmTodoDeletes={{}} // EyeOff 削除のため no-op
+                          setConfirmTodoDeletes={() => {}} // no-op
+                          todoDeleteTimeouts={{} as any} // no-op
                         />
                       </div>
                     );
@@ -565,11 +577,12 @@ export default function TodoTaskCard({
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
           <div
+            ref={footerRef} // ★ 追加：実高計測
             className="shrink-0 sticky left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200"
-            // キーボード表示時は下に持ち上げる
-            style={{ bottom: bottomOffset }}
+            /* ★ キーボード分はコンテナの高さ縮小で吸収。ここは安全域のみ適用 */
+            style={{ bottom: 'env(safe-area-inset-bottom, 0px)' }} // ★ 変更
           >
-            <div className="px-4 pt-4 pb-8">
+            <div className="px-4 py-4">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
                 <input

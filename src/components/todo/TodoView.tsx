@@ -1031,9 +1031,9 @@ export default function TodoView() {
                         updatedAt: serverTimestamp(),
                       });
                     }}
-                    onDeleteTask={async () => {
-                      setConfirmHide({ open: true, taskId: selectedTask.id, source: 'detail' });
-                    }}
+                    // onDeleteTask={async () => {
+                    //   setConfirmHide({ open: true, taskId: selectedTask.id, source: 'detail' });
+                    // }}
                     todoRefs={todoRefs}
                     focusedTodoId={focusedTodoId}
                     onReorderTodos={async (orderedIds) => {
