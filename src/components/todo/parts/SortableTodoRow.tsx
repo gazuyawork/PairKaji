@@ -45,7 +45,7 @@ type Props = {
   category: string | null | undefined;
   confirmTodoDeletes: Record<string, boolean>;
   setConfirmTodoDeletes: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  todoDeleteTimeouts: React.MutableRefObject<Record<string, ReturnType<typeof setTimeout>>>;
+  // todoDeleteTimeouts: React.MutableRefObject<Record<string, ReturnType<typeof setTimeout>>>;
 };
 
 export default function SortableTodoRow({
@@ -60,12 +60,12 @@ export default function SortableTodoRow({
   onChangeTodo,
   onBlurTodo,
   onOpenNote,
-  onDeleteTodo,
+  // onDeleteTodo,
   hasContentForIcon,
   category,
   confirmTodoDeletes,
-  setConfirmTodoDeletes,
-  todoDeleteTimeouts,
+  // setConfirmTodoDeletes,
+  // todoDeleteTimeouts,
 }: Props) {
   const [isEditingRow, setIsEditingRow] = useState(false);
   const [text, setText] = useState<string>(todo.text ?? '');
@@ -130,24 +130,24 @@ export default function SortableTodoRow({
     onBlurTodo(todo.id, newText);
   };
 
-  const handleTodoDeleteClick = (todoId: string) => {
-    if (confirmTodoDeletes[todoId]) {
-      const t = todoDeleteTimeouts.current[todoId];
-      if (t) {
-        clearTimeout(t);
-        delete todoDeleteTimeouts.current[todoId];
-      }
-      setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: false }));
-      onDeleteTodo(todoId);
-    } else {
-      setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: true }));
-      const timeout = setTimeout(() => {
-        setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: false }));
-        delete todoDeleteTimeouts.current[todoId];
-      }, 2000);
-      todoDeleteTimeouts.current[todoId] = timeout;
-    }
-  };
+  // const handleTodoDeleteClick = (todoId: string) => {
+  //   if (confirmTodoDeletes[todoId]) {
+  //     // const t = todoDeleteTimeouts.current[todoId];
+  //     if (t) {
+  //       clearTimeout(t);
+  //       // delete todoDeleteTimeouts.current[todoId];
+  //     }
+  //     setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: false }));
+  //     onDeleteTodo(todoId);
+  //   } else {
+  //     setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: true }));
+  //     const timeout = setTimeout(() => {
+  //       setConfirmTodoDeletes((prev) => ({ ...prev, [todoId]: false }));
+  //       // delete todoDeleteTimeouts.current[todoId];
+  //     }, 2000);
+  //     // todoDeleteTimeouts.current[todoId] = timeout;
+  //   }
+  // };
 
   // 未処理→完了のときだけ、チェック真上に緑のアニメを出し、アニメ中は全行ロック
   const handleToggleClick = () => {
@@ -274,7 +274,7 @@ export default function SortableTodoRow({
 
         <motion.button
           type="button"
-          onClick={() => handleTodoDeleteClick(todo.id)}
+          // onClick={() => handleTodoDeleteClick(todo.id)}
           animate={confirmTodoDeletes[todo.id] ? 'shake' : undefined}
           variants={SHAKE_VARIANTS}
           disabled={isLocked}

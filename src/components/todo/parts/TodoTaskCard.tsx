@@ -4,13 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import {
-  ChevronDown,
-  ChevronUp,
-  Plus,
-  Search,
-  X,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -21,10 +15,7 @@ import {
   PointerSensor,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 import SortableTodoRow from './SortableTodoRow';
 import { useTodoSearchAndSort, useCategoryIcon, type SimpleTodo } from './hooks/useTodoSearchAndSort';
@@ -41,7 +32,7 @@ const SHAKE_VARIANTS: Variants = {
 };
 
 function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
-  return Array.isArray(arr) && arr.every(t => !!t && typeof t === 'object' && 'id' in (t as object));
+  return Array.isArray(arr) && arr.every((t) => !!t && typeof t === 'object' && 'id' in (t as object));
 }
 
 /** 'HH:mm' → minutes, invalid => Infinity */
@@ -104,17 +95,13 @@ export default function TodoTaskCard({
 }: Props) {
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
-  const todos: SimpleTodo[] = useMemo(
-    () => (isSimpleTodos(rawTodos) ? rawTodos : []),
-    [rawTodos]
-  );
+  const todos: SimpleTodo[] = useMemo(() => (isSimpleTodos(rawTodos) ? rawTodos : []), [rawTodos]);
 
   // DnDのために残す（自動並び替えの有無には影響しない）
   const [, setHasUserOrder] = useState<boolean>(false);
 
   // カテゴリ
-  const category: string | null =
-    (task as unknown as { category?: string }).category ?? null;
+  const category: string | null = (task as unknown as { category?: string }).category ?? null;
   const { CatIcon, catColor } = useCategoryIcon(category);
   const categoryLabel = (category ?? '').trim() || '未分類';
 
@@ -131,35 +118,25 @@ export default function TodoTaskCard({
   const [searchQuery, setSearchQuery] = useState('');
 
   // 表示（保存順＝表示順にするため preferTimeSort は false）
-  const {
-    canAdd,
-    isCookingCategory,
-    undoneCount,
-    doneCount,
-    finalFilteredTodos,
-    doneMatchesCount,
-  } = useTodoSearchAndSort({
-    todos,
-    tab,
-    category,
-    searchQuery,
-    preferTimeSort: false,
-  });
+  const { canAdd, isCookingCategory, undoneCount, doneCount, finalFilteredTodos, doneMatchesCount } =
+    useTodoSearchAndSort({
+      todos,
+      tab,
+      category,
+      searchQuery,
+      preferTimeSort: false,
+    });
 
   // スクロールメーター
-  const {
-    scrollRef,
-    scrollRatio,
-    isScrollable,
-    showScrollDownHint,
-    showScrollUpHint,
-  } = useScrollMeter(finalFilteredTodos.length);
+  const { scrollRef, scrollRatio, isScrollable, showScrollDownHint, showScrollUpHint } = useScrollMeter(
+    finalFilteredTodos.length,
+  );
 
   // DnD
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 12 } }));
 
   // 表示対象ID（フィルタ後）
-  const visibleIds = useMemo(() => finalFilteredTodos.map(t => t.id), [finalFilteredTodos]);
+  const visibleIds = useMemo(() => finalFilteredTodos.map((t) => t.id), [finalFilteredTodos]);
 
   function arrayMove<T>(arr: T[], from: number, to: number): T[] {
     const copy = arr.slice();
@@ -168,7 +145,7 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => { };
+  const handleDragStart = () => {};
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -180,11 +157,11 @@ export default function TodoTaskCard({
 
     const newVisible = arrayMove(visibleIds, fromIdx, toIdx);
 
-    const fullIds = todos.map(t => t.id);
+    const fullIds = todos.map((t) => t.id);
     const visibleSet = new Set(visibleIds);
     let cursor = 0;
 
-    const nextFull = fullIds.map(id => {
+    const nextFull = fullIds.map((id) => {
       if (visibleSet.has(id)) {
         const nextId = newVisible[cursor];
         cursor += 1;
@@ -207,13 +184,13 @@ export default function TodoTaskCard({
     const trimmed = newTodoText.trim();
     if (!trimmed) return;
 
-    const isDuplicateUndone = todos.some(todo => todo.text === trimmed && !todo.done);
+    const isDuplicateUndone = todos.some((todo) => todo.text === trimmed && !todo.done);
     if (isDuplicateUndone) {
       toast.error('既に登録されています。');
       setInputError(null);
       return;
     }
-    const matchedDone = todos.find(todo => todo.text === trimmed && todo.done);
+    const matchedDone = todos.find((todo) => todo.text === trimmed && todo.done);
     if (matchedDone) {
       onToggleDone(matchedDone.id);
       setNewTodoText('');
@@ -250,14 +227,15 @@ export default function TodoTaskCard({
       const newId = pendingNewIdRef.current;
       if (!newId) return;
 
-      const ids = todos.map(t => t.id);
+      const ids = todos.map((t) => t.id);
       if (!ids.includes(newId)) return;
 
-      const rest = todos.filter(t => t.id !== newId).map((t, idx) => ({ id: t.id, idx }));
-      const nextIds = [newId, ...rest.sort((a, b) => a.idx - b.idx).map(r => r.id)];
+      const rest = todos
+        .filter((t) => t.id !== newId)
+        .map((t, idx) => ({ id: t.id, idx }));
+      const nextIds = [newId, ...rest.sort((a, b) => a.idx - b.idx).map((r) => r.id)];
 
-      const same =
-        ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
+      const same = ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
       if (!same) onReorderTodos(nextIds);
 
       pendingNewIdRef.current = null;
@@ -265,7 +243,7 @@ export default function TodoTaskCard({
     }
 
     // === 旅行カテゴリ ===
-    const ids = todos.map(t => t.id);
+    const ids = todos.map((t) => t.id);
     const newId = pendingNewIdRef.current;
     const hasNew = newId ? ids.includes(newId) : false;
 
@@ -273,28 +251,25 @@ export default function TodoTaskCard({
     const list = todos.map((t, idx) => ({
       id: t.id,
       idx,
-      minutes: hhmmToMinutes((t as any).timeStart),
+      minutes: hhmmToMinutes((t as unknown as { timeStart?: string }).timeStart),
     }));
 
     // 新規は必ず先頭に固定
-    const listWithoutNew = hasNew ? list.filter(x => x.id !== newId) : list;
+    const listWithoutNew = hasNew ? list.filter((x) => x.id !== newId) : list;
 
     // 未入力（minutes === Infinity）→ 元順
-    const withoutTime = listWithoutNew
-      .filter(x => x.minutes === Infinity)
-      .sort((a, b) => a.idx - b.idx);
+    const withoutTime = listWithoutNew.filter((x) => x.minutes === Infinity).sort((a, b) => a.idx - b.idx);
 
     // 時間あり → minutes昇順、同値は元順
     const withTime = listWithoutNew
-      .filter(x => x.minutes !== Infinity)
+      .filter((x) => x.minutes !== Infinity)
       .sort((a, b) => (a.minutes !== b.minutes ? a.minutes - b.minutes : a.idx - b.idx));
 
     const targetIds = hasNew
-      ? [newId!, ...withoutTime.map(x => x.id), ...withTime.map(x => x.id)]
-      : [...withoutTime.map(x => x.id), ...withTime.map(x => x.id)];
+      ? [newId!, ...withoutTime.map((x) => x.id), ...withTime.map((x) => x.id)]
+      : [...withoutTime.map((x) => x.id), ...withTime.map((x) => x.id)];
 
-    const same =
-      ids.length === targetIds.length && ids.every((v, i) => v === targetIds[i]);
+    const same = ids.length === targetIds.length && ids.every((v, i) => v === targetIds[i]);
 
     if (!same) {
       onReorderTodos(targetIds);
@@ -309,38 +284,63 @@ export default function TodoTaskCard({
     onClose?.();
   };
 
-  /* ------------------ ★ SPキーボード対応：可視領域に追従 ------------------ */
-  // visualViewport で可視領域の高さを監視し、コンテナ自体の高さを調整
-// 変更後（★ 高さと上オフセットを別stateで管理）
-const [vvh, setVvh] = useState<number | null>(null);     // 可視領域の高さのみ
-const [vvTop, setVvTop] = useState<number>(0);           // 上方向のオフセット
+  /* ------------------ SPキーボード対応：可視領域・重なり吸収 ------------------ */
 
-useEffect(() => {
-  if (typeof window === 'undefined') return;
-  const vv = window.visualViewport;
+  // 可視領域の高さはスクロールはみ出しを誘発しやすいので値だけ保持（読み出しはしない）
+  const [, setVvh] = useState<number | null>(null);
+  // 下方向の重なり（キーボード分）
+  const [vvBottom, setVvBottom] = useState(0);
 
-  const update = () => {
-    const h = Math.round(vv?.height ?? window.innerHeight);     // ★ 高さのみ
-    const t = Math.max(0, Math.round(vv?.offsetTop ?? 0));      // ★ 上オフセット
-    setVvh(h);
-    setVvTop(t);
-  };
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
 
-  update();
-  vv?.addEventListener('resize', update);
-  vv?.addEventListener('scroll', update);
-  window.addEventListener('orientationchange', update);
-  return () => {
-    vv?.removeEventListener('resize', update);
-    vv?.removeEventListener('scroll', update);
-    window.removeEventListener('orientationchange', update);
-  };
-}, []);
+    const update = () => {
+      const vv = window.visualViewport!;
+      const h = Math.round(vv?.height ?? window.innerHeight);
+      setVvh(h);
+      // 画面の“重なり”＝ レイアウトviewportの高さ - (可視高さ + 上オフセット)
+      const overlap = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+      setVvBottom(Math.ceil(overlap));
+    };
 
+    const raf = requestAnimationFrame(update);
+    window.visualViewport.addEventListener('resize', update);
+    window.visualViewport.addEventListener('scroll', update);
+    window.addEventListener('orientationchange', update);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+
+  // visualViewport の高さ変動時にスクロール位置をクランプ（真っ白防止）
+  // const { current: scrollEl } = { current: useScrollMeter(finalFilteredTodos.length).scrollRef.current } as {
+  //   current: HTMLElement | null;
+  // };
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const clampScroll = () => {
+      const max = Math.max(0, el.scrollHeight - el.clientHeight);
+      if (el.scrollTop > max) el.scrollTop = max;
+      if (el.scrollTop < 0) el.scrollTop = 0;
+    };
+
+    const onResize = () => requestAnimationFrame(clampScroll);
+    window.visualViewport.addEventListener('resize', onResize);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', onResize);
+    };
+  }, [scrollRef]);
 
   // フッターの実高さを監視し、スクロール領域の下余白に反映（入力欄が隠れないように）
-  const footerRef = useRef<HTMLDivElement | null>(null); // ★ 追加
-  const [footerH, setFooterH] = useState<number>(64);    // ★ 追加
+  const footerRef = useRef<HTMLDivElement | null>(null);
+  const [footerH, setFooterH] = useState<number>(64);
   useEffect(() => {
     if (!footerRef.current) return;
     const ro = new ResizeObserver((entries) => {
@@ -352,39 +352,45 @@ useEffect(() => {
     return () => ro.disconnect();
   }, []);
 
+  // ★ ヘッダーの実高さを測定して本文を押し下げる（fixedヘッダーのため）
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerH, setHeaderH] = useState<number>(56);
+  useEffect(() => {
+    if (!headerRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setHeaderH(Math.max(40, Math.round(entry.contentRect.height)));
+      }
+    });
+    ro.observe(headerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
     <div
       ref={groupDnd?.setNodeRef}
-      /* ★ visualViewport の実測高さを優先。非対応端末は 100svh フォールバック */
-      style={{ ...(groupDnd?.style ?? {}), height: vvh ? `${vvh}px` : undefined }} // ★ 変更
-      className={clsx(
-        'relative scroll-mt-4 h-[100svh]', // ★ 変更: 100dvh → 100svh（アドレスバー対策）
-        groupDnd?.isDragging && 'opacity-70'
-      )}
+      // ★ 強制 height をやめ、最小高さで器を確保。100svh を基本
+      style={{ ...(groupDnd?.style ?? {}), minHeight: '100svh' }}
+      className={clsx('relative scroll-mt-4', groupDnd?.isDragging && 'opacity-70')}
     >
       {/* カード全体（ヘッダー＋本文）を縦flexで構成 */}
-      <div className="flex h-full min-h-0 flex-col border border-gray-300 shadow-sm bg-white overflow-hidden">
+      <div className="flex h-full min-h-0 flex-col bg-white overflow-hidden">
         {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン） ===== */}
         <div
+          ref={headerRef}
           className={clsx(
-            'sticky z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
-            'pl-2 pr-2'
+            'fixed left-0 right-0 z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
+            'pl-2 pr-2',
           )}
-          style={{ top: `calc(${vvTop}px + env(safe-area-inset-top, 0px))` }}
+          // safe-areaぶんだけ上に
+          style={{ top: 'env(safe-area-inset-top, 0px)' }}
         >
           {/* 1段目：カテゴリ＆タスク名＆× */}
           <div className="flex justify-between items-center py-1">
-            <div
-              className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0"
-              aria-label="タスク名"
-            >
-              <CatIcon
-                size={20}
-                className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)}
-                aria-label={`${categoryLabel}カテゴリ`}
-              />
+            <div className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0" aria-label="タスク名">
+              <CatIcon size={20} className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)} aria-label={`${categoryLabel}カテゴリ`} />
               <span className="font-bold text-[18px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2">
                 {(task as unknown as { name?: string }).name ?? ''}
               </span>
@@ -416,9 +422,7 @@ useEffect(() => {
                     className={clsx(
                       'relative pl-5 py-1 text-[13px] sm:text-sm font-bold border border-gray-300',
                       'rounded-t-md w-24 sm:w-24 flex items-center justify-center',
-                      type === tab
-                        ? 'bg-white text-[#5E5E5E] border-b-transparent z-10'
-                        : 'bg-gray-100 text-gray-400 z-0'
+                      type === tab ? 'bg-white text-[#5E5E5E] border-b-transparent z-10' : 'bg-gray-100 text-gray-400 z-0',
                     )}
                     type="button"
                   >
@@ -428,8 +432,8 @@ useEffect(() => {
                         count === 0
                           ? 'bg-gray-300'
                           : type === 'undone'
-                            ? 'bg-gradient-to-b from-red-300 to-red-500'
-                            : 'bg-gradient-to-b from-blue-300 to-blue-500'
+                          ? 'bg-gradient-to-b from-red-300 to-red-500'
+                          : 'bg-gradient-to-b from-blue-300 to-blue-500',
                       )}
                     >
                       {count}
@@ -444,6 +448,9 @@ useEffect(() => {
         </div>
         {/* ===== 固定ヘッダー ここまで ===== */}
 
+        {/* ★ ヘッダー分のスペーサー（本文が隠れないように） */}
+        <div aria-hidden style={{ height: headerH }} />
+
         {/* body（スクロール領域 + 固定フッター） */}
         <div className="relative flex-1 min-h-0 flex flex-col">
           {/* スクロールメーター（右端） */}
@@ -455,7 +462,10 @@ useEffect(() => {
             />
           )}
 
-          <div className="pt-3 pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col">
+          <div
+            className="pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col"
+            style={{ paddingTop: 8 }} // 見た目の余白を少し足す
+          >
             {isCookingCategory && (
               <div className="px-1 pr-5">
                 <div className="relative">
@@ -465,7 +475,7 @@ useEffect(() => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="料理名・材料名で検索"
-                    className="w-full pl-8 pr-8 py-1.5 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-orange-300"
+                    className="w-full pl-8 pr-8 py-1.5 outline-none focus:ring-2 focus:ring-orange-300"
                   />
                   {searchQuery.trim() !== '' && (
                     <button
@@ -490,10 +500,10 @@ useEffect(() => {
             <div
               ref={scrollRef}
               className={clsx(
-                'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2'
+                'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2',
               )}
-              /* ★ フッター実高に応じて最下部に余白を追加（入力欄が隠れない） */
-              style={{ paddingBottom: footerH + 16 }} // ★ 変更
+              // ★ フッター実高 + キーボード重なり分を確保（入力欄が隠れない）
+              style={{ paddingBottom: footerH + 16 + vvBottom }}
               onTouchMove={(e) => e.stopPropagation()}
             >
               {finalFilteredTodos.length === 0 && tab === 'done' && (
@@ -510,7 +520,9 @@ useEffect(() => {
                     const hasShopping =
                       category === '買い物' &&
                       ((typeof todo.price === 'number' && Number.isFinite(todo.price) && (todo.price ?? 0) > 0) ||
-                        (typeof todo.quantity === 'number' && Number.isFinite(todo.quantity) && (todo.quantity ?? 0) > 0));
+                        (typeof todo.quantity === 'number' &&
+                          Number.isFinite(todo.quantity) &&
+                          (todo.quantity ?? 0) > 0));
                     const hasImage = typeof todo.imageUrl === 'string' && todo.imageUrl.trim() !== '';
                     const hasRecipe =
                       category === '料理' &&
@@ -548,7 +560,7 @@ useEffect(() => {
                           category={category}
                           confirmTodoDeletes={{}} // EyeOff 削除のため no-op
                           setConfirmTodoDeletes={() => {}} // no-op
-                          todoDeleteTimeouts={{} as any} // no-op
+                          // todoDeleteTimeouts は未使用のため渡さない
                         />
                       </div>
                     );
@@ -569,20 +581,18 @@ useEffect(() => {
             )}
 
             {isCookingCategory && tab === 'undone' && searchQuery.trim() !== '' && doneMatchesCount > 0 && (
-              <div className="px-1 pr-5 mt-2 text-xs text-gray-600 border-t border-gray-200 pt-2">
-                済に{doneMatchesCount}件見つかりました。
-              </div>
+              <div className="px-1 pr-5 mt-2 text-xs text-gray-600 border-t border-gray-200 pt-2">済に{doneMatchesCount}件見つかりました。</div>
             )}
           </div>
 
           {/* 固定フッター：常時下部表示の入力行（未処理タブで有効） */}
           <div
-            ref={footerRef} // ★ 追加：実高計測
-            className="shrink-0 sticky left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200"
-            /* ★ キーボード分はコンテナの高さ縮小で吸収。ここは安全域のみ適用 */
-            style={{ bottom: 'env(safe-area-inset-bottom, 0px)' }} // ★ 変更
+            ref={footerRef}
+            className="fixed left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200"
+            // ★ キーボード直上に吸着（セーフエリアも考慮）
+            style={{ bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))` }}
           >
-            <div className="px-4 py-4">
+            <div className="px-4 py-4 max-w-screen-sm mx-auto">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
                 <input
@@ -613,7 +623,7 @@ useEffect(() => {
                   aria-disabled={!canAdd}
                   className={clsx(
                     'w-[75%] border-b bg-transparent outline-none h-9 pb-1',
-                    canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed'
+                    canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed',
                   )}
                   placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
                 />
