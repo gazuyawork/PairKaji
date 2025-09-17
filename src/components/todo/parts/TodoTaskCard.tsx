@@ -533,7 +533,7 @@ export default function TodoTaskCard({
             // キーボード表示時は下に持ち上げる
             style={{ bottom: `calc(${kbGap}px + env(safe-area-inset-bottom, 0px))` }}
           >
-            <div className="px-4 py-4">
+            <div className="px-4 pt-4 pb-8">
               <div className="flex items-center gap-2">
                 <Plus className={clsx(canAdd ? 'text-[#FFCB7D]' : 'text-gray-300')} />
                 <input

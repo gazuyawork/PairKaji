@@ -8,7 +8,7 @@ import {
   useRef,
   useEffect,
   useMemo,
-  useCallback,
+  // useCallback,
 } from 'react';
 import {
   collection,
@@ -382,12 +382,12 @@ export default function TodoView() {
   );
 
   // ★ 変更: 詳細を閉じたらフィルタも解除（カテゴリ含む）
-  const handleCloseDetail = useCallback(() => {
-    setSelectedTaskId(null);
-    setFilterText('');
-    setSelectedCategoryId(null);
-    // 必要ならタブも初期化: setActiveTabs({})
-  }, []);
+  // const handleCloseDetail = useCallback(() => {
+  //   setSelectedTaskId(null);
+  //   setFilterText('');
+  //   setSelectedCategoryId(null);
+  //   // 必要ならタブも初期化: setActiveTabs({})
+  // }, []);
 
   /* =========================
      ★ 追加: 一覧側カテゴリ選択 state
