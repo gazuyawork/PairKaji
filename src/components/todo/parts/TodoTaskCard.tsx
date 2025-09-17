@@ -192,7 +192,7 @@ export default function TodoTaskCard({
   const categoryLabel = (category ?? '').trim() || '未分類';
 
   // 追加用入力
-  const [isComposingAdd, ] = useState(false);
+  const [isComposingAdd,] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [, setInputError] = useState<string | null>(null);
@@ -379,6 +379,17 @@ export default function TodoTaskCard({
     }
   }, [todos, category, onReorderTodos, scrollListToTop]);
 
+
+
+
+
+
+
+
+
+
+
+
   /* ------------------------------ 閉じる（×） ------------------------------ */
 
   const handleClose = () => {
@@ -411,8 +422,6 @@ export default function TodoTaskCard({
 
     const update = () => {
       recalcVvBottom();
-      // iOS Safari が勝手にページ全体をスクロールしないよう抑制
-      if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     };
 
     const raf = requestAnimationFrame(update);
@@ -475,19 +484,39 @@ export default function TodoTaskCard({
     return () => ro.disconnect();
   }, []);
 
+
+
+  // フォーカス直後は visualViewport の resize を待ってから再計算＆再フォーカス
+  const waitKeyboardOpenAndFix = useCallback(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    let done = false;
+    const timeout = setTimeout(() => {
+      if (done) return;
+      recalcVvBottom();
+      inputRef.current?.focus();
+      done = true;
+    }, 300); // 300ms を上限に待つ（端末差を吸収）
+
+    const onResizeOnce = () => {
+      if (done) return;
+      recalcVvBottom();
+      // resize 到達（= キーボード表示が反映）後にフォーカス再強制
+      requestAnimationFrame(() => inputRef.current?.focus());
+      done = true;
+      window.visualViewport?.removeEventListener('resize', onResizeOnce);
+      clearTimeout(timeout);
+    };
+    window.visualViewport.addEventListener('resize', onResizeOnce, { once: true });
+  }, [recalcVvBottom]);
+
+
   // ★ 修正: フォーカス/タップの直前・直後に即時計算して初回フレームの取りこぼしを防ぐ
   const handleInputFocus = () => {
-    recalcVvBottom();
-    requestAnimationFrame(() => {
-      if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
-      requestAnimationFrame(() => recalcVvBottom());
-    });
+    recalcVvBottom();         // まず即時計算
+    waitKeyboardOpenAndFix(); // その後、キーボード表示(=resize)を待って追撃
   };
   const handleInputBlur = () => {
-    setTimeout(() => {
-      recalcVvBottom();
-      if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
-    }, 50);
+    setTimeout(() => recalcVvBottom(), 50);
   };
   const handlePointerDown = (e: React.PointerEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -501,6 +530,21 @@ export default function TodoTaskCard({
     e.stopPropagation();
     recalcVvBottom();
   };
+
+  // ドキュメント全体の focusin を拾って即時計算（初回タップ取りこぼし対策）
+  useEffect(() => {
+    const onFocusIn = () => {
+      recalcVvBottom();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('focusin', onFocusIn, { passive: true });
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('focusin', onFocusIn);
+      }
+    };
+  }, [recalcVvBottom]);
 
   /* ---------------------------- render (card) ---------------------------- */
 
