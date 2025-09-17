@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { toast } from 'sonner';
@@ -90,7 +90,7 @@ export default function TodoTaskCard({
   focusedTodoId,
   onOpenNote,
   onReorderTodos,
-  onClose, // ★ 追加：×ボタンで親に閉じる通知
+  onClose,
   groupDnd,
 }: Props) {
   // todos抽出
@@ -179,6 +179,13 @@ export default function TodoTaskCard({
   // 直近に追加した TODO のID（DB反映後に先頭へ固定）
   const pendingNewIdRef = useRef<string | null>(null);
 
+  // 先頭へスクロール
+  const scrollListToTop = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => el.scrollTo({ top: 0, behavior }));
+  }, [scrollRef]);
+
   const handleAdd = () => {
     if (!canAdd) return;
     const trimmed = newTodoText.trim();
@@ -196,6 +203,8 @@ export default function TodoTaskCard({
       setNewTodoText('');
       setInputError(null);
       toast.success('完了済のタスクを復活しました');
+      // 復活も先頭に出すケースが多いので先頭へスクロール
+      scrollListToTop('smooth');
       return;
     }
 
@@ -209,9 +218,12 @@ export default function TodoTaskCard({
     // まずはDB反映待ち（todosに newId が現れたら並び替えを適用）
     pendingNewIdRef.current = newId;
 
+    // 追加直後に一覧を先頭へ
+    scrollListToTop('smooth');
+
     setNewTodoText('');
     setInputError(null);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    requestAnimationFrame(() => inputRef.current?.focus?.());
   };
 
   /* -------------------- 自動並び替え（旅行カテゴリ用） -------------------- */
@@ -219,8 +231,6 @@ export default function TodoTaskCard({
   //   1) 新規は必ず先頭（pendingNewId が存在＆反映後）
   //   2) 次に「時間未入力」
   //   3) 最後に「時間あり」を開始時刻の昇順（同時刻は元順）
-  //
-  // 時間の入力・変更時にもこのロジックを毎回適用するため、todos 変化で走らせる
   useEffect(() => {
     if (category !== '旅行') {
       // 旅行以外は自動並べ替えなし（新規時のみ先頭固定を行う）
@@ -237,6 +247,9 @@ export default function TodoTaskCard({
 
       const same = ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
       if (!same) onReorderTodos(nextIds);
+
+      // 並べ替え後も先頭へ寄せる
+      requestAnimationFrame(() => scrollListToTop('smooth'));
 
       pendingNewIdRef.current = null;
       return;
@@ -259,7 +272,6 @@ export default function TodoTaskCard({
 
     // 未入力（minutes === Infinity）→ 元順
     const withoutTime = listWithoutNew.filter((x) => x.minutes === Infinity).sort((a, b) => a.idx - b.idx);
-
     // 時間あり → minutes昇順、同値は元順
     const withTime = listWithoutNew
       .filter((x) => x.minutes !== Infinity)
@@ -270,13 +282,13 @@ export default function TodoTaskCard({
       : [...withoutTime.map((x) => x.id), ...withTime.map((x) => x.id)];
 
     const same = ids.length === targetIds.length && ids.every((v, i) => v === targetIds[i]);
+    if (!same) onReorderTodos(targetIds);
 
-    if (!same) {
-      onReorderTodos(targetIds);
+    if (hasNew) {
+      requestAnimationFrame(() => scrollListToTop('smooth'));
+      pendingNewIdRef.current = null;
     }
-
-    if (hasNew) pendingNewIdRef.current = null;
-  }, [todos, category, onReorderTodos]);
+  }, [todos, category, onReorderTodos, scrollListToTop]);
 
   /* ------------------------------ 閉じる（×） ------------------------------ */
 
@@ -284,23 +296,25 @@ export default function TodoTaskCard({
     onClose?.();
   };
 
-  /* ------------------ SPキーボード対応：可視領域・重なり吸収 ------------------ */
+  /* --------- SPキーボード対策：可視領域変動・初回タップで隠れる問題 --------- */
 
-  // 可視領域の高さはスクロールはみ出しを誘発しやすいので値だけ保持（読み出しはしない）
-  const [, setVvh] = useState<number | null>(null);
   // 下方向の重なり（キーボード分）
   const [vvBottom, setVvBottom] = useState(0);
 
+  // visualViewport に追従し、キーボード重なり量を反映
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
 
     const update = () => {
       const vv = window.visualViewport!;
-      const h = Math.round(vv?.height ?? window.innerHeight);
-      setVvh(h);
-      // 画面の“重なり”＝ レイアウトviewportの高さ - (可視高さ + 上オフセット)
       const overlap = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
       setVvBottom(Math.ceil(overlap));
+      // ブラウザが勝手にページ全体をスクロールしてしまうのを抑制
+      // （特に iOS Safari の初回フォーカス時）
+      if (typeof window.scrollTo === 'function') {
+        // ヘッダーが画面外へ押し出されるのを防ぐ
+        window.scrollTo(0, 0);
+      }
     };
 
     const raf = requestAnimationFrame(update);
@@ -316,10 +330,7 @@ export default function TodoTaskCard({
     };
   }, []);
 
-  // visualViewport の高さ変動時にスクロール位置をクランプ（真っ白防止）
-  // const { current: scrollEl } = { current: useScrollMeter(finalFilteredTodos.length).scrollRef.current } as {
-  //   current: HTMLElement | null;
-  // };
+  // visualViewport の高さ変動時にスクロール位置をクランプ（白画面防止）
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
     const el = scrollRef.current;
@@ -338,7 +349,7 @@ export default function TodoTaskCard({
     };
   }, [scrollRef]);
 
-  // フッターの実高さを監視し、スクロール領域の下余白に反映（入力欄が隠れないように）
+  // フッター（入力行）の実高さを監視し、スクロール領域の下余白に反映
   const footerRef = useRef<HTMLDivElement | null>(null);
   const [footerH, setFooterH] = useState<number>(64);
   useEffect(() => {
@@ -352,7 +363,7 @@ export default function TodoTaskCard({
     return () => ro.disconnect();
   }, []);
 
-  // ★ ヘッダーの実高さを測定して本文を押し下げる（fixedヘッダーのため）
+  // ★ ヘッダーの実高さを測定して本文を押し下げる（fixed ヘッダー用）
   const headerRef = useRef<HTMLDivElement | null>(null);
   const [headerH, setHeaderH] = useState<number>(56);
   useEffect(() => {
@@ -366,13 +377,42 @@ export default function TodoTaskCard({
     return () => ro.disconnect();
   }, []);
 
+  // 初回タップで隠れる問題の緩和：フォーカス時にページスクロールを 0 に固定
+  const handleInputFocus = () => {
+    // iOS の初回フォーカスでページ全体が勝手にスクロールするのを戻す
+    requestAnimationFrame(() => {
+      if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    });
+  };
+
+  // キーボードを閉じた時に縦幅がズレるのを最小化（vvBottom の即時更新）
+  const handleInputBlur = () => {
+    // ほんの少し後に再計測（端末により resize イベントが遅れるため）
+    setTimeout(() => {
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        const vv = window.visualViewport;
+        const overlap = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+        setVvBottom(Math.ceil(overlap));
+      } else {
+        setVvBottom(0);
+      }
+      // ページスクロールを原点へ
+      if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    }, 50);
+  };
+
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
     <div
       ref={groupDnd?.setNodeRef}
-      // ★ 強制 height をやめ、最小高さで器を確保。100svh を基本
-      style={{ ...(groupDnd?.style ?? {}), minHeight: '100svh' }}
+      // 器は 100dvh（動的ビューポート）で統一し、外側スクロールの介入を防ぐ
+      style={{
+        ...(groupDnd?.style ?? {}),
+        minHeight: '100dvh',
+        // ページ全体のスクロール連鎖を断ち、ヘッダーが画面外へ押し出されるのを防止
+        overscrollBehaviorY: 'contain',
+      }}
       className={clsx('relative scroll-mt-4', groupDnd?.isDragging && 'opacity-70')}
     >
       {/* カード全体（ヘッダー＋本文）を縦flexで構成 */}
@@ -384,7 +424,7 @@ export default function TodoTaskCard({
             'fixed left-0 right-0 z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
             'pl-2 pr-2',
           )}
-          // safe-areaぶんだけ上に
+          // safe-area ぶんだけ上に
           style={{ top: 'env(safe-area-inset-top, 0px)' }}
         >
           {/* 1段目：カテゴリ＆タスク名＆× */}
@@ -502,7 +542,7 @@ export default function TodoTaskCard({
               className={clsx(
                 'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2',
               )}
-              // ★ フッター実高 + キーボード重なり分を確保（入力欄が隠れない）
+              // フッター実高 + キーボード重なり分を確保（入力欄が隠れない）
               style={{ paddingBottom: footerH + 16 + vvBottom }}
               onTouchMove={(e) => e.stopPropagation()}
             >
@@ -560,7 +600,6 @@ export default function TodoTaskCard({
                           category={category}
                           confirmTodoDeletes={{}} // EyeOff 削除のため no-op
                           setConfirmTodoDeletes={() => {}} // no-op
-                          // todoDeleteTimeouts は未使用のため渡さない
                         />
                       </div>
                     );
@@ -589,7 +628,7 @@ export default function TodoTaskCard({
           <div
             ref={footerRef}
             className="fixed left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200"
-            // ★ キーボード直上に吸着（セーフエリアも考慮）
+            // キーボード直上に吸着（セーフエリアも考慮）
             style={{ bottom: `calc(${vvBottom}px + env(safe-area-inset-bottom, 0px))` }}
           >
             <div className="px-4 py-4 max-w-screen-sm mx-auto">
@@ -602,6 +641,8 @@ export default function TodoTaskCard({
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
+                  onFocus={handleInputFocus}   // ★ 初回フォーカス時のスクロール抑制
+                  onBlur={handleInputBlur}     // ★ キーボードクローズ時の高さズレ抑制
                   onChange={(e) => {
                     setNewTodoText(e.target.value);
                     setInputError(null);
@@ -613,16 +654,13 @@ export default function TodoTaskCard({
                     e.preventDefault();
                     handleAdd();
                   }}
-                  onBlur={() => {
-                    if (!canAdd) return;
-                    handleAdd();
-                  }}
                   onCompositionStart={() => setIsComposingAdd(true)}
                   onCompositionEnd={() => setIsComposingAdd(false)}
                   disabled={!canAdd}
                   aria-disabled={!canAdd}
                   className={clsx(
-                    'w-[75%] border-b bg-transparent outline-none h-9 pb-1',
+                    // iOS の自動ズーム抑止（初回タップで隠れる/ズームする問題対策）
+                    'w-[75%] border-b bg-transparent outline-none h-9 pb-1 text-[16px]',
                     canAdd ? 'border-gray-300 text-black' : 'border-gray-200 text-gray-400 cursor-not-allowed',
                   )}
                   placeholder={canAdd ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
