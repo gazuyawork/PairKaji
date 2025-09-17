@@ -112,6 +112,11 @@ export default function TodoTaskCard({
     onBlur: () => void;
     // useRef<HTMLInputElement | null>(null) をそのまま渡せるようにする
     inputRef: React.MutableRefObject<HTMLInputElement | null>;
+    // Portal 外枠（fixed コンテナ）の参照を親から渡す
+    containerRef: React.MutableRefObject<HTMLDivElement | null>;
+    // IME中の誤Enter対策
+    onCompositionStart: () => void;
+    onCompositionEnd: () => void;
   };
 
   const KeyboardAwareFooter = React.memo(function KeyboardAwareFooter({
@@ -119,7 +124,6 @@ export default function TodoTaskCard({
     deltaBottom,
     canAdd,
     value,
-    onChange,
     onEnter,
     onPointerDown,
     onMouseDown,
@@ -127,11 +131,14 @@ export default function TodoTaskCard({
     onFocus,
     onBlur,
     inputRef,
+    containerRef,
+    onCompositionStart,
+    onCompositionEnd,
   }: FooterProps) {
     if (typeof document === 'undefined') return null;
     return createPortal(
       <div
-        ref={footerPortalRef}
+        ref={containerRef}
         className="fixed left-0 right-0 z-[9999] bg-transparent"
         style={{
           bottom: `calc(${deltaBottom}px + env(safe-area-inset-bottom, 0px))`,
@@ -159,7 +166,8 @@ export default function TodoTaskCard({
               onTouchStart={onTouchStart}
               onFocus={onFocus}
               onBlur={onBlur}
-              onChange={(e) => onChange(e.target.value)}
+              onCompositionStart={onCompositionStart}
+              onCompositionEnd={onCompositionEnd}
               onKeyDown={(e) => {
                 if (!canAdd) return;
                 if (e.key !== 'Enter') return;
@@ -195,7 +203,7 @@ export default function TodoTaskCard({
   const categoryLabel = (category ?? '').trim() || '未分類';
 
   // 追加用入力
-  const [isComposingAdd,] = useState(false);
+  const [isComposingAdd, setIsComposingAdd] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [, setInputError] = useState<string | null>(null);
@@ -453,7 +461,7 @@ export default function TodoTaskCard({
       window.visualViewport?.removeEventListener('scroll', update);
       window.removeEventListener('orientationchange', update);
     };
-  },  [recalcVvBottom, vvBottom]);
+  }, [recalcVvBottom, vvBottom]);
 
   // 実際に反映する下オフセット（基準値を引いた差分）
   const deltaBottom = Math.max(0, vvBottom - vvBaseline);
@@ -809,6 +817,9 @@ export default function TodoTaskCard({
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             inputRef={inputRef}
+            containerRef={footerPortalRef}
+            onCompositionStart={() => setIsComposingAdd(true)}
+            onCompositionEnd={() => setIsComposingAdd(false)}
           />
         </div>
       </div>
