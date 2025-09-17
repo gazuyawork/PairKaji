@@ -968,7 +968,7 @@ export default function TodoView() {
               </div> */}
 
               <div className="flex-1 overflow-y-auto">
-                <div className="mx-auto w-full max-w-xl px-3 pb-3">
+                <div className="mx-auto w-full max-w-xl">
                   <TodoTaskCard
                     task={selectedTask}
                     tab={activeTabs[selectedTask.id] ?? 'undone'}

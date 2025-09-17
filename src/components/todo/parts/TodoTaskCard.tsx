@@ -291,12 +291,12 @@ export default function TodoTaskCard({
       style={groupDnd?.style}
       className={clsx(
         // ▼ 端末の可視領域に追従（アドレスバー/キーボード対応）
-        'relative mb-2.5 scroll-mt-4 h-[100dvh]',
+        'relative scroll-mt-4 h-[100dvh]',
         groupDnd?.isDragging && 'opacity-70'
       )}
     >
       {/* カード全体（ヘッダー＋本文）を縦flexで構成し、常に高さ100dvh */}
-      <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-300 shadow-sm bg-white overflow-hidden">
+      <div className="flex h-full min-h-0 flex-col border border-gray-300 shadow-sm bg-white overflow-hidden">
         {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン） ===== */}
         <div
           className={clsx(
