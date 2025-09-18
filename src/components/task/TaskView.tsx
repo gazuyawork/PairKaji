@@ -918,7 +918,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     </button>
 
                     {/* 仕切り */}
-                    {pairStatus === 'confirmed' && <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />}
+                    {/* {pairStatus === 'confirmed' && <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />} */}
 
                     {/* 🔒 プライベート（ペア確定時のみ） */}
                     {pairStatus === 'confirmed' && (
@@ -940,7 +940,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     )}
 
                     {/* 仕切り */}
-                    <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+                    {/* <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" /> */}
 
                     {/* 🚩 フラグ */}
                     <button

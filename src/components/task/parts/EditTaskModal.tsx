@@ -15,20 +15,21 @@ import {
   ChevronUp,
   Utensils,
   ShoppingCart,
-  Plane,              // ★ 追加: 旅行用アイコン
+  Plane,
   type LucideIcon,
+  ChevronRight, // ★ 追加：横スクロールヒント用
 } from 'lucide-react';
 
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
 
-type TaskCategory = '料理' | '買い物' | '旅行'; // ★ 追加: 旅行
+type TaskCategory = '料理' | '買い物' | '旅行';
 
-type CategoryOption = { key: TaskCategory; label: TaskCategory; Icon: LucideIcon };
+type CategoryOption = { key: TaskCategory; label: TaskCategory; Icon: LucideIcon; iconColor: string; selectedIconColor?: string; };
 const CATEGORY_OPTIONS: CategoryOption[] = [
-  { key: '料理', label: '料理', Icon: Utensils },
-  { key: '買い物', label: '買い物', Icon: ShoppingCart },
-  { key: '旅行', label: '旅行', Icon: Plane }, // ★ 追加
+  { key: '料理', label: '料理', Icon: Utensils, iconColor: 'text-emerald-500', selectedIconColor: 'text-white' },
+  { key: '買い物', label: '買い物', Icon: ShoppingCart, iconColor: 'text-sky-500', selectedIconColor: 'text-white' },
+  { key: '旅行', label: '旅行', Icon: Plane, iconColor: 'text-orange-500', selectedIconColor: 'text-white' },
 ];
 
 type TaskWithNote = Task & { note?: string; category?: TaskCategory };
@@ -70,7 +71,6 @@ const normalizeCategory = (v: unknown): TaskCategory | undefined => {
   const s = v.normalize('NFKC').trim().toLowerCase();
   if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
   if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
-  // ★ 追加: 旅行のゆらぎ
   if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
   return undefined;
 };
@@ -99,7 +99,6 @@ const resolveUserImageSrc = (user: UserInfo): string => {
   ];
   let src = candidates.find((v) => typeof v === 'string' && v.trim().length > 0) ?? '';
   if (src && !/^https?:\/\//.test(src) && !src.startsWith('/')) {
-    // 不正なパスは破棄（lintのため console は使わない）
     src = '';
   }
   return src || '/images/default.png';
@@ -141,6 +140,10 @@ export default function EditTaskModal({
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
   const isIOS = isIOSMobileSafari;
+
+  // ★ 追加: カテゴリ行の横スクロール関連
+  const catScrollRef = useRef<HTMLDivElement | null>(null); // 横スクロールDOM参照
+  const [catOverflow, setCatOverflow] = useState(false); // 溢れているかどうか
 
   // 端末判定（iOS Mobile Safari）
   useEffect(() => {
@@ -194,7 +197,7 @@ export default function EditTaskModal({
       period: task.period,
       note: (task as unknown as { note?: string }).note ?? '',
       visible: Boolean((task as unknown as { visible?: unknown }).visible),
-      category: normalizedCategory, // 正規化後の値（'料理' | '買い物' | '旅行' | undefined）
+      category: normalizedCategory,
     });
 
     setIsPrivate(Boolean((task as unknown as { private?: unknown }).private) || !isPairConfirmed);
@@ -253,7 +256,6 @@ export default function EditTaskModal({
       requestAnimationFrame(resizeTextarea);
     });
   }, [isOpen, resizeTextarea]);
-
 
   useEffect(() => {
     if (!editedTask) return;
@@ -344,7 +346,7 @@ export default function EditTaskModal({
       userIds: [...editedUsers],
       daysOfWeek: editedTask.daysOfWeek.map((d) => toDayNumber(d)) as Task['daysOfWeek'],
       private: isPrivate,
-      category: normalizedCat, // '料理' | '買い物' | '旅行' | undefined
+      category: normalizedCat,
     } as Task;
 
     setIsSaving(true);
@@ -364,6 +366,37 @@ export default function EditTaskModal({
       }, 1500);
     }, 300);
   }, [editedTask, existingTasks, isPrivate, onSave]);
+
+  // ★ 追加: カテゴリのオーバーフローチェック
+  const measureCatOverflow = useCallback(() => {
+    const el = catScrollRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 1;
+    setCatOverflow(hasOverflow);
+  }, []);
+
+  // ★ 追加: モーダルオープン時にオーバーフロー測定 & “揺らぎ”でスクロールを示唆
+  useEffect(() => {
+    if (!isOpen) return;
+    requestAnimationFrame(() => {
+      measureCatOverflow();
+      const el = catScrollRef.current;
+      if (!el) return;
+      if (el.scrollWidth > el.clientWidth + 1) {
+        const to = Math.min(32, el.scrollWidth - el.clientWidth);
+        el.scrollTo({ left: 0, behavior: 'auto' });
+        setTimeout(() => el.scrollTo({ left: to, behavior: 'smooth' }), 120);
+        setTimeout(() => el.scrollTo({ left: 0, behavior: 'smooth' }), 420);
+      }
+    });
+  }, [isOpen, measureCatOverflow]);
+
+  // ★ 追加: リサイズ時に再測定
+  useEffect(() => {
+    const onResize = () => measureCatOverflow();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [measureCatOverflow]);
 
   if (!mounted || !isOpen || !editedTask || !portalTarget) return null;
 
@@ -408,30 +441,65 @@ export default function EditTaskModal({
           {nameError && <p className="text-xs text-red-500 ml-20 mt-1">{nameError}</p>}
         </div>
 
-        {/* 🍱 カテゴリ選択 */}
+        {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
+        {/* ★ 差し替え: 改行せず1行・溢れたら横スクロール＋ヒント */}
         <div className="flex items-center">
           <label className="w-20 text-gray-600 shrink-0">カテゴリ：</label>
-          <div className="flex gap-2">
-            {CATEGORY_OPTIONS.map(({ key, label, Icon }) => {
-              const selected = eqCat(editedTask.category, key);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleCategory(key)}
-                  aria-pressed={selected}
-                  data-cat={key}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-full border transition ${selected
-                    ? 'border-[#FFCB7D] bg-yellow-500 text-white'
-                    : 'border-gray-300 text-gray-600 opacity-80'
-                    }`}
-                  title={label}
-                >
-                  <Icon size={18} />
-                  <span className="text-xs font-bold">{label}</span>
-                </button>
-              );
-            })}
+
+          <div className="relative flex-1">
+            <div
+              ref={catScrollRef}
+              onScroll={measureCatOverflow}
+              className={[
+                'flex flex-nowrap gap-2 overflow-x-auto',
+                '[-webkit-overflow-scrolling:touch]',
+                '[&::-webkit-scrollbar]:hidden',
+                'scrollbar-width-none',
+                'pr-8',
+                'snap-x snap-mandatory',
+              ].join(' ')}
+              style={{ scrollbarWidth: 'none' }}
+              aria-label="カテゴリ一覧（横スクロール）"
+            >
+              {CATEGORY_OPTIONS.map(({ key, label, Icon, iconColor, selectedIconColor }) => {
+                const selected = eqCat(editedTask.category, key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleCategory(key)}
+                    aria-pressed={selected}
+                    data-cat={key}
+                    className={[
+                      'inline-flex items-center gap-2 px-3 py-2 rounded-full border transition',
+                      'shrink-0 snap-start',
+                      selected
+                        ? 'border-[#FFCB7D] bg-yellow-500 text-white'
+                        : 'border-gray-300 text-gray-600 opacity-80',
+                    ].join(' ')}
+                    title={label}
+                  >
+                    {/* ★ 変更点: className で色を指定（selected時は selectedIconColor か text-white） */}
+                    <Icon
+                      size={18}
+                      className={selected ? (selectedIconColor ?? 'text-white') : iconColor}
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs font-bold whitespace-nowrap">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 右端グラデ＋矢印パルスのスクロールヒント */}
+            {catOverflow && (
+              <div className="pointer-events-none absolute right-0 top-0 h-full w-10 flex items-center justify-end">
+                <div className="absolute inset-0 bg-gradient-to-l from-white to-transparent" />
+                <div className="relative mr-1 rounded-full bg-black/40 p-1 animate-pulse">
+                  <ChevronRight size={14} className="text-white" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -477,8 +545,8 @@ export default function EditTaskModal({
                   type="button"
                   onClick={() => toggleDay(day)}
                   className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                    ? 'bg-[#5E5E5E] text-white'
-                    : 'bg-gray-200 text-gray-600'
+                      ? 'bg-[#5E5E5E] text-white'
+                      : 'bg-gray-200 text-gray-600'
                     }`}
                 >
                   {day}
@@ -574,7 +642,10 @@ export default function EditTaskModal({
             <select
               value={(editedTask as unknown as { point?: number }).point ?? 0}
               onChange={(e) =>
-                update('point' as keyof TaskWithNote, Number(e.target.value) as unknown as TaskWithNote[keyof TaskWithNote])
+                update(
+                  'point' as keyof TaskWithNote,
+                  Number(e.target.value) as unknown as TaskWithNote[keyof TaskWithNote]
+                )
               }
               className="w-full border-b border-gray-300 outline-none pl-2"
             >
@@ -588,7 +659,7 @@ export default function EditTaskModal({
         )}
 
         {/* 👤 担当者（共有時）/ 🔒 プライベート */}
-        {(isPairConfirmed) && (
+        {isPairConfirmed && (
           <>
             {!isPrivate && (
               <div className="flex items-center">
@@ -612,7 +683,9 @@ export default function EditTaskModal({
                           width={48}
                           height={48}
                           className="object-cover w-full h-full"
-                          onError={() => { /* no-op: 画像エラー時もクラッシュさせない */ }}
+                          onError={() => {
+                            /* no-op */
+                          }}
                         />
                       </button>
                     );
