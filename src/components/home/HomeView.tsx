@@ -18,7 +18,6 @@ import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasks
 import { isToday } from 'date-fns';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
-// ▼ 変更：usePremiumStatus を廃止し、useUserPlan を使用
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 
@@ -37,14 +36,8 @@ export default function HomeView() {
   const [isWeeklyPointsHidden, setIsWeeklyPointsHidden] = useState(false);
   const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
 
-  // ▼ 変更：isPremium / isChecking → plan / isChecking
   const { plan, isChecking } = useUserPlan();
-
   const uid = useUserUid();
-  const handleCloseOverlay = () => {
-    localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
-    setIsWeeklyPointsHidden(true);
-  };
 
   const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
 
@@ -65,14 +58,12 @@ export default function HomeView() {
   useEffect(() => {
     if (!uid) return;
     const userRef = doc(db, 'users', uid);
-
     const unsubscribe = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setIsLineLinked(!!(data as any).lineLinked);
       }
     });
-
     return () => unsubscribe();
   }, [uid]);
 
@@ -141,7 +132,6 @@ export default function HomeView() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const taskList = snapshot.docs.map(mapFirestoreDocToTask);
       setTasks(taskList);
-
       setTimeout(() => {
         setIsLoading(false);
       }, 50);
@@ -180,8 +170,6 @@ export default function HomeView() {
           }
         }}
       >
-        {/* <main className="main-content px-4 py-5 space-y-4 pb-20"> */}
-        {/* <main className="main-content overflow-y-auto px-4 py-5"> */}
         <main className="overflow-y-auto px-4 py-5">
           <motion.div
             initial={{ opacity: 0 }}
@@ -201,13 +189,15 @@ export default function HomeView() {
 
             <div
               onClick={() => setIsExpanded((prev) => !prev)}
-              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-                }`}
+              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+                isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+              }`}
             >
               <div className="absolute top-5 right-6 pointer-events-none z-10">
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-                    }`}
+                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
+                    isExpanded ? 'rotate-180' : ''
+                  }`}
                 />
               </div>
             </div>
@@ -229,7 +219,6 @@ export default function HomeView() {
                   period: period ?? '毎日',
                   dates,
                   daysOfWeek,
-                  // ▼ 追加：TaskCalendar に done を渡す（未処理表示に必要）
                   done: !!done,
                 }))}
               />
@@ -244,7 +233,10 @@ export default function HomeView() {
                   {!hasPairConfirmed && (
                     <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4 mx-auto w-full max-w-xl">
                       <button
-                        onClick={handleCloseOverlay}
+                        onClick={() => {
+                          localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
+                          setIsWeeklyPointsHidden(true);
+                        }}
                         className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
                         aria-label="閉じる"
                       >
@@ -272,46 +264,43 @@ export default function HomeView() {
               )}
             />
 
-            {/* ▼ 変更：プレミアム以外のときに広告表示 */}
             {!isLoading && !isChecking && plan === 'free' && <AdCard />}
+
+            {/* ▼ 追加：ホーム画面最下部に再表示ボタン */}
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowOnboarding(true)}
+                className="px-4 py-2 text-sm text-gray-500 underline hover:text-blue-800"
+              >
+                もう一度説明を見る
+              </button>
+            </div>
           </motion.div>
         </main>
       </div>
 
-      {/* ▼ 追加：初回のみ表示するオンボーディングモーダル */}
+      {/* ▼ オンボーディングモーダル */}
       {showOnboarding && (
-        // src/components/home/HomeView.tsx
         <OnboardingModal
           slides={[
             {
               src: '/onboarding/slide1.png',
               title: 'ようこそ PairKaji へ',
-              description: 'タスクを2人でシェア。まずは基本の動線を確認しましょう。',
+              description: 'タスクを2人でシェアして、家事をもっとスムーズに。',
             },
             {
               src: '/onboarding/slide2.png',
               title: 'タスクの追加と共有',
-              description: '＋から作成。ペア確定後は双方で編集・完了が可能です。',
+              description: '右下の＋からタスクを作成。ペアが確定すると双方で編集できます。',
             },
             {
               src: '/onboarding/slide3.png',
               title: '本日の進捗',
-              description: '今日の予定と達成度を見える化。WeeklyポイントでモチベUP。',
-            },
-            {
-              src: '/onboarding/slide3.png',
-              title: '本日の進捗',
-              description: '今日の予定と達成度を見える化。WeeklyポイントでモチベUP。',
-            },
-                        {
-              src: '/onboarding/slide3.png',
-              title: '本日の進捗',
-              description: '今日の予定と達成度を見える化。WeeklyポイントでモチベUP。',
+              description: '今日の完了タスクを確認。Weeklyポイントで達成度も見える化。',
             },
           ]}
           onClose={handleCloseOnboarding}
         />
-
       )}
     </>
   );
