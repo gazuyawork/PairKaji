@@ -294,7 +294,7 @@ export default function TaskCard({
           setShowActionButtons(true);
         }}
         className={clsx(
-          'w-full relative flex justify-between items-center px-2.5 py-2 rounded-2xl shadow-sm border overflow-hidden border-2',
+          'w-full relative flex justify-between items-center px-2.5 py-2 rounded-2xl shadow-xs border overflow-hidden border-2',
           task.done && 'opacity-50 scale-[0.99]',
           'hover:shadow-md cursor-pointer',
           'border-[#e5e5e5] bg-white',
