@@ -396,7 +396,7 @@ export default function TodoTaskCard({
           </div>
 
           {/* 2段目：タブ（左 or 非表示）＋ 入力/FAB（右→全幅） */}
-          <div className="flex items-center justify-between pt-3 pb-0 gap-2">
+          <div className="flex items-center justify-between pt-2 pb-0 gap-2">
             {/* 左：タブ（入力展開中は非表示にして入力を全幅に） */}
             {!isInputOpen && (
               <div className="flex space-x-0 h-10 shrink-0">
@@ -471,7 +471,7 @@ export default function TodoTaskCard({
                     layoutId="addInputInline"
                     className="
                       w-full
-                      px-3 py-2
+                      px-3 py-1 mb-1
                       bg-white/90 backdrop-blur
                       rounded-xl shadow-sm ring-1 ring-gray-200
                       flex items-center gap-2
@@ -511,7 +511,7 @@ export default function TodoTaskCard({
                       aria-label="TODOを入力"
                       title={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
                       className={clsx(
-                        'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px] border-b',
+                        'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px]',
                         tab === 'undone' && canAdd
                           ? 'border-gray-300 text-black'
                           : 'border-gray-200 text-gray-400 cursor-not-allowed',
