@@ -4,21 +4,44 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 type SlideInput =
   | string
   | {
+      /** 画像パス（/public 配下） */
       src: string;
+      /** 見出し（任意） */
       title?: string;
+      /** 説明テキスト（任意） */
       description?: string;
     };
 
 type Props = {
+  /**
+   * Figma書き出し画像の配列。string か {src,title,description} のどちらでもOK。
+   * captions を別で渡す場合は string[] 推奨（同じインデックスで対応）。
+   * 未指定・空でもデフォルトにフォールバックします。
+   */
   slides?: SlideInput[];
+
+  /**
+   * 旧形式：画像と説明を分離したいときに使用（slides が string[] の場合）。
+   * 長さが slides に満たない分は空文字で補完されます。
+   */
   captions?: string[];
+
+  /** モーダルを閉じる（確定時） */
   onClose: () => void;
+
+  /**
+   * 確認ダイアログの案内文（×/スキップ時）
+   * 例: '説明を閉じますか？\nホーム画面最下部の「もう一度説明を見る」から再表示できます。'
+   */
+  confirmMessage?: string;
 };
 
+// デフォルト（任意差し替え可）
 const DEFAULT_SLIDES: Array<{ src: string; title?: string; description?: string }> = [
   {
     src: '/onboarding/slide1.png',
@@ -37,8 +60,10 @@ const DEFAULT_SLIDES: Array<{ src: string; title?: string; description?: string 
   },
 ];
 
+// SlideInput を正規化して {src,title,description} の配列にそろえる
 function normalizeSlides(slides?: SlideInput[], captions?: string[]) {
   if (!slides || slides.length === 0) return DEFAULT_SLIDES;
+
   if (typeof slides[0] === 'string') {
     const s = slides as string[];
     const caps = captions ?? [];
@@ -48,6 +73,7 @@ function normalizeSlides(slides?: SlideInput[], captions?: string[]) {
       description: caps[i] ?? '',
     }));
   }
+
   return (slides as Array<{ src: string; title?: string; description?: string }>).map((v) => ({
     src: v.src,
     title: v.title,
@@ -55,20 +81,37 @@ function normalizeSlides(slides?: SlideInput[], captions?: string[]) {
   }));
 }
 
-export default function OnboardingModal({ slides, captions, onClose }: Props) {
+export default function OnboardingModal({
+  slides,
+  captions,
+  onClose,
+  confirmMessage = '説明を閉じますか？\nホーム画面最下部の「もう一度説明を見る」から再表示できます。',
+}: Props) {
   const items = normalizeSlides(slides, captions);
   const [current, setCurrent] = useState(0);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
+  // 初期フォーカス（アクセシビリティ）
   useEffect(() => {
     closeBtnRef.current?.focus();
   }, []);
 
+  // items が変わった時に current の範囲を安全に補正
   useEffect(() => {
     if (current > items.length - 1) {
       setCurrent(0);
     }
   }, [items.length, current]);
+
+  // モーダル表示中は背面スクロールをロック
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const isLast = current === items.length - 1;
 
@@ -84,28 +127,30 @@ export default function OnboardingModal({ slides, captions, onClose }: Props) {
     if (current > 0) setCurrent((p) => p - 1);
   };
 
-  // 背景クリックで閉じる。内側クリックは伝播停止
+  // ×/スキップ/背景クリック時の確認
+  const handleCloseWithConfirm = () => {
+    // window.confirm はユーザーの指示で使用（ブラウザ標準の簡易モーダル）
+    const ok = window.confirm(confirmMessage);
+    if (ok) onClose();
+  };
+
+  // 背景クリック → 確認ダイアログ。内側クリックは伝播停止
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   const { src, title, description } = items[current] ?? {};
 
-  // ★ 追加：×ボタンで閉じる時の確認ダイアログ
-  const handleCloseWithConfirm = () => {
-    const ok = window.confirm(
-      '説明を閉じますか？\n「〇〇画面」からもう一度見ることができます。'
-    );
-    if (ok) {
-      onClose();
-    }
-  };
+  if (typeof window === 'undefined') return null; // SSR ガード
 
-  return (
+  // Portal で body 直下に描画（transform/z-index 影響を回避）
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/60"
+      // z-index は極めて高く設定（ヘッダー/フッターより上）
+      className="fixed inset-0 z-[2147483647] bg-black/60"
       role="dialog"
       aria-modal="true"
       onClick={handleCloseWithConfirm}
     >
+      {/* 縦幅いっぱい（100dvh）・フレックス縦配置 */}
       <div
         className="relative w-screen h-[100dvh] bg-white flex flex-col"
         onClick={stop}
@@ -122,10 +167,11 @@ export default function OnboardingModal({ slides, captions, onClose }: Props) {
           </button>
         </div>
 
-        {/* 本文 */}
+        {/* 本文：スクロール可能領域（画像 + 説明） */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
+          {/* 画像：表示範囲を広げたい場合は height を調整（例: 70vh / 80vh） */}
           <div className="relative w-full rounded-xl bg-gray-50 overflow-hidden">
-            <div className="relative w-full" style={{ height: 'min(65vh, 650px)' }}>
+            <div className="relative w-full" style={{ height: 'min(70vh, 720px)' }}>
               {src && (
                 <Image
                   src={src}
@@ -154,8 +200,9 @@ export default function OnboardingModal({ slides, captions, onClose }: Props) {
           )}
         </div>
 
-        {/* フッター */}
+        {/* フッター：ページネーション＋操作ボタン（セーフエリア対応） */}
         <div className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] border-t border-gray-200 bg-white">
+          {/* ページネーションドット */}
           <div className="flex items-center justify-center gap-2 mb-3">
             {items.map((_, i) => (
               <span
@@ -167,6 +214,7 @@ export default function OnboardingModal({ slides, captions, onClose }: Props) {
             ))}
           </div>
 
+          {/* ナビゲーションボタン */}
           <div className="flex items-center justify-between">
             <button
               onClick={handlePrev}
@@ -180,23 +228,26 @@ export default function OnboardingModal({ slides, captions, onClose }: Props) {
             </button>
 
             <div className="flex items-center gap-3">
-              {/* <button
+              <button
                 onClick={handleCloseWithConfirm}
                 className="text-gray-500 hover:text-gray-700 underline underline-offset-2"
               >
                 スキップ
-              </button> */}
+              </button>
               <button
                 onClick={handleNext}
                 className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
               >
-                {isLast ? 'はじめる' : '次へ'}
-                {!isLast && <ChevronRight className="inline-block ml-1 w-4 h-4" />}
+                {current === items.length - 1 ? 'はじめる' : '次へ'}
+                {current !== items.length - 1 && (
+                  <ChevronRight className="inline-block ml-1 w-4 h-4" />
+                )}
               </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
