@@ -906,11 +906,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
                       ].join(' ')}
                     >
-                      <Calendar className={`w-6 h-6 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
+                      <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-[#f5b94f]'}`} />
                       <span
                         className={[
                           'absolute text-[12px] font-bold top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
-                          todayFilter ? 'text-white' : 'text-gray-600',
+                          todayFilter ? 'text-white' : 'text-[#f5b94f] pb-1',
                         ].join(' ')}
                       >
                         {todayDate}
@@ -932,7 +932,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           'shrink-0',
                           privateFilter
                             ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[2px] border-[#059669] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                            : 'bg-white text-[#5E5E5E] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#059669] hover:text-white hover:border-[#059669]',
+                            : 'bg-white text-[#059669] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#059669] hover:text-white hover:border-[#059669]',
                         ].join(' ')}
                       >
                         <SquareUser className="w-7 h-7" />
@@ -953,7 +953,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         'shrink-0',
                         flaggedFilter
                           ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] text-white border-[2px] border-[#f43f5e] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                          : 'bg-white text-[#5E5E5E] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]',
+                          : 'bg-white text-[#fb7185] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]',
                       ].join(' ')}
                     >
                       <Flag className="w-6 h-6" />
