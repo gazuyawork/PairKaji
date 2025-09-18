@@ -1,6 +1,7 @@
+// src/components/home/HomeView.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
@@ -20,6 +21,9 @@ import LineLinkCard from '@/components/home/parts/LineLinkCard';
 // ▼ 変更：usePremiumStatus を廃止し、useUserPlan を使用
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
+
+// ▼ 追加：オンボーディングモーダル
+import OnboardingModal from '@/components/common/OnboardingModal';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -44,6 +48,20 @@ export default function HomeView() {
 
   const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
 
+  // ▼ 追加：オンボーディング制御
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
+
+  useEffect(() => {
+    const seen = localStorage.getItem(ONBOARDING_SEEN_KEY);
+    if (!seen) setShowOnboarding(true);
+  }, []);
+
+  const handleCloseOnboarding = () => {
+    localStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
+    setShowOnboarding(false);
+  };
+
   useEffect(() => {
     if (!uid) return;
     const userRef = doc(db, 'users', uid);
@@ -51,7 +69,7 @@ export default function HomeView() {
     const unsubscribe = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        setIsLineLinked(!!data.lineLinked);
+        setIsLineLinked(!!(data as any).lineLinked);
       }
     });
 
@@ -249,7 +267,7 @@ export default function HomeView() {
                   isToday(
                     typeof task.completedAt === 'string'
                       ? new Date(task.completedAt)
-                      : task.completedAt.toDate()
+                      : (task.completedAt as any).toDate()
                   )
               )}
             />
@@ -259,6 +277,42 @@ export default function HomeView() {
           </motion.div>
         </main>
       </div>
+
+      {/* ▼ 追加：初回のみ表示するオンボーディングモーダル */}
+      {showOnboarding && (
+        // src/components/home/HomeView.tsx
+        <OnboardingModal
+          slides={[
+            {
+              src: '/onboarding/slide1.png',
+              title: 'ようこそ PairKaji へ',
+              description: 'タスクを2人でシェア。まずは基本の動線を確認しましょう。',
+            },
+            {
+              src: '/onboarding/slide2.png',
+              title: 'タスクの追加と共有',
+              description: '＋から作成。ペア確定後は双方で編集・完了が可能です。',
+            },
+            {
+              src: '/onboarding/slide3.png',
+              title: '本日の進捗',
+              description: '今日の予定と達成度を見える化。WeeklyポイントでモチベUP。',
+            },
+            {
+              src: '/onboarding/slide3.png',
+              title: '本日の進捗',
+              description: '今日の予定と達成度を見える化。WeeklyポイントでモチベUP。',
+            },
+                        {
+              src: '/onboarding/slide3.png',
+              title: '本日の進捗',
+              description: '今日の予定と達成度を見える化。WeeklyポイントでモチベUP。',
+            },
+          ]}
+          onClose={handleCloseOnboarding}
+        />
+
+      )}
     </>
   );
 }
