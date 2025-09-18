@@ -145,7 +145,7 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => {};
+  const handleDragStart = () => { };
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -373,7 +373,7 @@ export default function TodoTaskCard({
           style={{ top: 'env(safe-area-inset-top, 0px)' }}
         >
           {/* 1段目：カテゴリ＆タスク名＆× */}
-          <div className="flex justify-between items-center py-1">
+          <div className="flex justify-between items-center py-2 mx-[-6px] bg-white">
             <div className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0" aria-label="タスク名">
               <CatIcon size={20} className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)} aria-label={`${categoryLabel}カテゴリ`} />
               <span className="font-bold text-[18px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2">
@@ -384,19 +384,19 @@ export default function TodoTaskCard({
             {/* ×ボタン */}
             <motion.button
               onClick={handleClose}
-              className="px-2 shrink-0 text-gray-500 hover:text-red-500"
+              className="pr-4 shrink-0 text-red-600 hover:text-red-500"
               type="button"
               title="この画面を閉じる"
               aria-label="この画面を閉じる"
               whileTap={{ scale: 0.98 }}
               variants={SHAKE_VARIANTS}
             >
-              <X size={20} />
+              <X size={22} />
             </motion.button>
           </div>
 
           {/* 2段目：タブ（左 or 非表示）＋ 入力/FAB（右→全幅） */}
-          <div className="flex items-center justify-between pb-1 gap-2">
+          <div className="flex items-center justify-between pt-3 pb-0 gap-2">
             {/* 左：タブ（入力展開中は非表示にして入力を全幅に） */}
             {!isInputOpen && (
               <div className="flex space-x-0 h-10 shrink-0">
@@ -407,8 +407,8 @@ export default function TodoTaskCard({
                       key={type}
                       onClick={() => setTab(type)}
                       className={clsx(
-                        'relative pl-5 py-1 text-[13px] sm:text-sm font-bold border border-gray-300',
-                        'rounded-t-md w-24 sm:w-24 flex items-center justify-center',
+                        'relative pl-5 pt-5 pb-6 text-[14px] sm:text-sm font-bold border border-gray-300',
+                        'rounded-t-md w-26 sm:w-26 flex items-center justify-center',
                         type === tab ? 'bg-white text-[#5E5E5E] border-b-transparent z-10' : 'bg-gray-100 text-gray-400 z-0',
                       )}
                       type="button"
@@ -417,7 +417,7 @@ export default function TodoTaskCard({
                     >
                       <span
                         className={clsx(
-                          'absolute left-1.5 sm:left-2 inline-block min-w-[18px] sm:min-w-[20px] h-[18px] sm:h-[20px] leading-[18px] sm:leading-[20px] text-white rounded-full text-center',
+                          'absolute left-2.5 sm:left-2 inline-block min-w-[20px] sm:min-w-[22px] h-[20px] sm:h-[22px] leading-[20px] sm:leading-[22px] text-white rounded-full text-center',
                           count === 0
                             ? 'bg-gray-300'
                             : type === 'undone'
@@ -440,24 +440,30 @@ export default function TodoTaskCard({
                 {!isInputOpen ? (
                   <motion.button
                     key="fab-plus-inline"
-                    layoutId="addInputInline"
+                    /* 削除: layoutId="addInputInline" */
+                    layout={false} /* ← レイアウトの補間を禁止 */
                     type="button"
                     onClick={openAddInput}
                     aria-label="TODOを追加"
                     className={clsx(
-                      'ml-auto block',
+                      'ml-auto block mb-2',
                       'rounded-full shadow-md',
                       'bg-gradient-to-br from-orange-300 to-orange-500 text-white',
                       'h-10 w-10 flex items-center justify-center'
                     )}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                    /* フェードインのみ */
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }} // 速め
+                    /* 伸び縮みも完全排除したい場合は whileTap も消します */
+                    /* 削除推奨: whileTap={{ scale: 0.96 }} */
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
                   >
-                    <Plus size={22} />
+                    <Plus size={24} />
                   </motion.button>
+
+
+
                 ) : (
                   <motion.div
                     key="full-input"
@@ -562,9 +568,9 @@ export default function TodoTaskCard({
                       type="button"
                       aria-label="検索をクリア"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 mr-2"
                     >
-                      <X size={16} />
+                      <X size={18} />
                     </button>
                   )}
                 </div>
