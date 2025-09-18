@@ -69,7 +69,7 @@ export default function FilterControls({
               ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] border-[#f0a93a] shadow-inner'
               : 'bg-white border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)] hover:bg-[#FFCB7D] hover:border-[#FFCB7D]'}`}
         >
-          <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
+          <Calendar className={`w-6 h-6 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
           <span
             className={`absolute text-[12px] font-bold top-[62.14%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${todayFilter ? 'text-white' : 'text-gray-600'}`}
           >

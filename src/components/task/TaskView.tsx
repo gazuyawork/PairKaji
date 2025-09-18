@@ -906,7 +906,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
                       ].join(' ')}
                     >
-                      <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
+                      <Calendar className={`w-6 h-6 ${todayFilter ? 'text-white' : 'text-gray-600'}`} />
                       <span
                         className={[
                           'absolute text-[12px] font-bold top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
@@ -977,7 +977,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
                       ].join(' ')}
                     >
-                      <Search className={`w-7 h-7 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
+                      <Search className={`w-6 h-6 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
                     </button>
 
 

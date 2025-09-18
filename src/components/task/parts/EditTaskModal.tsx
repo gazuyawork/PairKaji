@@ -544,7 +544,7 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-7 h-7 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
+                  className={`w-6 h-6 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
                       ? 'bg-[#5E5E5E] text-white'
                       : 'bg-gray-200 text-gray-600'
                     }`}
@@ -772,12 +772,12 @@ export default function EditTaskModal({
           </div>
           {noteError && <p className="text-xs text-red-500 ml-20 mt-1">{noteError}</p>}
           {isIOS && showScrollHint && (
-            <div className="pointer-events-none absolute bottom-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+            <div className="pointer-events-none absolute bottom-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
               <ChevronDown size={16} className="text-white" />
             </div>
           )}
           {isIOS && showScrollUpHint && (
-            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
               <ChevronUp size={16} className="text-white" />
             </div>
           )}

@@ -654,12 +654,12 @@ export default function TodoTaskCard({
             </div>
 
             {showScrollDownHint && (
-              <div className="pointer-events-none absolute bottom-4 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <div className="pointer-events-none absolute bottom-4 right-5 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
                 <ChevronDown size={16} className="text-white" />
               </div>
             )}
             {showScrollUpHint && (
-              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <div className="pointer-events-none absolute top-2 right-5 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
                 <ChevronUp size={16} className="text-white" />
               </div>
             )}
