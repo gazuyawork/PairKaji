@@ -36,21 +36,21 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
           pathname === '/contact' ||
           pathname === '/task_manage' ||
           pathname === '/delete-account') && (
-          <motion.button
-            whileTap={{ scale: 0.9 }} // ▼ 押した時に縮小
-            onClick={() => {
-              if (pathname === '/task_manage') {
-                router.push('/main?fromTaskManage=true');
-                return;
-              }
-              router.push('/main');
-            }}
-            className="text-[#5E5E5E] active:translate-y-[1px]"
-            aria-label="戻る"
-          >
-            <ArrowLeft size={24} />
-          </motion.button>
-        )}
+            <motion.button
+              whileTap={{ scale: 0.9 }} // ▼ 押した時に縮小
+              onClick={() => {
+                if (pathname === '/task_manage') {
+                  router.push('/main?fromTaskManage=true');
+                  return;
+                }
+                router.push('/main');
+              }}
+              className="text-[#5E5E5E] active:translate-y-[1px]"
+              aria-label="戻る"
+            >
+              <ArrowLeft size={24} />
+            </motion.button>
+          )}
       </div>
 
       {/* タイトル */}
@@ -102,7 +102,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
                 <Mail size={16} />
                 お問い合わせ
               </li>
-                            <li
+              <li
                 className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
                 onClick={() => {
                   setShowMenu(false);
@@ -114,10 +114,18 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
               </li>
               <li
                 className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                // 変更後（★追加・変更点を明示）
                 onClick={async () => {
                   setShowMenu(false);
-                  await signOut(auth);
-                  router.push('/login');
+                  try {
+                    // ★追加：手動ログアウト中フラグを立てる
+                    sessionStorage.setItem('manualSignOut', '1');
+
+                    await signOut(auth);
+                  } finally {
+                    // 遷移は従来どおり
+                    router.push('/login');
+                  }
                 }}
               >
                 <LogOut size={16} />

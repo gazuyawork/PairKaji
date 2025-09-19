@@ -10,7 +10,6 @@ import RequireAuth from '@/components/auth/RequireAuth';
 
 export default function MainPage() {
   return (
-
     <Suspense
       fallback={
         <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">

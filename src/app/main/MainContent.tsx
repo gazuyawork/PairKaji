@@ -1,12 +1,12 @@
+// src/app/main/MainContent.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { auth } from '@/lib/firebase';
 import FooterNav from '@/components/common/FooterNav';
 import HomeView from '@/components/home/HomeView';
 import TaskView from '@/components/task/TaskView';
@@ -17,21 +17,19 @@ import { useView } from '@/context/ViewContext';
 import clsx from 'clsx';
 import { Plus } from 'lucide-react';
 
+/**
+ * 認証ガードは親 (page.tsx) の <RequireAuth> で実施。
+ * 本コンポーネントは UI 制御の Hook だけを常に同順で実行する。
+ */
 export default function MainContent() {
   const searchParams = useSearchParams();
   const searchKeyword = searchParams.get('search') ?? '';
   const { index, setIndex } = useView();
-  const [authReady, setAuthReady] = useState(false);
+
   const [showQuickSplash, setShowQuickSplash] = useState(false);
   const [contentVisible, setContentVisible] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(() => {
-      setAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
+  // クエリ view による初期タブ設定（常に実行）
   useEffect(() => {
     const view = searchParams.get('view');
     if (view === 'task') setIndex(1);
@@ -39,6 +37,7 @@ export default function MainContent() {
     else if (view === 'todo') setIndex(2);
   }, [searchParams, setIndex]);
 
+  // QuickSplash の制御（常に実行）
   useEffect(() => {
     const withSplash = searchParams.get('withQuickSplash');
     const skipSplash = searchParams.get('skipQuickSplash');
@@ -61,6 +60,38 @@ export default function MainContent() {
     }
   }, [searchParams]);
 
+  // タイトルは index から算出（メモ化）
+  const currentTitle = useMemo(() => {
+    const titles = ['Home', 'Task', 'Todo'];
+    return titles[index] ?? 'タイトル未設定';
+  }, [index]);
+
+  // クイックスプラッシュ表示中は全面表示
+  if (showQuickSplash) {
+    return <QuickSplash />;
+  }
+
+  return (
+    <AuthedMainContent
+      index={index}
+      setIndex={setIndex}
+      contentVisible={contentVisible}
+      searchKeyword={searchKeyword}
+      currentTitle={currentTitle}
+    />
+  );
+}
+
+/** ログイン後だけ必要な UI/Hook（useSwipeable 等）はこの子に集約 */
+function AuthedMainContent(props: {
+  index: number;
+  setIndex: (n: number) => void;
+  contentVisible: boolean;
+  searchKeyword: string;
+  currentTitle: string;
+}) {
+  const { index, setIndex, contentVisible, searchKeyword, currentTitle } = props;
+
   const handleSwipe = (direction: 'left' | 'right') => {
     if (direction === 'left' && index < 2) setIndex(index + 1);
     else if (direction === 'right' && index > 0) setIndex(index - 1);
@@ -81,13 +112,6 @@ export default function MainContent() {
     touchEventOptions: { passive: true },
   });
 
-  if (!authReady || showQuickSplash) {
-    return <QuickSplash />;
-  }
-
-  const titles = ['Home', 'Task', 'Todo'];
-  const currentTitle = titles[index] ?? 'タイトル未設定';
-
   return (
     <div className="h-[calc(100dvh-150px)]">
       <Header title={currentTitle} />
@@ -101,7 +125,7 @@ export default function MainContent() {
           <motion.div
             className="relative flex w-[300vw] h-full"
             initial={false}
-            animate={{ left: `-${index * 100}vw` }}  // ← transformではなくleftでスライド
+            animate={{ left: `-${index * 100}vw` }}
             transition={{
               type: 'tween',
               ease: [0.25, 0.1, 0.25, 1],

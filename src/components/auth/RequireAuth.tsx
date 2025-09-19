@@ -1,115 +1,85 @@
 // src/components/auth/RequireAuth.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { onIdTokenChanged, type User } from 'firebase/auth';
+import { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { motion } from 'framer-motion';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
-export default function RequireAuth({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+type Props = { children: React.ReactNode };
 
-  const [checking, setChecking] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
-  const [showModal, setShowModal] = useState(false);
+export default function RequireAuth({ children }: Props) {
+    const router = useRouter();
+    const pathname = usePathname();
 
-  const actedRef = useRef(false);
+    const [ready, setReady] = useState(false);        // 認証確認完了
+    const [authed, setAuthed] = useState<boolean>(false);
+    const [showExpired, setShowExpired] = useState(false);
+    const wasAuthedRef = useRef(false);
 
-  const nextUrl = useMemo(() => {
-    const qs = searchParams?.toString();
-    return qs && qs.length > 0 ? `${pathname}?${qs}` : pathname || '/';
-  }, [pathname, searchParams]);
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (u) => {
+            if (u) {
+                setAuthed(true);
+                setReady(true);
+                wasAuthedRef.current = true;
+                setShowExpired(false);
+            } else {
+                setAuthed(false);
+                setReady(true);
+                if (wasAuthedRef.current) {
+                    // ★セッション切れ or 手動ログアウト
+                    const manual = sessionStorage.getItem('manualSignOut') === '1';
+                    if (manual) {
+                        // ★手動ログアウト時はモーダルを出さない
+                        sessionStorage.removeItem('manualSignOut');
+                        const from = encodeURIComponent(pathname || '/');
+                        router.replace(`/login?from=${from}`);
+                    } else {
+                        // ★純粋なセッション切れのみモーダル表示
+                        setShowExpired(true);
+                    }
+                } else {
+                    // 初回から未ログイン
+                    const from = encodeURIComponent(pathname || '/');
+                    router.replace(`/login?from=${from}`);
+                }
+            }
+        });
+        return () => unsub();
+    }, [router, pathname]);
 
-  const handleRedirect = () => {
-    if (typeof queueMicrotask === 'function') {
-      queueMicrotask(() =>
-        router.replace(`/login?next=${encodeURIComponent(nextUrl)}`)
-      );
-    } else {
-      Promise.resolve().then(() =>
-        router.replace(`/login?next=${encodeURIComponent(nextUrl)}`)
-      );
+
+    // 認証確認中
+    if (!ready) {
+        return (
+            <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
+                <div className="w-6 h-6 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
     }
-  };
 
-  const openConfirmModal = () => {
-    if (actedRef.current) return;
-    actedRef.current = true;
-    setShowModal(true);
-  };
-
-  useEffect(() => {
-    // 即時チェック
-    if (auth?.currentUser) {
-      setUser(auth.currentUser);
-      setChecking(false);
+    // 未ログイン時
+    if (!authed) {
+        return (
+            <>
+                {showExpired && (
+                    <ConfirmModal
+                        isOpen={true}
+                        title="セッション切れ"
+                        message="セッションが切れました。ログイン画面に移動します。"
+                        confirmLabel="OK"
+                        onConfirm={() => {
+                            const from = encodeURIComponent(pathname || '/');
+                            router.replace(`/login?from=${from}`);
+                        }}
+                    />
+                )}
+            </>
+        );
     }
 
-    // 監視
-    const unsub = onIdTokenChanged(auth, (u) => {
-      setUser(u);
-      setChecking(false);
-      if (!u) {
-        openConfirmModal();
-      }
-    });
-
-    const timeoutId = window.setTimeout(() => {
-      if (checking && !actedRef.current) {
-        if (!auth?.currentUser) {
-          setChecking(false);
-          openConfirmModal();
-        }
-      }
-    }, 4000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-      unsub();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nextUrl]);
-
-  // 🔒 Hooks を呼び出した後に判定する
-  if (pathname?.startsWith('/login')) {
+    // ログイン済み
     return <>{children}</>;
-  }
-
-  if (checking) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-sm text-gray-500"
-        >
-          認証情報を確認しています…
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <ConfirmModal
-        isOpen={showModal}
-        title="セッション切れ"
-        message={
-          <div>
-            ログインセッションが切れました。
-            <br />
-            再ログインします。
-          </div>
-        }
-        onConfirm={handleRedirect}
-        confirmLabel="OK"
-      />
-    );
-  }
-
-  return <>{children}</>;
 }
