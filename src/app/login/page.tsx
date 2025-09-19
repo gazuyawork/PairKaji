@@ -49,11 +49,19 @@ export default function LoginPage() {
   useEffect(() => {
     if (handledRedirectRef.current) return;
     handledRedirectRef.current = true;
+
     (async () => {
       try {
         const result = await getRedirectResult(auth);
-        if (result?.user) router.replace('/main');
-      } finally {
+        if (result?.user) {
+          // ユーザーが取得できた → 遷移。ローディングは維持（アンマウントまで）
+          router.replace('/main');
+        } else {
+          // ユーザーなし → このページに留まるのでローディング解除
+          setIsLoading(false);
+        }
+      } catch {
+        // 失敗時はこのページに留まるのでローディング解除
         setIsLoading(false);
       }
     })();
@@ -63,7 +71,7 @@ export default function LoginPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u) {
-        setIsLoading(false);
+        // ローディングは維持したまま遷移（アンマウントまで覆いかぶせる）
         router.replace('/main');
       }
     });
