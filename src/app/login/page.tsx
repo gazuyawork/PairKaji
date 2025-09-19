@@ -24,44 +24,44 @@ import Link from 'next/link';
 export default function LoginPage() {
   const router = useRouter();
 
-  // ---------------- UI state ----------------
+  // UI state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // ---------------- 一度だけ persistence を設定 ----------------
+  // NEW: インラインエラー
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // persistence設定
   useEffect(() => {
     (async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
       } catch {
-        // 無視：デフォルトでも動作する
+        // デフォルトで動作するので無視
       }
     })();
   }, []);
 
-  // ---------------- Redirect result (one-shot) ----------------
+  // Redirect result
   const handledRedirectRef = useRef(false);
   useEffect(() => {
     if (handledRedirectRef.current) return;
     handledRedirectRef.current = true;
-
     (async () => {
       try {
         const result = await getRedirectResult(auth);
-        if (result?.user) {
-          router.replace('/main');
-        }
-      } catch {
-        // "Pending promise was never set" 等は無視
+        if (result?.user) router.replace('/main');
       } finally {
         setIsLoading(false);
       }
     })();
   }, [router]);
 
-  // ---------------- Auth state watcher ----------------
+  // Auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u) {
@@ -72,74 +72,81 @@ export default function LoginPage() {
     return () => unsub();
   }, [router]);
 
-  // ---------------- Handlers ----------------
+  // Handlers
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleLogin();
+  };
+
   const handleLogin = async () => {
+    setEmailError('');
+    setPasswordError('');
+    setLoginError('');
+
+    const emailTrimmed = email.trim();
+    let hasError = false;
+    if (!emailTrimmed) {
+      setEmailError('メールアドレスを入力してください');
+      hasError = true;
+    }
+    if (!password) {
+      setPasswordError('パスワードを入力してください');
+      hasError = true;
+    }
+    if (hasError) return;
+
     setIsLoading(true);
     try {
-      // persistence はマウント時に設定済み
-      await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged が遷移を担当
+      await signInWithEmailAndPassword(auth, emailTrimmed, password);
     } catch (error: unknown) {
       if (error instanceof FirebaseError) {
-        alert('ログインに失敗しました: ' + error.message);
+        setLoginError('ログインに失敗しました：' + error.message);
       } else {
-        alert('予期せぬエラーが発生しました');
+        setLoginError('予期せぬエラーが発生しました');
       }
       setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
+    setEmailError('');
+    setPasswordError('');
+    setLoginError('');
     try {
       const provider = new GoogleAuthProvider();
-      // ★ ユーザー操作の連続性を維持：先に Promise を作ってから isLoading を立てる
       const popupPromise = signInWithPopup(auth, provider);
       setIsLoading(true);
       await popupPromise;
-      // 認証成功 → onAuthStateChanged が遷移
     } catch (err) {
       const fe = err as FirebaseError;
-
-      // ユーザーが自分で閉じた → その場で解除
       if (fe?.code === 'auth/popup-closed-by-user') {
         setIsLoading(false);
         return;
       }
-
-      // ポップアップ不可系 → Redirect フォールバック
       const needRedirect =
         fe?.code === 'auth/popup-blocked' ||
         fe?.code === 'auth/operation-not-supported-in-this-environment' ||
         fe?.code === 'auth/unauthorized-domain';
-
       if (needRedirect) {
         try {
-          setIsLoading(true); // 遷移までローディング維持
+          setIsLoading(true);
           await signInWithRedirect(auth, new GoogleAuthProvider());
-          return; // 以降はブラウザ遷移
+          return;
         } catch (e) {
-          // Redirect 自体が失敗
           setIsLoading(false);
           if (e instanceof FirebaseError) {
-            alert('ログインに失敗しました: ' + e.message);
+            setLoginError('ログインに失敗しました：' + e.message);
           } else {
-            alert('予期せぬエラーが発生しました');
+            setLoginError('予期せぬエラーが発生しました');
           }
-          return;
         }
       }
-
-      // その他のエラー
       setIsLoading(false);
-      if (fe) {
-        alert('ログインに失敗しました: ' + fe.message);
-      } else {
-        alert('予期せぬエラーが発生しました');
-      }
+      setLoginError('ログインに失敗しました：' + fe?.message);
     }
   };
 
-  // ---------------- UI ----------------
+  // UI
   return (
     <motion.div
       className="relative min-h-screen flex flex-col items-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-4 py-12"
@@ -147,89 +154,118 @@ export default function LoginPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.7 }}
     >
+      {/* ロゴとサブタイトル → 元のまま */}
       <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
       <p className="text-[#5E5E5E] mb-[50px] font-sans">ログイン</p>
 
-      <div className="w-full max-w-[340px] flex flex-col gap-4">
-        <label className="text-[#5E5E5E] text-[18px] font-sans">メールアドレス</label>
-        <input
-          type="email"
-          className="text-[18px] p-[10px] mt-[-10px] border border-[#AAAAAA] w-full font-sans"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="test@gmail.com"
-          disabled={isLoading}
-        />
+      {/* カード化 */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        className="w-full max-w-md rounded-2xl border border-[#e8e2d7] bg-white/80 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.07)] p-4 sm:p-5"
+      >
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          {/* メール */}
+          <div className="space-y-1">
+            <label className="text-[#5E5E5E] text-[16px] font-medium">メールアドレス</label>
+            <input
+              type="email"
+              className="text-[16px] px-3.5 py-3 rounded-xl border border-[#d8d5cf] bg-white/90 shadow-inner outline-none
+                         focus:ring-4 focus:ring-amber-200/70 focus:border-amber-400 transition w-full"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              disabled={isLoading}
+              autoComplete="email"
+              inputMode="email"
+            />
+            {emailError && (
+              <p className="text-sm text-red-500">{emailError}</p>
+            )}
+          </div>
 
-        <label className="text-[#5E5E5E] text-[18px] font-sans">パスワード</label>
-        <div className="relative">
-          <input
-            type={showPassword ? 'text' : 'password'}
-            className="text-[18px] mt-[-10px] p-[10px] border border-[#AAAAAA] w-full font-sans"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••"
+          {/* パスワード */}
+          <div className="space-y-1">
+            <label className="text-[#5E5E5E] text-[16px] font-medium">パスワード</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="text-[16px] px-3.5 py-3 rounded-xl border border-[#d8d5cf] bg-white/90 shadow-inner outline-none
+                           focus:ring-4 focus:ring-amber-200/70 focus:border-amber-400 transition w-full pr-10"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••"
+                disabled={isLoading}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute top-1/2 right-2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition"
+                disabled={isLoading}
+                aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {passwordError && (
+              <p className="text-sm text-red-500">{passwordError}</p>
+            )}
+          </div>
+
+          {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+
+          {/* ログインボタン → 元の青色 */}
+          <motion.button
+            whileTap={{ scale: isLoading ? 1 : 0.98 }}
+            type="submit"
             disabled={isLoading}
-          />
+            className="w-full mt-2 px-4 py-3 text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px]
+                       disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
+          >
+            {isLoading ? '認証中…' : 'ログインする'}
+          </motion.button>
+
+          <Link href="/forgot-password" className="text-xs text-center text-[#5E5E5E] underline font-sans mt-1">
+            パスワードを忘れた方はこちら
+          </Link>
+
+          <hr className="w-full border-t border-[#AAAAAA] opacity-30 my-3" />
+
+          {/* Googleログイン → 赤色そのまま */}
+          <motion.button
+            whileTap={{ scale: isLoading ? 1 : 0.98 }}
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+            className="w-full px-4 py-3 text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]
+                       disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
+          >
+            Googleでログイン
+          </motion.button>
+
+          {/* 新規登録へ → 枠線のみ */}
           <button
             type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute top-1/2 right-2 -translate-y-1/2 text-gray-500"
+            onClick={() => router.push('/register')}
             disabled={isLoading}
-            aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+            className="w-full px-4 py-3 rounded-[10px] border border-[#AAAAAA] font-sans text-[16px] text-[#5E5E5E]
+                       disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
           >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            初めての方はこちら
           </button>
-        </div>
+        </form>
+      </motion.div>
 
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={handleLogin}
-          disabled={isLoading}
-          className="w-full mt-[20px] mb-[10px] p-[10px] text-white rounded-[10px] bg-[#5E8BC7] border border-[#AAAAAA] font-sans text-[16px] disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
-        >
-          ログインする
-        </motion.button>
-
-        <Link href="/forgot-password">
-          <p className="text-xs text-center text-[#5E5E5E] mt-2 underline font-sans">
-            パスワードを忘れた方はこちら
-          </p>
-        </Link>
-
-        <hr className="w-full border-t border-[#AAAAAA] opacity-30 my-5" />
-
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={handleGoogleLogin}
-          disabled={isLoading}
-          className="w-full mb-[5px] p-[10px] text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px] disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
-        >
-          Googleでログイン
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => router.push('/register')}
-          disabled={isLoading}
-          className="w-full mb-[10px] p-[10px] rounded-[10px] border border-[#AAAAAA] font-sans text-[16px] disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
-        >
-          初めての方はこちら
-        </motion.button>
-      </div>
-
-      <Link href="/landing">
-        <p className="text-xs text-center text-[#5E5E5E] mt-6 underline font-sans">
+      <Link href="/landing" className="mt-6">
+        <p className="text-xs text-center text-[#5E5E5E] underline font-sans">
           PairKajiとは？
         </p>
       </Link>
 
       {isLoading && (
-        <div
-          className="absolute inset-0 bg-white/70 flex items-center justify-center z-50"
-          role="status"
-          aria-label="認証処理中"
-        >
+        <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-50">
           <motion.div
             className="w-12 h-12 border-4 border-[#5E8BC7] border-t-transparent rounded-full"
             animate={{ rotate: 360 }}

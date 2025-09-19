@@ -53,12 +53,21 @@ export default function RequireAuth({ children }: Props) {
 
     // 認証確認中
     if (!ready) {
+        // ★ QuickSplash が表示中ならローディングを出さない
+        const splashActive =
+            typeof window !== 'undefined' && sessionStorage.getItem('splashActive') === '1';
+        if (splashActive) {
+            return null; // ← スプラッシュに画面制御を委ねる
+        }
+
+        // （スプラッシュが無い画面のために既存ローディングは残す）
         return (
             <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
                 <div className="w-6 h-6 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
+
 
     // 未ログイン時
     if (!authed) {
