@@ -107,8 +107,8 @@ export default function RegisterPage() {
 
       {/* ★NEW: フォーム全体をカードで包む（外側の幅は元と同等に） */}
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
         className="w-full max-w-md rounded-2xl border border-[#e8e2d7] bg-white/80 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.07)] p-4 sm:p-5"
       >

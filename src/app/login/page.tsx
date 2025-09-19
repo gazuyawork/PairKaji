@@ -30,23 +30,21 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // NEW: インラインエラー
+  // エラー
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // persistence設定
+  // persistence
   useEffect(() => {
     (async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-      } catch {
-        // デフォルトで動作するので無視
-      }
+      } catch {}
     })();
   }, []);
 
-  // Redirect result
+  // redirect result
   const handledRedirectRef = useRef(false);
   useEffect(() => {
     if (handledRedirectRef.current) return;
@@ -61,7 +59,7 @@ export default function LoginPage() {
     })();
   }, [router]);
 
-  // Auth state
+  // auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u) {
@@ -72,7 +70,7 @@ export default function LoginPage() {
     return () => unsub();
   }, [router]);
 
-  // Handlers
+  // handlers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleLogin();
@@ -154,14 +152,14 @@ export default function LoginPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.7 }}
     >
-      {/* ロゴとサブタイトル → 元のまま */}
+      {/* ロゴとサブタイトル（位置そのまま） */}
       <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
       <p className="text-[#5E5E5E] mb-[50px] font-sans">ログイン</p>
 
-      {/* カード化 */}
+      {/* カード → 下から上のアニメ削除、フェードのみ */}
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
         className="w-full max-w-md rounded-2xl border border-[#e8e2d7] bg-white/80 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.07)] p-4 sm:p-5"
       >
@@ -180,9 +178,7 @@ export default function LoginPage() {
               autoComplete="email"
               inputMode="email"
             />
-            {emailError && (
-              <p className="text-sm text-red-500">{emailError}</p>
-            )}
+            {emailError && <p className="text-sm text-red-500">{emailError}</p>}
           </div>
 
           {/* パスワード */}
@@ -209,14 +205,12 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            {passwordError && (
-              <p className="text-sm text-red-500">{passwordError}</p>
-            )}
+            {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
           </div>
 
           {loginError && <p className="text-sm text-red-500">{loginError}</p>}
 
-          {/* ログインボタン → 元の青色 */}
+          {/* ログインボタン（青色） */}
           <motion.button
             whileTap={{ scale: isLoading ? 1 : 0.98 }}
             type="submit"
@@ -233,7 +227,7 @@ export default function LoginPage() {
 
           <hr className="w-full border-t border-[#AAAAAA] opacity-30 my-3" />
 
-          {/* Googleログイン → 赤色そのまま */}
+          {/* Googleログイン（赤色） */}
           <motion.button
             whileTap={{ scale: isLoading ? 1 : 0.98 }}
             type="button"
@@ -245,7 +239,7 @@ export default function LoginPage() {
             Googleでログイン
           </motion.button>
 
-          {/* 新規登録へ → 枠線のみ */}
+          {/* 新規登録へ */}
           <button
             type="button"
             onClick={() => router.push('/register')}
@@ -259,9 +253,7 @@ export default function LoginPage() {
       </motion.div>
 
       <Link href="/landing" className="mt-6">
-        <p className="text-xs text-center text-[#5E5E5E] underline font-sans">
-          PairKajiとは？
-        </p>
+        <p className="text-xs text-center text-[#5E5E5E] underline font-sans">PairKajiとは？</p>
       </Link>
 
       {isLoading && (

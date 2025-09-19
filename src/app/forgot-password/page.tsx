@@ -53,8 +53,8 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex flex-col items-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-4 py-12 text-center">
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
         className="w-full max-w-md"
       >
