@@ -83,59 +83,94 @@ export default function VerifyPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-[#fffaf1] text-[#5E5E5E] relative">
-      {/* ★NEW: 戻るUI（画面左上に配置） */}
-      <div className="w-full max-w-2xl px-4 pt-4">
+    <div
+      className="
+      min-h-screen relative
+      bg-gradient-to-b from-[#fffaf1] to-[#fff2da]
+      text-[#5E5E5E]
+      flex flex-col
+    "
+    >
+      {/* ★NEW: 戻るバー */}
+      <div className="w-full px-4 pt-4">
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex items-center gap-2 text-sm text-[#5E5E5E] hover:opacity-80 transition"
+          className="inline-flex items-center gap-2 text-sm text-[#5E5E5E] hover:opacity-80 active:opacity-90 transition px-2 py-1"
           aria-label="前の画面に戻る"
         >
-          <span className="inline-block w-2.5 h-2.5 rotate-45 border-l-2 border-b-2 border-[#5E5E5E] -ml-0.5" />
+          <ArrowLeft className="w-4 h-4" />
           戻る
         </button>
       </div>
 
-      <div className="flex flex-col justify-center items-center flex-1 w-full max-w-2xl px-4 pb-12">
-        <h1 className="text-2xl font-bold mb-4">メールアドレスの確認</h1>
-
-        {/* ★NEW: 送信先メールアドレスの表示（入力ミス確認用） */}
-        <p className="text-sm mb-2">
-          送信先：
-          <span className="font-semibold break-all">{email || '（未取得）'}</span>
-        </p>
-
-        <p className="text-center max-w-md px-4 mb-6">
-          ご登録いただいたメールアドレス宛に確認メールを送信しました。メール内のリンクをクリックして確認を完了してください。
-          <br />
-          確認が完了すると自動的に次の画面に進みます。
-        </p>
-
-        <button
-          onClick={handleResend}
-          disabled={!canResend}
-          className={`px-4 py-2 rounded bg-[#FFCB7D] text-white font-semibold shadow ${canResend ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'
-            }`}
+      {/* 中央カード */}
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div
+          className="
+          w-full max-w-md
+          rounded-2xl border border-gray-200
+          bg-white/70 backdrop-blur
+          shadow-lg
+          px-6 py-7
+        "
         >
-          再送信 {canResend ? '' : `(${timer}s）`}
-        </button>
+          <h1 className="text-xl font-bold mb-3 text-center">
+            メールアドレスの確認
+          </h1>
 
-        {/* ★NEW: 補助ヘルプ（カード下） */}
-        <div className="mt-6 w-full max-w-md px-1">
-          <div className="rounded-xl border border-gray-200 bg-white/70 backdrop-blur p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2 text-[#5E5E5E]">
-              <HelpCircle className="w-4 h-4" />
-              <span className="text-sm font-semibold">メールが届かない場合</span>
+          {/* 送信先チップ */}
+          <div className="flex justify-center mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-300 bg-white/80">
+              <Mail className="w-4 h-4" />
+              <span className="text-sm font-semibold break-all">
+                {email || '（未取得）'}
+              </span>
             </div>
-            <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-              <li>メールアドレスに誤りがないか確認する</li>
-              <li>迷惑メールフォルダを確認する</li>
-              <li>「再送信」ボタンを押す</li>
-            </ul>
+          </div>
+
+          {/* 説明文 */}
+          <p className="text-sm text-center text-gray-700 leading-relaxed">
+            ご登録のメールアドレス宛に確認メールを送信しました。メール内のリンクをクリックして確認を完了してください。
+            <br />
+            確認が完了すると自動的に次の画面に進みます。
+          </p>
+
+          {/* アクション */}
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <button
+              onClick={handleResend}
+              disabled={!canResend}
+              className={[
+                'w-full rounded-xl px-4 py-3 font-semibold text-white shadow',
+                canResend
+                  ? 'bg-[#FFCB7D] hover:opacity-90 active:opacity-95'
+                  : 'bg-[#FFCB7D]/60 cursor-not-allowed',
+              ].join(' ')}
+            >
+              再送信
+            </button>
+
+            <div className="text-xs text-gray-500">
+              {canResend ? '再送信が可能です' : `再送まで ${timer}s`}
+            </div>
+          </div>
+
+          {/* ★NEW: 補助ヘルプ（カード内の下段余白） */}
+          <div className="mt-6">
+            <div className="rounded-xl border border-gray-200 bg-white/60 p-4">
+              <div className="flex items-center gap-2 mb-1 text-[#5E5E5E]">
+                <HelpCircle className="w-4 h-4" />
+                <span className="text-sm font-semibold">メールが届かない場合</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
+                <li>メールアドレスに誤りがないか確認する</li>
+                <li>迷惑メールフォルダを確認する</li>
+                <li>「再送信」ボタンを押す</li>
+              </ul>
+            </div>
           </div>
         </div>
-
       </div>
     </div>
   );
