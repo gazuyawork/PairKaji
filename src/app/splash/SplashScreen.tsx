@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import clsx from 'clsx';
-import { markSplashAsShown } from '@/lib/storageUtils'; // ✅ 追加
+import { markSplashAsShown } from '@/lib/storageUtils';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 const sentence = '家事をわけて、やさしさふえる。';
 
@@ -131,7 +132,8 @@ export default function SplashScreen() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="w-10 h-10 border-4 border-gray-500 border-t-transparent rounded-full animate-spin" />
+            <LoadingSpinner size={48} />
+
           </motion.div>
         )}
       </AnimatePresence>

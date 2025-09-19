@@ -7,6 +7,8 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import type { PendingApproval } from '@/types/Pair';
 import { motion } from 'framer-motion';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+
 
 type PartnerSettingsProps = {
   isLoading: boolean;
@@ -55,7 +57,7 @@ export default function PartnerSettings({
 
       {isPairLoading ? (
         <div className="flex items-center justify-center text-gray-400 text-sm">
-          <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          <LoadingSpinner size={48} />
         </div>
       ) : (
         <>
@@ -119,9 +121,8 @@ export default function PartnerSettings({
               </div>
               <button
                 onClick={pairDocId ? onCancelInvite : onSendInvite}
-                className={`w-full py-2 rounded shadow text-sm ${
-                  pairDocId ? 'bg-gray-100 text-red-500 hover:underline' : 'bg-[#FFCB7D] text-white'
-                }`}
+                className={`w-full py-2 rounded shadow text-sm ${pairDocId ? 'bg-gray-100 text-red-500 hover:underline' : 'bg-[#FFCB7D] text-white'
+                  }`}
               >
                 {pairDocId ? '招待を取り消す' : '招待コードを発行'}
               </button>

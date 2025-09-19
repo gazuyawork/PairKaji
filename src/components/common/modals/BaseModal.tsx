@@ -7,6 +7,7 @@ import { ReactNode, useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 type BaseModalProps = {
   isOpen: boolean;
@@ -106,7 +107,8 @@ export default function BaseModal({
                 <CheckCircle className="text-green-500 w-12 h-12" />
               </motion.div>
             ) : (
-              <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+              // ★ 共通スピナー（グレー）に統一。w-8(=32px) 相当なので size={32}
+              <LoadingSpinner size={48} />
             )}
           </motion.div>
         </div>
@@ -129,30 +131,7 @@ export default function BaseModal({
         onWheel={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
         onTouchMove={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
         style={{ transform: 'none' }}
-
       >
-        {/* {(isSaving || saveComplete) && (
-          <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center rounded-xl">
-            <motion.div
-              key={saveComplete ? 'check' : 'spinner'}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              {saveComplete ? (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: [0.8, 1.5, 1.2] }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <CheckCircle className="text-green-500 w-12 h-12" />
-                </motion.div>
-              ) : (
-                <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-              )}
-            </motion.div>
-          </div>
-        )} */}
 
         {/* 子がそのまま入る。スクロールは子（textarea）側のみで発生 */}
         <div className="space-y-6">

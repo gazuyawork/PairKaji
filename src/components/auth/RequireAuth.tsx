@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 type Props = { children: React.ReactNode };
 
@@ -63,11 +64,11 @@ export default function RequireAuth({ children }: Props) {
         // （スプラッシュが無い画面のために既存ローディングは残す）
         return (
             <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
-                <div className="w-6 h-6 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                <LoadingSpinner size={48} />
             </div>
         );
-    }
 
+    }
 
     // 未ログイン時
     if (!authed) {

@@ -20,6 +20,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { FirebaseError } from 'firebase/app';
 import Link from 'next/link';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function LoginPage() {
     (async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -266,11 +267,7 @@ export default function LoginPage() {
 
       {isLoading && (
         <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-50">
-          <motion.div
-            className="w-12 h-12 border-4 border-[#5E8BC7] border-t-transparent rounded-full"
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-          />
+          <LoadingSpinner size={48} />
         </div>
       )}
     </motion.div>

@@ -33,6 +33,8 @@ import LineLinkCard from '@/components/profile/LineLinkCard';
 import PushToggle from '@/components/settings/PushToggle'; // ★ PushToggle を使用
 import { useUserUid } from '@/hooks/useUserUid';           // ★ uid を React state として取得
 import { onAuthStateChanged } from 'firebase/auth';        // ★ 追加
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -484,7 +486,7 @@ export default function ProfilePage() {
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center w-full h-[60vh]">
-            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            <LoadingSpinner size={48} />
           </div>
         ) : (
           <>

@@ -284,13 +284,14 @@ export default function HomeView() {
           slides={[
             {
               // ページ1：アプリ全体の導入
-              title: 'ようこそ PairKaji へ',
               blocks: [
                 {
-                  subtitle: 'はじめに',
-                  src: '/onboarding/slide1.png',
+                  src: '/onboarding/welcome.png',
+                },
+                                {
+                  subtitle: 'ご利用ありがとうございます。',
                   description:
-                    'このアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
+                    'このアプリは「家事を見える化して、お互いに協力して日々の家事を行う」をコンセプトにしています。\nまずはこのアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
                 },
               ],
             },
@@ -392,6 +393,18 @@ export default function HomeView() {
                   // 例：指示がない要素（空文字/未指定）は自動で非表示
                   subtitle: '',
                   description: '',
+                },
+              ],
+            },
+                        {
+              // ページ1：アプリ全体の導入
+              title: 'おつかれさまでした。',
+              blocks: [
+                {
+                  subtitle: 'はじめに',
+                  src: '/onboarding/slide1.png',
+                  description:
+                    'おつかれさまでした。\nPairKajiは家事を見える科するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n',
                 },
               ],
             },
