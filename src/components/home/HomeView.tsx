@@ -189,15 +189,13 @@ export default function HomeView() {
 
             <div
               onClick={() => setIsExpanded((prev) => !prev)}
-              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-                isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
+              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+                }`}
             >
               <div className="absolute top-5 right-6 pointer-events-none z-10">
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
+                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
+                    }`}
                 />
               </div>
             </div>
@@ -281,26 +279,98 @@ export default function HomeView() {
 
       {/* ▼ オンボーディングモーダル */}
       {showOnboarding && (
+        // src/components/home/HomeView.tsx の該当箇所をこの配列に置き換え
         <OnboardingModal
           slides={[
             {
-              src: '/onboarding/slide1.png',
+              // ページ1：アプリ全体の導入
               title: 'ようこそ PairKaji へ',
-              description: 'タスクを2人でシェアして、家事をもっとスムーズに。',
+              blocks: [
+                {
+                  subtitle: 'はじめに',
+                  src: '/onboarding/slide1.png',
+                  description:
+                    'このアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
+                },
+              ],
             },
             {
-              src: '/onboarding/slide2.png',
-              title: 'タスクの追加と共有',
-              description: '右下の＋からタスクを作成。ペアが確定すると双方で編集できます。',
+              // ページ2：Home の概要を1画面で複数ブロック表示
+              title: 'Home 画面の見方',
+              blocks: [
+                {
+                  subtitle: '1. 概要',
+                  description:
+                    'Home では「タスク一覧」「週間ポイント」「本日完了タスク」など、日々の進捗をひと目で確認できます。',
+                },
+                {
+                  subtitle: '2. タスク一覧（7日間）',
+                  src: '/onboarding/schedule.jpg',
+                  description:
+                    '本日から7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
+                },
+                {
+                  subtitle: '3. 本日完了タスク',
+                  src: '/onboarding/finish_task.jpg',
+                  description:
+                    '本日完了したタスクを一覧表示します。各タスクの右に実行者のアイコンが表示され、誰が完了したか確認できます。',
+                },
+                {
+                  subtitle: '3. フラグ付きタスク',
+                  src: '/onboarding/flag.jpg',
+                  description:
+                    'フラグを付けたタスクが表示されます。新規で追加した場合は New のバッチが表示され、プッシュ通知が届きます。※プッシュ通知を受け取るためには設定が必要です。',
+                },
+              ],
             },
             {
-              src: '/onboarding/slide3.png',
-              title: '本日の進捗',
-              description: '今日の完了タスクを確認。Weeklyポイントで達成度も見える化。',
+              // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
+              title: 'Task画面',
+              blocks: [
+                {
+                  subtitle: 'ペア設定が未完了の場合',
+                  description:
+                    'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
+                },
+                {
+                  subtitle: 'Weekly ポイントとは？',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                },
+                {
+                  // 例：指示がない要素（空文字/未指定）は自動で非表示
+                  subtitle: '',
+                  description: '',
+                },
+              ],
+            },
+            {
+              // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
+              title: 'Todo画面',
+              blocks: [
+                {
+                  subtitle: 'ペア設定が未完了の場合',
+                  description:
+                    'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
+                },
+                {
+                  subtitle: 'Weekly ポイントとは？',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                },
+                {
+                  // 例：指示がない要素（空文字/未指定）は自動で非表示
+                  subtitle: '',
+                  description: '',
+                },
+              ],
             },
           ]}
           onClose={handleCloseOnboarding}
         />
+
       )}
     </>
   );
