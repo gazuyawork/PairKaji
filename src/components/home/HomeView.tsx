@@ -316,10 +316,16 @@ export default function HomeView() {
                     '本日完了したタスクを一覧表示します。各タスクの右に実行者のアイコンが表示され、誰が完了したか確認できます。',
                 },
                 {
-                  subtitle: '3. フラグ付きタスク',
+                  subtitle: '4. フラグ付きタスク',
                   src: '/onboarding/flag.jpg',
                   description:
                     'フラグを付けたタスクが表示されます。新規で追加した場合は New のバッチが表示され、プッシュ通知が届きます。※プッシュ通知を受け取るためには設定が必要です。',
+                },
+                {
+                  subtitle: '5. ポイント',
+                  src: '/onboarding/point_check.jpg',
+                  description:
+                    '1週間の目標値と進捗状況をひょうじします。タップすることで、目標値を編集することができます。',
                 },
               ],
             },
@@ -328,9 +334,31 @@ export default function HomeView() {
               title: 'Task画面',
               blocks: [
                 {
+                  subtitle: '1. 概要',
+                  description:
+                    'この画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。\n',
+                },
+                {
+                  subtitle: 'Weekly ポイントとは？',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                },
+                {
+                  // 例：指示がない要素（空文字/未指定）は自動で非表示
+                  subtitle: '画像挿入テスト',
+                  description: 'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
+                },
+              ],
+            },
+            {
+              // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
+              title: 'Todo画面',
+              blocks: [
+                {
                   subtitle: 'ペア設定が未完了の場合',
                   description:
-                    'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
+                    'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
                 },
                 {
                   subtitle: 'Weekly ポイントとは？',

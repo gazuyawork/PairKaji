@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 
 /* ----------------------------------------------------------------
    型定義
@@ -17,13 +18,13 @@ import { createPortal } from 'react-dom';
 type SlideInput =
   | string
   | {
-      /** 画像パス（/public 配下） */
-      src: string;
-      /** 旧形式の見出し（任意, いまはページタイトルへ昇格） */
-      title?: string;
-      /** 説明テキスト（任意） */
-      description?: string;
-    };
+    /** 画像パス（/public 配下） */
+    src: string;
+    /** 旧形式の見出し（任意, いまはページタイトルへ昇格） */
+    title?: string;
+    /** 説明テキスト（任意） */
+    description?: string;
+  };
 
 type SlideBlock = {
   /** サブタイトル（任意） */
@@ -43,28 +44,28 @@ type SlidePage = {
 
 type Props =
   | {
-      /** 旧形式：Figma書き出し画像の配列（従来互換） */
-      slides?: SlideInput[];
-      /**
-       * 旧形式：画像と説明を分離したいときに使用（slides が string[] の場合）。
-       * 長さが slides に満たない分は空文字で補完されます。
-       */
-      captions?: string[];
-      /** モーダルを閉じる（確定時） */
-      onClose: () => void;
-      /**
-       * 確認ダイアログの案内文（×/スキップ時）
-       * 例: '説明を閉じますか？\nホーム画面最下部の「もう一度説明を見る」から再表示できます。'
-       */
-      confirmMessage?: string;
-    }
+    /** 旧形式：Figma書き出し画像の配列（従来互換） */
+    slides?: SlideInput[];
+    /**
+     * 旧形式：画像と説明を分離したいときに使用（slides が string[] の場合）。
+     * 長さが slides に満たない分は空文字で補完されます。
+     */
+    captions?: string[];
+    /** モーダルを閉じる（確定時） */
+    onClose: () => void;
+    /**
+     * 確認ダイアログの案内文（×/スキップ時）
+     * 例: '説明を閉じますか？\nホーム画面最下部の「もう一度説明を見る」から再表示できます。'
+     */
+    confirmMessage?: string;
+  }
   | {
-      /** 新形式：ページ/ブロック構造 */
-      slides?: SlidePage[];
-      captions?: never;
-      onClose: () => void;
-      confirmMessage?: string;
-    };
+    /** 新形式：ページ/ブロック構造 */
+    slides?: SlidePage[];
+    captions?: never;
+    onClose: () => void;
+    confirmMessage?: string;
+  };
 
 /* ----------------------------------------------------------------
    デフォルト（旧形式 & 新形式）
@@ -295,25 +296,30 @@ export default function OnboardingModal(props: Props) {
 
   // ブロック数に応じた画像コンテナの高さ（目安）
   const getImageHeightStyle = (count: number) => {
-    if (count <= 1) return { height: 'min(70dvh, 720px)' }; // 1個 → 大きめ
-    if (count === 2) return { height: 'min(40dvh, 480px)' }; // 2個 → 中
-    return { height: 'min(28dvh, 360px)' }; // 3個以上 → 小さめ
+    if (count <= 1) return { height: 'min(60dvh, 600px)' }; // 以前: 70dvh / 720px
+    if (count === 2) return { height: 'min(34dvh, 420px)' }; // 以前: 40dvh / 480px
+    return { height: 'min(22dvh, 300px)' };                   // 以前: 28dvh / 360px
   };
-
   if (typeof window === 'undefined') return null; // SSR ガード
 
   // Portal で body 直下に描画（transform/z-index の影響を回避）
   return createPortal(
-    <div
-      className="fixed inset-0 z-[2147483647] bg-black/60"
+    <motion.div
+      className="fixed inset-0 z-[2147483647] bg-white/60"
       role="dialog"
       aria-modal="true"
       onClick={handleCloseWithConfirm}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
     >
       {/* 縦幅いっぱい（100dvh）・フレックス縦配置 */}
-      <div
+      <motion.div
         className="relative w-screen h-[100dvh] bg-white flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.25, ease: 'easeOut', delay: 0.02 }}
       >
         {/* ヘッダー（閉じる） */}
         <div className="flex items-center justify-end px-3 py-2">
@@ -368,8 +374,8 @@ export default function OnboardingModal(props: Props) {
                                 b.subtitle
                                   ? b.subtitle
                                   : pages[current]?.title
-                                  ? String(pages[current]?.title)
-                                  : `onboarding-${current + 1}-${idx + 1}`
+                                    ? String(pages[current]?.title)
+                                    : `onboarding-${current + 1}-${idx + 1}`
                               }
                               fill
                               className="object-contain"
@@ -399,9 +405,8 @@ export default function OnboardingModal(props: Props) {
             {pages.map((_, i) => (
               <span
                 key={i}
-                className={`inline-block h-2 rounded-full transition-all ${
-                  i === current ? 'bg-gray-800 w-4' : 'bg-gray-300 w-2'
-                }`}
+                className={`inline-block h-2 rounded-full transition-all ${i === current ? 'bg-gray-800 w-4' : 'bg-gray-300 w-2'
+                  }`}
               />
             ))}
           </div>
@@ -438,8 +443,8 @@ export default function OnboardingModal(props: Props) {
             </div>
           </div>
         </div>
-      </div>
-    </div>,
+      </motion.div>
+    </motion.div>,
     document.body
   );
 }
