@@ -162,7 +162,7 @@ export default function LoginPage() {
     >
       {/* ロゴとサブタイトル（位置そのまま） */}
       <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
-      <p className="text-[#5E5E5E] mb-[50px] font-sans">ログイン</p>
+      <p className="text-[#5E5E5E] mb-[40px] font-sans">ログイン</p>
 
       {/* カード → 下から上のアニメ削除、フェードのみ */}
       <motion.div

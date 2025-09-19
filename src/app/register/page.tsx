@@ -103,7 +103,7 @@ export default function RegisterPage() {
     >
       {/* ★KEEP: ロゴ/サブタイトルの位置と余白は元のまま */}
       <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
-      <p className="text-[#5E5E5E] mb-[50px] font-sans">新規登録</p>
+      <p className="text-[#5E5E5E] mb-[40px] font-sans">新規登録</p>
 
       {/* ★NEW: フォーム全体をカードで包む（外側の幅は元と同等に） */}
       <motion.div

@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
       >
         {/* ← ここは “元の” 直置き h1 / p 構成に戻しています */}
         <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
-        <p className="text-[#5E5E5E] mb-[50px] font-sans">パスワードリセット</p>
+        <p className="text-[#5E5E5E] mb-[40px] font-sans">パスワードリセット</p>
 
         {/* ★NEW: ガラス風カード */}
         <div className="rounded-2xl border border-[#e8e2d7] bg-white/80 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.07)] p-5 sm:p-6">
