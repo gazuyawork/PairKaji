@@ -1,8 +1,7 @@
-// 修正対象ファイル: ConfirmModal.tsx
-
+// src/components/common/modals/ConfirmModal.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
@@ -31,11 +30,9 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
-  // ✅ UIレンダリング後に少し遅らせてonConfirm実行する
+  // ✅ OK押下ですぐに実行（遅延削除）
   const handleConfirm = () => {
-    setTimeout(() => {
-      onConfirm();
-    }, 100); // 100ms遅延
+    onConfirm();
   };
 
   return createPortal(
@@ -52,22 +49,23 @@ export default function ConfirmModal({
         )}
         <div className="text-sm text-gray-700 text-center">{message}</div>
 
-        <div className="mt-6 flex flex-row justify-end gap-3">
+        <div className="mt-6 flex flex-col gap-3">
           <button
             onClick={handleConfirm}
             disabled={isProcessing}
-            className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
+            className={`w-full px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
               ${isProcessing ? 'bg-gray-300 text-white cursor-not-allowed' : 'bg-[#FFCB7D] text-white'}
             `}
           >
             {confirmLabel}
           </button>
 
+          {/* キャンセルは props 指定時のみ表示（今回は未指定） */}
           {cancelLabel && onCancel && (
             <button
               onClick={onCancel}
               disabled={isProcessing}
-              className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+              className="w-full px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
             >
               {cancelLabel}
             </button>
