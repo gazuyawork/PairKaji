@@ -1,95 +1,83 @@
 // src/components/auth/RequireAuth.tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 type Props = { children: React.ReactNode };
 
+/** 認証不要ページ（必要に応じて追加してください） */
+const PUBLIC_PATHS = new Set<string>(['/login', '/signup', '/verify', '/terms', '/privacy']);
+
 export default function RequireAuth({ children }: Props) {
-    const router = useRouter();
-    const pathname = usePathname();
+  const pathname = usePathname();
 
-    const [ready, setReady] = useState(false);        // 認証確認完了
-    const [authed, setAuthed] = useState<boolean>(false);
-    const [showExpired, setShowExpired] = useState(false);
-    const wasAuthedRef = useRef(false);
+  const [ready, setReady] = useState(false);
+  const [authed, setAuthed] = useState<boolean>(false);
 
-    useEffect(() => {
-        const unsub = onAuthStateChanged(auth, (u) => {
-            if (u) {
-                setAuthed(true);
-                setReady(true);
-                wasAuthedRef.current = true;
-                setShowExpired(false);
-            } else {
-                setAuthed(false);
-                setReady(true);
-                if (wasAuthedRef.current) {
-                    // ★セッション切れ or 手動ログアウト
-                    const manual = sessionStorage.getItem('manualSignOut') === '1';
-                    if (manual) {
-                        // ★手動ログアウト時はモーダルを出さない
-                        sessionStorage.removeItem('manualSignOut');
-                        const from = encodeURIComponent(pathname || '/');
-                        router.replace(`/login?from=${from}`);
-                    } else {
-                        // ★純粋なセッション切れのみモーダル表示
-                        setShowExpired(true);
-                    }
-                } else {
-                    // 初回から未ログイン
-                    const from = encodeURIComponent(pathname || '/');
-                    router.replace(`/login?from=${from}`);
-                }
-            }
-        });
-        return () => unsub();
-    }, [router, pathname]);
+  // アンマウント後の setState 防止
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
+  // 初回マウント直後：currentUser を即時確認して強制遷移
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isPublic = PUBLIC_PATHS.has(pathname || '');
+    if (!isPublic && !auth.currentUser) {
+      window.location.replace(`/login?next=${encodeURIComponent(pathname || '/')}&reauth=1`);
+    }
+  }, [pathname]);
 
-    // 認証確認中
-    if (!ready) {
-        // ★ QuickSplash が表示中ならローディングを出さない
-        const splashActive =
-            typeof window !== 'undefined' && sessionStorage.getItem('splashActive') === '1';
-        if (splashActive) {
-            return null; // ← スプラッシュに画面制御を委ねる
+  // onAuthStateChanged でも未ログインを強制遷移（握りつぶし防止に window.location.replace）
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const isPublic = PUBLIC_PATHS.has(pathname || '');
+
+      if (!user) {
+        if (!isPublic) {
+          window.location.replace(`/login?next=${encodeURIComponent(pathname || '/')}&reauth=1`);
+          return; // 以降の setState は不要
         }
+        if (mountedRef.current) {
+          setAuthed(false);
+          setReady(true);
+        }
+      } else {
+        if (mountedRef.current) {
+          setAuthed(true);
+          setReady(true);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [pathname]);
 
-        // （スプラッシュが無い画面のために既存ローディングは残す）
-        return (
-            <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
-                <LoadingSpinner size={48} />
-            </div>
-        );
+  if (!ready) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
-    }
+  // 念のためのフォールバック（瞬断時のチラつき防止）
+  if (!authed && !PUBLIC_PATHS.has(pathname || '')) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
-    // 未ログイン時
-    if (!authed) {
-        return (
-            <>
-                {showExpired && (
-                    <ConfirmModal
-                        isOpen={true}
-                        title="セッション切れ"
-                        message="セッションが切れました。ログイン画面に移動します。"
-                        confirmLabel="OK"
-                        onConfirm={() => {
-                            const from = encodeURIComponent(pathname || '/');
-                            router.replace(`/login?from=${from}`);
-                        }}
-                    />
-                )}
-            </>
-        );
-    }
-
-    // ログイン済み
-    return <>{children}</>;
+  return <>{children}</>;
 }

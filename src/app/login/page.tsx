@@ -3,8 +3,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   signInWithEmailAndPassword,
   setPersistence,
@@ -13,7 +13,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  onAuthStateChanged,
+  signOut, // ★追加
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
@@ -24,6 +24,11 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams(); // ★追加
+
+  // 遷移先と再認証フラグ
+  const next = searchParams.get('next') || '/main';   // ★変更: 固定ではなくクエリ優先
+  const reauth = searchParams.get('reauth') === '1';  // ★追加
 
   // UI state
   const [email, setEmail] = useState('');
@@ -36,16 +41,24 @@ export default function LoginPage() {
   const [passwordError, setPasswordError] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // persistence
+  // persistence（必要なら維持）
   useEffect(() => {
     (async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-      } catch { }
+      } catch {
+        // 失敗時は黙殺（firebase.ts側でフォールバック実装している想定）
+      }
     })();
   }, []);
 
-  // redirect result
+  // ★追加: reauth=1 の時は必ず Firebase セッションをクリア（自動再ログイン防止）
+  useEffect(() => {
+    if (!reauth) return;
+    signOut(auth).catch(() => void 0);
+  }, [reauth]);
+
+  // redirect result（Google リダイレクト戻り）
   const handledRedirectRef = useRef(false);
   useEffect(() => {
     if (handledRedirectRef.current) return;
@@ -55,29 +68,35 @@ export default function LoginPage() {
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
-          // ユーザーが取得できた → 遷移。ローディングは維持（アンマウントまで）
-          router.replace('/main');
+          // ★変更: 成功時のみ next へ
+          router.replace(next);
         } else {
-          // ユーザーなし → このページに留まるのでローディング解除
+          // ユーザーなし → ローディング解除
           setIsLoading(false);
         }
       } catch {
-        // 失敗時はこのページに留まるのでローディング解除
+        // 失敗時 → ローディング解除
         setIsLoading(false);
       }
     })();
-  }, [router]);
+  }, [router, next]); // ★next を依存に含める
 
-  // auth state
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) {
-        // ローディングは維持したまま遷移（アンマウントまで覆いかぶせる）
-        router.replace('/main');
-      }
-    });
-    return () => unsub();
-  }, [router]);
+  // ★削除: onAuthStateChanged での自動遷移
+  // useEffect(() => {
+  //   const unsub = onAuthStateChanged(auth, (u) => {
+  //     if (u) {
+  //       router.replace('/main');
+  //     }
+  //   });
+  //   return () => unsub();
+  // }, [router]);
+
+  // Google プロバイダ（毎回アカウント選択を強制）
+  const googleProvider = useMemo(() => {
+    const p = new GoogleAuthProvider();
+    p.setCustomParameters({ prompt: 'select_account' }); // ★追加
+    return p;
+  }, []);
 
   // handlers
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,7 +123,10 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
+      // 念のため都度クリア（自動再ログイン抑止）
+      await signOut(auth).catch(() => void 0); // ★追加（安全）
       await signInWithEmailAndPassword(auth, emailTrimmed, password);
+      router.replace(next); // ★変更: 成功時のみ next へ
     } catch (error: unknown) {
       if (error instanceof FirebaseError) {
         setLoginError('ログインに失敗しました：' + error.message);
@@ -115,15 +137,17 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = useCallback(async () => {
     setEmailError('');
     setPasswordError('');
     setLoginError('');
     try {
-      const provider = new GoogleAuthProvider();
-      const popupPromise = signInWithPopup(auth, provider);
+      // 念のため毎回クリア（自動再ログイン抑止）
+      await signOut(auth).catch(() => void 0); // ★追加
       setIsLoading(true);
-      await popupPromise;
+      // まずはポップアップ
+      await signInWithPopup(auth, googleProvider);
+      router.replace(next); // ★変更: 成功時のみ next へ
     } catch (err) {
       const fe = err as FirebaseError;
       if (fe?.code === 'auth/popup-closed-by-user') {
@@ -134,11 +158,13 @@ export default function LoginPage() {
         fe?.code === 'auth/popup-blocked' ||
         fe?.code === 'auth/operation-not-supported-in-this-environment' ||
         fe?.code === 'auth/unauthorized-domain';
+
       if (needRedirect) {
         try {
           setIsLoading(true);
-          await signInWithRedirect(auth, new GoogleAuthProvider());
-          return;
+          // リダイレクトでも毎回アカウント選択が効くよう同じ provider を利用
+          await signInWithRedirect(auth, googleProvider);
+          return; // ここから先は getRedirectResult で処理
         } catch (e) {
           setIsLoading(false);
           if (e instanceof FirebaseError) {
@@ -146,12 +172,13 @@ export default function LoginPage() {
           } else {
             setLoginError('予期せぬエラーが発生しました');
           }
+          return;
         }
       }
       setIsLoading(false);
       setLoginError('ログインに失敗しました：' + fe?.message);
     }
-  };
+  }, [googleProvider, next, router]);
 
   // UI
   return (
@@ -161,11 +188,11 @@ export default function LoginPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.7 }}
     >
-      {/* ロゴとサブタイトル（位置そのまま） */}
+      {/* ロゴとサブタイトル */}
       <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
       <p className="text-[#5E5E5E] mb-[40px] font-sans">ログイン</p>
 
-      {/* カード → 下から上のアニメ削除、フェードのみ */}
+      {/* カード（フェードのみ） */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -236,7 +263,7 @@ export default function LoginPage() {
 
           <hr className="w-full border-t border-[#AAAAAA] opacity-30 my-3" />
 
-          {/* Googleログイン（赤色） */}
+          {/* Googleログイン（毎回アカウント選択） */}
           <motion.button
             whileTap={{ scale: isLoading ? 1 : 0.98 }}
             type="button"

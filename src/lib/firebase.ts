@@ -2,17 +2,21 @@
 
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   initializeFirestore,
   persistentLocalCache,
+  memoryLocalCache,
+  type Firestore,
 } from 'firebase/firestore';
 import {
   getAuth,
   setPersistence,
+  indexedDBLocalPersistence,
   browserLocalPersistence,
+  inMemoryPersistence,
 } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
@@ -30,14 +34,104 @@ const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error('Auth persistence setting failed:', error);
-});
+/** 認証不要ページと同一（RequireAuth と揃える） */
+const PUBLIC_PATHS = new Set<string>(['/login', '/signup', '/verify', '/terms', '/privacy']);
 
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache(),
-});
+/* --------------------------- IndexedDB クリーナー --------------------------- */
+/** 破損時に Firebase 関連の IndexedDB を可能な範囲で削除（非同期・失敗しても続行） */
+async function nukeCorruptedFirebaseIndexedDB(projectId?: string) {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) return;
+
+  const deleteDB = (name: string) =>
+    new Promise<void>((resolve) => {
+      try {
+        const req = indexedDB.deleteDatabase(name);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+
+  try {
+    const anyIDB: any = indexedDB as any;
+    if (typeof anyIDB.databases === 'function') {
+      const dbs: Array<{ name?: string }> = (await anyIDB.databases()) || [];
+      for (const db of dbs) {
+        const name = db.name ?? '';
+        if (/firebase/i.test(name) || (projectId && name.includes(projectId))) {
+          await deleteDB(name);
+        }
+      }
+      return;
+    }
+  } catch {
+    // 列挙失敗時は既知名を削除
+  }
+
+  const knownNames = [
+    'firebaseLocalStorageDb',
+    'firebase-heartbeat-database',
+    'firebase-auth-database',
+    'firebase-installations-database',
+    'firebase-firestore-database',
+    'firestore/[DEFAULT]/' + (firebaseConfig.projectId ?? ''),
+  ];
+  for (const name of knownNames) {
+    await deleteDB(name);
+  }
+}
+
+/* ------------------------------ Auth 永続化 ------------------------------ */
+const auth = getAuth(app);
+if (typeof window !== 'undefined') {
+  // IndexedDB → localStorage → inMemory の順で安全フォールバック
+  setPersistence(auth, indexedDBLocalPersistence)
+    .catch((e1) => {
+      console.warn('[Auth] indexedDBLocalPersistence failed. Fallback to browserLocalPersistence.', e1);
+      return setPersistence(auth, browserLocalPersistence);
+    })
+    .catch((e2) => {
+      console.warn('[Auth] browserLocalPersistence failed. Fallback to inMemoryPersistence.', e2);
+      return setPersistence(auth, inMemoryPersistence);
+    })
+    .catch((e3) => {
+      console.warn('[Auth] inMemoryPersistence also failed (rare).', e3);
+    });
+}
+
+/* --------------------------- Firestore 安全初期化 --------------------------- */
+/**
+ * - Public パスでは最初から memoryLocalCache()（IDB に触れず確実に起動）
+ * - 通常は persistentLocalCache()、失敗/破損時はクリーナー→ memoryLocalCache() へ切替
+ * - 非同期削除は「投げるだけ」。以降のクラッシュは防ぎ、Auth 判定・リダイレクトが必ず動く
+ */
+function isPublicPath(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    return PUBLIC_PATHS.has(window.location.pathname);
+  } catch {
+    return false;
+  }
+}
+
+let db: Firestore;
+try {
+  const useMemory = isPublicPath();
+  db = initializeFirestore(app, {
+    localCache: useMemory ? memoryLocalCache() : persistentLocalCache(),
+  });
+} catch (e) {
+  console.warn('[Firestore] persistentLocalCache init failed. Cleaning & falling back to memory.', e);
+  // 破損の可能性があるのでクリーンアップ（待たずに実行）
+  if (typeof window !== 'undefined') {
+    void nukeCorruptedFirebaseIndexedDB(firebaseConfig.projectId);
+  }
+  db = initializeFirestore(app, {
+    localCache: memoryLocalCache(),
+  });
+}
 
 const storage = getStorage(app);
 
