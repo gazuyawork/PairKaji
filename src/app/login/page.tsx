@@ -13,7 +13,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  signOut,
+  signOut, // reauth=1 用に使用継続
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
@@ -133,8 +133,10 @@ function LoginInner() {
 
     setIsLoading(true);
     try {
-      // 念のため都度クリア（自動再ログイン抑止）
-      await signOut(auth).catch(() => void 0);
+      // 【削除対象】念のため都度クリア（自動再ログイン抑止）
+      // await signOut(auth).catch(() => void 0);
+
+      // 【変更後】直接サインイン
       await signInWithEmailAndPassword(auth, emailTrimmed, password);
       router.replace(next);
     } catch (error: unknown) {
@@ -152,8 +154,9 @@ function LoginInner() {
     setPasswordError('');
     setLoginError('');
     try {
-      // 念のため毎回クリア（自動再ログイン抑止）
-      await signOut(auth).catch(() => void 0);
+      // 【削除対象】念のため毎回クリア（自動再ログイン抑止）
+      // await signOut(auth).catch(() => void 0);
+
       setIsLoading(true);
       // まずはポップアップ
       await signInWithPopup(auth, googleProvider);
@@ -281,7 +284,7 @@ function LoginInner() {
             className="w-full px-4 py-3 text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]
                        disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
           >
-            Googleでログイン（毎回アカウント選択）
+            Googleでログイン
           </motion.button>
 
           {/* 新規登録へ */}

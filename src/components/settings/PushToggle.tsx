@@ -1,4 +1,4 @@
-// src/components/PushToggle.tsx
+// src/components/settings/PushToggle.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -12,8 +12,11 @@ type Props = {
 export default function PushToggle({ uid }: Props) {
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [phase, setPhase] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
 
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
+  const ENV_BASE = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/+$/g, '');
+
+  // ---------------- utils ----------------
   const b64ToU8 = (b64: string) => {
     const pad = '='.repeat((4 - (b64.length % 4)) % 4);
     const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
@@ -23,22 +26,208 @@ export default function PushToggle({ uid }: Props) {
     return out;
   };
 
-  const getRegistration = async (): Promise<ServiceWorkerRegistration | null> => {
+  const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  const pTimeout = <T,>(p: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const t = setTimeout(() => {
+        onTimeout?.();
+        reject(new Error(`timeout:${ms}ms`));
+      }, ms);
+      p.then((v) => {
+        clearTimeout(t);
+        resolve(v);
+      }).catch((e) => {
+        clearTimeout(t);
+        reject(e);
+      });
+    });
+
+  /** basePath を推定（ENV > __NEXT_DATA__.assetPrefix > <base>） */
+  const getBasePath = (): string => {
+    if (ENV_BASE) return ENV_BASE; // 例: "/app"
+    const anyWin = window as unknown as { __NEXT_DATA__?: { assetPrefix?: string } };
+    const ap = anyWin.__NEXT_DATA__?.assetPrefix || '';
+    if (ap && ap.startsWith('/')) return ap.replace(/\/+$/g, '');
+    const baseEl = document.querySelector('base') as HTMLBaseElement | null;
+    if (baseEl) {
+      try {
+        const u = new URL(baseEl.href);
+        return u.pathname.replace(/\/+$/g, '');
+      } catch {
+        /* noop */
+      }
+    }
+    return '';
+  };
+
+  /** 候補の sw.js URL と scope を列挙 */
+  const getSWCandidates = () => {
+    const base = getBasePath();
+    const list: Array<{ url: string; scope: string }> = [];
+    if (base) list.push({ url: `${base}/sw.js`, scope: `${base}/` });
+    list.push({ url: `/sw.js`, scope: `/` }); // 最後にルート直下
+    return list;
+  };
+
+  /** sw.js の到達性チェック（200 のみ OK） */
+  const isReachable = async (url: string): Promise<boolean> => {
     try {
-      const reg =
-        (await navigator.serviceWorker.getRegistration()) ??
-        (await navigator.serviceWorker.ready);
-      return reg ?? null;
-    } catch (e) {
-      console.error('[push] getRegistration error', e);
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  /** 既存登録を即時取得（候補 scope を総当たり） */
+  const getRegImmediate = async (): Promise<ServiceWorkerRegistration | null> => {
+    try {
+      const anyReg = await navigator.serviceWorker.getRegistration();
+      if (anyReg) return anyReg;
+      for (const c of getSWCandidates()) {
+        const r = await navigator.serviceWorker.getRegistration(c.scope);
+        if (r) return r;
+      }
+      return null;
+    } catch {
       return null;
     }
   };
 
-  const refreshSubscribedState = async () => {
+  /**
+   * SW を確実に用意:
+   * 1) 既存 registration を探す
+   * 2) 無ければ候補URLを到達性チェック→register
+   * 3) activation と controller 付与を待機（最大 totalMs）
+   */
+  const ensureRegistration = async (totalMs = 6000): Promise<ServiceWorkerRegistration | null> => {
+    if (!('serviceWorker' in navigator)) return null;
+
+    let reg: ServiceWorkerRegistration | null = await getRegImmediate();
+    if (!reg) {
+      const candidates = getSWCandidates();
+      const reachable: Array<{ url: string; scope: string }> = [];
+      for (const c of candidates) {
+        if (await isReachable(c.url)) reachable.push(c);
+      }
+      if (reachable.length === 0) {
+        toast.error(
+          `Service Worker が準備できていません（${candidates
+            .map((c) => c.url)
+            .join(' or ')} が 200 で配信されていません）`,
+        );
+        return null;
+      }
+      let lastErr: unknown = null;
+      for (const c of reachable) {
+        try {
+          reg = await navigator.serviceWorker.register(c.url, { scope: c.scope });
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!reg) {
+        console.error('[push] register failed', lastErr);
+        return null;
+      }
+    }
+
+    // activation を待つ（最大 totalMs の 2/3）
+    const budgetA = Math.max(500, Math.floor((totalMs * 2) / 3));
     try {
-      const reg = await getRegistration();
-      const sub = await reg?.pushManager.getSubscription();
+      await pTimeout<void>(
+        (async () => {
+          const sw: ServiceWorker | null | undefined =
+            reg?.installing ?? reg?.waiting ?? reg?.active ?? null;
+          if (!sw) return;
+          if (sw.state === 'activated') return;
+          await new Promise<void>((resolve) => {
+            const onState = () => {
+              if (sw.state === 'activated') {
+                sw.removeEventListener('statechange', onState);
+                resolve();
+              }
+            };
+            sw.addEventListener('statechange', onState);
+          });
+        })(),
+        budgetA,
+      );
+    } catch {
+      /* timeout → 次へ */
+    }
+
+    // controller 付与を残り時間で待つ
+    const budgetB = Math.max(500, totalMs - budgetA);
+    if (!navigator.serviceWorker.controller) {
+      try {
+        await pTimeout<void>(
+          new Promise<void>((resolve) => {
+            if (navigator.serviceWorker.controller) return resolve();
+            const onCtrl = () => resolve();
+            navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
+          }),
+          budgetB,
+        );
+      } catch {
+        /* timeout → 最終チェックへ */
+      }
+    }
+
+    const finalReg = await getRegImmediate();
+    return finalReg ?? reg;
+  };
+
+  /** 状態再取得（待ちすぎず UI を必ず更新） */
+  const refreshSubscribedState = async (): Promise<void> => {
+    try {
+      const isSecure =
+        window.location.protocol === 'https:' ||
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
+
+      if (!isSecure) {
+        setIsSubscribed(false);
+        toast.error('HTTPS 環境でのみ通知が利用できます');
+        return;
+      }
+      if (!('serviceWorker' in navigator)) {
+        setIsSubscribed(false);
+        return;
+      }
+
+      // 即時チェック
+      let reg: ServiceWorkerRegistration | null = await getRegImmediate();
+
+      // controller 未付与なら 2s 待機 → 再取得
+      if (!reg || !navigator.serviceWorker.controller) {
+        await Promise.race<void>([
+          new Promise<void>((resolve) => {
+            if (navigator.serviceWorker.controller) return resolve();
+            const h = () => resolve();
+            navigator.serviceWorker.addEventListener('controllerchange', h, { once: true });
+          }),
+          delay(2000),
+        ]);
+        reg = await getRegImmediate();
+      }
+
+      // 最後の保険：ready を 2s で打ち切り
+      if (!reg) {
+        reg = await Promise.race<ServiceWorkerRegistration | null>([
+          navigator.serviceWorker.ready,
+          delay(2000).then(() => null),
+        ]);
+      }
+
+      if (!reg) {
+        setIsSubscribed(false);
+        return;
+      }
+
+      const sub = await reg.pushManager.getSubscription();
       setIsSubscribed(!!sub);
     } catch (e) {
       console.error('[push] refreshSubscribedState error', e);
@@ -46,13 +235,37 @@ export default function PushToggle({ uid }: Props) {
     }
   };
 
+  // 初期化
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       await refreshSubscribedState();
+      setTimeout(() => {
+        if (!cancelled && isSubscribed === null) setIsSubscribed(false);
+      }, 1800);
     })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const subscribe = async () => {
+  // SW が後から制御を握った場合に再チェック
+  useEffect(() => {
+    const handler = () => setTimeout(() => void refreshSubscribedState(), 200);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', handler);
+    }
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', handler);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --------------- actions ---------------
+  const subscribe = async (): Promise<void> => {
     try {
       if (!('Notification' in window)) {
         toast.error('このブラウザは通知に対応していません');
@@ -76,26 +289,48 @@ export default function PushToggle({ uid }: Props) {
       }
 
       setPhase('sending');
-      const reg = await getRegistration();
+
+      // 無ければ登録→待機まで（最大 6s）
+      let reg: ServiceWorkerRegistration | null = await ensureRegistration(6000);
+
+      // 保険で ready を 2s 待つ
+      if (!reg || !navigator.serviceWorker.controller) {
+        reg = await Promise.race<ServiceWorkerRegistration | null>([
+          navigator.serviceWorker.ready,
+          delay(2000).then(() => null),
+        ]);
+      }
+
       if (!reg) {
-        toast.error('Service Worker が準備できていません');
+        toast.error('Service Worker が準備できていません（sw.js の配置や scope を確認）');
         setPhase('error');
         return;
       }
 
       const existing = await reg.pushManager.getSubscription();
-      const sub =
-        existing ||
-        (await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: b64ToU8(vapidKey),
-        }));
 
-      const res = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid, subscription: sub.toJSON() }),
-      });
+      // 新規 subscribe は最大 6s で打ち切り
+      const sub: PushSubscription =
+        existing ??
+        (await pTimeout<PushSubscription>(
+          reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: b64ToU8(vapidKey),
+          }),
+          6000,
+          () => console.warn('[push] subscribe timeout'),
+        ));
+
+      const res = await pTimeout<Response>(
+        fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid, subscription: sub.toJSON() }),
+        }),
+        8000,
+        () => console.warn('[push] /api/push/subscribe timeout'),
+      );
+
       if (!res.ok) throw new Error('subscribe api failed');
 
       await refreshSubscribedState();
@@ -109,12 +344,14 @@ export default function PushToggle({ uid }: Props) {
     }
   };
 
-  const unsubscribe = async () => {
+  const unsubscribe = async (): Promise<void> => {
     try {
       setPhase('sending');
-      const reg = await getRegistration();
+      const reg: ServiceWorkerRegistration | null = await ensureRegistration(3000);
       const sub = await reg?.pushManager.getSubscription();
-      if (sub) await sub.unsubscribe();
+      if (sub) {
+        await pTimeout<boolean>(sub.unsubscribe(), 4000);
+      }
       await refreshSubscribedState();
       setPhase('idle');
       toast.success('通知を解除しました');
@@ -126,20 +363,23 @@ export default function PushToggle({ uid }: Props) {
     }
   };
 
-  const sendTest = async () => {
+  const sendTest = async (): Promise<void> => {
     try {
       setPhase('sending');
-      const res = await fetch('/api/push/test-send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid,
-          title: '通知テスト',
-          body: 'これはテスト通知です',
-          url: '/main',
-          badgeCount: 1,
+      const res = await pTimeout<Response>(
+        fetch('/api/push/test-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid,
+            title: '通知テスト',
+            body: 'これはテスト通知です',
+            url: '/main',
+            badgeCount: 1,
+          }),
         }),
-      });
+        8000,
+      );
       if (!res.ok) throw new Error('test-send api failed');
       setPhase('sent');
       toast.success('テスト通知を送信しました');
@@ -152,6 +392,7 @@ export default function PushToggle({ uid }: Props) {
     }
   };
 
+  // ---------------- UI ----------------
   const statusText = (() => {
     const base =
       isSubscribed === null
@@ -178,51 +419,48 @@ export default function PushToggle({ uid }: Props) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      {/* <div className="rounded-xl border border-gray-200 bg-white shadow p-7 space-y-3 max-w-xl m-auto"> */}
-        <label className="text-[#5E5E5E] font-semibold">通知設定</label>
-        <p className="text-sm text-gray-700 mt-4">{statusText}</p>
+      <label className="text-[#5E5E5E] font-semibold">通知設定</label>
+      <p className="text-sm text-gray-700 mt-4">{statusText}</p>
 
-        {/* ▼ flex → flex-col に変更、ボタンは w-full */}
-        <div className="flex flex-col gap-2">
-          {isSubscribed === false && (
+      <div className="flex flex-col gap-2">
+        {isSubscribed === false && (
+          <button
+            onClick={subscribe}
+            disabled={phase === 'sending'}
+            className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-orange-400 to-pink-400 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
+          >
+            プッシュ通知を受け取る
+          </button>
+        )}
+
+        {isSubscribed === true && (
+          <>
             <button
-              onClick={subscribe}
+              onClick={unsubscribe}
               disabled={phase === 'sending'}
-              className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-orange-400 to-pink-400 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
+              className="w-full px-4 py-2 rounded-lg bg-gray-300 text-gray-800 text-sm shadow hover:bg-gray-400 disabled:opacity-60"
             >
-              プッシュ通知を受け取る
+              プッシュ通知を解除する
             </button>
-          )}
-
-          {isSubscribed === true && (
-            <>
-              <button
-                onClick={unsubscribe}
-                disabled={phase === 'sending'}
-                className="w-full px-4 py-2 rounded-lg bg-gray-300 text-gray-800 text-sm shadow hover:bg-gray-400 disabled:opacity-60"
-              >
-                プッシュ通知を解除する
-              </button>
-              <button
-                onClick={sendTest}
-                disabled={phase === 'sending'}
-                className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
-              >
-                テスト通知を送信
-              </button>
-            </>
-          )}
-
-          {isSubscribed === null && (
             <button
-              onClick={refreshSubscribedState}
-              className="w-full px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm shadow hover:bg-gray-300"
+              onClick={sendTest}
+              disabled={phase === 'sending'}
+              className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
             >
-              状態を再取得
+              テスト通知を送信
             </button>
-          )}
-        </div>
-      {/* </div> */}
+          </>
+        )}
+
+        {isSubscribed === null && (
+          <button
+            onClick={refreshSubscribedState}
+            className="w-full px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm shadow hover:bg-gray-300"
+          >
+            状態を再取得
+          </button>
+        )}
+      </div>
     </motion.div>
   );
 }
