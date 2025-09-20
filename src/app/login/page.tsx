@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   signInWithEmailAndPassword,
@@ -13,7 +13,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  signOut, // ★追加
+  signOut,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
@@ -22,13 +22,36 @@ import { FirebaseError } from 'firebase/app';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
+/**
+ * ラッパー: Suspense で useSearchParams を含む内側を包む
+ */
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <LoadingSpinner size={48} />
+        </div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
+  );
+}
+
+/**
+ * ここから内側: useSearchParams を利用
+ * - reauth=1 なら必ず signOut
+ * - Google は prompt: 'select_account' で毎回アカウント選択
+ * - 自動遷移なし。成功時のみ next へ遷移
+ */
+function LoginInner() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // ★追加
+  const searchParams = useSearchParams();
 
   // 遷移先と再認証フラグ
-  const next = searchParams.get('next') || '/main';   // ★変更: 固定ではなくクエリ優先
-  const reauth = searchParams.get('reauth') === '1';  // ★追加
+  const next = searchParams.get('next') || '/main';
+  const reauth = searchParams.get('reauth') === '1';
 
   // UI state
   const [email, setEmail] = useState('');
@@ -41,24 +64,24 @@ export default function LoginPage() {
   const [passwordError, setPasswordError] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // persistence（必要なら維持）
+  // 永続化（必要に応じて）
   useEffect(() => {
     (async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
       } catch {
-        // 失敗時は黙殺（firebase.ts側でフォールバック実装している想定）
+        // firebase.ts 側のフォールバックに任せる
       }
     })();
   }, []);
 
-  // ★追加: reauth=1 の時は必ず Firebase セッションをクリア（自動再ログイン防止）
+  // reauth=1 の時は必ず Firebase セッションをクリア（自動再ログイン防止）
   useEffect(() => {
     if (!reauth) return;
     signOut(auth).catch(() => void 0);
   }, [reauth]);
 
-  // redirect result（Google リダイレクト戻り）
+  // Google リダイレクト戻り
   const handledRedirectRef = useRef(false);
   useEffect(() => {
     if (handledRedirectRef.current) return;
@@ -68,43 +91,30 @@ export default function LoginPage() {
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
-          // ★変更: 成功時のみ next へ
           router.replace(next);
         } else {
-          // ユーザーなし → ローディング解除
           setIsLoading(false);
         }
       } catch {
-        // 失敗時 → ローディング解除
         setIsLoading(false);
       }
     })();
-  }, [router, next]); // ★next を依存に含める
-
-  // ★削除: onAuthStateChanged での自動遷移
-  // useEffect(() => {
-  //   const unsub = onAuthStateChanged(auth, (u) => {
-  //     if (u) {
-  //       router.replace('/main');
-  //     }
-  //   });
-  //   return () => unsub();
-  // }, [router]);
+  }, [router, next]);
 
   // Google プロバイダ（毎回アカウント選択を強制）
   const googleProvider = useMemo(() => {
     const p = new GoogleAuthProvider();
-    p.setCustomParameters({ prompt: 'select_account' }); // ★追加
+    p.setCustomParameters({ prompt: 'select_account' });
     return p;
   }, []);
 
   // handlers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await handleLogin();
+    await handleEmailLogin();
   };
 
-  const handleLogin = async () => {
+  const handleEmailLogin = async () => {
     setEmailError('');
     setPasswordError('');
     setLoginError('');
@@ -124,9 +134,9 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       // 念のため都度クリア（自動再ログイン抑止）
-      await signOut(auth).catch(() => void 0); // ★追加（安全）
+      await signOut(auth).catch(() => void 0);
       await signInWithEmailAndPassword(auth, emailTrimmed, password);
-      router.replace(next); // ★変更: 成功時のみ next へ
+      router.replace(next);
     } catch (error: unknown) {
       if (error instanceof FirebaseError) {
         setLoginError('ログインに失敗しました：' + error.message);
@@ -143,11 +153,11 @@ export default function LoginPage() {
     setLoginError('');
     try {
       // 念のため毎回クリア（自動再ログイン抑止）
-      await signOut(auth).catch(() => void 0); // ★追加
+      await signOut(auth).catch(() => void 0);
       setIsLoading(true);
       // まずはポップアップ
       await signInWithPopup(auth, googleProvider);
-      router.replace(next); // ★変更: 成功時のみ next へ
+      router.replace(next);
     } catch (err) {
       const fe = err as FirebaseError;
       if (fe?.code === 'auth/popup-closed-by-user') {
@@ -162,9 +172,8 @@ export default function LoginPage() {
       if (needRedirect) {
         try {
           setIsLoading(true);
-          // リダイレクトでも毎回アカウント選択が効くよう同じ provider を利用
           await signInWithRedirect(auth, googleProvider);
-          return; // ここから先は getRedirectResult で処理
+          return; // 以後は getRedirectResult で処理
         } catch (e) {
           setIsLoading(false);
           if (e instanceof FirebaseError) {
@@ -272,7 +281,7 @@ export default function LoginPage() {
             className="w-full px-4 py-3 text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]
                        disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
           >
-            Googleでログイン
+            Googleでログイン（毎回アカウント選択）
           </motion.button>
 
           {/* 新規登録へ */}
