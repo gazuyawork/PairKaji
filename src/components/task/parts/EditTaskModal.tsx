@@ -20,6 +20,8 @@ import {
   ChevronRight, // ★ 追加：横スクロールヒント用
 } from 'lucide-react';
 import UrlAwareTextarea from '@/components/common/UrlAwareTextarea';
+import HelpPopover from '@/components/common/HelpPopover';
+
 
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
@@ -731,7 +733,26 @@ export default function EditTaskModal({
             )}
 
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-sm text-gray-600">プライベート：</span>
+              <span className="text-sm text-gray-600 flex items-center">
+                プライベート
+  <HelpPopover
+    className="ml-1"
+    content={
+      <div className="space-y-2">
+        <p>
+          プライベートをオンにすると、このタスクは
+          <span className="font-semibold">自分だけ</span>の管理対象になります。
+        </p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>パートナーの画面には表示されません。</li>
+          <li>ポイント付与や担当者の選択は無効化されます。</li>
+          <li>後から共有に戻すこともできます。</li>
+        </ul>
+      </div>
+    }
+  />
+                ：
+              </span>
               <button
                 type="button"
                 role="switch"
@@ -746,6 +767,7 @@ export default function EditTaskModal({
                 />
               </button>
             </div>
+
           </>
         )}
 
