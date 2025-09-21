@@ -145,7 +145,7 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => {};
+  const handleDragStart = () => { };
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -180,24 +180,29 @@ export default function TodoTaskCard({
   const [isInputOpen, setIsInputOpen] = useState(false);
   const inputWrapRef = useRef<HTMLDivElement | null>(null);
 
-  const openAddInput = () => {
-    setIsInputOpen(true);
-    // ▼ 変更: アニメーション後でも確実にフォーカスされるよう二段階フォーカス
-    requestAnimationFrame(() => inputRef.current?.focus());
-    setTimeout(() => inputRef.current?.focus(), 60); // マウント＋アニメの完了を待つ保険
-  };
-  const closeAddInput = () => setIsInputOpen(false);
+  /* ▼▼▼ 追加: iOS検出とフォーカス用ダミー入力 ▼▼▼ */
+  const isIOS = useMemo(
+    () => typeof navigator !== 'undefined' && /iP(hone|od|ad)/.test(navigator.userAgent),
+    []
+  );
+  const dummyFocusRef = useRef<HTMLInputElement | null>(null);
+  /* ▲▲▲ 追加ここまで ▲▲▲ */
 
-  // ▼ 変更: isInputOpen 変化後にもフォーカスを再試行（PC/SPどちらでも安定）
-  useEffect(() => {
-    if (!isInputOpen) return;
-    const t1 = requestAnimationFrame(() => inputRef.current?.focus());
-    const t2 = setTimeout(() => inputRef.current?.focus(), 120);
-    return () => {
-      cancelAnimationFrame(t1);
-      clearTimeout(t2);
-    };
-  }, [isInputOpen]);
+  const openAddInput = () => {
+    /* ▼ 変更: iOSでは「同期的にフォーカス」→ その後に入力表示＆本入力へ引き継ぎ */
+    if (isIOS) {
+      // ダミーへ即フォーカス（ユーザー操作のコンテキスト内）
+      dummyFocusRef.current?.focus();
+    }
+
+    setIsInputOpen(true);
+
+    // 表示反映後に本入力へフォーカスを引き継ぎ（iOSでも維持されやすい）
+    requestAnimationFrame(() => inputRef.current?.focus());
+    setTimeout(() => inputRef.current?.focus(), 120);
+  };
+
+  const closeAddInput = () => setIsInputOpen(false);
 
   // [ADD] 入力ボックス外クリックでクローズ（クリックアウェイ）
   useEffect(() => {
@@ -249,7 +254,6 @@ export default function TodoTaskCard({
       setInputError(null);
       toast.success('完了済のタスクを復活しました');
       scrollListToTop('smooth');
-      // 連続入力：閉じずにフォーカス維持
       requestAnimationFrame(() => inputRef.current?.focus?.());
       return;
     }
@@ -276,6 +280,7 @@ export default function TodoTaskCard({
   /* -------------------- 自動並び替え（旅行カテゴリ用） -------------------- */
   useEffect(() => {
     if (category !== '旅行') {
+      // 旅行以外は自動並べ替えなし（新規時のみ先頭固定を行う）
       const newId = pendingNewIdRef.current;
       if (!newId) return;
 
@@ -290,6 +295,7 @@ export default function TodoTaskCard({
       const same = ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
       if (!same) onReorderTodos(nextIds);
 
+      // 並べ替え後も先頭へ寄せる
       requestAnimationFrame(() => scrollListToTop('smooth'));
 
       pendingNewIdRef.current = null;
@@ -301,15 +307,19 @@ export default function TodoTaskCard({
     const newId = pendingNewIdRef.current;
     const hasNew = newId ? ids.includes(newId) : false;
 
+    // 元の順を保持するため idx を持たせる
     const list = todos.map((t, idx) => ({
       id: t.id,
       idx,
       minutes: hhmmToMinutes((t as unknown as { timeStart?: string }).timeStart),
     }));
 
+    // 新規は必ず先頭に固定
     const listWithoutNew = hasNew ? list.filter((x) => x.id !== newId) : list;
 
+    // 未入力（minutes === Infinity）→ 元順
     const withoutTime = listWithoutNew.filter((x) => x.minutes === Infinity).sort((a, b) => a.idx - b.idx);
+    // 時間あり → minutes昇順、同値は元順
     const withTime = listWithoutNew
       .filter((x) => x.minutes !== Infinity)
       .sort((a, b) => (a.minutes !== b.minutes ? a.minutes - b.minutes : a.idx - b.idx));
@@ -353,15 +363,17 @@ export default function TodoTaskCard({
   return (
     <div
       ref={groupDnd?.setNodeRef}
+      // 器は 100dvh（動的ビューポート）で統一し、外側スクロールの介入を防ぐ
       style={{
         ...(groupDnd?.style ?? {}),
         minHeight: '100dvh',
-        overscrollBehaviorY: 'contain',
+        overscrollBehaviorY: 'contain', // ページ全体のスクロール連鎖を断つ
       }}
       className={clsx('relative scroll-mt-4', groupDnd?.isDragging && 'opacity-70')}
     >
+      {/* カード全体（ヘッダー＋本文） */}
       <div className="flex h-full min-h-0 flex-col bg-white overflow-hidden">
-        {/* ===== 固定ヘッダー ===== */}
+        {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン・追加入力/FAB） ===== */}
         <div
           ref={headerRef}
           className={clsx(
@@ -369,7 +381,7 @@ export default function TodoTaskCard({
           )}
           style={{ top: 'env(safe-area-inset-top, 0px)' }}
         >
-          {/* ▼ 追加：1段目（タスク名行）の白背景を画面幅いっぱいに */}
+          {/* ▼ タスク名行の白背景を画面幅いっぱいに */}
           <div className="bg-white">
             <div className="mx-auto w-full max-w-xl px-2">
               <div className="flex justify-between items-center py-2">
@@ -380,6 +392,7 @@ export default function TodoTaskCard({
                   </span>
                 </div>
 
+                {/* ×ボタン */}
                 <motion.button
                   onClick={handleClose}
                   className="pr-4 shrink-0 text-red-600 hover:text-red-500"
@@ -395,9 +408,10 @@ export default function TodoTaskCard({
             </div>
           </div>
 
-          {/* ▼ 2段目：タブ＋追加入力（内側は max-w-xl で中央寄せ） */}
+          {/* ▼ 2段目：タブ（左 or 非表示）＋ 入力/FAB（右→全幅） */}
           <div className="mx-auto w-full max-w-xl px-2">
             <div className="flex items-center justify-between pt-2 pb-0 gap-2">
+              {/* 左：タブ（入力展開中は非表示にして入力を全幅に） */}
               {!isInputOpen && (
                 <div className="flex space-x-0 h-10 shrink-0">
                   {(['undone', 'done'] as const).map((type) => {
@@ -434,12 +448,14 @@ export default function TodoTaskCard({
                 </div>
               )}
 
+              {/* 右：FAB または 全幅入力（レイアウトモーフィング） */}
               <div className={clsx('flex-1 min-w-0', isInputOpen ? 'ml-0' : 'ml-2')}>
                 <AnimatePresence mode="wait" initial={false}>
                   {!isInputOpen ? (
                     <motion.button
                       key="fab-plus-inline"
-                      layout={false}
+                      /* 削除: layoutId="addInputInline" */
+                      layout={false} /* ← レイアウトの補間を禁止 */
                       type="button"
                       onClick={openAddInput}
                       aria-label="TODOを追加"
@@ -449,9 +465,10 @@ export default function TodoTaskCard({
                         'bg-gradient-to-br from-orange-300 to-orange-500 text-white',
                         'h-10 w-10 flex items-center justify-center'
                       )}
+                      /* フェードインのみ */
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
+                      exit={{ opacity: 0 }} // 速め
                       transition={{ duration: 0.22, ease: 'easeOut' }}
                     >
                       <Plus size={24} />
@@ -510,7 +527,6 @@ export default function TodoTaskCard({
                         )}
                         placeholder={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
                         inputMode="text"
-                        // ▼ 変更: 直接 autoFocus も併用し、SP/PCの差異を吸収
                         autoFocus
                       />
                       <button
@@ -528,7 +544,20 @@ export default function TodoTaskCard({
               </div>
             </div>
           </div>
-          {/* ▲ 2段目終わり */}
+
+          {/* ▼ iOSフォーカスハンドオフ用ダミー入力（不可視だがフォーカス可能） */}
+          <input
+            ref={dummyFocusRef}
+            type="text"
+            aria-hidden="true"
+            // display/visibility を使わず、不可視＆タップ不可にしつつフォーカスは通す
+            className="fixed top-0 left-0 w-px h-px opacity-0 pointer-events-none"
+            // iOSで不要にキーボードが開かないよう value固定（必要なら空文字）
+            value=""
+            readOnly
+            tabIndex={-1}
+          />
+          {/* ▲ ダミー入力ここまで */}
         </div>
         {/* ===== 固定ヘッダー ここまで ===== */}
 
@@ -584,6 +613,7 @@ export default function TodoTaskCard({
               className={clsx(
                 'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2',
               )}
+              // フッター入力を廃止したため固定余白
               style={{ paddingBottom: 16 }}
               onTouchMove={(e) => e.stopPropagation()}
               aria-live="polite"
