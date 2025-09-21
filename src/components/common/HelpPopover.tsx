@@ -157,7 +157,7 @@ export default function HelpPopover({
                   top: pos.side === 'bottom' ? pos.top : undefined,
                   bottom: pos.side === 'top' ? pos.containerH - pos.top : undefined,
                   left: pos.left,
-                  transform: 'translateX(-40%)',
+                  transform: 'translateX(-45%)',
                   maxWidth,
                   width: 'calc(100vw - 32px)',
                 }}
