@@ -95,6 +95,22 @@ export default function PushToggle({ uid }: Props) {
     }
   };
 
+  /** 候補 scope の registration を全取得（重複排除して配列で返す） */
+  const getAllRegistrations = async (): Promise<ServiceWorkerRegistration[]> => {
+    const regs: ServiceWorkerRegistration[] = [];
+    try {
+      const def = await navigator.serviceWorker.getRegistration();
+      if (def) regs.push(def);
+    } catch { }
+    for (const c of getSWCandidates()) {
+      try {
+        const r = await navigator.serviceWorker.getRegistration(c.scope);
+        if (r && !regs.includes(r)) regs.push(r);
+      } catch { }
+    }
+    return regs;
+  };
+
   /**
    * SW を確実に用意:
    * 1) 既存 registration を探す
@@ -198,11 +214,11 @@ export default function PushToggle({ uid }: Props) {
         return;
       }
 
-      // 即時チェック
-      let reg: ServiceWorkerRegistration | null = await getRegImmediate();
+      // 即時チェック（全 registration を対象）
+      let regs: ServiceWorkerRegistration[] = await getAllRegistrations();
 
       // controller 未付与なら 2s 待機 → 再取得
-      if (!reg || !navigator.serviceWorker.controller) {
+      if (regs.length === 0 || !navigator.serviceWorker.controller) {
         await Promise.race<void>([
           new Promise<void>((resolve) => {
             if (navigator.serviceWorker.controller) return resolve();
@@ -211,24 +227,34 @@ export default function PushToggle({ uid }: Props) {
           }),
           delay(2000),
         ]);
-        reg = await getRegImmediate();
+        regs = await getAllRegistrations();
       }
 
       // 最後の保険：ready を 2s で打ち切り
-      if (!reg) {
-        reg = await Promise.race<ServiceWorkerRegistration | null>([
+      if (regs.length === 0) {
+        const readyReg = await Promise.race<ServiceWorkerRegistration | null>([
           navigator.serviceWorker.ready,
           delay(2000).then(() => null),
         ]);
+        if (readyReg) regs = [readyReg];
       }
 
-      if (!reg) {
+      if (regs.length === 0) {
         setIsSubscribed(false);
         return;
       }
 
-      const sub = await reg.pushManager.getSubscription();
-      setIsSubscribed(!!sub);
+      // ★ 重要：全 registration で購読を探す
+      for (const r of regs) {
+        try {
+          const sub = await r.pushManager.getSubscription();
+          if (sub) {
+            setIsSubscribed(true);
+            return;
+          }
+        } catch { }
+      }
+      setIsSubscribed(false);
     } catch (e) {
       console.error('[push] refreshSubscribedState error', e);
       setIsSubscribed(false);
@@ -240,8 +266,10 @@ export default function PushToggle({ uid }: Props) {
     let cancelled = false;
     (async () => {
       await refreshSubscribedState();
+      // ▼ フォールバックが必要なら functional update で現在値を参照
       setTimeout(() => {
-        if (!cancelled && isSubscribed === null) setIsSubscribed(false);
+        if (cancelled) return;
+        setIsSubscribed((prev) => (prev === null ? false : prev));
       }, 1800);
     })();
     return () => {
@@ -249,6 +277,7 @@ export default function PushToggle({ uid }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   // SW が後から制御を握った場合に再チェック
   useEffect(() => {
@@ -307,7 +336,17 @@ export default function PushToggle({ uid }: Props) {
         return;
       }
 
-      const existing = await reg.pushManager.getSubscription();
+      // 既存購読は全 registration をチェック（使い回せるならそれを利用）
+      let existing: PushSubscription | null = null;
+      for (const r of await getAllRegistrations()) {
+        try {
+          const s = await r.pushManager.getSubscription();
+          if (s) {
+            existing = s;
+            break;
+          }
+        } catch { }
+      }
 
       // 新規 subscribe は最大 6s で打ち切り
       const sub: PushSubscription =
@@ -347,11 +386,20 @@ export default function PushToggle({ uid }: Props) {
   const unsubscribe = async (): Promise<void> => {
     try {
       setPhase('sending');
-      const reg: ServiceWorkerRegistration | null = await ensureRegistration(3000);
-      const sub = await reg?.pushManager.getSubscription();
-      if (sub) {
-        await pTimeout<boolean>(sub.unsubscribe(), 4000);
+      // 全 registration の購読を解除
+      const regs = await getAllRegistrations();
+      let any = false;
+      for (const r of regs) {
+        try {
+          const sub = await r.pushManager.getSubscription();
+          if (sub) {
+            await pTimeout<boolean>(sub.unsubscribe(), 4000);
+            any = true;
+          }
+        } catch { }
       }
+      if (!any) console.warn('[push] no subscription found on any registration');
+
       await refreshSubscribedState();
       setPhase('idle');
       toast.success('通知を解除しました');
