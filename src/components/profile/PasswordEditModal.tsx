@@ -56,7 +56,7 @@ export default function PasswordEditModal({ open, onClose }: PasswordEditModalPr
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-      <div className="bg-white w-[90%] max-w-md p-6 rounded-xl shadow-lg relative">
+      <div className="bg-white w-[90%] max-w-xl p-6 rounded-xl shadow-lg relative">
         <div className="space-y-6 mt-4 mx-3">
           <div className="text-center">
             <p className="text-lg font-bold text-[#5E5E5E] font-sans">パスワードを変更</p>

@@ -100,9 +100,9 @@ export default function ContactPage() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-6">
+          <form onSubmit={handleSubmit} className="max-w-xl mx-auto space-y-6">
                     {/* お問い合わせ案内メッセージ */}
-        <div className="max-w-md mx-2 mb-6 text-sm text-gray-600">
+        <div className="max-w-xl mx-2 mb-6 text-sm text-gray-600">
           当フォームでは、アプリに関するお問い合わせやご要望も受け付けております。
           ご質問や改善のご提案など、ぜひお気軽にお送りください。
         </div>
@@ -145,7 +145,7 @@ export default function ContactPage() {
             </button>
 
             {/* 返信に関する注意文 */}
-            <p className="mt-3 mx-2 text-xs text-gray-500 leading-relaxed　max-w-md">
+            <p className="mt-3 mx-2 text-xs text-gray-500 leading-relaxed　max-w-xl">
               ※お問い合わせ内容は確認後、必要に応じてご返信いたします。<br />
               ご返信が必要な場合は、通常 <span className="font-semibold text-gray-600">3営業日以内</span> にメールにてご連絡いたします。
             </p>

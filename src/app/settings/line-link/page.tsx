@@ -220,7 +220,7 @@ export default function LineLinkPage() {
         戻る
       </button>
 
-      <div className="max-w-md w-full bg-white rounded-xl shadow-md border border-gray-200 p-6">
+      <div className="max-w-xl w-full bg-white rounded-xl shadow-md border border-gray-200 p-6">
         <div className="flex flex-col items-center text-center">
           <div className="bg-sky-100 rounded-full p-3 mb-4">
             <MessageCircle className="text-sky-500 w-8 h-8" />

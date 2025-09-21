@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
-        className="w-full max-w-md"
+        className="w-full max-w-xl"
       >
         {/* ← ここは “元の” 直置き h1 / p 構成に戻しています */}
         <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>

@@ -64,7 +64,7 @@ export default function DeleteAccountPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
       <Header title="Withdrawal" />
-      <main className="flex-1 px-6 py-10 max-w-md mx-auto space-y-6">
+      <main className="flex-1 px-6 py-10 max-w-xl mx-auto space-y-6">
         <p className="text-[#5E5E5E] text-sm">
           アカウントを削除すると、これまでのすべての情報（タスク、ポイントなど）が失われます。
         </p>

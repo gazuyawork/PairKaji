@@ -108,7 +108,7 @@ export default function VerifyPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div
           className="
-          w-full max-w-md
+          w-fullxl
           rounded-2xl border border-gray-200
           bg-white/70 backdrop-blur
           shadow-lg

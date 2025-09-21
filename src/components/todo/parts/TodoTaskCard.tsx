@@ -145,7 +145,7 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => { };
+  const handleDragStart = () => {};
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -182,10 +182,22 @@ export default function TodoTaskCard({
 
   const openAddInput = () => {
     setIsInputOpen(true);
-    // 次フレームでフォーカス
+    // ▼ 変更: アニメーション後でも確実にフォーカスされるよう二段階フォーカス
     requestAnimationFrame(() => inputRef.current?.focus());
+    setTimeout(() => inputRef.current?.focus(), 60); // マウント＋アニメの完了を待つ保険
   };
   const closeAddInput = () => setIsInputOpen(false);
+
+  // ▼ 変更: isInputOpen 変化後にもフォーカスを再試行（PC/SPどちらでも安定）
+  useEffect(() => {
+    if (!isInputOpen) return;
+    const t1 = requestAnimationFrame(() => inputRef.current?.focus());
+    const t2 = setTimeout(() => inputRef.current?.focus(), 120);
+    return () => {
+      cancelAnimationFrame(t1);
+      clearTimeout(t2);
+    };
+  }, [isInputOpen]);
 
   // [ADD] 入力ボックス外クリックでクローズ（クリックアウェイ）
   useEffect(() => {
@@ -193,9 +205,7 @@ export default function TodoTaskCard({
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
       if (!target) return;
-      // 入力ラッパ内をクリックした場合は維持
       if (inputWrapRef.current && inputWrapRef.current.contains(target)) return;
-      // それ以外（＝外側）をタップ/クリックで閉じる
       closeAddInput();
     };
     document.addEventListener('mousedown', onPointerDown, { capture: true });
@@ -264,13 +274,8 @@ export default function TodoTaskCard({
   };
 
   /* -------------------- 自動並び替え（旅行カテゴリ用） -------------------- */
-  // 仕様：
-  //   1) 新規は必ず先頭（pendingNewId が存在＆反映後）
-  //   2) 次に「時間未入力」
-  //   3) 最後に「時間あり」を開始時刻の昇順（同時刻は元順）
   useEffect(() => {
     if (category !== '旅行') {
-      // 旅行以外は自動並べ替えなし（新規時のみ先頭固定を行う）
       const newId = pendingNewIdRef.current;
       if (!newId) return;
 
@@ -285,7 +290,6 @@ export default function TodoTaskCard({
       const same = ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
       if (!same) onReorderTodos(nextIds);
 
-      // 並べ替え後も先頭へ寄せる
       requestAnimationFrame(() => scrollListToTop('smooth'));
 
       pendingNewIdRef.current = null;
@@ -297,19 +301,15 @@ export default function TodoTaskCard({
     const newId = pendingNewIdRef.current;
     const hasNew = newId ? ids.includes(newId) : false;
 
-    // 元の順を保持するため idx を持たせる
     const list = todos.map((t, idx) => ({
       id: t.id,
       idx,
       minutes: hhmmToMinutes((t as unknown as { timeStart?: string }).timeStart),
     }));
 
-    // 新規は必ず先頭に固定
     const listWithoutNew = hasNew ? list.filter((x) => x.id !== newId) : list;
 
-    // 未入力（minutes === Infinity）→ 元順
     const withoutTime = listWithoutNew.filter((x) => x.minutes === Infinity).sort((a, b) => a.idx - b.idx);
-    // 時間あり → minutes昇順、同値は元順
     const withTime = listWithoutNew
       .filter((x) => x.minutes !== Infinity)
       .sort((a, b) => (a.minutes !== b.minutes ? a.minutes - b.minutes : a.idx - b.idx));
@@ -353,186 +353,182 @@ export default function TodoTaskCard({
   return (
     <div
       ref={groupDnd?.setNodeRef}
-      // 器は 100dvh（動的ビューポート）で統一し、外側スクロールの介入を防ぐ
       style={{
         ...(groupDnd?.style ?? {}),
         minHeight: '100dvh',
-        overscrollBehaviorY: 'contain', // ページ全体のスクロール連鎖を断つ
+        overscrollBehaviorY: 'contain',
       }}
       className={clsx('relative scroll-mt-4', groupDnd?.isDragging && 'opacity-70')}
     >
-      {/* カード全体（ヘッダー＋本文） */}
       <div className="flex h-full min-h-0 flex-col bg-white overflow-hidden">
-        {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン・追加入力/FAB） ===== */}
+        {/* ===== 固定ヘッダー ===== */}
         <div
           ref={headerRef}
           className={clsx(
             'fixed left-0 right-0 z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
-            'pl-2 pr-2',
           )}
           style={{ top: 'env(safe-area-inset-top, 0px)' }}
         >
-          {/* 1段目：カテゴリ＆タスク名＆× */}
-          <div className="flex justify-between items-center py-2 mx-[-6px] bg-white">
-            <div className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0" aria-label="タスク名">
-              <CatIcon size={20} className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)} aria-label={`${categoryLabel}カテゴリ`} />
-              <span className="font-bold text-[18px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2">
-                {(task as unknown as { name?: string }).name ?? ''}
-              </span>
-            </div>
+          {/* ▼ 追加：1段目（タスク名行）の白背景を画面幅いっぱいに */}
+          <div className="bg-white">
+            <div className="mx-auto w-full max-w-xl px-2">
+              <div className="flex justify-between items-center py-2">
+                <div className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0" aria-label="タスク名">
+                  <CatIcon size={20} className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)} aria-label={`${categoryLabel}カテゴリ`} />
+                  <span className="font-bold text-[18px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2">
+                    {(task as unknown as { name?: string }).name ?? ''}
+                  </span>
+                </div>
 
-            {/* ×ボタン */}
-            <motion.button
-              onClick={handleClose}
-              className="pr-4 shrink-0 text-red-600 hover:text-red-500"
-              type="button"
-              title="この画面を閉じる"
-              aria-label="この画面を閉じる"
-              whileTap={{ scale: 0.98 }}
-              variants={SHAKE_VARIANTS}
-            >
-              <X size={22} />
-            </motion.button>
-          </div>
-
-          {/* 2段目：タブ（左 or 非表示）＋ 入力/FAB（右→全幅） */}
-          <div className="flex items-center justify-between pt-2 pb-0 gap-2">
-            {/* 左：タブ（入力展開中は非表示にして入力を全幅に） */}
-            {!isInputOpen && (
-              <div className="flex space-x-0 h-10 shrink-0">
-                {(['undone', 'done'] as const).map((type) => {
-                  const count = type === 'undone' ? undoneCount : doneCount;
-                  return (
-                    <button
-                      key={type}
-                      onClick={() => setTab(type)}
-                      className={clsx(
-                        'relative pl-5 pt-5 pb-6 text-[14px] sm:text-sm font-bold border border-gray-300',
-                        'rounded-t-md w-26 sm:w-26 flex items-center justify-center',
-                        type === tab ? 'bg-white text-[#5E5E5E] border-b-transparent z-10' : 'bg-gray-100 text-gray-400 z-0',
-                      )}
-                      type="button"
-                      aria-pressed={type === tab}
-                      aria-label={type === 'undone' ? `未処理 (${count})` : `処理済 (${count})`}
-                    >
-                      <span
-                        className={clsx(
-                          'absolute left-2.5 sm:left-2 inline-block min-w-[20px] sm:min-w-[22px] h-[20px] sm:h-[22px] leading-[20px] sm:leading-[22px] text-white rounded-full text-center',
-                          count === 0
-                            ? 'bg-gray-300'
-                            : type === 'undone'
-                              ? 'bg-gradient-to-b from-red-300 to-red-500'
-                              : 'bg-gradient-to-b from-blue-300 to-blue-500',
-                        )}
-                      >
-                        {count}
-                      </span>
-                      {type === 'undone' ? '未処理' : '処理済'}
-                    </button>
-                  );
-                })}
+                <motion.button
+                  onClick={handleClose}
+                  className="pr-4 shrink-0 text-red-600 hover:text-red-500"
+                  type="button"
+                  title="この画面を閉じる"
+                  aria-label="この画面を閉じる"
+                  whileTap={{ scale: 0.98 }}
+                  variants={SHAKE_VARIANTS}
+                >
+                  <X size={22} />
+                </motion.button>
               </div>
-            )}
-
-            {/* 右：FAB または 全幅入力（レイアウトモーフィング） */}
-            <div className={clsx('flex-1 min-w-0', isInputOpen ? 'ml-0' : 'ml-2')}>
-              <AnimatePresence mode="wait" initial={false}>
-                {!isInputOpen ? (
-                  <motion.button
-                    key="fab-plus-inline"
-                    /* 削除: layoutId="addInputInline" */
-                    layout={false} /* ← レイアウトの補間を禁止 */
-                    type="button"
-                    onClick={openAddInput}
-                    aria-label="TODOを追加"
-                    className={clsx(
-                      'ml-auto block mb-2',
-                      'rounded-full shadow-md',
-                      'bg-gradient-to-br from-orange-300 to-orange-500 text-white',
-                      'h-10 w-10 flex items-center justify-center'
-                    )}
-                    /* フェードインのみ */
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }} // 速め
-                    /* 伸び縮みも完全排除したい場合は whileTap も消します */
-                    /* 削除推奨: whileTap={{ scale: 0.96 }} */
-                    transition={{ duration: 0.22, ease: 'easeOut' }}
-                  >
-                    <Plus size={24} />
-                  </motion.button>
-
-
-
-                ) : (
-                  <motion.div
-                    key="full-input"
-                    ref={inputWrapRef}
-                    layoutId="addInputInline"
-                    className="
-                      w-full
-                      px-3 py-1 mb-1
-                      bg-white/90 backdrop-blur
-                      rounded-xl shadow-sm ring-1 ring-gray-200
-                      flex items-center gap-2
-                      focus-within:ring-2 focus-within:ring-orange-300
-                    "
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                  >
-                    <Plus className={clsx('shrink-0', canAdd && tab === 'undone' ? 'text-[#FFCB7D]' : 'text-gray-300')} />
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={newTodoText}
-                      onChange={(e) => {
-                        setNewTodoText(e.target.value);
-                        setInputError(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          e.preventDefault();
-                          closeAddInput();
-                          return;
-                        }
-                        if (e.key !== 'Enter') return;
-                        e.preventDefault();
-                        if (tab !== 'undone') return;
-                        if (!canAdd) return;
-                        if (isComposingAdd) return;
-                        handleAdd();
-                      }}
-                      onCompositionStart={() => setIsComposingAdd(true)}
-                      onCompositionEnd={() => setIsComposingAdd(false)}
-                      disabled={tab !== 'undone' || !canAdd}
-                      aria-disabled={tab !== 'undone' || !canAdd}
-                      aria-label="TODOを入力"
-                      title={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
-                      className={clsx(
-                        'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px]',
-                        tab === 'undone' && canAdd
-                          ? 'border-gray-300 text-black'
-                          : 'border-gray-200 text-gray-400 cursor-not-allowed',
-                      )}
-                      placeholder={tab === 'undone' ? 'TODOを入力してEnter' : '未処理タブで追加できます'}
-                      inputMode="text"
-                    />
-                    <button
-                      type="button"
-                      onClick={closeAddInput}
-                      className="px-1 text-gray-400 hover:text-gray-600"
-                      aria-label="入力を閉じる"
-                      title="入力を閉じる"
-                    >
-                      <X size={18} />
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           </div>
+
+          {/* ▼ 2段目：タブ＋追加入力（内側は max-w-xl で中央寄せ） */}
+          <div className="mx-auto w-full max-w-xl px-2">
+            <div className="flex items-center justify-between pt-2 pb-0 gap-2">
+              {!isInputOpen && (
+                <div className="flex space-x-0 h-10 shrink-0">
+                  {(['undone', 'done'] as const).map((type) => {
+                    const count = type === 'undone' ? undoneCount : doneCount;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setTab(type)}
+                        className={clsx(
+                          'relative pl-5 pt-5 pb-6 text-[14px] sm:text-sm font-bold border border-gray-300',
+                          'rounded-t-md w-26 sm:w-26 flex items-center justify-center',
+                          type === tab ? 'bg-white text-[#5E5E5E] border-b-transparent z-10' : 'bg-gray-100 text-gray-400 z-0',
+                        )}
+                        type="button"
+                        aria-pressed={type === tab}
+                        aria-label={type === 'undone' ? `未処理 (${count})` : `処理済 (${count})`}
+                      >
+                        <span
+                          className={clsx(
+                            'absolute left-2.5 sm:left-2 inline-block min-w-[20px] sm:min-w-[22px] h-[20px] sm:h-[22px] leading-[20px] sm:leading-[22px] text-white rounded-full text-center',
+                            count === 0
+                              ? 'bg-gray-300'
+                              : type === 'undone'
+                                ? 'bg-gradient-to-b from-red-300 to-red-500'
+                                : 'bg-gradient-to-b from-blue-300 to-blue-500',
+                          )}
+                        >
+                          {count}
+                        </span>
+                        {type === 'undone' ? '未処理' : '処理済'}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className={clsx('flex-1 min-w-0', isInputOpen ? 'ml-0' : 'ml-2')}>
+                <AnimatePresence mode="wait" initial={false}>
+                  {!isInputOpen ? (
+                    <motion.button
+                      key="fab-plus-inline"
+                      layout={false}
+                      type="button"
+                      onClick={openAddInput}
+                      aria-label="TODOを追加"
+                      className={clsx(
+                        'ml-auto block mb-2',
+                        'rounded-full shadow-md',
+                        'bg-gradient-to-br from-orange-300 to-orange-500 text-white',
+                        'h-10 w-10 flex items-center justify-center'
+                      )}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                    >
+                      <Plus size={24} />
+                    </motion.button>
+                  ) : (
+                    <motion.div
+                      key="full-input"
+                      ref={inputWrapRef}
+                      layoutId="addInputInline"
+                      className="
+                        w-full
+                        px-3 py-1 mb-1
+                        bg-white/90 backdrop-blur
+                        rounded-xl shadow-sm ring-1 ring-gray-200
+                        flex items-center gap-2
+                        focus-within:ring-2 focus-within:ring-orange-300
+                      "
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                    >
+                      <Plus className={clsx('shrink-0', canAdd && tab === 'undone' ? 'text-[#FFCB7D]' : 'text-gray-300')} />
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={newTodoText}
+                        onChange={(e) => {
+                          setNewTodoText(e.target.value);
+                          setInputError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            closeAddInput();
+                            return;
+                          }
+                          if (e.key !== 'Enter') return;
+                          e.preventDefault();
+                          if (tab !== 'undone') return;
+                          if (!canAdd) return;
+                          if (isComposingAdd) return;
+                          handleAdd();
+                        }}
+                        onCompositionStart={() => setIsComposingAdd(true)}
+                        onCompositionEnd={() => setIsComposingAdd(false)}
+                        disabled={tab !== 'undone' || !canAdd}
+                        aria-disabled={tab !== 'undone' || !canAdd}
+                        aria-label="TODOを入力"
+                        title={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
+                        className={clsx(
+                          'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px]',
+                          tab === 'undone' && canAdd
+                            ? 'border-gray-300 text-black'
+                            : 'border-gray-200 text-gray-400 cursor-not-allowed',
+                        )}
+                        placeholder={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
+                        inputMode="text"
+                        // ▼ 変更: 直接 autoFocus も併用し、SP/PCの差異を吸収
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={closeAddInput}
+                        className="px-1 text-gray-400 hover:text-gray-600"
+                        aria-label="入力を閉じる"
+                        title="入力を閉じる"
+                      >
+                        <X size={18} />
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+          {/* ▲ 2段目終わり */}
         </div>
         {/* ===== 固定ヘッダー ここまで ===== */}
 
@@ -588,7 +584,6 @@ export default function TodoTaskCard({
               className={clsx(
                 'flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch] space-y-4 pr-2 pt-2',
               )}
-              // フッター入力を廃止したため固定余白
               style={{ paddingBottom: 16 }}
               onTouchMove={(e) => e.stopPropagation()}
               aria-live="polite"

@@ -216,7 +216,7 @@ function LineLinkHandler() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-4 py-10">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         {/* ヘッダ */}
         <div className="flex items-center gap-2 mb-4">
           <BellRing className="w-6 h-6 text-sky-600" />
