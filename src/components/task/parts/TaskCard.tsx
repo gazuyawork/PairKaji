@@ -15,6 +15,8 @@ import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import { createPortal } from 'react-dom';
+import LinkifiedText from '@/components/common/LinkifiedText';
+
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
@@ -521,9 +523,12 @@ export default function TaskCard({
                 </button>
               </div>
 
-              <div className="whitespace-pre-wrap break-words text-[15px] leading-6 text-gray-700">
-                {(task as Task & { note?: string }).note?.trim() || ''}
-              </div>
+{/* ★ 変更：URLをクリック可能に */}
+<LinkifiedText
+  text={(task as Task & { note?: string }).note?.trim() || ''}
+  className="whitespace-pre-wrap break-words text-[15px] leading-6 text-gray-700"
+/>
+
             </div>
           </div>,
           document.body

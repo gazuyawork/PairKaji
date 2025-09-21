@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'; // ★ 変更: useLayoutEffect を追加
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
@@ -19,6 +19,7 @@ import {
   type LucideIcon,
   ChevronRight, // ★ 追加：横スクロールヒント用
 } from 'lucide-react';
+import UrlAwareTextarea from '@/components/common/UrlAwareTextarea';
 
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
@@ -140,6 +141,9 @@ export default function EditTaskModal({
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
   const isIOS = isIOSMobileSafari;
+
+  // ★ 追加: 改行時のキャレット復元用
+  const caretRef = useRef<{ start: number; end: number } | null>(null);
 
   // ★ 追加: カテゴリ行の横スクロール関連
   const catScrollRef = useRef<HTMLDivElement | null>(null); // 横スクロールDOM参照
@@ -398,6 +402,38 @@ export default function EditTaskModal({
     return () => window.removeEventListener('resize', onResize);
   }, [measureCatOverflow]);
 
+  // ★ 追加: 備考テキスト変更後にキャレット位置を復元
+  useLayoutEffect(() => {
+    const el = memoRef.current;
+    const caret = caretRef.current;
+    if (!el || !caret) return;
+
+    const len = el.value.length;
+    const s = Math.max(0, Math.min(caret.start, len));
+    const e = Math.max(0, Math.min(caret.end, len));
+
+    try {
+      el.setSelectionRange(s, e);
+    } catch {
+      // iOS等のフォールバック：末尾へ
+      el.setSelectionRange(len, len);
+    } finally {
+      caretRef.current = null; // 復元したらクリア
+    }
+  }, [editedTask?.note]);
+
+  // ★ 追加（任意）: フォーカス時に末尾へ
+  const handleMemoFocus = useCallback(() => {
+    const el = memoRef.current;
+    if (!el) return;
+    const len = el.value.length;
+    try {
+      el.setSelectionRange(len, len);
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
   if (!mounted || !isOpen || !editedTask || !portalTarget) return null;
 
   return createPortal(
@@ -545,8 +581,8 @@ export default function EditTaskModal({
                   type="button"
                   onClick={() => toggleDay(day)}
                   className={`w-6 h-6 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                      ? 'bg-[#5E5E5E] text-white'
-                      : 'bg-gray-200 text-gray-600'
+                    ? 'bg-[#5E5E5E] text-white'
+                    : 'bg-gray-200 text-gray-600'
                     }`}
                 >
                   {day}
@@ -695,7 +731,7 @@ export default function EditTaskModal({
             )}
 
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-sm text-gray-600">プライベートモード：</span>
+              <span className="text-sm text-gray-600">プライベート：</span>
               <button
                 type="button"
                 role="switch"
@@ -745,7 +781,8 @@ export default function EditTaskModal({
         <div className="relative pr-8">
           <div className="flex items-top">
             <label className="w-20 text-gray-600 shrink-0">備考：</label>
-            <textarea
+
+            <UrlAwareTextarea
               ref={memoRef}
               data-scrollable="true"
               onScroll={onTextareaScroll}
@@ -753,14 +790,38 @@ export default function EditTaskModal({
               rows={1}
               placeholder="備考を入力"
               onChange={(e) => {
-                const nextV = e.target.value;
+                // ▼ 変更開始：キャレット位置の取得を currentTarget ベースに
+                const el = e.currentTarget; // HTMLTextAreaElement
+                const native = e.nativeEvent as unknown as { inputType?: string; isComposing?: boolean };
+
+                let start = el.selectionStart ?? el.value.length;
+                let end = el.selectionEnd ?? el.value.length;
+
+                // ▼ 追加: Enter による改行（insertLineBreak）が原因の 1文字前ズレを補正
+                //   - IME変換中は補正しない（isComposing）
+                const isLineBreak =
+                  native?.inputType === 'insertLineBreak' && native?.isComposing !== true;
+
+                // 選択が collapse（単一点）で Enter のときだけ +1 補正
+                if (isLineBreak && start === end) {
+                  start += 1;
+                  end = start;
+                }
+
+                caretRef.current = { start, end };
+                // ▲ 変更終了
+
+                const nextV = el.value;
                 if (nextV.length > NOTE_MAX) setNoteError('500文字以内で入力してください。');
                 else setNoteError(null);
                 setEditedTask((prev) => (prev ? { ...prev, note: nextV } : prev));
               }}
+              onFocus={handleMemoFocus}
               onTouchMove={(e) => e.stopPropagation()}
               className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-0 ml-0 pb-0 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
             />
+
+
           </div>
           <div className="mt-1 pr-1 flex justify-end">
             <span

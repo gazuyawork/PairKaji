@@ -127,7 +127,7 @@ export default function BaseModal({
         transition={{ duration: 0.25, ease: 'easeOut' }}
         role="dialog"
         aria-modal="true"
-        className={`relative z-10 bg-white w-full max-w-[400px] p-5 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-x-hidden ${(isSaving || saveComplete) ? 'overflow-hidden' : ''}`}
+        className={`relative z-10 bg-white w-full max-w-xl px-5 pt-10 pb-5 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-x-hidden ${(isSaving || saveComplete) ? 'overflow-hidden' : ''}`}
         onWheel={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
         onTouchMove={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
         style={{ transform: 'none' }}
