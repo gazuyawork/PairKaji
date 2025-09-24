@@ -1,4 +1,4 @@
-// src/components/SearchBox.tsx
+// src/components/task/parts/SearchBox.tsx
 
 'use client';
 
@@ -14,10 +14,12 @@ type Props = {
 
 const SearchBox = forwardRef<HTMLInputElement, Props>(({ value, onChange }, ref) => {
   return (
-    <div className="flex items-center gap-2 rounded-xl px-3 py-2
+    <div
+      className="flex items-center gap-2 rounded-xl px-3 py-2
 bg-gradient-to-b from-white to-gray-50
 border border-gray-200
-shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
+shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
+    >
       <Search className="text-gray-400 mr-2" size={20} />
       <input
         ref={ref}
@@ -25,7 +27,7 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
         placeholder="キーワードを入力"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400s"
+        className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
         inputMode="search"
         autoCapitalize="none"
         autoCorrect="off"
@@ -34,7 +36,6 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
     </div>
   );
 });
-
 
 SearchBox.displayName = 'SearchBox';
 export default SearchBox;

@@ -150,7 +150,7 @@ const getComparableDateTimeMs = (
     }
   }
 
-  if (explicitDateMsCandidates.length > 0) {
+  if (explicitDateMsCandidates.length > 0)    {
     explicitDateMsCandidates.sort((a, b) => a - b);
     return { hasDate: true, hasTimeOnly: false, ms: explicitDateMsCandidates[0] };
   }
@@ -211,6 +211,32 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index } = useView();
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
+
+  /* ★ 追加: URLクエリから検索語とフォーカス指示を取得して反映 */
+  const urlSearch = (searchParams.get('search') ?? '').trim();
+  const urlFocusSearch = searchParams.get('focus') === 'search';
+
+  useEffect(() => {
+    // クエリに search があるときは、表示時点で検索欄を出し、語句を投入
+    if (urlSearch !== '') {
+      setSearchTerm(urlSearch);
+      setShowSearchBox(true);
+    }
+    // focus=search のときは入力にフォーカス（2段階で安定化）
+    if (urlFocusSearch) {
+      requestAnimationFrame(() => {
+        const el = searchInputRef.current;
+        if (el) {
+          el.focus();
+          el.select?.();
+          requestAnimationFrame(() => {
+            el.focus();
+            el.select?.();
+          });
+        }
+      });
+    }
+  }, [urlSearch, urlFocusSearch]);
 
   const isSameOrBeforeToday = (ymd: string): boolean => {
     if (typeof ymd !== 'string') return false;
@@ -477,7 +503,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       pairsSnap.forEach((d) => {
         const data = d.data() as { userIds?: string[] } | undefined;
         if (Array.isArray(data?.userIds)) {
-          data!.userIds!.forEach((id) => partnerUids.add(id));
+          (data!.userIds!).forEach((id) => partnerUids.add(id));
         }
       });
       const ids = Array.from(partnerUids);
@@ -712,6 +738,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
                     {isSearchVisible && (
                       <div className="mb-3">
+                        {/* ★ 変更: URL反映に合わせ ref と value/onChange を使用 */}
                         <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
                       </div>
                     )}
@@ -731,7 +758,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     // (!periodFilter || periodFilter === task.period) &&
                     // (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
+                    (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
                     (!flaggedFilter || getOpt(task, 'flagged') === true)
                 );
@@ -749,7 +776,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     // (!periodFilter || periodFilter === period) &&
                     // (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
-                    (!todayFilter || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
+                    (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
                     (!flaggedFilter || getOpt(task, 'flagged') === true)
                 );

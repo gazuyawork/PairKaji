@@ -22,6 +22,10 @@ import { useTodoSearchAndSort, useCategoryIcon, type SimpleTodo } from './hooks/
 import { useScrollMeter } from './hooks/useScrollMeter';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
+// ★ 追加: ルーティング & ビューコンテキスト
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useView } from '@/context/ViewContext';
+
 /* ------------------------------ helpers ------------------------------ */
 
 const SHAKE_VARIANTS: Variants = {
@@ -93,6 +97,12 @@ export default function TodoTaskCard({
   onClose,
   groupDnd,
 }: Props) {
+  // ★ 追加: ルーター & 現在のURL/クエリ、ビュー切替
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const { setIndex } = useView();
+
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
   const todos: SimpleTodo[] = useMemo(() => (isSimpleTodos(rawTodos) ? rawTodos : []), [rawTodos]);
@@ -358,6 +368,50 @@ export default function TodoTaskCard({
     return () => ro.disconnect();
   }, []);
 
+  /* ----------------------- タスク画面へジャンプ（修正） ---------------------- */
+
+  /**
+   * ★ 重要修正:
+   * - ViewContext で index=1 に切り替え（確実にタスク画面を表示）
+   * - URL のクエリも index=1 / search / focus=search に更新（リロードや共有時の整合）
+   * - モーダルは onClose() で閉じる
+   */
+  const jumpToTaskFilter = useCallback(() => {
+    const name = (task as unknown as { name?: string }).name?.trim() ?? '';
+    if (!name) return;
+
+    // 1) ビューをタスク画面へ切替（最優先）
+    try {
+      setIndex?.(1);
+    } catch {
+      /* no-op */
+    }
+
+    // 2) URLクエリを更新（既存クエリは維持しつつ必要なキーを上書き）
+    try {
+      const q = new URLSearchParams(Array.from(params.entries()));
+      q.set('index', '1');
+      q.set('search', name);
+      q.set('focus', 'search');
+
+      // 現在のパスに対してクエリのみ更新（scrollはそのまま）
+      router.push(`${pathname}?${q.toString()}`);
+    } catch {
+      // 失敗時はフォールバックで /main を直接指定（プロジェクト構成に合わせ調整）
+      router.push(`/main?index=1&search=${encodeURIComponent(name)}&focus=search`);
+    }
+
+    // 3) メイン側で参照している可能性のあるフラグ
+    try {
+      sessionStorage.setItem('goToTaskView', 'true');
+    } catch {
+      /* no-op */
+    }
+
+    // 4) このカード（モーダル）を閉じる
+    onClose?.();
+  }, [task, setIndex, params, pathname, router, onClose]);
+
   /* ---------------------------- render (card) ---------------------------- */
 
   return (
@@ -385,12 +439,24 @@ export default function TodoTaskCard({
           <div className="bg-white">
             <div className="mx-auto w-full max-w-xl px-2">
               <div className="flex justify-between items-center py-2">
-                <div className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0" aria-label="タスク名">
-                  <CatIcon size={20} className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)} aria-label={`${categoryLabel}カテゴリ`} />
-                  <span className="font-bold text-[18px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2">
+                {/* ▼ ボタン化：タップで TaskView へジャンプ */}
+                <button
+                  type="button"
+                  onClick={jumpToTaskFilter}
+                  className="group flex items-center gap-1.5 sm:gap-2 pl-1 pr-1.5 sm:pr-2 py-1 flex-1 min-w-0 text-left"
+                  aria-label="このタスク名でタスク画面を絞り込む"
+                  title="タップしてタスク画面をこのタスク名で絞り込み表示"
+                >
+                  <CatIcon
+                    size={20}
+                    className={clsx('ml-2 shrink-0 sm:size-[20px]', catColor)}
+                    aria-label={`${categoryLabel}カテゴリ`}
+                  />
+                  {/* ★ バグ修正: text^[18px] → text-[18px] */}
+                  <span className="font-bold text-[18px] sm:text-md text-[#5E5E5E] truncate whitespace-nowrap overflow-hidden ml-2 underline decoration-transparent group-hover:decoration-[#5E5E5E]/40">
                     {(task as unknown as { name?: string }).name ?? ''}
                   </span>
-                </div>
+                </button>
 
                 {/* ×ボタン */}
                 <motion.button
