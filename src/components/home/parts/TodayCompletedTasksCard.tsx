@@ -46,9 +46,7 @@ function isTaskPrivate(task: Task | MaybePrivate): boolean {
   );
 }
 
-/** 完了者の userId を決定
- * 優先: completedBy → completedUserId → completedById → users[0]
- */
+/** 完了者の userId を決定 */
 function getCompletedUserId(task: Task | MaybeCompleted): string | null {
   const t = task as MaybeCompleted;
   const fromCompleted = t.completedBy ?? t.completedUserId ?? t.completedById ?? null;
@@ -59,7 +57,7 @@ function getCompletedUserId(task: Task | MaybeCompleted): string | null {
   return typeof first === 'string' && first.trim().length > 0 ? first : null;
 }
 
-/** 画像URL候補から最適なものを選ぶ（Storage パスは不可。getDownloadURL 済み前提） */
+/** プロフィール画像URL候補から最適なものを選択 */
 function resolveUserImageSrc(profile: FirestoreDocData | null): string {
   const pick = (k: string): string | undefined => {
     const v = profile?.[k];
@@ -91,7 +89,6 @@ function resolveUserImageSrc(profile: FirestoreDocData | null): string {
 
   let src = candidates[0] ?? '';
   if (src && !/^https?:\/\//.test(src) && !src.startsWith('/')) {
-    // 相対/gs:等の不正URLは不採用
     src = '';
   }
   return src;
@@ -104,9 +101,6 @@ function getDisplayName(data: FirestoreDocData | null): string {
   if (typeof name === 'string' && name.trim()) return name;
   return '';
 }
-
-/** 任意の Firestore 値→Date へ安全変換（時刻表示停止中） */
-// function toDateSafe(value: unknown): Date | null { ... }
 
 /** イニシャル文字（フォールバック） */
 function initialOf(idOrName?: string | null): string {
@@ -197,7 +191,7 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
     return () => { cancelled = true; };
   }, [currentUid]);
 
-  // このカードで必要な UID を一意化（完了者のプロフィール表示に利用）
+  // このカードで必要な UID を一意化
   const completedUids = useMemo(() => {
     const set = new Set<string>();
     for (const t of tasks) {
@@ -207,7 +201,7 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
     return Array.from(set);
   }, [tasks]);
 
-  // Firestore から未取得の UID のプロフィールを解決
+  // Firestore プロフィールを解決
   useEffect(() => {
     let cancelled = false;
 
@@ -220,18 +214,13 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
         pendingRef.current.add(uid);
         try {
           let data: FirestoreDocData | null = null;
-
-          // 1) users/{uid}
           let snap = await getDoc(doc(db, 'users', uid));
           data = snap.exists() ? (snap.data() as FirestoreDocData) : null;
 
-          // 2) profiles/{uid}
           if (!data) {
             snap = await getDoc(doc(db, 'profiles', uid));
             data = snap.exists() ? (snap.data() as FirestoreDocData) : null;
           }
-
-          // 3) app_users/{uid}（必要に応じて）
           if (!data) {
             snap = await getDoc(doc(db, 'app_users', uid));
             data = snap.exists() ? (snap.data() as FirestoreDocData) : null;
@@ -253,12 +242,10 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
     const targets = completedUids.filter((uid) => uid && !imgMap[uid] && !pendingRef.current.has(uid));
     if (targets.length > 0) void fetchProfiles(targets);
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [completedUids, imgMap]);
 
-  // いいね購読（各 taskId × 今日）
+  // いいね購読
   useEffect(() => {
     if (!pairEnabled) return;
     const date = todayKey();
@@ -274,15 +261,13 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
       });
       unsubs.push(unsub);
     }
-    return () => {
-      unsubs.forEach((f) => f());
-    };
+    return () => { unsubs.forEach((f) => f()); };
   }, [pairEnabled, tasks]);
 
-  // ハートON/OFF切り替え（ON時のみ震えアニメ）
+  // ハートON/OFF切り替え
   const toggleLike = async (taskId?: string, ownerId?: string | null) => {
     if (!taskId || !pairEnabled || !currentUid) return;
-    if (ownerId && currentUid === ownerId) return; // 自分の完了タスクは押せない
+    if (ownerId && currentUid === ownerId) return;
     const date = todayKey();
     const ref = doc(db, 'taskLikes', likeDocId(taskId, date));
     const snap = await getDoc(ref);
@@ -291,19 +276,13 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
     const already = Array.isArray(current) ? current.includes(currentUid) : false;
 
     if (!exists) {
-      await setDoc(ref, {
-        taskId,
-        date,
-        ownerId: ownerId ?? null,
-        likedBy: [currentUid],
-      }, { merge: true });
+      await setDoc(ref, { taskId, date, ownerId: ownerId ?? null, likedBy: [currentUid] }, { merge: true });
     } else if (already) {
       await updateDoc(ref, { likedBy: arrayRemove(currentUid) });
     } else {
       await updateDoc(ref, { likedBy: arrayUnion(currentUid) });
     }
 
-    // ONになるときだけ揺らす
     if (!already) {
       setAnimatingIds((a) => new Set(a).add(taskId));
       setTimeout(() => {
@@ -327,73 +306,43 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
         <ul className="divide-y divide-gray-200 mx-4">
           {tasks.map((task) => {
             const completedUserId = getCompletedUserId(task);
-
-            // ▼ 時刻表示は停止
-            // const completedAtDate = toDateSafe((task as any)?.completedAt);
-            // const timeLabel = completedAtDate ? format(completedAtDate, 'HH:mm') : '';
-
             const privateFlag = isTaskPrivate(task);
 
             const imgSrc = completedUserId ? imgMap[completedUserId] : '';
-            const displayName =
-              (completedUserId && nameMap[completedUserId]) || completedUserId || '';
+            const displayName = (completedUserId && nameMap[completedUserId]) || completedUserId || '';
 
             const isMine = completedUserId && currentUid ? completedUserId === currentUid : false;
             const showHeart = pairEnabled;
-
             const likedBy = likesMap[task.id] ?? [];
-            // ON条件: 自分が押した（相手のタスク） or 相手が押した（自分のタスク）
-            const heartOn = showHeart && (
-              (isMine ? (partnerUid ? likedBy.includes(partnerUid) : false)
-                      : likedBy.includes(currentUid ?? ''))
-            );
+
+            // 誰が押したかで色を変える
+            const heartOnByPartner = isMine && !!partnerUid ? likedBy.includes(partnerUid) : false;
+            const heartOnByMe = !isMine && !!currentUid ? likedBy.includes(currentUid) : false;
+            const heartOn = heartOnByPartner || heartOnByMe;
             const heartDisabled = !showHeart || isMine;
 
             return (
               <li key={task.id} className="py-2 flex items-center justify-between gap-2">
-                {/* 左：タスク名 */}
                 <span className="text-gray-700 truncate">{task.name}</span>
-
-                {/* 右：完了者（プライベート時は鍵風アイコン） + ハート（条件表示） */}
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* <span className="text-sm text-gray-400">{timeLabel}</span> */} {/* 時刻表示停止 */}
-
                   {privateFlag ? (
-                    <div
-                      className="w-6 h-6 rounded-full text-gray-600 flex items-center justify-center"
-                      title="プライベート（パートナーには非表示）"
-                      aria-label="プライベート（パートナーには非表示）"
-                    >
+                    <div className="w-6 h-6 rounded-full text-gray-600 flex items-center justify-center">
                       <SquareUser className="w-6 h-6 text-green-600" />
                     </div>
                   ) : completedUserId ? (
                     imgSrc ? (
                       <div className="relative w-6 h-6 rounded-full overflow-hidden shrink-0">
-                        <Image
-                          src={imgSrc}
-                          alt={displayName || 'user'}
-                          fill
-                          sizes="24px"
-                          className="object-cover"
-                          onError={() => { /* no-op */ }}
-                        />
+                        <Image src={imgSrc} alt={displayName || 'user'} fill sizes="24px" className="object-cover" />
                       </div>
                     ) : (
-                      <div
-                        className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 text-xs flex items-center justify-center"
-                        title={displayName}
-                        aria-label={displayName}
-                      >
+                      <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 text-xs flex items-center justify-center">
                         {initialOf(displayName)}
                       </div>
                     )
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs flex items-center justify-center">
-                      U
-                    </div>
+                    <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs flex items-center justify-center">U</div>
                   )}
 
-                  {/* ハート（ペア時のみ） */}
                   {showHeart && (
                     <button
                       type="button"
@@ -406,21 +355,17 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
                         'flex-shrink-0',
                         heartDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer',
                       ].join(' ')}
-                      title={
-                        heartDisabled
-                          ? isMine
-                            ? '自分の完了タスクには「いいね」できません'
-                            : 'パートナー設定時のみ利用できます'
-                          : (heartOn ? 'いいね済み' : 'いいね')
-                      }
-                      tabIndex={heartDisabled ? -1 : 0}
                     >
                       <Heart
                         className={[
                           'h-6 w-6',
-                          heartOn ? 'text-rose-500 fill-rose-500' : 'text-gray-300',
+                          heartOnByPartner
+                            ? 'text-orange-400 fill-orange-400' // パートナーからのいいね → 淡いオレンジ
+                            : heartOnByMe
+                            ? 'text-rose-400 fill-rose-400'     // 自分が押した → 淡いピンク
+                            : 'text-gray-300',
                           animatingIds.has(task.id) ? 'heart-shake' : '',
-                          heartDisabled && !heartOn ? 'heart-dashed' : '', // 自分の完了タスクは点線表示
+                          heartDisabled && !heartOn ? 'heart-dashed' : '',
                           !heartDisabled ? 'hover:scale-110 transition-transform' : '',
                         ].join(' ')}
                       />
@@ -435,7 +380,6 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
         <p className="text-gray-500 text-sm text-center py-4">本日の完了タスクはありません。</p>
       )}
 
-      {/* 震えアニメーション（ON時）と点線スタイル */}
       <style jsx>{`
         @keyframes heartShake {
           0%   { transform: scale(1) rotate(0deg); }
