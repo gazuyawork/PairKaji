@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
@@ -20,7 +20,15 @@ import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import OnboardingModal from '@/components/common/OnboardingModal';
 import HeartsProgressCard from '@/components/home/parts/HeartsProgressCard';
-import { isToday, startOfWeek } from 'date-fns';
+
+import {
+  isToday,
+  startOfWeek,
+  endOfWeek,
+  parseISO,
+  isWithinInterval,
+} from 'date-fns';
+
 import {
   collection,
   query,
@@ -29,7 +37,6 @@ import {
   doc,
   Timestamp,
   type DocumentData,
-  type QuerySnapshot,
 } from 'firebase/firestore';
 
 export default function HomeView() {
@@ -53,16 +60,11 @@ export default function HomeView() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
 
-  // 今週「受け取ったありがとう（ハート）」の集計（2系統）
-  const [thanksCountFromCollection, setThanksCountFromCollection] = useState(0); // ① thanks 直集計
-  const [thanksCountFromTasks, setThanksCountFromTasks] = useState(0);           // ② tasks 由来の派生集計
-  const weeklyThanksCount = useMemo(
-    () => Math.max(thanksCountFromCollection, thanksCountFromTasks),
-    [thanksCountFromCollection, thanksCountFromTasks]
-  );
-
-  // パートナーID（派生集計に使用）
+  // パートナーID
   const [partnerId, setPartnerId] = useState<string | null>(null);
+
+  // 今週「パートナーから自分がもらった」ありがとう（ハート）の件数
+  const [weeklyThanksCount, setWeeklyThanksCount] = useState(0);
 
   useEffect(() => {
     const seen = localStorage.getItem(ONBOARDING_SEEN_KEY);
@@ -74,16 +76,20 @@ export default function HomeView() {
     setShowOnboarding(false);
   };
 
-  // users/{uid} の lineLinked を購読（no-explicit-any回避）
+  // users/{uid} の lineLinked を購読（any回避）
   useEffect(() => {
     if (!uid) return;
     const userRef = doc(db, 'users', uid);
-    const unsubscribe = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) {
-        const userData = snap.data() as Record<string, unknown>;
-        setIsLineLinked(Boolean(userData.lineLinked));
-      }
-    });
+    const unsubscribe = onSnapshot(
+      userRef,
+      (snap) => {
+        if (snap.exists()) {
+          const userData = snap.data() as Record<string, unknown>;
+          setIsLineLinked(Boolean(userData.lineLinked));
+        }
+      },
+      (err) => console.warn('[HomeView] users onSnapshot error:', err)
+    );
     return () => unsubscribe();
   }, [uid]);
 
@@ -92,7 +98,7 @@ export default function HomeView() {
     setIsWeeklyPointsHidden(stored === 'true');
   }, []);
 
-  // 招待・ペア確定の購読
+  // 招待・ペア確定の購読（partnerId 抽出もここで）
   useEffect(() => {
     if (!uid) return;
 
@@ -101,28 +107,42 @@ export default function HomeView() {
       where('userAId', '==', uid),
       where('status', '==', 'pending')
     );
-    const unsubscribeSent = onSnapshot(sentQuery, (snapshot) => {
-      setHasSentInvite(!snapshot.empty);
-    });
+    const unsubscribeSent = onSnapshot(
+      sentQuery,
+      (snapshot) => setHasSentInvite(!snapshot.empty),
+      (err) => console.warn('[HomeView] pairs(sent) onSnapshot error:', err)
+    );
 
     const confirmedQuery = query(
       collection(db, 'pairs'),
-      where('userIds', 'array-contains', uid),
-      where('status', '==', 'confirmed')
+      where('status', '==', 'confirmed'),
+      where('userIds', 'array-contains', uid)
     );
-    const unsubscribeConfirmed = onSnapshot(confirmedQuery, (snapshot) => {
-      setHasPairConfirmed(!snapshot.empty);
+    const unsubscribeConfirmed = onSnapshot(
+      confirmedQuery,
+      (snapshot) => {
+        const confirmed = !snapshot.empty;
+        setHasPairConfirmed(confirmed);
 
-      // パートナーIDを抽出（最初のconfirmedを採用）
-      if (!snapshot.empty) {
-        const doc0 = snapshot.docs[0].data() as { userIds?: string[] } & DocumentData;
-        const ids = Array.isArray(doc0.userIds) ? doc0.userIds : [];
-        const other = ids.find((x) => x && x !== uid) ?? null;
-        setPartnerId(other ?? null);
-      } else {
-        setPartnerId(null);
-      }
-    });
+        if (confirmed) {
+          const d0 = snapshot.docs[0].data() as DocumentData;
+          // userIds / userAId / userBId の順でパートナーを推定
+          const ids = Array.isArray(d0.userIds) ? (d0.userIds as unknown[]) : [];
+          let other =
+            (ids.find((x) => typeof x === 'string' && x !== uid) as string | undefined) ??
+            undefined;
+          if (!other) {
+            const a = typeof d0.userAId === 'string' ? (d0.userAId as string) : undefined;
+            const b = typeof d0.userBId === 'string' ? (d0.userBId as string) : undefined;
+            other = a && a !== uid ? a : b && b !== uid ? b : undefined;
+          }
+          setPartnerId(other ?? null);
+        } else {
+          setPartnerId(null);
+        }
+      },
+      (err) => console.warn('[HomeView] pairs(confirmed) onSnapshot error:', err)
+    );
 
     return () => {
       unsubscribeSent();
@@ -149,9 +169,11 @@ export default function HomeView() {
       where('status', '==', 'pending')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setHasPairInvite(!snapshot.empty);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => setHasPairInvite(!snapshot.empty),
+      (err) => console.warn('[HomeView] pairs(invite-received) onSnapshot error:', err)
+    );
 
     return () => unsubscribe();
   }, []);
@@ -161,11 +183,15 @@ export default function HomeView() {
     if (!uid) return;
 
     const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const taskList = snapshot.docs.map(mapFirestoreDocToTask);
-      setTasks(taskList);
-      setTimeout(() => setIsLoading(false), 50);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const taskList = snapshot.docs.map(mapFirestoreDocToTask);
+        setTasks(taskList);
+        setTimeout(() => setIsLoading(false), 50);
+      },
+      (err) => console.warn('[HomeView] tasks onSnapshot error:', err)
+    );
 
     return () => unsubscribe();
   }, [uid]);
@@ -180,90 +206,64 @@ export default function HomeView() {
       where('flagged', '==', true)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setFlaggedCount(snapshot.size);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => setFlaggedCount(snapshot.size),
+      (err) => console.warn('[HomeView] flagged tasks onSnapshot error:', err)
+    );
 
     return () => unsubscribe();
   }, [uid]);
 
-  // ① thanks コレクションからの「自分が受け取った」今週分のリアルタイム集計
+  /**
+   * ここが肝心：
+   * taskLikes コレクションから「今週、パートナーから自分がもらった“いいね”件数」を集計
+   * - インデックス不要にするため、ownerId のみで絞り、週の判定はクライアントで実施
+   * - ドキュメント1件を 1 ハートとしてカウント（likedBy に partnerId が含まれていれば）
+   * 期待フィールド: { ownerId: string, date: "YYYY-MM-DD", likedBy: string[] }
+   */
   useEffect(() => {
     if (!uid) return;
 
-    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
-    start.setHours(0, 0, 0, 0);
+    const q = query(collection(db, 'taskLikes'), where('ownerId', '==', uid));
 
-    const q = query(
-      collection(db, 'thanks'), // 実データが he(l)arts 等の場合はここを合わせてください
-      where('toUserId', '==', uid),
-      where('createdAt', '>=', Timestamp.fromDate(start))
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+
+        let count = 0;
+
+        snap.forEach((d) => {
+          const data = d.data() as Record<string, unknown>;
+          const dateStr = typeof data.date === 'string' ? data.date : '';
+          const likedBy = Array.isArray(data.likedBy)
+            ? (data.likedBy.filter((x) => typeof x === 'string') as string[])
+            : [];
+
+          if (!dateStr) return;
+
+          const dateObj = parseISO(dateStr); // "YYYY-MM-DD" → Date
+          const inThisWeek = isWithinInterval(dateObj, { start: weekStart, end: weekEnd });
+
+          if (!inThisWeek) return;
+
+          // パートナーが特定できている場合は partnerId を、できていない場合は “自分以外が押した” で判定
+          if (partnerId) {
+            if (likedBy.includes(partnerId)) count += 1;
+          } else if (likedBy.some((u) => u && u !== uid)) {
+            count += 1;
+          }
+        });
+
+        setWeeklyThanksCount(count);
+      },
+      (err) => console.warn('[HomeView] taskLikes onSnapshot error:', err)
     );
 
-    const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
-      setThanksCountFromCollection(snap.size);
-    });
-
     return () => unsub();
-  }, [uid]);
-
-  // ② tasks からの派生集計（今週・自分が完了・パートナーがいいねを押した件数）
-  useEffect(() => {
-    if (!uid) return;
-
-    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
-    start.setHours(0, 0, 0, 0);
-    const startMs = start.getTime();
-
-    // 今週＆自分完了のタスクを抽出（completedAt は string | Date | Timestamp を想定）
-    const isThisWeek = (v: unknown): boolean => {
-      if (!v) return false;
-      if (v instanceof Timestamp) return v.toDate().getTime() >= startMs;
-      if (v instanceof Date) return v.getTime() >= startMs;
-      if (typeof v === 'string') return new Date(v).getTime() >= startMs;
-      try {
-        return new Date(v as string).getTime() >= startMs;
-      } catch {
-        return false;
-      }
-    };
-
-    // completedBy / doneBy のどちらかで実行者を判定（プロジェクト内の命名揺れに対応）
-    const getCompletedBy = (t: Task): string | undefined => {
-      const anyT = t as unknown as Record<string, unknown>;
-      const a = anyT.completedBy;
-      const b = anyT.doneBy;
-      return typeof a === 'string'
-        ? a
-        : typeof b === 'string'
-        ? b
-        : undefined;
-    };
-
-    // likes / likedBy / hearts のいずれかの配列に partnerId が含まれていれば「受け取ったありがとう」とみなす
-    const getLikerUids = (t: Task): string[] => {
-      const anyT = t as unknown as Record<string, unknown>;
-      const candidates = [anyT.likes, anyT.likedBy, anyT.hearts];
-      for (const c of candidates) {
-        if (Array.isArray(c) && c.every((x) => typeof x === 'string')) {
-          return c as string[];
-        }
-      }
-      return [];
-    };
-
-    // 集計
-    const count = tasks.reduce((acc, t) => {
-      if (!isThisWeek((t as unknown as Record<string, unknown>).completedAt)) return acc;
-      const by = getCompletedBy(t);
-      if (by !== uid) return acc; // 自分が完了したものが対象
-      if (!partnerId) return acc; // パートナー不明ならカウント不可
-      const likers = getLikerUids(t);
-      return acc + (likers.includes(partnerId) ? 1 : 0);
-    }, 0);
-
-    setThanksCountFromTasks(count);
-  }, [tasks, uid, partnerId]);
+  }, [uid, partnerId]);
 
   const flaggedTasks = tasks.filter((task) => task.flagged === true);
 
@@ -318,7 +318,7 @@ export default function HomeView() {
             {/* ▼ ハート進捗カード：フラグカードの直後に表示 */}
             {!isLoading && (
               <HeartsProgressCard
-                totalHearts={weeklyThanksCount}   // 10個分まで塗りつぶし、超過は +N
+                totalHearts={weeklyThanksCount}   // 10個まで塗り、超過は +N
                 isPaired={hasPairConfirmed}
                 title="今週のありがとう"
                 hintText="タップで履歴を見る"
@@ -457,6 +457,7 @@ export default function HomeView() {
                 ],
               },
               {
+                // 以下は元のまま
                 title: 'Task画面',
                 blocks: [
                   {
@@ -475,23 +476,6 @@ export default function HomeView() {
                     description:
                       'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
                   },
-                ],
-              },
-              {
-                title: 'Todo画面',
-                blocks: [
-                  {
-                    subtitle: 'ペア設定が未完了の場合',
-                    description:
-                      'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
-                  },
-                  {
-                    subtitle: 'Weekly ポイントとは？',
-                    src: '/onboarding/slide2.png',
-                    description:
-                      '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
-                  },
-                  { subtitle: '', description: '' },
                 ],
               },
               {
