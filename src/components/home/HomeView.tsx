@@ -3,13 +3,13 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-import { ChevronDown, Info } from 'lucide-react';
+import { ChevronDown, Info, GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
@@ -39,6 +39,78 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 
+// ▼ ドラッグ&ドロップ（Dnd Kit）
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+/* ---------------------------------------
+ * SortableCard：
+ * - 子要素（カード本体）に手を加えず、その上に
+ *   「左上の小さなグリップ」を重ねて表示。
+ * - ドラッグ開始は“グリップのみ”で可能。
+ * - グリップは枠線なし（アイコンのみ）
+ * -------------------------------------*/
+function SortableCard({
+  id,
+  children,
+  className = '',
+}: {
+  id: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.98 : 1,
+    zIndex: isDragging ? 10 : 'auto',
+    position: 'relative',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={className}>
+      {/* ▼ 左上オーバーレイのドラッグハンドル（枠線なし） */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label="ドラッグして並び替え"
+        title="ドラッグして並び替え"
+        className={`
+          absolute top-1 left-1
+          h-7 w-7
+          flex items-center justify-center
+          cursor-grab active:cursor-grabbing
+          text-gray-400 hover:text-gray-600
+          z-20
+        `}
+        style={{ touchAction: 'none', background: 'transparent' }}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      {/* ▼ 既存カード本体 */}
+      <div className="rounded-lg">{children}</div>
+    </div>
+  );
+}
+
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,6 +138,9 @@ export default function HomeView() {
   // 今週「パートナーから自分がもらった」ありがとう（ハート）の件数
   const [weeklyThanksCount, setWeeklyThanksCount] = useState(0);
 
+  // ドラッグ中フラグ（スクロール抑止用）
+  const [isDraggingCard, setIsDraggingCard] = useState(false);
+
   useEffect(() => {
     const seen = localStorage.getItem(ONBOARDING_SEEN_KEY);
     if (!seen) setShowOnboarding(true);
@@ -76,7 +151,7 @@ export default function HomeView() {
     setShowOnboarding(false);
   };
 
-  // users/{uid} の lineLinked を購読（any回避）
+  // users/{uid} の lineLinked を購読
   useEffect(() => {
     if (!uid) return;
     const userRef = doc(db, 'users', uid);
@@ -126,7 +201,6 @@ export default function HomeView() {
 
         if (confirmed) {
           const d0 = snapshot.docs[0].data() as DocumentData;
-          // userIds / userAId / userBId の順でパートナーを推定
           const ids = Array.isArray(d0.userIds) ? (d0.userIds as unknown[]) : [];
           let other =
             (ids.find((x) => typeof x === 'string' && x !== uid) as string | undefined) ??
@@ -215,13 +289,7 @@ export default function HomeView() {
     return () => unsubscribe();
   }, [uid]);
 
-  /**
-   * ここが肝心：
-   * taskLikes コレクションから「今週、パートナーから自分がもらった“いいね”件数」を集計
-   * - インデックス不要にするため、ownerId のみで絞り、週の判定はクライアントで実施
-   * - ドキュメント1件を 1 ハートとしてカウント（likedBy に partnerId が含まれていれば）
-   * 期待フィールド: { ownerId: string, date: "YYYY-MM-DD", likedBy: string[] }
-   */
+  // 今週の“ありがとう”集計
   useEffect(() => {
     if (!uid) return;
 
@@ -244,12 +312,11 @@ export default function HomeView() {
 
           if (!dateStr) return;
 
-          const dateObj = parseISO(dateStr); // "YYYY-MM-DD" → Date
+          const dateObj = parseISO(dateStr);
           const inThisWeek = isWithinInterval(dateObj, { start: weekStart, end: weekEnd });
 
           if (!inThisWeek) return;
 
-          // パートナーが特定できている場合は partnerId を、できていない場合は “自分以外が押した” で判定
           if (partnerId) {
             if (likedBy.includes(partnerId)) count += 1;
           } else if (likedBy.some((u) => u && u !== uid)) {
@@ -267,11 +334,72 @@ export default function HomeView() {
 
   const flaggedTasks = tasks.filter((task) => task.flagged === true);
 
+  /* ---------------------------------------
+   * カード順序 永続化 & DnD センサー
+   *  ※ 並び替え“対象外”は Flagged のみ（固定表示）
+   * -------------------------------------*/
+  const HOME_CARD_ORDER_KEY = 'homeCardOrderV1';
+  const DEFAULT_ORDER = [
+    'lineLink',
+    'pairInvite',
+    'pairInviteNone',
+    'expandableInfo',
+    'hearts',
+    'calendar',
+    'weeklyPoints',
+    'todayDone',
+    'ad',
+    'helpButton',
+  ] as const; // ← 'flagged' は含めない
+  type CardId = (typeof DEFAULT_ORDER)[number];
+
+  const [cardOrder, setCardOrder] = useState<CardId[]>(() => {
+    try {
+      const raw = localStorage.getItem(HOME_CARD_ORDER_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[];
+        const knownSet = new Set(DEFAULT_ORDER);
+        const filtered = parsed.filter((x) => knownSet.has(x as CardId)) as CardId[];
+        const missing = DEFAULT_ORDER.filter((d) => !filtered.includes(d));
+        return [...filtered, ...missing];
+      }
+    } catch {}
+    return [...DEFAULT_ORDER];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HOME_CARD_ORDER_KEY, JSON.stringify(cardOrder));
+    } catch {}
+  }, [cardOrder]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 }, // 誤操作防止
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = cardOrder.indexOf(active.id as CardId);
+    const newIndex = cardOrder.indexOf(over.id as CardId);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    setCardOrder((prev) => arrayMove(prev, oldIndex, newIndex));
+  };
+
   return (
     <>
       <div
         className="flex-1 overflow-y-auto"
         ref={scrollRef}
+        // ドラッグ中は画面スクロールを無効化
+        style={{
+          overflowY: isDraggingCard ? 'hidden' : undefined,
+          touchAction: isDraggingCard ? 'none' : undefined,
+        }}
         onTouchStart={(e) => {
           const target = e.target as HTMLElement;
           if (target.closest('.horizontal-scroll')) {
@@ -286,112 +414,240 @@ export default function HomeView() {
             transition={{ duration: 0.4 }}
             className="space-y-1.5"
           >
-            {!isLoading && !isChecking && plan === 'premium' && !isLineLinked && (
-              <LineLinkCard />
-            )}
-
-            {!isLoading && hasPairInvite && <PairInviteCard mode="invite-received" />}
-
-            {!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed && (
-              <PairInviteCard mode="no-partner" />
-            )}
-
-            <div
-              onClick={() => setIsExpanded((prev) => !prev)}
-              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-                isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
-            >
-              <div className="absolute top-5 right-6 pointer-events-none z-10">
-                <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                />
-              </div>
-            </div>
-
+            {/* ▼ 固定カード（並び替え対象外） */}
             {!isLoading && flaggedCount > 0 && (
               <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />
             )}
 
-            {/* ▼ ハート進捗カード：フラグカードの直後に表示 */}
-            {!isLoading && (
-              <HeartsProgressCard
-                totalHearts={weeklyThanksCount}   // 10個まで塗り、超過は +N
-                isPaired={hasPairConfirmed}
-                title="今週のありがとう"
-                hintText="タップで履歴を見る"
-                navigateTo="/main?view=points&tab=thanks"
-              />
-            )}
-
-            {isLoading ? (
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
-                <div className="h-4 bg-gray-200 rounded w-2/4 animate-pulse" />
-              </div>
-            ) : (
-              <TaskCalendar
-                tasks={tasks.map(({ id, name, period, dates, daysOfWeek, done }) => ({
-                  id,
-                  name,
-                  period: period ?? '毎日',
-                  dates,
-                  daysOfWeek,
-                  done: !!done,
-                }))}
-              />
-            )}
-
-            {isLoading ? (
-              <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
-            ) : (
-              !isWeeklyPointsHidden && (
-                <div className="relative">
-                  <WeeklyPoints />
-                  {!hasPairConfirmed && (
-                    <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4 mx-auto w-full max-w-xl">
-                      <button
-                        onClick={() => {
-                          localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
-                          setIsWeeklyPointsHidden(true);
-                        }}
-                        className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
-                        aria-label="閉じる"
-                      >
-                        ×
-                      </button>
-                      <p className="text-md font-semibold text-center flex items-center gap-1">
-                        <Info className="w-4 h-4 text-gray-700" />
-                        パートナー設定完了後に使用できます。
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )
-            )}
-
-            <TodayCompletedTasksCard
-              tasks={tasks.filter((task) => {
-                if (!task.completedAt) return false;
-                const v = (task as unknown as Record<string, unknown>).completedAt;
-
-                if (v instanceof Timestamp) return isToday(v.toDate());
-                if (v instanceof Date) return isToday(v);
-                if (typeof v === 'string') return isToday(new Date(v));
-
+            {/* ▼ 並び替え可能なカード群 */}
+            <DndContext
+              sensors={sensors}
+              onDragStart={() => {
+                setIsDraggingCard(true);
                 try {
-                  return isToday(new Date(v as string));
-                } catch {
-                  return false;
+                  document.body.style.overflow = 'hidden';
+                } catch {}
+              }}
+              onDragCancel={() => {
+                setIsDraggingCard(false);
+                try {
+                  document.body.style.overflow = '';
+                } catch {}
+              }}
+              onDragEnd={(event) => {
+                handleDragEnd(event);
+                setIsDraggingCard(false);
+                try {
+                  document.body.style.overflow = '';
+                } catch {}
+              }}
+            >
+              {(() => {
+                // 表示条件に応じて “見えているカード” を構築
+                const visibleCards: { id: CardId; node: ReactNode }[] = [];
+
+                // 1) LINE連携（Premium かつ未連携）
+                if (!isLoading && !isChecking && plan === 'premium' && !isLineLinked) {
+                  visibleCards.push({
+                    id: 'lineLink',
+                    node: (
+                      <SortableCard id="lineLink">
+                        <LineLinkCard />
+                      </SortableCard>
+                    ),
+                  });
                 }
-              })}
-            />
 
-            {!isLoading && !isChecking && plan === 'free' && <AdCard />}
+                // 2) ペア招待（受信中 or まだペアなし）
+                if (!isLoading && hasPairInvite) {
+                  visibleCards.push({
+                    id: 'pairInvite',
+                    node: (
+                      <SortableCard id="pairInvite">
+                        <PairInviteCard mode="invite-received" />
+                      </SortableCard>
+                    ),
+                  });
+                } else if (!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed) {
+                  visibleCards.push({
+                    id: 'pairInviteNone',
+                    node: (
+                      <SortableCard id="pairInviteNone">
+                        <PairInviteCard mode="no-partner" />
+                      </SortableCard>
+                    ),
+                  });
+                }
 
-            {/* ▼ 追加：ホーム画面最下部に再表示ボタン */}
+                // 3) 既存の expandable コンテナ（内容はそのまま）
+                visibleCards.push({
+                  id: 'expandableInfo',
+                  node: (
+                    <SortableCard id="expandableInfo">
+                      <div
+                        onClick={() => setIsExpanded((prev) => !prev)}
+                        className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+                          isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+                        }`}
+                      >
+                        <div className="absolute top-5 right-6 pointer-events-none z-10">
+                          <ChevronDown
+                            className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
+                              isExpanded ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </SortableCard>
+                  ),
+                });
+
+                // 4) ハート進捗
+                if (!isLoading) {
+                  visibleCards.push({
+                    id: 'hearts',
+                    node: (
+                      <SortableCard id="hearts">
+                        <HeartsProgressCard
+                          totalHearts={weeklyThanksCount}
+                          isPaired={hasPairConfirmed}
+                          title="今週のありがとう"
+                          hintText="タップで履歴を見る"
+                          navigateTo="/main?view=points&tab=thanks"
+                        />
+                      </SortableCard>
+                    ),
+                  });
+                }
+
+                // 5) カレンダー or スケルトン
+                if (isLoading) {
+                  visibleCards.push({
+                    id: 'calendar',
+                    node: (
+                      <SortableCard id="calendar">
+                        <div className="space-y-2">
+                          <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                          <div className="h-4 bg-gray-200 rounded w-2/4 animate-pulse" />
+                        </div>
+                      </SortableCard>
+                    ),
+                  });
+                } else {
+                  visibleCards.push({
+                    id: 'calendar',
+                    node: (
+                      <SortableCard id="calendar">
+                        <TaskCalendar
+                          tasks={tasks.map(({ id, name, period, dates, daysOfWeek, done }) => ({
+                            id,
+                            name,
+                            period: period ?? '毎日',
+                            dates,
+                            daysOfWeek,
+                            done: !!done,
+                          }))}
+                        />
+                      </SortableCard>
+                    ),
+                  });
+                }
+
+                // 6) Weekly Points（オーバーレイ含む） or スケルトン
+                if (isLoading) {
+                  visibleCards.push({
+                    id: 'weeklyPoints',
+                    node: (
+                      <SortableCard id="weeklyPoints">
+                        <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
+                      </SortableCard>
+                    ),
+                  });
+                } else if (!isWeeklyPointsHidden) {
+                  visibleCards.push({
+                    id: 'weeklyPoints',
+                    node: (
+                      <SortableCard id="weeklyPoints">
+                        <div className="relative">
+                          <WeeklyPoints />
+                          {!hasPairConfirmed && (
+                            <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4 mx-auto w-full max-w-xl">
+                              <button
+                                onClick={() => {
+                                  localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
+                                  setIsWeeklyPointsHidden(true);
+                                }}
+                                className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
+                                aria-label="閉じる"
+                              >
+                                ×
+                              </button>
+                              <p className="text-md font-semibold text-center flex items-center gap-1">
+                                <Info className="w-4 h-4 text-gray-700" />
+                                パートナー設定完了後に使用できます。
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </SortableCard>
+                    ),
+                  });
+                }
+
+                // 7) 今日の完了タスク
+                visibleCards.push({
+                  id: 'todayDone',
+                  node: (
+                    <SortableCard id="todayDone">
+                      <TodayCompletedTasksCard
+                        tasks={tasks.filter((task) => {
+                          if (!task.completedAt) return false;
+                          const v = (task as unknown as Record<string, unknown>).completedAt;
+
+                          if (v instanceof Timestamp) return isToday(v.toDate());
+                          if (v instanceof Date) return isToday(v);
+                          if (typeof v === 'string') return isToday(new Date(v));
+
+                          try {
+                            return isToday(new Date(v as string));
+                          } catch {
+                            return false;
+                          }
+                        })}
+                      />
+                    </SortableCard>
+                  ),
+                });
+
+                // 8) 広告
+                if (!isLoading && !isChecking && plan === 'free') {
+                  visibleCards.push({
+                    id: 'ad',
+                    node: (
+                      <SortableCard id="ad">
+                        <AdCard />
+                      </SortableCard>
+                    ),
+                  });
+                }
+
+                // 現在の order に基づいて並べ替え（未表示のIDはスキップ）
+                const idToNode = new Map<CardId, ReactNode>(visibleCards.map((c) => [c.id, c.node]));
+                const visibleIds = cardOrder.filter((id) => idToNode.has(id));
+
+                return (
+                  <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-1.5">
+                      {visibleIds.map((id) => (
+                        <div key={id}>{idToNode.get(id as CardId)}</div>
+                      ))}
+                    </div>
+                  </SortableContext>
+                );
+              })()}
+            </DndContext>
+
+            {/* ▼ オンボーディング再表示ボタン（固定） */}
             <div className="mt-6 flex justify-center">
               <button
                 onClick={() => setShowOnboarding(true)}
@@ -404,14 +660,12 @@ export default function HomeView() {
         </main>
       </div>
 
-      {/* ▼ オンボーディングモーダル */}
+      {/* オンボーディングモーダル */}
       {showOnboarding && (
         <>
-          {/* src/components/home/HomeView.tsx の該当箇所をこの配列に置き換え */}
           <OnboardingModal
             slides={[
               {
-                // ページ1：アプリ全体の導入
                 blocks: [
                   { src: '/onboarding/welcome.png' },
                   {
@@ -422,7 +676,6 @@ export default function HomeView() {
                 ],
               },
               {
-                // ページ2：Home の概要を1画面で複数ブロック表示
                 title: 'Home 画面の見方',
                 blocks: [
                   {
@@ -457,7 +710,6 @@ export default function HomeView() {
                 ],
               },
               {
-                // 以下は元のまま
                 title: 'Task画面',
                 blocks: [
                   {
