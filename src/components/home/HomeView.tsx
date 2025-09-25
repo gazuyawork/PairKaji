@@ -7,7 +7,6 @@ import { useState, useEffect, useRef } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
-import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { ChevronDown, Info } from 'lucide-react';
@@ -15,14 +14,21 @@ import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
-import { isToday } from 'date-fns';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
-
-// ▼ 追加：オンボーディングモーダル
 import OnboardingModal from '@/components/common/OnboardingModal';
+import HeartsProgressCard from '@/components/home/parts/HeartsProgressCard';
+import { isToday, startOfWeek } from 'date-fns';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  Timestamp,
+} from 'firebase/firestore';
 
 export default function HomeView() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -45,6 +51,9 @@ export default function HomeView() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
 
+  // ▼ 追加：今週もらったハート数（リアルタイム集計）
+  const [weeklyThanksCount, setWeeklyThanksCount] = useState(0);
+
   useEffect(() => {
     const seen = localStorage.getItem(ONBOARDING_SEEN_KEY);
     if (!seen) setShowOnboarding(true);
@@ -60,8 +69,8 @@ export default function HomeView() {
     const userRef = doc(db, 'users', uid);
     const unsubscribe = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        setIsLineLinked(!!(data as any).lineLinked);
+        const userData = snap.data() as Record<string, unknown>;
+        setIsLineLinked(Boolean(userData.lineLinked));
       }
     });
     return () => unsubscribe();
@@ -128,7 +137,10 @@ export default function HomeView() {
   useEffect(() => {
     if (!uid) return;
 
-    const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
+    const q = query(
+      collection(db, 'tasks'),
+      where('userIds', 'array-contains', uid)
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const taskList = snapshot.docs.map(mapFirestoreDocToTask);
       setTasks(taskList);
@@ -156,6 +168,28 @@ export default function HomeView() {
     return () => unsubscribe();
   }, [uid]);
 
+  // ▼ 追加：今週分の「もらったハート（thanks）」をリアルタイム集計
+  useEffect(() => {
+    if (!uid) return;
+
+    // 今週（月曜始まり）の0:00を基準に集計
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    start.setHours(0, 0, 0, 0);
+
+    // 例：thanks コレクションに { toUserId, createdAt(Timestamp) } で保存している想定
+    const q = query(
+      collection(db, 'thanks'),
+      where('toUserId', '==', uid),
+      where('createdAt', '>=', Timestamp.fromDate(start))
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      setWeeklyThanksCount(snap.size);
+    });
+
+    return () => unsub();
+  }, [uid]);
+
   const flaggedTasks = tasks.filter((task) => task.flagged === true);
 
   return (
@@ -177,7 +211,9 @@ export default function HomeView() {
             transition={{ duration: 0.4 }}
             className="space-y-1.5"
           >
-            {!isLoading && !isChecking && plan === 'premium' && !isLineLinked && <LineLinkCard />}
+            {!isLoading && !isChecking && plan === 'premium' && !isLineLinked && (
+              <LineLinkCard />
+            )}
 
             {!isLoading && hasPairInvite && (
               <PairInviteCard mode="invite-received" />
@@ -189,19 +225,32 @@ export default function HomeView() {
 
             <div
               onClick={() => setIsExpanded((prev) => !prev)}
-              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-                }`}
+              className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+                isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+              }`}
             >
               <div className="absolute top-5 right-6 pointer-events-none z-10">
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-                    }`}
+                  className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
+                    isExpanded ? 'rotate-180' : ''
+                  }`}
                 />
               </div>
             </div>
 
             {!isLoading && flaggedCount > 0 && (
               <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />
+            )}
+
+            {/* ▼ ハート進捗カード：フラグカードの直後に表示 */}
+            {!isLoading && (
+              <HeartsProgressCard
+                totalHearts={weeklyThanksCount}
+                isPaired={hasPairConfirmed}
+                title="今週のありがとう"
+                hintText="タップで履歴を見る"
+                navigateTo="/main?view=points&tab=thanks"
+              />
             )}
 
             {isLoading ? (
@@ -211,14 +260,16 @@ export default function HomeView() {
               </div>
             ) : (
               <TaskCalendar
-                tasks={tasks.map(({ id, name, period, dates, daysOfWeek, done }) => ({
-                  id,
-                  name,
-                  period: period ?? '毎日',
-                  dates,
-                  daysOfWeek,
-                  done: !!done,
-                }))}
+                tasks={tasks.map(
+                  ({ id, name, period, dates, daysOfWeek, done }) => ({
+                    id,
+                    name,
+                    period: period ?? '毎日',
+                    dates,
+                    daysOfWeek,
+                    done: !!done,
+                  })
+                )}
               />
             )}
 
@@ -251,15 +302,30 @@ export default function HomeView() {
             )}
 
             <TodayCompletedTasksCard
-              tasks={tasks.filter(
-                (task) =>
-                  task.completedAt &&
-                  isToday(
-                    typeof task.completedAt === 'string'
-                      ? new Date(task.completedAt)
-                      : (task.completedAt as any).toDate()
-                  )
-              )}
+              tasks={tasks.filter((task) => {
+                if (!task.completedAt) return false;
+                const v = task.completedAt as unknown;
+
+                // Firestore Timestamp の場合
+                if (v instanceof Timestamp) {
+                  return isToday(v.toDate());
+                }
+
+                // 文字列（ISO）または Date の場合にフォールバック
+                if (typeof v === 'string') {
+                  return isToday(new Date(v));
+                }
+                if (v instanceof Date) {
+                  return isToday(v);
+                }
+
+                // 型が不明な場合の保険（Dateにキャストして試みる）
+                try {
+                  return isToday(new Date(v as string));
+                } catch {
+                  return false;
+                }
+              })}
             />
 
             {!isLoading && !isChecking && plan === 'free' && <AdCard />}
@@ -279,139 +345,143 @@ export default function HomeView() {
 
       {/* ▼ オンボーディングモーダル */}
       {showOnboarding && (
-        // src/components/home/HomeView.tsx の該当箇所をこの配列に置き換え
-        <OnboardingModal
-          slides={[
-            {
-              // ページ1：アプリ全体の導入
-              blocks: [
-                {
-                  src: '/onboarding/welcome.png',
-                },
-                                {
-                  subtitle: 'ご利用ありがとうございます。',
-                  description:
-                    'このアプリは「家事を見える化して、お互いに協力して日々の家事を行う」をコンセプトにしています。\nまずはこのアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
-                },
-              ],
-            },
-            {
-              // ページ2：Home の概要を1画面で複数ブロック表示
-              title: 'Home 画面の見方',
-              blocks: [
-                {
-                  subtitle: '1. 概要',
-                  description:
-                    'Home では「タスク一覧」「週間ポイント」「本日完了タスク」など、日々の進捗をひと目で確認できます。',
-                },
-                {
-                  subtitle: '2. タスク一覧（7日間）',
-                  src: '/onboarding/schedule.jpg',
-                  description:
-                    '本日から7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
-                },
-                {
-                  subtitle: '3. 本日完了タスク',
-                  src: '/onboarding/finish_task.jpg',
-                  description:
-                    '本日完了したタスクを一覧表示します。各タスクの右に実行者のアイコンが表示され、誰が完了したか確認できます。',
-                },
-                {
-                  subtitle: '4. フラグ付きタスク',
-                  src: '/onboarding/flag.jpg',
-                  description:
-                    'フラグを付けたタスクが表示されます。新規で追加した場合は New のバッチが表示され、プッシュ通知が届きます。※プッシュ通知を受け取るためには設定が必要です。',
-                },
-                {
-                  subtitle: '5. ポイント',
-                  src: '/onboarding/point_check.jpg',
-                  description:
-                    '1週間の目標値と進捗状況をひょうじします。タップすることで、目標値を編集することができます。',
-                },
-              ],
-            },
-            {
-              // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
-              title: 'Task画面',
-              blocks: [
-                {
-                  subtitle: '1. 概要',
-                  description:
-                    'この画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。\n',
-                },
-                {
-                  subtitle: 'Weekly ポイントとは？',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
-                },
-                {
-                  // 例：指示がない要素（空文字/未指定）は自動で非表示
-                  subtitle: '画像挿入テスト',
-                  description: 'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
-                },
-              ],
-            },
-            {
-              // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
-              title: 'Todo画面',
-              blocks: [
-                {
-                  subtitle: 'ペア設定が未完了の場合',
-                  description:
-                    'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
-                },
-                {
-                  subtitle: 'Weekly ポイントとは？',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
-                },
-                {
-                  // 例：指示がない要素（空文字/未指定）は自動で非表示
-                  subtitle: '',
-                  description: '',
-                },
-              ],
-            },
-            {
-              // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
-              title: 'Todo画面',
-              blocks: [
-                {
-                  subtitle: 'ペア設定が未完了の場合',
-                  description:
-                    'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
-                },
-                {
-                  subtitle: 'Weekly ポイントとは？',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
-                },
-                {
-                  // 例：指示がない要素（空文字/未指定）は自動で非表示
-                  subtitle: '',
-                  description: '',
-                },
-              ],
-            },
-                        {
-              // ページ1：アプリ全体の導入
-              title: 'おつかれさまでした。',
-              blocks: [
-                {
-                  subtitle: 'はじめに',
-                  src: '/onboarding/slide1.png',
-                  description:
-                    'おつかれさまでした。\nPairKajiは家事を見える科するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n',
-                },
-              ],
-            },
-          ]}
-          onClose={handleCloseOnboarding}
-        />
-
+        <>
+          {/*
+            src/components/home/HomeView.tsx の該当箇所をこの配列に置き換え
+          */}
+          <OnboardingModal
+            slides={[
+              {
+                // ページ1：アプリ全体の導入
+                blocks: [
+                  {
+                    src: '/onboarding/welcome.png',
+                  },
+                  {
+                    subtitle: 'ご利用ありがとうございます。',
+                    description:
+                      'このアプリは「家事を見える化して、お互いに協力して日々の家事を行う」をコンセプトにしています。\nまずはこのアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
+                  },
+                ],
+              },
+              {
+                // ページ2：Home の概要を1画面で複数ブロック表示
+                title: 'Home 画面の見方',
+                blocks: [
+                  {
+                    subtitle: '1. 概要',
+                    description:
+                      'Home では「タスク一覧」「週間ポイント」「本日完了タスク」など、日々の進捗をひと目で確認できます。',
+                  },
+                  {
+                    subtitle: '2. タスク一覧（7日間）',
+                    src: '/onboarding/schedule.jpg',
+                    description:
+                      '本日から7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
+                  },
+                  {
+                    subtitle: '3. 本日完了タスク',
+                    src: '/onboarding/finish_task.jpg',
+                    description:
+                      '本日完了したタスクを一覧表示します。各タスクの右に実行者のアイコンが表示され、誰が完了したか確認できます。',
+                  },
+                  {
+                    subtitle: '4. フラグ付きタスク',
+                    src: '/onboarding/flag.jpg',
+                    description:
+                      'フラグを付けたタスクが表示されます。新規で追加した場合は New のバッチが表示され、プッシュ通知が届きます。※プッシュ通知を受け取るためには設定が必要です。',
+                  },
+                  {
+                    subtitle: '5. ポイント',
+                    src: '/onboarding/point_check.jpg',
+                    description:
+                      '1週間の目標値と進捗状況をひょうじします。タップすることで、目標値を編集することができます。',
+                  },
+                ],
+              },
+              {
+                // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
+                title: 'Task画面',
+                blocks: [
+                  {
+                    subtitle: '1. 概要',
+                    description:
+                      'この画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。\n',
+                  },
+                  {
+                    subtitle: 'Weekly ポイントとは？',
+                    src: '/onboarding/slide2.png',
+                    description:
+                      '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                  },
+                  {
+                    // 例：指示がない要素（空文字/未指定）は自動で非表示
+                    subtitle: '画像挿入テスト',
+                    description:
+                      'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
+                  },
+                ],
+              },
+              {
+                // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
+                title: 'Todo画面',
+                blocks: [
+                  {
+                    subtitle: 'ペア設定が未完了の場合',
+                    description:
+                      'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
+                  },
+                  {
+                    subtitle: 'Weekly ポイントとは？',
+                    src: '/onboarding/slide2.png',
+                    description:
+                      '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                  },
+                  {
+                    // 例：指示がない要素（空文字/未指定）は自動で非表示
+                    subtitle: '',
+                    description: '',
+                  },
+                ],
+              },
+              {
+                // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
+                title: 'Todo画面',
+                blocks: [
+                  {
+                    subtitle: 'ペア設定が未完了の場合',
+                    description:
+                      'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
+                  },
+                  {
+                    subtitle: 'Weekly ポイントとは？',
+                    src: '/onboarding/slide2.png',
+                    description:
+                      '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                  },
+                  {
+                    // 例：指示がない要素（空文字/未指定）は自動で非表示
+                    subtitle: '',
+                    description: '',
+                  },
+                ],
+              },
+              {
+                // ページ1：アプリ全体の導入
+                title: 'おつかれさまでした。',
+                blocks: [
+                  {
+                    subtitle: 'はじめに',
+                    src: '/onboarding/slide1.png',
+                    description:
+                      'おつかれさまでした。\nPairKajiは家事を見える科するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n',
+                  },
+                ],
+              },
+            ]}
+            onClose={handleCloseOnboarding}
+          />
+        </>
       )}
     </>
   );
