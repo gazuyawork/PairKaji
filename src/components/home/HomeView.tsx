@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
@@ -28,6 +28,8 @@ import {
   onSnapshot,
   doc,
   Timestamp,
+  type DocumentData,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 
 export default function HomeView() {
@@ -47,12 +49,20 @@ export default function HomeView() {
 
   const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
 
-  // ▼ 追加：オンボーディング制御
+  // オンボーディング
   const [showOnboarding, setShowOnboarding] = useState(false);
   const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
 
-  // ▼ 追加：今週もらったハート数（リアルタイム集計）
-  const [weeklyThanksCount, setWeeklyThanksCount] = useState(0);
+  // 今週「受け取ったありがとう（ハート）」の集計（2系統）
+  const [thanksCountFromCollection, setThanksCountFromCollection] = useState(0); // ① thanks 直集計
+  const [thanksCountFromTasks, setThanksCountFromTasks] = useState(0);           // ② tasks 由来の派生集計
+  const weeklyThanksCount = useMemo(
+    () => Math.max(thanksCountFromCollection, thanksCountFromTasks),
+    [thanksCountFromCollection, thanksCountFromTasks]
+  );
+
+  // パートナーID（派生集計に使用）
+  const [partnerId, setPartnerId] = useState<string | null>(null);
 
   useEffect(() => {
     const seen = localStorage.getItem(ONBOARDING_SEEN_KEY);
@@ -64,6 +74,7 @@ export default function HomeView() {
     setShowOnboarding(false);
   };
 
+  // users/{uid} の lineLinked を購読（no-explicit-any回避）
   useEffect(() => {
     if (!uid) return;
     const userRef = doc(db, 'users', uid);
@@ -81,6 +92,7 @@ export default function HomeView() {
     setIsWeeklyPointsHidden(stored === 'true');
   }, []);
 
+  // 招待・ペア確定の購読
   useEffect(() => {
     if (!uid) return;
 
@@ -89,7 +101,6 @@ export default function HomeView() {
       where('userAId', '==', uid),
       where('status', '==', 'pending')
     );
-
     const unsubscribeSent = onSnapshot(sentQuery, (snapshot) => {
       setHasSentInvite(!snapshot.empty);
     });
@@ -99,9 +110,18 @@ export default function HomeView() {
       where('userIds', 'array-contains', uid),
       where('status', '==', 'confirmed')
     );
-
     const unsubscribeConfirmed = onSnapshot(confirmedQuery, (snapshot) => {
       setHasPairConfirmed(!snapshot.empty);
+
+      // パートナーIDを抽出（最初のconfirmedを採用）
+      if (!snapshot.empty) {
+        const doc0 = snapshot.docs[0].data() as { userIds?: string[] } & DocumentData;
+        const ids = Array.isArray(doc0.userIds) ? doc0.userIds : [];
+        const other = ids.find((x) => x && x !== uid) ?? null;
+        setPartnerId(other ?? null);
+      } else {
+        setPartnerId(null);
+      }
     });
 
     return () => {
@@ -110,6 +130,7 @@ export default function HomeView() {
     };
   }, [uid]);
 
+  // ペア確定でWeeklyPointsのブロック解除
   useEffect(() => {
     if (hasPairConfirmed) {
       localStorage.removeItem(WEEKLY_POINTS_HIDE_KEY);
@@ -117,6 +138,7 @@ export default function HomeView() {
     }
   }, [hasPairConfirmed]);
 
+  // 自分宛の招待受信の購読
   useEffect(() => {
     const user = auth.currentUser;
     if (!user?.email) return;
@@ -134,24 +156,21 @@ export default function HomeView() {
     return () => unsubscribe();
   }, []);
 
+  // 自分が関与する tasks の購読
   useEffect(() => {
     if (!uid) return;
 
-    const q = query(
-      collection(db, 'tasks'),
-      where('userIds', 'array-contains', uid)
-    );
+    const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const taskList = snapshot.docs.map(mapFirestoreDocToTask);
       setTasks(taskList);
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 50);
+      setTimeout(() => setIsLoading(false), 50);
     });
 
     return () => unsubscribe();
   }, [uid]);
 
+  // フラグ付き数の購読
   useEffect(() => {
     if (!uid) return;
 
@@ -168,27 +187,83 @@ export default function HomeView() {
     return () => unsubscribe();
   }, [uid]);
 
-  // ▼ 追加：今週分の「もらったハート（thanks）」をリアルタイム集計
+  // ① thanks コレクションからの「自分が受け取った」今週分のリアルタイム集計
   useEffect(() => {
     if (!uid) return;
 
-    // 今週（月曜始まり）の0:00を基準に集計
     const start = startOfWeek(new Date(), { weekStartsOn: 1 });
     start.setHours(0, 0, 0, 0);
 
-    // 例：thanks コレクションに { toUserId, createdAt(Timestamp) } で保存している想定
     const q = query(
-      collection(db, 'thanks'),
+      collection(db, 'thanks'), // 実データが he(l)arts 等の場合はここを合わせてください
       where('toUserId', '==', uid),
       where('createdAt', '>=', Timestamp.fromDate(start))
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      setWeeklyThanksCount(snap.size);
+    const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
+      setThanksCountFromCollection(snap.size);
     });
 
     return () => unsub();
   }, [uid]);
+
+  // ② tasks からの派生集計（今週・自分が完了・パートナーがいいねを押した件数）
+  useEffect(() => {
+    if (!uid) return;
+
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    start.setHours(0, 0, 0, 0);
+    const startMs = start.getTime();
+
+    // 今週＆自分完了のタスクを抽出（completedAt は string | Date | Timestamp を想定）
+    const isThisWeek = (v: unknown): boolean => {
+      if (!v) return false;
+      if (v instanceof Timestamp) return v.toDate().getTime() >= startMs;
+      if (v instanceof Date) return v.getTime() >= startMs;
+      if (typeof v === 'string') return new Date(v).getTime() >= startMs;
+      try {
+        return new Date(v as string).getTime() >= startMs;
+      } catch {
+        return false;
+      }
+    };
+
+    // completedBy / doneBy のどちらかで実行者を判定（プロジェクト内の命名揺れに対応）
+    const getCompletedBy = (t: Task): string | undefined => {
+      const anyT = t as unknown as Record<string, unknown>;
+      const a = anyT.completedBy;
+      const b = anyT.doneBy;
+      return typeof a === 'string'
+        ? a
+        : typeof b === 'string'
+        ? b
+        : undefined;
+    };
+
+    // likes / likedBy / hearts のいずれかの配列に partnerId が含まれていれば「受け取ったありがとう」とみなす
+    const getLikerUids = (t: Task): string[] => {
+      const anyT = t as unknown as Record<string, unknown>;
+      const candidates = [anyT.likes, anyT.likedBy, anyT.hearts];
+      for (const c of candidates) {
+        if (Array.isArray(c) && c.every((x) => typeof x === 'string')) {
+          return c as string[];
+        }
+      }
+      return [];
+    };
+
+    // 集計
+    const count = tasks.reduce((acc, t) => {
+      if (!isThisWeek((t as unknown as Record<string, unknown>).completedAt)) return acc;
+      const by = getCompletedBy(t);
+      if (by !== uid) return acc; // 自分が完了したものが対象
+      if (!partnerId) return acc; // パートナー不明ならカウント不可
+      const likers = getLikerUids(t);
+      return acc + (likers.includes(partnerId) ? 1 : 0);
+    }, 0);
+
+    setThanksCountFromTasks(count);
+  }, [tasks, uid, partnerId]);
 
   const flaggedTasks = tasks.filter((task) => task.flagged === true);
 
@@ -215,9 +290,7 @@ export default function HomeView() {
               <LineLinkCard />
             )}
 
-            {!isLoading && hasPairInvite && (
-              <PairInviteCard mode="invite-received" />
-            )}
+            {!isLoading && hasPairInvite && <PairInviteCard mode="invite-received" />}
 
             {!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed && (
               <PairInviteCard mode="no-partner" />
@@ -245,7 +318,7 @@ export default function HomeView() {
             {/* ▼ ハート進捗カード：フラグカードの直後に表示 */}
             {!isLoading && (
               <HeartsProgressCard
-                totalHearts={weeklyThanksCount}
+                totalHearts={weeklyThanksCount}   // 10個分まで塗りつぶし、超過は +N
                 isPaired={hasPairConfirmed}
                 title="今週のありがとう"
                 hintText="タップで履歴を見る"
@@ -260,16 +333,14 @@ export default function HomeView() {
               </div>
             ) : (
               <TaskCalendar
-                tasks={tasks.map(
-                  ({ id, name, period, dates, daysOfWeek, done }) => ({
-                    id,
-                    name,
-                    period: period ?? '毎日',
-                    dates,
-                    daysOfWeek,
-                    done: !!done,
-                  })
-                )}
+                tasks={tasks.map(({ id, name, period, dates, daysOfWeek, done }) => ({
+                  id,
+                  name,
+                  period: period ?? '毎日',
+                  dates,
+                  daysOfWeek,
+                  done: !!done,
+                }))}
               />
             )}
 
@@ -304,22 +375,12 @@ export default function HomeView() {
             <TodayCompletedTasksCard
               tasks={tasks.filter((task) => {
                 if (!task.completedAt) return false;
-                const v = task.completedAt as unknown;
+                const v = (task as unknown as Record<string, unknown>).completedAt;
 
-                // Firestore Timestamp の場合
-                if (v instanceof Timestamp) {
-                  return isToday(v.toDate());
-                }
+                if (v instanceof Timestamp) return isToday(v.toDate());
+                if (v instanceof Date) return isToday(v);
+                if (typeof v === 'string') return isToday(new Date(v));
 
-                // 文字列（ISO）または Date の場合にフォールバック
-                if (typeof v === 'string') {
-                  return isToday(new Date(v));
-                }
-                if (v instanceof Date) {
-                  return isToday(v);
-                }
-
-                // 型が不明な場合の保険（Dateにキャストして試みる）
                 try {
                   return isToday(new Date(v as string));
                 } catch {
@@ -346,17 +407,13 @@ export default function HomeView() {
       {/* ▼ オンボーディングモーダル */}
       {showOnboarding && (
         <>
-          {/*
-            src/components/home/HomeView.tsx の該当箇所をこの配列に置き換え
-          */}
+          {/* src/components/home/HomeView.tsx の該当箇所をこの配列に置き換え */}
           <OnboardingModal
             slides={[
               {
                 // ページ1：アプリ全体の導入
                 blocks: [
-                  {
-                    src: '/onboarding/welcome.png',
-                  },
+                  { src: '/onboarding/welcome.png' },
                   {
                     subtitle: 'ご利用ありがとうございます。',
                     description:
@@ -400,7 +457,6 @@ export default function HomeView() {
                 ],
               },
               {
-                // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
                 title: 'Task画面',
                 blocks: [
                   {
@@ -415,7 +471,6 @@ export default function HomeView() {
                       '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
                   },
                   {
-                    // 例：指示がない要素（空文字/未指定）は自動で非表示
                     subtitle: '画像挿入テスト',
                     description:
                       'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
@@ -423,7 +478,6 @@ export default function HomeView() {
                 ],
               },
               {
-                // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
                 title: 'Todo画面',
                 blocks: [
                   {
@@ -437,15 +491,10 @@ export default function HomeView() {
                     description:
                       '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
                   },
-                  {
-                    // 例：指示がない要素（空文字/未指定）は自動で非表示
-                    subtitle: '',
-                    description: '',
-                  },
+                  { subtitle: '', description: '' },
                 ],
               },
               {
-                // ページ3：パートナー連携と Weekly ポイント（空要素は非表示）
                 title: 'Todo画面',
                 blocks: [
                   {
@@ -459,15 +508,10 @@ export default function HomeView() {
                     description:
                       '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
                   },
-                  {
-                    // 例：指示がない要素（空文字/未指定）は自動で非表示
-                    subtitle: '',
-                    description: '',
-                  },
+                  { subtitle: '', description: '' },
                 ],
               },
               {
-                // ページ1：アプリ全体の導入
                 title: 'おつかれさまでした。',
                 blocks: [
                   {
