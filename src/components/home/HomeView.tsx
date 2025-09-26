@@ -21,13 +21,7 @@ import { useUserUid } from '@/hooks/useUserUid';
 import OnboardingModal from '@/components/common/OnboardingModal';
 import HeartsProgressCard from '@/components/home/parts/HeartsProgressCard';
 
-import {
-  isToday,
-  startOfWeek,
-  endOfWeek,
-  parseISO,
-  isWithinInterval,
-} from 'date-fns';
+import { isToday, startOfWeek, endOfWeek, parseISO, isWithinInterval } from 'date-fns';
 
 import {
   collection,
@@ -57,11 +51,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 /* ---------------------------------------
- * SortableCard：
- * - 子要素に手を加えず、左上に小さな“つまみ”を重ねる
- * - つまみでのみドラッグ開始
- * - showGrip=false のときはつまみ非表示（上端の重複・視覚ノイズを回避）
- * - ドラッグ中は元要素を隠し、DragOverlay 側のみを表示（複製の二重表示防止）
+ * SortableCard（カード左上に“つまみ”を重ねる。トップのカードはつまみ非表示）
  * -------------------------------------*/
 function SortableCard({
   id,
@@ -84,6 +74,7 @@ function SortableCard({
     opacity: isDragging ? 0.98 : 1,
     zIndex: isDragging ? 10 : 'auto',
     position: 'relative',
+    // DragOverlay を使うため、ドラッグ中は元要素を非表示（複製の二重表示防止）
     visibility: isDragging ? 'hidden' : 'visible',
   };
 
@@ -109,7 +100,6 @@ function SortableCard({
           <GripVertical className="w-4 h-4" />
         </button>
       )}
-
       <div className="rounded-lg">{children}</div>
     </div>
   );
@@ -341,7 +331,7 @@ export default function HomeView() {
 
   /* ---------------------------------------
    * カード順序 永続化 & DnD センサー
-   *  ※ 並び替え“対象外”は Flagged のみ（固定表示）
+   *  ※ 並び替え“対象外”は Flagged と「もう一度説明を見る」
    * -------------------------------------*/
   const HOME_CARD_ORDER_KEY = 'homeCardOrderV1';
   const DEFAULT_ORDER = [
@@ -354,7 +344,7 @@ export default function HomeView() {
     'weeklyPoints',
     'todayDone',
     'ad',
-  ] as const; // ← 'flagged' は含めない
+  ] as const; // ← helpButton を除外
   type CardId = (typeof DEFAULT_ORDER)[number];
 
   const [cardOrder, setCardOrder] = useState<CardId[]>(() => {
@@ -367,14 +357,14 @@ export default function HomeView() {
         const missing = DEFAULT_ORDER.filter((d) => !filtered.includes(d));
         return [...filtered, ...missing];
       }
-    } catch { }
+    } catch {}
     return [...DEFAULT_ORDER];
   });
 
   useEffect(() => {
     try {
       localStorage.setItem(HOME_CARD_ORDER_KEY, JSON.stringify(cardOrder));
-    } catch { }
+    } catch {}
   }, [cardOrder]);
 
   const sensors = useSensors(
@@ -407,13 +397,15 @@ export default function HomeView() {
         return (
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
-            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
+            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+              isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+            }`}
           >
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-                  }`}
+                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
               />
             </div>
           </div>
@@ -535,14 +527,14 @@ export default function HomeView() {
                 setActiveCardId(String(e.active.id));
                 try {
                   document.body.style.overflow = 'hidden';
-                } catch { }
+                } catch {}
               }}
               onDragCancel={() => {
                 setIsDraggingCard(false);
                 setActiveCardId(null);
                 try {
                   document.body.style.overflow = '';
-                } catch { }
+                } catch {}
               }}
               onDragEnd={(event) => {
                 handleDragEnd(event);
@@ -550,13 +542,12 @@ export default function HomeView() {
                 setActiveCardId(null);
                 try {
                   document.body.style.overflow = '';
-                } catch { }
+                } catch {}
               }}
             >
               {(() => {
-                // 1) 表示条件を満たす候補ID集合を作成
+                // 1) 表示条件を満たす候補ID集合を作成（helpButton は含めない）
                 const candidateSet = new Set<CardId>();
-
                 if (!isLoading && !isChecking && plan === 'premium' && !isLineLinked) {
                   candidateSet.add('lineLink');
                 }
@@ -583,7 +574,7 @@ export default function HomeView() {
                       <div className="space-y-1.5">
                         {visibleIds.map((id, idx) => (
                           <div key={id}>
-                            <SortableCard id={id} showGrip={idx !== 0 /* ← 一番上は つまみ非表示 */}>
+                            <SortableCard id={id} showGrip={idx !== 0 /* 一番上は つまみ非表示 */}>
                               {renderCardContent(id)}
                             </SortableCard>
                           </div>
@@ -594,9 +585,7 @@ export default function HomeView() {
                     {/* ▼ DragOverlay：つまみ無しの“カード本体のみ”を表示 */}
                     <DragOverlay>
                       {activeCardId ? (
-                        <div className="rounded-lg">
-                          {renderCardContent(activeCardId as CardId)}
-                        </div>
+                        <div className="rounded-lg">{renderCardContent(activeCardId as CardId)}</div>
                       ) : null}
                     </DragOverlay>
                   </>
@@ -613,113 +602,110 @@ export default function HomeView() {
                 もう一度説明を見る
               </button>
             </div>
-
           </motion.div>
         </main>
       </div>
 
-      {/* オンボーディングモーダル */}
+      {/* ▼ オンボーディングモーダル */}
       {showOnboarding && (
-        <>
-          <OnboardingModal
-            slides={[
-              {
-                blocks: [
-                  { src: '/onboarding/welcome.png' },
-                  {
-                    subtitle: 'ご利用ありがとうございます。',
-                    description:
-                      'このアプリは「家事を見える化して、お互いに協力して日々の家事を行う」をコンセプトにしています。\nまずはこのアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
-                  },
-                ],
-              },
-              {
-                title: 'Home 画面の見方',
-                blocks: [
-                  {
-                    subtitle: '1. 概要',
-                    description:
-                      'Home では「タスク一覧」「週間ポイント」「本日完了タスク」など、日々の進捗をひと目で確認できます。',
-                  },
-                  {
-                    subtitle: '2. タスク一覧（7日間）',
-                    src: '/onboarding/schedule.jpg',
-                    description:
-                      '本日から7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
-                  },
-                  {
-                    subtitle: '3. 本日完了タスク',
-                    src: '/onboarding/finish_task.jpg',
-                    description:
-                      '本日完了したタスクを一覧表示します。各タスクの右に実行者のアイコンが表示され、誰が完了したか確認できます。',
-                  },
-                  {
-                    subtitle: '4. フラグ付きタスク',
-                    src: '/onboarding/flag.jpg',
-                    description:
-                      'フラグを付けたタスクが表示されます。新規で追加した場合は New のバッチが表示され、プッシュ通知が届きます。※プッシュ通知を受け取るためには設定が必要です。',
-                  },
-                  {
-                    subtitle: '5. ポイント',
-                    src: '/onboarding/point_check.jpg',
-                    description:
-                      '1週間の目標値と進捗状況をひょうじします。タップすることで、目標値を編集することができます。',
-                  },
-                ],
-              },
-              {
-                title: 'Task画面',
-                blocks: [
-                  {
-                    subtitle: '1. 概要',
-                    description:
-                      'この画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。\n',
-                  },
-                  {
-                    subtitle: 'Weekly ポイントとは？',
-                    src: '/onboarding/slide2.png',
-                    description:
-                      '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
-                  },
-                  {
-                    subtitle: '画像挿入テスト',
-                    description:
-                      'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
-                  },
-                ],
-              },
-              {
-                title: 'Todo画面',
-                blocks: [
-                  {
-                    subtitle: 'ペア設定が未完了の場合',
-                    description:
-                      'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
-                  },
-                  {
-                    subtitle: 'Weekly ポイントとは？',
-                    src: '/onboarding/slide2.png',
-                    description:
-                      '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
-                  },
-                  { subtitle: '', description: '' },
-                ],
-              },
-              {
-                title: 'おつかれさまでした。',
-                blocks: [
-                  {
-                    subtitle: 'はじめに',
-                    src: '/onboarding/slide1.png',
-                    description:
-                      'おつかれさまでした。\nPairKajiは家事を見える科するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n',
-                  },
-                ],
-              },
-            ]}
-            onClose={handleCloseOnboarding}
-          />
-        </>
+        <OnboardingModal
+          slides={[
+            {
+              blocks: [
+                { src: '/onboarding/welcome.png' },
+                {
+                  subtitle: 'ご利用ありがとうございます。',
+                  description:
+                    'このアプリは「家事を見える化して、お互いに協力して日々の家事を行う」をコンセプトにしています。\nまずはこのアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
+                },
+              ],
+            },
+            {
+              title: 'Home 画面の見方',
+              blocks: [
+                {
+                  subtitle: '1. 概要',
+                  description:
+                    'Home では「タスク一覧」「週間ポイント」「本日完了タスク」など、日々の進捗をひと目で確認できます。',
+                },
+                {
+                  subtitle: '2. タスク一覧（7日間）',
+                  src: '/onboarding/schedule.jpg',
+                  description:
+                    '本日から7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
+                },
+                {
+                  subtitle: '3. 本日完了タスク',
+                  src: '/onboarding/finish_task.jpg',
+                  description:
+                    '本日完了したタスクを一覧表示します。各タスクの右に実行者のアイコンが表示され、誰が完了したか確認できます。',
+                },
+                {
+                  subtitle: '4. フラグ付きタスク',
+                  src: '/onboarding/flag.jpg',
+                  description:
+                    'フラグを付けたタスクが表示されます。新規で追加した場合は New のバッチが表示され、プッシュ通知が届きます。※プッシュ通知を受け取るためには設定が必要です。',
+                },
+                {
+                  subtitle: '5. ポイント',
+                  src: '/onboarding/point_check.jpg',
+                  description:
+                    '1週間の目標値と進捗状況をひょうじします。タップすることで、目標値を編集することができます。',
+                },
+              ],
+            },
+            {
+              title: 'Task画面',
+              blocks: [
+                {
+                  subtitle: '1. 概要',
+                  description:
+                    'この画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。\n',
+                },
+                {
+                  subtitle: 'Weekly ポイントとは？',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                },
+                {
+                  subtitle: '画像挿入テスト',
+                  description:
+                    'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
+                },
+              ],
+            },
+            {
+              title: 'Todo画面',
+              blocks: [
+                {
+                  subtitle: 'ペア設定が未完了の場合',
+                  description:
+                    'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
+                },
+                {
+                  subtitle: 'Weekly ポイントとは？',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                },
+                { subtitle: '', description: '' },
+              ],
+            },
+            {
+              title: 'おつかれさまでした。',
+              blocks: [
+                {
+                  subtitle: 'はじめに',
+                  src: '/onboarding/slide1.png',
+                  description:
+                    'おつかれさまでした。\nPairKajiは家事を見える科するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n',
+                },
+              ],
+            },
+          ]}
+          onClose={handleCloseOnboarding}
+        />
       )}
     </>
   );
