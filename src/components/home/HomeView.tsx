@@ -1,9 +1,8 @@
-// src/components/home/HomeView.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
@@ -13,15 +12,17 @@ import { ChevronDown, Info, GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
-import TodayCompletedTasksCard from '@/components/home/parts/TodayCompletedTasksCard';
 import AdCard from '@/components/home/parts/AdCard';
 import LineLinkCard from '@/components/home/parts/LineLinkCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import OnboardingModal from '@/components/common/OnboardingModal';
-import HeartsProgressCard from '@/components/home/parts/HeartsProgressCard';
 
-import { isToday, startOfWeek, endOfWeek, parseISO, isWithinInterval } from 'date-fns';
+// 活動サマリー
+import HomeDashboardCard from '@/components/home/parts/HomeDashboardCard';
+import PartnerCompletedTasksCard from '@/components/home/parts/PartnerCompletedTasksCard';
+
+import { startOfWeek, endOfWeek, parseISO, isWithinInterval } from 'date-fns';
 
 import {
   collection,
@@ -29,11 +30,10 @@ import {
   where,
   onSnapshot,
   doc,
-  Timestamp,
   type DocumentData,
 } from 'firebase/firestore';
 
-// ▼ ドラッグ&ドロップ（Dnd Kit）
+// ▼ DnD Kit
 import {
   DndContext,
   PointerSensor,
@@ -50,19 +50,24 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-/* ---------------------------------------
- * SortableCard（カード左上に“つまみ”を重ねる。トップのカードはつまみ非表示）
- * -------------------------------------*/
+/* =========================================================
+ * SortableCard
+ * - 各カードを isolate（独立スタッキング）化
+ * - カード内に overflow-hidden ラッパーを追加し、ハンドルのはみ出しを完全防止
+ * - isDragging 中は元要素を透明化して DragOverlay の二重表示を防止
+ * =======================================================*/
 function SortableCard({
   id,
   children,
   className = '',
   showGrip = true,
+  boundClass = 'mx-auto w-full max-w-xl',
 }: {
   id: string;
   children: ReactNode;
   className?: string;
   showGrip?: boolean;
+  boundClass?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -71,36 +76,31 @@ function SortableCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.98 : 1,
-    zIndex: isDragging ? 10 : 'auto',
-    position: 'relative',
-    // DragOverlay を使うため、ドラッグ中は元要素を非表示（複製の二重表示防止）
-    visibility: isDragging ? 'hidden' : 'visible',
+    opacity: isDragging ? 0 : 1,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={className}>
-      {showGrip && (
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          aria-label="ドラッグして並び替え"
-          title="ドラッグして並び替え"
-          className={`
-            absolute top-1 left-1
-            h-7 w-7
-            flex items-center justify-center
-            cursor-grab active:cursor-grabbing
-            text-gray-400 hover:text-gray-600
-            z-20
-          `}
-          style={{ touchAction: 'none', background: 'transparent' }}
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
-      )}
-      <div className="rounded-lg">{children}</div>
+    <div className={className}>
+      {/* 並び替え対象ボックス（max-w-xl 内側） */}
+      <div ref={setNodeRef} style={style} className={`relative isolate ${boundClass}`}>
+        {/* ここでハンドルを必ずカード内に閉じ込める */}
+        <div className="relative rounded-lg overflow-hidden">
+          {showGrip && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              aria-label="ドラッグして並び替え"
+              title="ドラッグして並び替え"
+              className="absolute top-1 left-1 h-7 w-7 flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 z-10"
+              style={{ touchAction: 'none', background: 'transparent' }}
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+          )}
+          <div className="rounded-lg">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -132,7 +132,7 @@ export default function HomeView() {
   // 今週「パートナーから自分がもらった」ありがとう（ハート）の件数
   const [weeklyThanksCount, setWeeklyThanksCount] = useState(0);
 
-  // ドラッグ中フラグ（スクロール抑止用）と、アクティブID（DragOverlay 用）
+  // DnD
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
@@ -169,33 +169,37 @@ export default function HomeView() {
   }, []);
 
   // 招待・ペア確定の購読（partnerId 抽出もここで）
+  // ※ 複合インデックス不要化：単一 where のみ + クライアント側フィルタ
   useEffect(() => {
     if (!uid) return;
 
-    const sentQuery = query(
-      collection(db, 'pairs'),
-      where('userAId', '==', uid),
-      where('status', '==', 'pending')
-    );
+    // 自分が送った pending 招待
+    const sentQuery = query(collection(db, 'pairs'), where('userAId', '==', uid));
     const unsubscribeSent = onSnapshot(
       sentQuery,
-      (snapshot) => setHasSentInvite(!snapshot.empty),
+      (snapshot) => {
+        const hasPending = snapshot.docs.some((d) => {
+          const s = (d.data() as Record<string, unknown>).status;
+          return s === 'pending';
+        });
+        setHasSentInvite(hasPending);
+      },
       (err) => console.warn('[HomeView] pairs(sent) onSnapshot error:', err)
     );
 
-    const confirmedQuery = query(
-      collection(db, 'pairs'),
-      where('status', '==', 'confirmed'),
-      where('userIds', 'array-contains', uid)
-    );
+    // 自分が含まれるレコードのうち confirmed を抽出
+    const confirmedQuery = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
     const unsubscribeConfirmed = onSnapshot(
       confirmedQuery,
       (snapshot) => {
-        const confirmed = !snapshot.empty;
+        const docConfirmed = snapshot.docs.find(
+          (d) => (d.data() as Record<string, unknown>).status === 'confirmed'
+        );
+        const confirmed = Boolean(docConfirmed);
         setHasPairConfirmed(confirmed);
 
-        if (confirmed) {
-          const d0 = snapshot.docs[0].data() as DocumentData;
+        if (confirmed && docConfirmed) {
+          const d0 = docConfirmed.data() as DocumentData;
           const ids = Array.isArray(d0.userIds) ? (d0.userIds as unknown[]) : [];
           let other =
             (ids.find((x) => typeof x === 'string' && x !== uid) as string | undefined) ??
@@ -227,20 +231,20 @@ export default function HomeView() {
     }
   }, [hasPairConfirmed]);
 
-  // 自分宛の招待受信の購読
+  // 自分宛の招待受信の購読（pending をクライアント側で抽出）
   useEffect(() => {
     const user = auth.currentUser;
     if (!user?.email) return;
 
-    const q = query(
-      collection(db, 'pairs'),
-      where('emailB', '==', user.email),
-      where('status', '==', 'pending')
-    );
-
+    const qPairs = query(collection(db, 'pairs'), where('emailB', '==', user.email));
     const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => setHasPairInvite(!snapshot.empty),
+      qPairs,
+      (snapshot) => {
+        const hasPending = snapshot.docs.some(
+          (d) => (d.data() as Record<string, unknown>).status === 'pending'
+        );
+        setHasPairInvite(hasPending);
+      },
       (err) => console.warn('[HomeView] pairs(invite-received) onSnapshot error:', err)
     );
 
@@ -251,9 +255,9 @@ export default function HomeView() {
   useEffect(() => {
     if (!uid) return;
 
-    const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
+    const qTasks = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
     const unsubscribe = onSnapshot(
-      q,
+      qTasks,
       (snapshot) => {
         const taskList = snapshot.docs.map(mapFirestoreDocToTask);
         setTasks(taskList);
@@ -265,26 +269,16 @@ export default function HomeView() {
     return () => unsubscribe();
   }, [uid]);
 
-  // フラグ付き数の購読
+  // flagged の件数は tasks から導出（別購読を廃止 → 複合インデックス不要）
+  const flaggedTasks = useMemo(
+    () => tasks.filter((t) => t.flagged === true),
+    [tasks]
+  );
   useEffect(() => {
-    if (!uid) return;
+    setFlaggedCount(flaggedTasks.length);
+  }, [flaggedTasks.length]);
 
-    const q = query(
-      collection(db, 'tasks'),
-      where('userIds', 'array-contains', uid),
-      where('flagged', '==', true)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => setFlaggedCount(snapshot.size),
-      (err) => console.warn('[HomeView] flagged tasks onSnapshot error:', err)
-    );
-
-    return () => unsubscribe();
-  }, [uid]);
-
-  // 今週の“ありがとう”集計
+  // 今週の“ありがとう”集計（ownerId 単一 where のみ）
   useEffect(() => {
     if (!uid) return;
 
@@ -305,11 +299,10 @@ export default function HomeView() {
             ? (data.likedBy.filter((x) => typeof x === 'string') as string[])
             : [];
 
-          if (!dateStr) return;
+        if (!dateStr) return;
 
           const dateObj = parseISO(dateStr);
           const inThisWeek = isWithinInterval(dateObj, { start: weekStart, end: weekEnd });
-
           if (!inThisWeek) return;
 
           if (partnerId) {
@@ -327,11 +320,9 @@ export default function HomeView() {
     return () => unsub();
   }, [uid, partnerId]);
 
-  const flaggedTasks = tasks.filter((task) => task.flagged === true);
-
   /* ---------------------------------------
    * カード順序 永続化 & DnD センサー
-   *  ※ 並び替え“対象外”は Flagged と「もう一度説明を見る」
+   *  ※ 並び替え対象外：Flagged と「もう一度説明を見る」
    * -------------------------------------*/
   const HOME_CARD_ORDER_KEY = 'homeCardOrderV1';
   const DEFAULT_ORDER = [
@@ -344,7 +335,7 @@ export default function HomeView() {
     'weeklyPoints',
     'todayDone',
     'ad',
-  ] as const; // ← helpButton を除外
+  ] as const;
   type CardId = (typeof DEFAULT_ORDER)[number];
 
   const [cardOrder, setCardOrder] = useState<CardId[]>(() => {
@@ -369,7 +360,7 @@ export default function HomeView() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 6 }, // 誤操作防止
+      activationConstraint: { distance: 6 },
     })
   );
 
@@ -384,7 +375,7 @@ export default function HomeView() {
     setCardOrder((prev) => arrayMove(prev, oldIndex, newIndex));
   };
 
-  // ▼ DragOverlay/通常描画で使う：ID→“カード本体のみ（つまみ無し）”
+  // ▼ ID → 実体
   const renderCardContent = (id: CardId): ReactNode => {
     switch (id) {
       case 'lineLink':
@@ -411,15 +402,7 @@ export default function HomeView() {
           </div>
         );
       case 'hearts':
-        return (
-          <HeartsProgressCard
-            totalHearts={weeklyThanksCount}
-            isPaired={hasPairConfirmed}
-            title="今週のありがとう"
-            hintText="タップで履歴を見る"
-            navigateTo="/main?view=points&tab=thanks"
-          />
-        );
+        return <HomeDashboardCard />;
       case 'calendar':
         return isLoading ? (
           <div className="space-y-2">
@@ -465,24 +448,7 @@ export default function HomeView() {
           </div>
         ) : null;
       case 'todayDone':
-        return (
-          <TodayCompletedTasksCard
-            tasks={tasks.filter((task) => {
-              if (!task.completedAt) return false;
-              const v = (task as unknown as Record<string, unknown>).completedAt;
-
-              if (v instanceof Timestamp) return isToday(v.toDate());
-              if (v instanceof Date) return isToday(v);
-              if (typeof v === 'string') return isToday(new Date(v));
-
-              try {
-                return isToday(new Date(v as string));
-              } catch {
-                return false;
-              }
-            })}
-          />
-        );
+        return <PartnerCompletedTasksCard />;
       case 'ad':
         return !isChecking && plan === 'free' ? <AdCard /> : null;
       default:
@@ -514,12 +480,12 @@ export default function HomeView() {
             transition={{ duration: 0.4 }}
             className="space-y-1.5"
           >
-            {/* ▼ 固定カード（並び替え対象外：フラグ通知） */}
+            {/* ▼ 並び替え対象外：フラグ通知 */}
             {!isLoading && flaggedCount > 0 && (
               <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />
             )}
 
-            {/* ▼ 並び替え可能なカード群 */}
+            {/* ▼ 並び替え可能ブロック */}
             <DndContext
               sensors={sensors}
               onDragStart={(e) => {
@@ -546,7 +512,7 @@ export default function HomeView() {
               }}
             >
               {(() => {
-                // 1) 表示条件を満たす候補ID集合を作成（helpButton は含めない）
+                // 1) 表示条件に合う候補
                 const candidateSet = new Set<CardId>();
                 if (!isLoading && !isChecking && plan === 'premium' && !isLineLinked) {
                   candidateSet.add('lineLink');
@@ -557,7 +523,7 @@ export default function HomeView() {
                   candidateSet.add('pairInviteNone');
                 }
                 candidateSet.add('expandableInfo');
-                candidateSet.add('hearts');
+                candidateSet.add('hearts');       // 活動サマリー
                 candidateSet.add('calendar');
                 candidateSet.add('weeklyPoints');
                 candidateSet.add('todayDone');
@@ -565,27 +531,39 @@ export default function HomeView() {
                   candidateSet.add('ad');
                 }
 
-                // 2) 現在の order に基づく可視ID配列を算出
-                const visibleIds = cardOrder.filter((id) => candidateSet.has(id));
+                // 2) 実際に描画できるカードだけ抽出
+                const visibleCards = cardOrder
+                  .filter((id) => candidateSet.has(id))
+                  .map((id) => ({ id, node: renderCardContent(id) }))
+                  .filter(
+                    (v): v is { id: CardId; node: ReactNode } =>
+                      v.node !== null && v.node !== false && v.node !== undefined
+                  );
+
+                const visibleIds = visibleCards.map((v) => v.id);
 
                 return (
                   <>
                     <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
                       <div className="space-y-1.5">
-                        {visibleIds.map((id, idx) => (
+                        {visibleCards.map(({ id, node }) => (
                           <div key={id}>
-                            <SortableCard id={id} showGrip={idx !== 0 /* 一番上は つまみ非表示 */}>
-                              {renderCardContent(id)}
+                            {/* ハンドルはこのコンポーネントの内側から出ません */}
+                            <SortableCard id={id} showGrip={true} boundClass="mx-auto w-full max-w-xl">
+                              {node}
                             </SortableCard>
                           </div>
                         ))}
                       </div>
                     </SortableContext>
 
-                    {/* ▼ DragOverlay：つまみ無しの“カード本体のみ”を表示 */}
+                    {/* DragOverlay：実体があるカードのみ */}
                     <DragOverlay>
-                      {activeCardId ? (
-                        <div className="rounded-lg">{renderCardContent(activeCardId as CardId)}</div>
+                      {activeCardId &&
+                      visibleCards.find((v) => v.id === (activeCardId as CardId)) ? (
+                        <div className="rounded-lg">
+                          {visibleCards.find((v) => v.id === (activeCardId as CardId))!.node}
+                        </div>
                       ) : null}
                     </DragOverlay>
                   </>
@@ -593,8 +571,8 @@ export default function HomeView() {
               })()}
             </DndContext>
 
-            {/* ▼ もう一度説明を見る（固定・最下部、並び替え対象外） */}
-            <div className="mt-6 flex justify-center">
+            {/* ▼ もう一度説明を見る（固定・最下部・並び替え対象外／ハンドルなし） */}
+            <div className="mt-6 flex justify-center relative z-0">
               <button
                 onClick={() => setShowOnboarding(true)}
                 className="px-4 py-2 text-sm text-gray-500 underline hover:text-blue-800"

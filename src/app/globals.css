@@ -48,9 +48,9 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-body {
+/* body {
   user-select: none;
-}
+} */
 
 .font-pacifico {
   font-family: var(--font-pacifico), cursive;
