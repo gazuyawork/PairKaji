@@ -7,7 +7,6 @@ import BaseModal from '@/components/common/modals/BaseModal';
 import { auth, db } from '@/lib/firebase';
 import {
   collection,
-  getDocs,
   onSnapshot,
   orderBy,
   query,

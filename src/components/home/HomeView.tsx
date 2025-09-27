@@ -130,7 +130,7 @@ export default function HomeView() {
   const [partnerId, setPartnerId] = useState<string | null>(null);
 
   // 今週「パートナーから自分がもらった」ありがとう（ハート）の件数
-  const [weeklyThanksCount, setWeeklyThanksCount] = useState(0);
+  const [, setWeeklyThanksCount] = useState(0);
 
   // DnD
   const [isDraggingCard, setIsDraggingCard] = useState(false);

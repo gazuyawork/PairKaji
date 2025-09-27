@@ -26,7 +26,7 @@ import { getThisWeekRangeJST } from '@/lib/weeklyRange';
 export default function HomeDashboardCard() {
   const [isHeartsOpen, setHeartsOpen] = useState(false);
   const [isTasksOpen, setTasksOpen] = useState(false);
-  const [isPointsOpen, setPointsOpen] = useState(false); // 既存のポイント履歴導線に合わせて使用
+  const [, setPointsOpen] = useState(false); // 既存のポイント履歴導線に合わせて使用
 
   const [heartCount, setHeartCount] = useState<number | null>(null);
   const [taskCount, setTaskCount] = useState<number | null>(null);
