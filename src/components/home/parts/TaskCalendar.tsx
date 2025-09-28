@@ -8,6 +8,7 @@ import { useRef, useState, useMemo } from 'react';
 import { ja } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
+import { startOfWeek, endOfWeek } from 'date-fns';
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -24,8 +25,11 @@ type Props = {
 };
 
 export default function TaskCalendar({ tasks }: Props) {
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const startToday = startOfDay(today);
 
   // ✅ day の赤線対策：型注釈を明示
@@ -79,7 +83,7 @@ export default function TaskCalendar({ tasks }: Props) {
 
   return (
     <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center mb-3 shadow-md border border-[#e5e5e5]">
-      <h2 className="text-lg font-bold text-[#5E5E5E] mb-4">今後7日間のタスク</h2>
+      <h2 className="text-base font-bold text-[#5E5E5E] mb-4">スケジュール {weekLabel}</h2>
       <div
         className="overflow-x-auto horizontal-scroll"
         ref={containerRef}
@@ -209,15 +213,14 @@ export default function TaskCalendar({ tasks }: Props) {
                           exit="exit"
                           className={`mt-1 text-[12px] rounded px-1.5 py-[3px] font-semibold border border-white/30
                           ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
-                          ${
-                            isOverdue
+                          ${isOverdue
                               ? 'bg-gradient-to-b from-red-300 to-red-500 text-white' // ← 赤系グラデ
                               : isWeeklyTask
                                 ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
                                 : isDateTask
                                   ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
                                   : 'bg-gradient-to-b from-blue-300 to-blue-500 text-white'
-                          }
+                            }
                           `}
                         >
                           {task.name}
