@@ -13,8 +13,6 @@ import {
   onSnapshot,
   doc,
   setDoc,
-  getDoc,
-  getDocs,
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from '@/components/home/parts/EditPointModal';
@@ -46,7 +44,7 @@ export default function PointsMiniCard() {
 
   const [selfTargetPoint, setSelfTargetPoint] = useState<number | null>(null);
   const [partnerTargetPoint, setPartnerTargetPoint] = useState<number | null>(null);
-  const [users, setUsers] = useState<UserInfo[]>([]);
+  const [users, ] = useState<UserInfo[]>([]);
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -144,45 +142,50 @@ export default function PointsMiniCard() {
 
 
   // ユーザー表示用（必要であれば）
+  // 目標（合計/各自）をリアルタイムで購読（あなた＋パートナー）
   useEffect(() => {
-    const fetchUsers = async () => {
-      if (!uid) return;
+    if (!uid) return;
 
-      const userArray: UserInfo[] = [];
+    // すべてのunsubscribeを一括で管理
+    let unsubscribers: Array<() => void> = [];
 
-      const userDocRef = doc(db, 'users', uid);
-      const userSnap = await getDoc(userDocRef);
-      if (userSnap.exists()) {
-        const data = userSnap.data() as any;
-        userArray.push({
-          id: uid,
-          name: data.name ?? '自分',
-          imageUrl: data.imageUrl ?? '/images/default.png',
-        });
-      }
+    (async () => {
+      // 1) あなた自身の目標ポイントを購読
+      const selfRef = doc(db, 'points', uid);
+      const unsubSelf = onSnapshot(selfRef, (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        if (typeof data.weeklyTargetPoint === 'number') setMaxPoints(data.weeklyTargetPoint);
+        if (typeof data.selfPoint === 'number') setSelfTargetPoint(data.selfPoint);
+      });
+      unsubscribers.push(unsubSelf);
 
-      const pairSnap = await getDocs(query(collection(db, 'pairs'), where('userIds', 'array-contains', uid)));
-      if (!pairSnap.empty) {
-        const pairData = pairSnap.docs[0].data() as any;
-        const partnerId = (pairData.userIds as string[]).find((id) => id !== uid);
-        if (partnerId) {
-          const partnerDoc = await getDoc(doc(db, 'users', partnerId));
-          if (partnerDoc.exists()) {
-            const data = partnerDoc.data() as any;
-            userArray.push({
-              id: partnerId,
-              name: data.name ?? 'パートナー',
-              imageUrl: data.imageUrl ?? '/images/default.png',
-            });
+      // 2) パートナーの目標ポイントを購読（存在する場合のみ）
+      //    ※既存のhasPartner算出は別useEffectのまま維持。ここでは購読だけ実施。
+      const pairUids = await fetchPairUserIds(uid);
+      // fetchPairUserIds は「ペア時： [あなたUID, パートナーUID] / 非ペア時：[]」想定
+      const partnerUid = pairUids.find((id) => id !== uid);
+
+      if (partnerUid) {
+        const partnerRef = doc(db, 'points', partnerUid);
+        const unsubPartner = onSnapshot(partnerRef, (snap) => {
+          if (!snap.exists()) {
+            // ドキュメント未作成の可能性もあるため初期化はしない（表示はnull許容）
+            return;
           }
-        }
+          const data = snap.data() as any;
+          if (typeof data.selfPoint === 'number') setPartnerTargetPoint(data.selfPoint);
+        });
+        unsubscribers.push(unsubPartner);
       }
+    })();
 
-      setUsers(userArray);
+    return () => {
+      unsubscribers.forEach((u) => u && u());
+      unsubscribers = [];
     };
-
-    fetchUsers();
   }, [uid]);
+
 
   const total = selfPoints + partnerPoints;
   const selfWidthPct = maxPoints > 0 ? Math.min(100, (selfPoints / maxPoints) * 100) : 0;
