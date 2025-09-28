@@ -98,30 +98,50 @@ export default function PointsMiniCard() {
   }, [uid, weekStart, weekEnd]);
 
   // 目標（合計/各自）を取得
+  // 目標（合計/各自）をリアルタイムで購読（あなた＋パートナー）
   useEffect(() => {
     if (!uid) return;
 
-    (async () => {
-      const partnerUids = await fetchPairUserIds(uid);
-      const allUids = [uid, ...partnerUids];
+    // すべてのunsubscribeを一括で管理
+    let unsubscribers: Array<() => void> = [];
 
-      await Promise.all(
-        allUids.map(async (targetUid) => {
-          const ref = doc(db, 'points', targetUid);
-          const snap = await getDoc(ref);
-          if (snap.exists()) {
-            const data = snap.data() as any;
-            if (targetUid === uid) {
-              if (typeof data.selfPoint === 'number') setSelfTargetPoint(data.selfPoint);
-              if (typeof data.weeklyTargetPoint === 'number') setMaxPoints(data.weeklyTargetPoint);
-            } else {
-              if (typeof data.selfPoint === 'number') setPartnerTargetPoint(data.selfPoint);
-            }
+    (async () => {
+      // 1) あなた自身の目標ポイントを購読
+      const selfRef = doc(db, 'points', uid);
+      const unsubSelf = onSnapshot(selfRef, (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        if (typeof data.weeklyTargetPoint === 'number') setMaxPoints(data.weeklyTargetPoint);
+        if (typeof data.selfPoint === 'number') setSelfTargetPoint(data.selfPoint);
+      });
+      unsubscribers.push(unsubSelf);
+
+      // 2) パートナーの目標ポイントを購読（存在する場合のみ）
+      //    ※既存のhasPartner算出は別useEffectのまま維持。ここでは購読だけ実施。
+      const pairUids = await fetchPairUserIds(uid);
+      // fetchPairUserIds は「ペア時： [あなたUID, パートナーUID] / 非ペア時：[]」想定
+      const partnerUid = pairUids.find((id) => id !== uid);
+
+      if (partnerUid) {
+        const partnerRef = doc(db, 'points', partnerUid);
+        const unsubPartner = onSnapshot(partnerRef, (snap) => {
+          if (!snap.exists()) {
+            // ドキュメント未作成の可能性もあるため初期化はしない（表示はnull許容）
+            return;
           }
-        }),
-      );
+          const data = snap.data() as any;
+          if (typeof data.selfPoint === 'number') setPartnerTargetPoint(data.selfPoint);
+        });
+        unsubscribers.push(unsubPartner);
+      }
     })();
+
+    return () => {
+      unsubscribers.forEach((u) => u && u());
+      unsubscribers = [];
+    };
   }, [uid]);
+
 
   // ユーザー表示用（必要であれば）
   useEffect(() => {
@@ -253,9 +273,9 @@ export default function PointsMiniCard() {
         onSave={handleSave}
         // ルーレット等はミニカードでは扱わない前提
         rouletteOptions={['ご褒美A', 'ご褒美B', 'ご褒美C']}
-        setRouletteOptions={() => {}}
+        setRouletteOptions={() => { }}
         rouletteEnabled={true}
-        setRouletteEnabled={() => {}}
+        setRouletteEnabled={() => { }}
         users={users}
       />
     </>

@@ -3,17 +3,17 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
-import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
+// import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-import { ChevronDown, Info, GripVertical } from 'lucide-react';
+import { ChevronDown, GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 import AdCard from '@/components/home/parts/AdCard';
-import LineLinkCard from '@/components/home/parts/LineLinkCard';
+// import LineLinkCard from '@/components/home/parts/LineLinkCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import OnboardingModal from '@/components/common/OnboardingModal';
@@ -114,7 +114,7 @@ export default function HomeView() {
   const [hasPairConfirmed, setHasPairConfirmed] = useState(false);
   const [flaggedCount, setFlaggedCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [isWeeklyPointsHidden, setIsWeeklyPointsHidden] = useState(false);
+  const [, setIsWeeklyPointsHidden] = useState(false);
   const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
 
   const { plan, isChecking } = useUserPlan();
@@ -332,7 +332,7 @@ export default function HomeView() {
     'expandableInfo',
     'hearts',
     'calendar',
-    'weeklyPoints',
+    // 'weeklyPoints',
     'todayDone',
     'ad',
   ] as const;
@@ -378,8 +378,8 @@ export default function HomeView() {
   // ▼ ID → 実体
   const renderCardContent = (id: CardId): ReactNode => {
     switch (id) {
-      case 'lineLink':
-        return <LineLinkCard />;
+      // case 'lineLink':
+      //   return <LineLinkCard />;
       case 'pairInvite':
         return <PairInviteCard mode="invite-received" />;
       case 'pairInviteNone':
@@ -421,32 +421,32 @@ export default function HomeView() {
             }))}
           />
         );
-      case 'weeklyPoints':
-        return isLoading ? (
-          <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
-        ) : !isWeeklyPointsHidden ? (
-          <div className="relative">
-            <WeeklyPoints />
-            {!hasPairConfirmed && (
-              <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4 mx-auto w-full max-w-xl">
-                <button
-                  onClick={() => {
-                    localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
-                    setIsWeeklyPointsHidden(true);
-                  }}
-                  className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
-                  aria-label="閉じる"
-                >
-                  ×
-                </button>
-                <p className="text-md font-semibold text-center flex items-center gap-1">
-                  <Info className="w-4 h-4 text-gray-700" />
-                  パートナー設定完了後に使用できます。
-                </p>
-              </div>
-            )}
-          </div>
-        ) : null;
+      // case 'weeklyPoints':
+      //   return isLoading ? (
+      //     <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
+      //   ) : !isWeeklyPointsHidden ? (
+      //     <div className="relative">
+      //       <WeeklyPoints />
+      //       {!hasPairConfirmed && (
+      //         <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4 mx-auto w-full max-w-xl">
+      //           <button
+      //             onClick={() => {
+      //               localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
+      //               setIsWeeklyPointsHidden(true);
+      //             }}
+      //             className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
+      //             aria-label="閉じる"
+      //           >
+      //             ×
+      //           </button>
+      //           <p className="text-md font-semibold text-center flex items-center gap-1">
+      //             <Info className="w-4 h-4 text-gray-700" />
+      //             パートナー設定完了後に使用できます。
+      //           </p>
+      //         </div>
+      //       )}
+      //     </div>
+      //   ) : null;
       case 'todayDone':
         return <PartnerCompletedTasksCard />;
       case 'ad':
@@ -525,7 +525,7 @@ export default function HomeView() {
                 candidateSet.add('expandableInfo');
                 candidateSet.add('hearts');       // 活動サマリー
                 candidateSet.add('calendar');
-                candidateSet.add('weeklyPoints');
+                // candidateSet.add('weeklyPoints');
                 candidateSet.add('todayDone');
                 if (!isLoading && !isChecking && plan === 'free') {
                   candidateSet.add('ad');

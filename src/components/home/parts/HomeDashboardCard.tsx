@@ -18,8 +18,13 @@ import {
 } from 'firebase/firestore';
 import { getThisWeekRangeJST } from '@/lib/weeklyRange';
 import PointsMiniCard from './parts_internal/PointsMiniCard';
+import { startOfWeek, endOfWeek, format } from 'date-fns';
 
 export default function HomeDashboardCard() {
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
   const [isHeartsOpen, setHeartsOpen] = useState(false);
   const [isTasksOpen, setTasksOpen] = useState(false);
 
@@ -78,7 +83,7 @@ export default function HomeDashboardCard() {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 max-w-3xl m-auto">
       <div className="mb-3">
-        <h2 className="text-base font-semibold text-gray-800 text-center">活動記録</h2>
+        <h2 className="text-base font-semibold text-gray-800 text-center">活動記録 {weekLabel}</h2>
       </div>
 
       <div className="grid grid-cols-3 gap-3 items-stretch">
