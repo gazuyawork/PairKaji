@@ -115,19 +115,19 @@ export default function HomeDashboardCard() {
 
       <div className="grid grid-cols-3 gap-3">
         <CardMini
-          icon={<Heart className="w-4 h-4" />}
+          icon={<Heart className="w-4 h-4 text-rose-400" />}
           label="ありがとう"
           value={loading ? '—' : `${heartCount}`}
           onClick={() => setHeartsOpen(true)}
         />
         <CardMini
-          icon={<CheckCircle className="w-4 h-4" />}
+          icon={<CheckCircle className="w-4 h-4 text-green-400" />}
           label="タスク"
           value={loading ? '—' : `${taskCount}`}
           onClick={() => setTasksOpen(true)}
         />
         <CardMini
-          icon={<Star className="w-4 h-4" />}
+          icon={<Star className="w-4 h-4 text-yellow-400" />}
           label="ポイント"
           value={loading ? '—' : `${pointSum}`}
           onClick={() => setPointsOpen(true)}
