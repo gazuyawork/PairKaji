@@ -4,33 +4,39 @@
 import React from 'react';
 
 type CardMiniProps = {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
+  label: string;                // 項目名
+  value: string;                // 数値文字列
   onClick?: () => void;
+  bgClass?: string;             // 背景色クラス
+  valueIcon?: React.ReactNode;  // 数値用アイコン
 };
 
-export function CardMini({ icon, label, value, onClick }: CardMiniProps) {
+export function CardMini({ label, value, onClick, bgClass, valueIcon }: CardMiniProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 transition text-center"
+      className={[
+        'group flex w-full flex-col items-center justify-center rounded-xl',
+        'p-3 ring-1 ring-gray-200/60 hover:ring-gray-300 transition',
+        bgClass ?? 'bg-gray-50',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
+        'text-center',
+      ].join(' ')}
     >
-      {/* アイコンとラベルを中央揃えで横並び */}
-      <div className="flex items-center gap-2 text-gray-700 justify-center">
-        <span className="rounded-md border border-gray-300 bg-white p-1 group-hover:shadow-sm">
-          {icon}
-        </span>
-        <span className="text-xs">{label}</span>
-      </div>
+      {/* 項目名（中央揃え） */}
+      <div className="text-xs font-medium text-gray-700">{label}</div>
 
-      {/* 数値も中央揃え */}
-      <div className="mt-3 text-xl font-semibold tracking-tight text-gray-900">
-        {value}
+      {/* 数値行：アイコン × 数値（中央揃え） */}
+      <div className="mt-2 flex items-center justify-center gap-1 text-gray-900">
+        {valueIcon && (
+          <span className="inline-flex items-center justify-center">
+            {valueIcon}
+          </span>
+        )}
+        <span className="text-sm leading-none">×</span>
+        <span className="text-xl font-semibold leading-none tracking-tight">{value}</span>
       </div>
-
-      {/* <div className="mt-1 text-[10px] text-gray-500">タップで履歴</div> */}
     </button>
   );
 }
