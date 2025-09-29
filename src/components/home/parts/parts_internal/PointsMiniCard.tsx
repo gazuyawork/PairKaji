@@ -44,25 +44,42 @@ export default function PointsMiniCard() {
 
   const [selfTargetPoint, setSelfTargetPoint] = useState<number | null>(null);
   const [partnerTargetPoint, setPartnerTargetPoint] = useState<number | null>(null);
-  const [users, ] = useState<UserInfo[]>([]);
+  const [users] = useState<UserInfo[]>([]);
+
+  // 追加: 集計対象UID（自分 or 自分+パートナー）をリアルタイム維持
+  const [targetIds, setTargetIds] = useState<string[]>([]);
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
 
-  // 今週のユーザー/パートナーのポイント合計を監視
-// 今週のユーザー/パートナーのポイント合計を監視（date 文字列 / completedAt Timestamp 両対応）
-useEffect(() => {
-  if (!uid) return;
+  // 追加: pairs を購読して targetIds / hasPartner をリアルタイム更新
+  useEffect(() => {
+    if (!uid) return;
 
-  let unsubscribe: (() => void) | null = null;
+    setTargetIds([uid]); // 初期値：自分のみ
 
-  (async () => {
-    const partnerUids = await fetchPairUserIds(uid);
-    setHasPartner(partnerUids.length > 1);
+    const pairsQ = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
+    const unsubscribe = onSnapshot(pairsQ, (snap) => {
+      if (snap.empty) {
+        setHasPartner(false);
+        setTargetIds([uid]);
+        return;
+      }
+      const data = snap.docs[0].data() as any;
+      const arr = Array.isArray(data.userIds) ? (data.userIds as string[]) : [uid];
+      const unique = Array.from(new Set(arr));
+      setHasPartner(unique.length > 1);
+      setTargetIds(unique);
+    });
 
-    const userIdsToQuery = partnerUids.length > 0 ? partnerUids : [uid];
+    return () => unsubscribe();
+  }, [uid]);
+
+  // 今週のユーザー/パートナーのポイント合計を監視（userId / userIds 両対応 & 再購読、date 文字列 / completedAt Timestamp 両対応）
+  useEffect(() => {
+    if (!uid || targetIds.length === 0) return;
 
     // 週の境界（JSTローカル）をミリ秒で比較
     const weekStartMs = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 0).getTime();
@@ -91,126 +108,103 @@ useEffect(() => {
       return false;
     };
 
-    unsubscribe = onSnapshot(
-      query(collection(db, 'taskCompletions'), where('userId', 'in', userIdsToQuery)),
-      (snapshot) => {
-        let bufferSelf = 0;
-        let bufferPartner = 0;
+    const col = collection(db, 'taskCompletions');
+    const acc = new Map<string, any>(); // 重複排除用のバッファ
 
-        snapshot.docs.forEach((docSnap) => {
-          const data = docSnap.data() as any;
-          const point = Number(data.point ?? 0);
-          const userId = data.userId as string;
+    const recompute = () => {
+      let bufferSelf = 0;
+      let bufferPartner = 0;
 
-          if (withinWeek(data)) {
-            if (userId === uid) bufferSelf += point;
-            else bufferPartner += point;
-          }
-        });
+      acc.forEach((data) => {
+        if (!withinWeek(data)) return;
+        const point = Number(data.point ?? 0);
 
-        setSelfPoints(bufferSelf);
-        setPartnerPoints(bufferPartner);
-      },
-    );
-  })();
+        // ownerId の決定: userId を優先、なければ userIds が単一ならそれを採用
+        const ownerId: string | undefined =
+          typeof data.userId === 'string'
+            ? data.userId
+            : (Array.isArray(data.userIds) && data.userIds.length === 1 ? data.userIds[0] : data.userId);
 
-  return () => {
-    if (unsubscribe) unsubscribe();
-  };
-}, [uid, weekStart, weekEnd]);
+        if (!ownerId) return;
 
+        if (ownerId === uid) bufferSelf += point;
+        else bufferPartner += point;
+      });
 
-  // 目標（合計/各自）を取得
+      setSelfPoints(bufferSelf);
+      setPartnerPoints(bufferPartner);
+    };
+
+    const unsubs: Array<() => void> = [];
+
+    // A) 従来スキーマ: userId in targetIds（最大10件）
+    if (targetIds.length > 0 && targetIds.length <= 10) {
+      const qA = query(col, where('userId', 'in', targetIds));
+      unsubs.push(
+        onSnapshot(qA, (snap) => {
+          snap.docChanges().forEach((ch) => {
+            if (ch.type === 'removed') acc.delete(ch.doc.id);
+            else acc.set(ch.doc.id, { id: ch.doc.id, ...(ch.doc.data() as any) });
+          });
+          recompute();
+        })
+      );
+    }
+
+    // B) 拡張スキーマ: userIds array-contains-any targetIds（最大10件）
+    if (targetIds.length > 0 && targetIds.length <= 10) {
+      const qB = query(col, where('userIds', 'array-contains-any', targetIds));
+      unsubs.push(
+        onSnapshot(qB, (snap) => {
+          snap.docChanges().forEach((ch) => {
+            if (ch.type === 'removed') acc.delete(ch.doc.id);
+            else acc.set(ch.doc.id, { id: ch.doc.id, ...(ch.doc.data() as any) });
+          });
+          recompute();
+        })
+      );
+    }
+
+    return () => {
+      unsubs.forEach((u) => u && u());
+    };
+  }, [uid, targetIds, weekStart, weekEnd]);
+
   // 目標（合計/各自）をリアルタイムで購読（あなた＋パートナー）
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || targetIds.length === 0) return;
 
-    // すべてのunsubscribeを一括で管理
     let unsubscribers: Array<() => void> = [];
 
-    (async () => {
-      // 1) あなた自身の目標ポイントを購読
-      const selfRef = doc(db, 'points', uid);
-      const unsubSelf = onSnapshot(selfRef, (snap) => {
+    // あなた自身
+    const selfRef = doc(db, 'points', uid);
+    const unsubSelf = onSnapshot(selfRef, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data() as any;
+      if (typeof data.weeklyTargetPoint === 'number') setMaxPoints(data.weeklyTargetPoint);
+      if (typeof data.selfPoint === 'number') setSelfTargetPoint(data.selfPoint);
+    });
+    unsubscribers.push(unsubSelf);
+
+    // パートナー（targetIds から自分以外を抽出）
+    const partnerUid = targetIds.find((id) => id !== uid);
+    if (partnerUid) {
+      const partnerRef = doc(db, 'points', partnerUid);
+      const unsubPartner = onSnapshot(partnerRef, (snap) => {
         if (!snap.exists()) return;
         const data = snap.data() as any;
-        if (typeof data.weeklyTargetPoint === 'number') setMaxPoints(data.weeklyTargetPoint);
-        if (typeof data.selfPoint === 'number') setSelfTargetPoint(data.selfPoint);
+        if (typeof data.selfPoint === 'number') setPartnerTargetPoint(data.selfPoint);
       });
-      unsubscribers.push(unsubSelf);
-
-      // 2) パートナーの目標ポイントを購読（存在する場合のみ）
-      //    ※既存のhasPartner算出は別useEffectのまま維持。ここでは購読だけ実施。
-      const pairUids = await fetchPairUserIds(uid);
-      // fetchPairUserIds は「ペア時： [あなたUID, パートナーUID] / 非ペア時：[]」想定
-      const partnerUid = pairUids.find((id) => id !== uid);
-
-      if (partnerUid) {
-        const partnerRef = doc(db, 'points', partnerUid);
-        const unsubPartner = onSnapshot(partnerRef, (snap) => {
-          if (!snap.exists()) {
-            // ドキュメント未作成の可能性もあるため初期化はしない（表示はnull許容）
-            return;
-          }
-          const data = snap.data() as any;
-          if (typeof data.selfPoint === 'number') setPartnerTargetPoint(data.selfPoint);
-        });
-        unsubscribers.push(unsubPartner);
-      }
-    })();
+      unsubscribers.push(unsubPartner);
+    } else {
+      setPartnerTargetPoint(null);
+    }
 
     return () => {
       unsubscribers.forEach((u) => u && u());
       unsubscribers = [];
     };
-  }, [uid]);
-
-
-  // ユーザー表示用（必要であれば）
-  // 目標（合計/各自）をリアルタイムで購読（あなた＋パートナー）
-  useEffect(() => {
-    if (!uid) return;
-
-    // すべてのunsubscribeを一括で管理
-    let unsubscribers: Array<() => void> = [];
-
-    (async () => {
-      // 1) あなた自身の目標ポイントを購読
-      const selfRef = doc(db, 'points', uid);
-      const unsubSelf = onSnapshot(selfRef, (snap) => {
-        if (!snap.exists()) return;
-        const data = snap.data() as any;
-        if (typeof data.weeklyTargetPoint === 'number') setMaxPoints(data.weeklyTargetPoint);
-        if (typeof data.selfPoint === 'number') setSelfTargetPoint(data.selfPoint);
-      });
-      unsubscribers.push(unsubSelf);
-
-      // 2) パートナーの目標ポイントを購読（存在する場合のみ）
-      //    ※既存のhasPartner算出は別useEffectのまま維持。ここでは購読だけ実施。
-      const pairUids = await fetchPairUserIds(uid);
-      // fetchPairUserIds は「ペア時： [あなたUID, パートナーUID] / 非ペア時：[]」想定
-      const partnerUid = pairUids.find((id) => id !== uid);
-
-      if (partnerUid) {
-        const partnerRef = doc(db, 'points', partnerUid);
-        const unsubPartner = onSnapshot(partnerRef, (snap) => {
-          if (!snap.exists()) {
-            // ドキュメント未作成の可能性もあるため初期化はしない（表示はnull許容）
-            return;
-          }
-          const data = snap.data() as any;
-          if (typeof data.selfPoint === 'number') setPartnerTargetPoint(data.selfPoint);
-        });
-        unsubscribers.push(unsubPartner);
-      }
-    })();
-
-    return () => {
-      unsubscribers.forEach((u) => u && u());
-      unsubscribers = [];
-    };
-  }, [uid]);
-
+  }, [uid, targetIds]);
 
   const total = selfPoints + partnerPoints;
   const selfWidthPct = maxPoints > 0 ? Math.min(100, (selfPoints / maxPoints) * 100) : 0;
