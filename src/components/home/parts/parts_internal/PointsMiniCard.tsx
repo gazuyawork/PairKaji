@@ -52,48 +52,73 @@ export default function PointsMiniCard() {
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
 
   // 今週のユーザー/パートナーのポイント合計を監視
-  useEffect(() => {
-    if (!uid) return;
+// 今週のユーザー/パートナーのポイント合計を監視（date 文字列 / completedAt Timestamp 両対応）
+useEffect(() => {
+  if (!uid) return;
 
-    let unsubscribe: (() => void) | null = null;
+  let unsubscribe: (() => void) | null = null;
 
-    (async () => {
-      const partnerUids = await fetchPairUserIds(uid);
-      setHasPartner(partnerUids.length > 1);
+  (async () => {
+    const partnerUids = await fetchPairUserIds(uid);
+    setHasPartner(partnerUids.length > 1);
 
-      const userIdsToQuery = partnerUids.length > 0 ? partnerUids : [uid];
+    const userIdsToQuery = partnerUids.length > 0 ? partnerUids : [uid];
 
-      const weekStartISO = weekStart.toISOString().split('T')[0];
-      const weekEndISO = weekEnd.toISOString().split('T')[0];
+    // 週の境界（JSTローカル）をミリ秒で比較
+    const weekStartMs = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 0).getTime();
+    const weekEndMs   = new Date(weekEnd.getFullYear(),   weekEnd.getMonth(),   weekEnd.getDate(),   23, 59, 59, 999).getTime();
 
-      unsubscribe = onSnapshot(
-        query(collection(db, 'taskCompletions'), where('userId', 'in', userIdsToQuery)),
-        (snapshot) => {
-          let bufferSelf = 0;
-          let bufferPartner = 0;
-
-          snapshot.docs.forEach((docSnap) => {
-            const data = docSnap.data() as any;
-            const date = data.date as string;
-            const point = Number(data.point ?? 0);
-            const userId = data.userId as string;
-
-            if (date >= weekStartISO && date <= weekEndISO) {
-              if (userId === uid) bufferSelf += point;
-              else bufferPartner += point;
-            }
-          });
-
-          setSelfPoints(bufferSelf);
-          setPartnerPoints(bufferPartner);
-        },
-      );
-    })();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
+    const withinWeek = (data: any): boolean => {
+      // 1) completedAt（Timestamp or string）優先
+      if (data?.completedAt) {
+        const v = data.completedAt;
+        // Firestore Timestamp
+        if (typeof v?.toDate === 'function') {
+          const t = v.toDate().getTime();
+          return t >= weekStartMs && t <= weekEndMs;
+        }
+        // 文字列（ISO/日付）として入っている場合もケア
+        if (typeof v === 'string') {
+          const t = new Date(`${v}T00:00:00+09:00`).getTime();
+          return t >= weekStartMs && t <= weekEndMs;
+        }
+      }
+      // 2) 後方互換：date (YYYY-MM-DD) での保存にも対応
+      if (typeof data?.date === 'string') {
+        const t = new Date(`${data.date}T00:00:00+09:00`).getTime();
+        return t >= weekStartMs && t <= weekEndMs;
+      }
+      return false;
     };
-  }, [uid, weekStart, weekEnd]);
+
+    unsubscribe = onSnapshot(
+      query(collection(db, 'taskCompletions'), where('userId', 'in', userIdsToQuery)),
+      (snapshot) => {
+        let bufferSelf = 0;
+        let bufferPartner = 0;
+
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as any;
+          const point = Number(data.point ?? 0);
+          const userId = data.userId as string;
+
+          if (withinWeek(data)) {
+            if (userId === uid) bufferSelf += point;
+            else bufferPartner += point;
+          }
+        });
+
+        setSelfPoints(bufferSelf);
+        setPartnerPoints(bufferPartner);
+      },
+    );
+  })();
+
+  return () => {
+    if (unsubscribe) unsubscribe();
+  };
+}, [uid, weekStart, weekEnd]);
+
 
   // 目標（合計/各自）を取得
   // 目標（合計/各自）をリアルタイムで購読（あなた＋パートナー）
