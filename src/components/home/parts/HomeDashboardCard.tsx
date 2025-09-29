@@ -11,7 +11,7 @@ import { Heart, CheckCircle } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import {
   collection,
-  getCountFromServer,
+  onSnapshot, // ← リアルタイム購読（変更点）
   query,
   where,
   Timestamp,
@@ -25,6 +25,7 @@ export default function HomeDashboardCard() {
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
+
   const [isHeartsOpen, setHeartsOpen] = useState(false);
   const [isTasksOpen, setTasksOpen] = useState(false);
 
@@ -36,49 +37,54 @@ export default function HomeDashboardCard() {
     [heartCount, taskCount],
   );
 
+  // ✅ 週範囲（JST）をメモ化して購読の依存を安定化
+  const { start: weekStartJst, end: weekEndJst } = useMemo(() => getThisWeekRangeJST(), []);
+  const weekStartTs = useMemo(() => Timestamp.fromDate(weekStartJst), [weekStartJst]);
+  const weekEndTs   = useMemo(() => Timestamp.fromDate(weekEndJst),   [weekEndJst]);
+
+  // ✅ 単発集計（getCountFromServer）→ リアルタイム購読（onSnapshot）に変更
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const { start, end } = getThisWeekRangeJST();
-
-    // ありがとう集計
-    (async () => {
-      try {
-        const col = collection(db, 'hearts');
-        const q1 = query(
-          col,
-          where('createdAt', '>=', Timestamp.fromDate(start)),
-          where('createdAt', '<', Timestamp.fromDate(end)),
-          where('participants', 'array-contains', user.uid),
-        );
-        const agg = await getCountFromServer(q1);
-        setHeartCount(agg.data().count);
-      } catch (e) {
-        console.error('fetch hearts count error:', e);
+    // ありがとう（hearts）リアルタイム購読
+    const heartsQ = query(
+      collection(db, 'hearts'),
+      where('createdAt', '>=', weekStartTs),
+      where('createdAt', '<',  weekEndTs),
+      where('participants', 'array-contains', user.uid),
+    );
+    const unsubHearts = onSnapshot(
+      heartsQ,
+      (snap) => setHeartCount(snap.size),
+      (e) => {
+        console.error('hearts onSnapshot error:', e);
         setHeartCount(0);
       }
-    })();
+    );
 
-    // タスク集計
-    (async () => {
-      try {
-        const col = collection(db, 'tasks');
-        const q2 = query(
-          col,
-          where('done', '==', true),
-          where('completedAt', '>=', Timestamp.fromDate(start)),
-          where('completedAt', '<', Timestamp.fromDate(end)),
-          where('userIds', 'array-contains', user.uid),
-        );
-        const agg2 = await getCountFromServer(q2);
-        setTaskCount(agg2.data().count);
-      } catch (e) {
-        console.error('fetch tasks count error:', e);
+    // タスク（tasks）リアルタイム購読
+    const tasksQ = query(
+      collection(db, 'tasks'),
+      where('done', '==', true),
+      where('completedAt', '>=', weekStartTs),
+      where('completedAt', '<',  weekEndTs),
+      where('userIds', 'array-contains', user.uid),
+    );
+    const unsubTasks = onSnapshot(
+      tasksQ,
+      (snap) => setTaskCount(snap.size),
+      (e) => {
+        console.error('tasks onSnapshot error:', e);
         setTaskCount(0);
       }
-    })();
-  }, []);
+    );
+
+    return () => {
+      unsubHearts();
+      unsubTasks();
+    };
+  }, [weekStartTs, weekEndTs]);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 max-w-3xl m-auto">
