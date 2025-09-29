@@ -88,13 +88,63 @@ export default function EditPointModal({
     return !hasAtLeastOne || hasEmpty;
   };
 
+  // 設定UIの開閉（デフォルト非表示）
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+
+  // ===== 追加：ユーザー別割当 =====
+  const [alloc, setAlloc] = useState<Record<string, number>>({});
+
+  // 合計計算のヘルパー
+  const sumAlloc = useMemo(
+    () =>
+      Object.values(alloc).reduce((a, b) => a + (Number.isFinite(b) ? Number(b) : 0), 0),
+    [alloc],
+  );
+
+  // 初期化 & 目標変更時の再配分（自分に selfPoint、最初の相手に残り）
+  useEffect(() => {
+    if (!isOpen || !users?.length) return;
+
+    // 自分のID（なければ先頭を自分扱い）
+    const meUid = auth.currentUser?.uid;
+    const selfId = users.find((u) => u.id === meUid)?.id ?? users[0].id;
+
+    const selfVal = Math.min(selfPoint, point);
+    let remaining = Math.max(point - selfVal, 0);
+
+    const next: Record<string, number> = {};
+    users.forEach((u) => {
+      if (u.id === selfId) {
+        next[u.id] = selfVal;
+      } else if (remaining > 0) {
+        next[u.id] = remaining; // 最初の相手に残り全て
+        remaining = 0;
+      } else {
+        next[u.id] = 0;
+      }
+    });
+    setAlloc(next);
+  }, [isOpen, users, point, selfPoint]);
+
+  // alloc が変わったら selfPoint に同期（既存 onSave(total, selfPoint) を維持）
+  useEffect(() => {
+    if (!users?.length) return;
+    const meUid = auth.currentUser?.uid;
+    const selfId = users.find((u) => u.id === meUid)?.id ?? users[0].id;
+    const val = alloc[selfId];
+    if (typeof val === 'number' && Number.isFinite(val)) {
+      setSelfPoint(val);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alloc, users]);
+
   const handleSave = async () => {
     if (point < 1) {
       setError('1以上の数値を入力してください');
       return;
     }
-    if (selfPoint > point) {
-      setError('目標値以下で入力してください');
+    if (sumAlloc !== point) {
+      setError(`内訳の合計 (${sumAlloc}pt) が目標ポイント (${point}pt) と一致しません`);
       return;
     }
     if (invalidRouletteConditions()) {
@@ -107,7 +157,7 @@ export default function EditPointModal({
 
     await handleSavePoints(
       point,
-      selfPoint,
+      selfPoint, // alloc から同期済み
       // rouletteEnabled,
       // rouletteOptions,
       onSave,
@@ -125,7 +175,27 @@ export default function EditPointModal({
     setPoint(value);
     const half = Math.floor(value / 2);
     const extra = value % 2;
-    setSelfPoint(half + extra);
+    const nextSelf = half + extra;
+    setSelfPoint(nextSelf);
+
+    // alloc も同様に自動再配分（自分に nextSelf、最初の相手に残り）
+    if (!users?.length) return;
+    const meUid = auth.currentUser?.uid;
+    const selfId = users.find((u) => u.id === meUid)?.id ?? users[0].id;
+
+    let remaining = Math.max(value - nextSelf, 0);
+    const nextAlloc: Record<string, number> = {};
+    users.forEach((u) => {
+      if (u.id === selfId) {
+        nextAlloc[u.id] = nextSelf;
+      } else if (remaining > 0) {
+        nextAlloc[u.id] = remaining;
+        remaining = 0;
+      } else {
+        nextAlloc[u.id] = 0;
+      }
+    });
+    setAlloc(nextAlloc);
   };
 
   // ===== 追加：ポイントの週次集計（自分 vs パートナー） =====
@@ -148,8 +218,6 @@ export default function EditPointModal({
       end: endOfWeek(base, { weekStartsOn: 1 }),
     };
   }, [weekOffset]);
-
-  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // パートナーIDを購読
   useEffect(() => {
@@ -197,9 +265,9 @@ export default function EditPointModal({
     const { start, end } = weekBounds;
 
     const qSelf = query(
-      collection(db, 'points'), // ←★プロジェクトのコレクション名に合わせて変更可
-      where('userId', '==', user.uid), // ←★ユーザーフィールド名を調整可
-      where('createdAt', '>=', Timestamp.fromDate(start)), // ←★日時フィールド名を調整可
+      collection(db, 'points'), // ← 実コレクション名/フィールド名はプロジェクトに合わせて調整可能
+      where('userId', '==', user.uid),
+      where('createdAt', '>=', Timestamp.fromDate(start)),
       where('createdAt', '<=', Timestamp.fromDate(end)),
     );
 
@@ -209,7 +277,7 @@ export default function EditPointModal({
         const list: PointDoc[] = [];
         snap.forEach((doc) => {
           const d = doc.data() as DocumentData;
-          const p = Number(d.point ?? 0); // ←★ポイント値フィールド名を調整可
+          const p = Number(d.point ?? 0);
           const at = d.createdAt ? (d.createdAt as Timestamp).toDate() : null;
           if (!at) return;
           list.push({ id: doc.id, point: p, date: at });
@@ -298,8 +366,8 @@ export default function EditPointModal({
       sPartner.push(perDayPartner[k] ?? 0);
     }
 
-    const daysCount = dayKeys.filter((k) => (perDaySelf[k] ?? 0) + (perDayPartner[k] ?? 0) > 0)
-      .length;
+    const daysCount =
+      dayKeys.filter((k) => (perDaySelf[k] ?? 0) + (perDayPartner[k] ?? 0) > 0).length;
     const label = `${format(start, 'M/d')} - ${format(end, 'M/d')}`;
 
     return {
@@ -313,7 +381,7 @@ export default function EditPointModal({
     };
   }, [selfPoints, partnerPoints, weekBounds]);
 
-  // 前週比（合計値のみ）
+  // 前週比（合計値）
   const [prevWeekTotals, setPrevWeekTotals] = useState<{ self: number; partner: number }>({
     self: 0,
     partner: 0,
@@ -401,7 +469,7 @@ export default function EditPointModal({
           <p className="text-sm text-gray-500 font-sans mt-1">無理のない程度で目標を設定しましょう</p>
         </div>
 
-        {/* タイトル直下のブロック（「目標ポイントを設定」「無理のない程度…」）の直後に追記 */}
+        {/* 設定トグル */}
         <div className="flex items-center justify-center">
           <button
             type="button"
@@ -411,12 +479,6 @@ export default function EditPointModal({
             {showSettings ? '設定を隠す' : 'ポイント設定を開く'}
           </button>
         </div>
-
-
-        {/* 目標ポイント入力（既存） */}
-        {showSettings && (
-          <PointInputRow point={point} onChange={handlePointChange} onAuto={handleAuto} />
-        )}
 
         {/* ▼▼▼ 追加：今週のポイント集計（自分 vs 相手） ▼▼▼ */}
         <div className="rounded-md border border-gray-200 p-3">
@@ -467,8 +529,8 @@ export default function EditPointModal({
                 (dtS === 'up'
                   ? 'bg-green-50 text-green-700'
                   : dtS === 'down'
-                    ? 'bg-red-50 text-red-700'
-                    : 'bg-gray-50 text-gray-600')
+                  ? 'bg-red-50 text-red-700'
+                  : 'bg-gray-50 text-gray-600')
               }
               title={`先週(自分): ${prevWeekTotals.self} pt`}
             >
@@ -489,8 +551,8 @@ export default function EditPointModal({
                 (dtP === 'up'
                   ? 'bg-green-50 text-green-700'
                   : dtP === 'down'
-                    ? 'bg-red-50 text-red-700'
-                    : 'bg-gray-50 text-gray-600')
+                  ? 'bg-red-50 text-red-700'
+                  : 'bg-gray-50 text-gray-600')
               }
               title={`先週(相手): ${prevWeekTotals.partner} pt`}
             >
@@ -557,14 +619,18 @@ export default function EditPointModal({
         </div>
         {/* ▲▲▲ 追加：今週のポイント集計 ▲▲▲ */}
 
-        {/* 既存：内訳入力（自分/相手） */}
+        {/* 設定：ポイント入力（折りたたみ） */}
+        {showSettings && (
+          <PointInputRow point={point} onChange={handlePointChange} onAuto={handleAuto} />
+        )}
+
+        {/* 設定：内訳（折りたたみ） */}
         {showSettings && (
           <div className="flex mt-2">
             <p className="text-gray-600 font-bold pt-2 pl-2 pr-4">内訳</p>
-            <div className="flex justify-center gap-6">
-              {users.map((user, index) => {
-                const isSelf = index === 0;
-                return (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-6">
+                {users?.map((user) => (
                   <div key={user.id} className="flex items-center gap-2">
                     <Image
                       src={user.imageUrl || '/images/default.png'}
@@ -573,19 +639,29 @@ export default function EditPointModal({
                       height={40}
                       className="rounded-full w-[40px] h-[40px] object-cover aspect-square border border-gray-300"
                     />
-                    <input
-                      type="number"
-                      min={0}
-                      max={point}
-                      value={isSelf ? selfPoint : point - selfPoint}
-                      onChange={(e) => isSelf && setSelfPoint(Number(e.target.value))}
-                      disabled={!isSelf}
-                      className={`w-16 text-xl border-b border-gray-300 outline-none text-center text-gray-700 ${!isSelf ? 'bg-gray-100' : ''}`}
-                    />
-                    <span className="text-gray-600">pt</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={point}
+                        value={alloc[user.id] ?? 0}
+                        onChange={(e) => {
+                          const raw = Number(e.target.value);
+                          const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                          setAlloc((prev) => ({ ...prev, [user.id]: val }));
+                        }}
+                        className="w-20 text-xl border-b border-gray-300 outline-none text-center text-gray-700"
+                      />
+                      <span className="text-gray-600">pt</span>
+                    </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+
+              {/* 合計のヘルパー表示 */}
+              <div className="text-xs text-gray-500">
+                合計: <span className="font-semibold">{sumAlloc}</span>/{point} pt
+              </div>
             </div>
           </div>
         )}
