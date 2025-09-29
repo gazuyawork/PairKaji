@@ -161,7 +161,7 @@ export default function BaseModal({
                 className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
                 disabled={isSaving || saveComplete}
               >
-                キャンセル
+                閉じる
               </button>
             </div>
           )}

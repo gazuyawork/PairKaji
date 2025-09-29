@@ -783,45 +783,47 @@ export default function TodoNoteModal({
   const showPreviewToggle = hasContent;
 
   return (
+    // 修正後（該当箇所のみ）
     <BaseModal
       isOpen={isOpen}
       isSaving={isSaving}
       saveComplete={saveComplete}
       onClose={onClose}
-      onSaveClick={isPreview ? undefined : handleSave}
-      saveLabel={isPreview ? undefined : saveLabel}
+      onSaveClick={handleSave}          // ← いつでも保存可能に
+      saveLabel={saveLabel}             // ← いつでもラベル表示
       hideActions={false}
     >
-{/* ヘッダー行 */}
-<div className="flex items-start justify-between ml-2 mr-1">
-  {/* todo名は複数行OK・折返し表示 */}
-  <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">
-    {todoText}
-  </h1>
 
-  {showPreviewToggle && (
-    <button
-      type="button"
-      onClick={() => setIsPreview((v) => !v)}
-      className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition flex-shrink-0"
-      aria-pressed={isPreview}
-      aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
-      title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
-    >
-      {isPreview ? (
-        <>
-          <Pencil size={16} />
-          <span>編集</span>
-        </>
-      ) : (
-        <>
-          <Eye size={16} />
-          <span>プレビュー</span>
-        </>
-      )}
-    </button>
-  )}
-</div>
+      {/* ヘッダー行 */}
+      <div className="flex items-start justify-between ml-2 mr-1">
+        {/* todo名は複数行OK・折返し表示 */}
+        <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">
+          {todoText}
+        </h1>
+
+        {showPreviewToggle && (
+          <button
+            type="button"
+            onClick={() => setIsPreview((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition flex-shrink-0"
+            aria-pressed={isPreview}
+            aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+            title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+          >
+            {isPreview ? (
+              <>
+                <Pencil size={16} />
+                <span>編集</span>
+              </>
+            ) : (
+              <>
+                <Eye size={16} />
+                <span>プレビュー</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
 
 
       {/* 画像挿入UI */}
@@ -877,34 +879,36 @@ export default function TodoNoteModal({
       </div>
 
       {/* textarea（備考） */}
-      {showMemo && (
-        <div className="relative pr-8 mt-4">
-          <textarea
-            ref={memoRef}
-            data-scrollable="true"
-            onScroll={onTextareaScroll}
-            value={memo}
-            rows={1}
-            placeholder="備考を入力"
-            onChange={(e) => setMemo(e.target.value)}
-            onTouchMove={(e) => e.stopPropagation()}
-            readOnly={isPreview}
-            aria-readonly={isPreview}
-            className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-          />
+      {
+        showMemo && (
+          <div className="relative pr-8 mt-4">
+            <textarea
+              ref={memoRef}
+              data-scrollable="true"
+              onScroll={onTextareaScroll}
+              value={memo}
+              rows={1}
+              placeholder="備考を入力"
+              onChange={(e) => setMemo(e.target.value)}
+              onTouchMove={(e) => e.stopPropagation()}
+              readOnly={isPreview}
+              aria-readonly={isPreview}
+              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+            />
 
-          {isIOS && showScrollHint && (
-            <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-              <ChevronDown size={16} className="text-white" />
-            </div>
-          )}
-          {isIOS && showScrollUpHint && (
-            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-              <ChevronUp size={16} className="text-white" />
-            </div>
-          )}
-        </div>
-      )}
+            {isIOS && showScrollHint && (
+              <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+                <ChevronDown size={16} className="text-white" />
+              </div>
+            )}
+            {isIOS && showScrollUpHint && (
+              <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+                <ChevronUp size={16} className="text-white" />
+              </div>
+            )}
+          </div>
+        )
+      }
 
       {/* ▼▼▼ 参考URL（プレビュー時は「追加項目」を非表示にする） ▼▼▼ */}
       <div className="mt-2 ml-2">
@@ -974,151 +978,157 @@ export default function TodoNoteModal({
       {/* ▲▲▲ 参考URLここまで ▲▲▲ */}
 
       {/* ★ 旅行カテゴリ：時間帯入力（開始〜終了 + 所要分） */}
-      {category === '旅行' && (
-        <div className="mt-4 ml-2">
-          <h3 className="font-medium">時間帯</h3>
-          <div className="flex items-center gap-2 mt-1">
-            {/* 開始 */}
-            <div className="relative">
-              {isPreview ? (
-                <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                  {timeStart || '— —'}
-                </span>
-              ) : (
-                <input
-                  type="time"
-                  value={timeStart}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTimeStart(v);
-
-                    // ★ 修正: 所要分が入っていれば自動で終了を更新
-                    const n = Number.parseInt(durationMin, 10);
-                    if (Number.isFinite(n) && n > 0) {
-                      const autoEnd = addMinutesToHHmm(v, n);
-                      setTimeEnd(autoEnd);
-                      setTimeError(validateTimeRange(v, autoEnd));
-                    } else {
-                      setTimeError(validateTimeRange(v, timeEnd));
-                    }
-
-                    // ★ 追加: すでに終了が入っている場合、所要分を開始～終了差で同期
-                    const diff2 = minutesBetweenHHmm(v, timeEnd);
-                    if (diff2 != null) {
-                      setDurationMin(String(diff2));
-                    }
-                  }}
-                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
-                  aria-label="開始時刻"
-                />
-              )}
-            </div>
-
-            <span className="text-gray-500">~</span>
-
-            {/* 終了 */}
-            <div className="relative">
-              {isPreview ? (
-                <>
+      {
+        category === '旅行' && (
+          <div className="mt-4 ml-2">
+            <h3 className="font-medium">時間帯</h3>
+            <div className="flex items-center gap-2 mt-1">
+              {/* 開始 */}
+              <div className="relative">
+                {isPreview ? (
                   <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                    {timeEnd || '— —'}
+                    {timeStart || '— —'}
                   </span>
-                  {/* ★ 追加: プレビュー時のみ所要時間を併記（有効な時間帯かつエラーなし時） */}
-                  {previewDurationMin !== null && !timeError && (
-                    <span className="ml-2 text-gray-700">
-                      （所要時間：{previewDurationMin}分）
-                    </span>
-                  )}
-                </>
-              ) : (
-                <input
-                  type="time"
-                  value={timeEnd}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTimeEnd(v);
-                    setTimeError(validateTimeRange(timeStart, v));
+                ) : (
+                  <input
+                    type="time"
+                    value={timeStart}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTimeStart(v);
 
-                    // （既存）終了手入力時に所要分を同期
-                    const diff = minutesBetweenHHmm(timeStart, v);
-                    if (diff != null) {
-                      setDurationMin(String(diff));
-                    }
-                  }}
-                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
-                  aria-label="終了時刻"
-                />
-              )}
+                      // ★ 修正: 所要分が入っていれば自動で終了を更新
+                      const n = Number.parseInt(durationMin, 10);
+                      if (Number.isFinite(n) && n > 0) {
+                        const autoEnd = addMinutesToHHmm(v, n);
+                        setTimeEnd(autoEnd);
+                        setTimeError(validateTimeRange(v, autoEnd));
+                      } else {
+                        setTimeError(validateTimeRange(v, timeEnd));
+                      }
 
-            </div>
-
-            {/* ★ 追加: 終了の右隣に「所要（分）」入力（DB保存なし） */}
-            {!isPreview && (
-              <div className="flex items-center gap-1 ml-2">
-                <span className="text-gray-500 text-sm">所要</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  step={1}
-                  value={durationMin}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/[^\d]/g, '');
-                    setDurationMin(v);
-                    const n = Number.parseInt(v, 10);
-                    // 開始が妥当 & 所要分が正のとき、終了を自動計算
-                    if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
-                      const autoEnd = addMinutesToHHmm(timeStart, n);
-                      setTimeEnd(autoEnd);
-                      setTimeError(validateTimeRange(timeStart, autoEnd));
-                    } else {
-                      setTimeError(validateTimeRange(timeStart, timeEnd));
-                    }
-                  }}
-                  placeholder="分"
-                  className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
-                  aria-label="所要時間（分）"
-                />
-                <span className="text-gray-500 text-sm">分</span>
+                      // ★ 追加: すでに終了が入っている場合、所要分を開始～終了差で同期
+                      const diff2 = minutesBetweenHHmm(v, timeEnd);
+                      if (diff2 != null) {
+                        setDurationMin(String(diff2));
+                      }
+                    }}
+                    className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                    aria-label="開始時刻"
+                  />
+                )}
               </div>
-            )}
+
+              <span className="text-gray-500">~</span>
+
+              {/* 終了 */}
+              <div className="relative">
+                {isPreview ? (
+                  <>
+                    <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                      {timeEnd || '— —'}
+                    </span>
+                    {/* ★ 追加: プレビュー時のみ所要時間を併記（有効な時間帯かつエラーなし時） */}
+                    {previewDurationMin !== null && !timeError && (
+                      <span className="ml-2 text-gray-700">
+                        （所要時間：{previewDurationMin}分）
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <input
+                    type="time"
+                    value={timeEnd}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTimeEnd(v);
+                      setTimeError(validateTimeRange(timeStart, v));
+
+                      // （既存）終了手入力時に所要分を同期
+                      const diff = minutesBetweenHHmm(timeStart, v);
+                      if (diff != null) {
+                        setDurationMin(String(diff));
+                      }
+                    }}
+                    className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                    aria-label="終了時刻"
+                  />
+                )}
+
+              </div>
+
+              {/* ★ 追加: 終了の右隣に「所要（分）」入力（DB保存なし） */}
+              {!isPreview && (
+                <div className="flex items-center gap-1 ml-2">
+                  <span className="text-gray-500 text-sm">所要</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    value={durationMin}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^\d]/g, '');
+                      setDurationMin(v);
+                      const n = Number.parseInt(v, 10);
+                      // 開始が妥当 & 所要分が正のとき、終了を自動計算
+                      if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
+                        const autoEnd = addMinutesToHHmm(timeStart, n);
+                        setTimeEnd(autoEnd);
+                        setTimeError(validateTimeRange(timeStart, autoEnd));
+                      } else {
+                        setTimeError(validateTimeRange(timeStart, timeEnd));
+                      }
+                    }}
+                    placeholder="分"
+                    className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
+                    aria-label="所要時間（分）"
+                  />
+                  <span className="text-gray-500 text-sm">分</span>
+                </div>
+              )}
+            </div>
+            {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
           </div>
-          {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
-        </div>
-      )}
+        )
+      }
 
       {/* 買い物カテゴリ */}
-      {category === '買い物' && (
-        <ShoppingDetailsEditor
-          price={price}
-          quantity={quantity}
-          unit={unit}
-          compareMode={compareMode}
-          comparePrice={comparePrice}
-          compareQuantity={compareQuantity}
-          onChangePrice={setPrice}
-          onChangeQuantity={setQuantity}
-          onChangeUnit={setUnit}
-          onToggleCompareMode={(next) => setCompareMode(next)}
-          onChangeComparePrice={setComparePrice}
-          onChangeCompareQuantity={setCompareQuantity}
-          animatedDifference={animatedDifference}
-          animationComplete={diffAnimationComplete}
-          isPreview={isPreview}
-          onRequestEditMode={() => setIsPreview(false)}
-        />
-      )}
+      {
+        category === '買い物' && (
+          <ShoppingDetailsEditor
+            price={price}
+            quantity={quantity}
+            unit={unit}
+            compareMode={compareMode}
+            comparePrice={comparePrice}
+            compareQuantity={compareQuantity}
+            onChangePrice={setPrice}
+            onChangeQuantity={setQuantity}
+            onChangeUnit={setUnit}
+            onToggleCompareMode={(next) => setCompareMode(next)}
+            onChangeComparePrice={setComparePrice}
+            onChangeCompareQuantity={setCompareQuantity}
+            animatedDifference={animatedDifference}
+            animationComplete={diffAnimationComplete}
+            isPreview={isPreview}
+            onRequestEditMode={() => setIsPreview(false)}
+          />
+        )
+      }
 
       {/* 料理カテゴリ */}
-      {category === '料理' && (
-        <RecipeEditor
-          ref={recipeEditorRef}
-          headerNote=""
-          value={recipe}
-          onChange={handleRecipeChange}
-          isPreview={isPreview}
-        />
-      )}
-    </BaseModal>
+      {
+        category === '料理' && (
+          <RecipeEditor
+            ref={recipeEditorRef}
+            headerNote=""
+            value={recipe}
+            onChange={handleRecipeChange}
+            isPreview={isPreview}
+          />
+        )
+      }
+    </BaseModal >
   );
 }
