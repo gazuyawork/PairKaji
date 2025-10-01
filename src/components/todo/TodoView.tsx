@@ -669,8 +669,10 @@ export default function TodoView() {
                 );
               })}
 
-              {/* 仕切り（縦線） */}
-              <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+              {/* 仕切り（縦線）: カテゴリが1件以上ある場合のみ表示 */}
+              {availableCategories.length > 0 && (
+                <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+              )}
 
               {/* 検索表示トグル（虫眼鏡） */}
               <button

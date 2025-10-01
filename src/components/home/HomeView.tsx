@@ -73,7 +73,7 @@ function SortableCard({
     id,
   });
 
-  const style: React.CSSProperties = {
+    const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0 : 1,
@@ -100,6 +100,28 @@ function SortableCard({
           )}
           <div className="rounded-lg">{children}</div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** ★追加: ペア未確定時にカード内を非活性化するラッパー（DnDハンドルは有効のまま） */
+function DisabledCardWrapper({
+  children,
+  message = 'ペア設定完了後に利用できます。',
+}: {
+  children: ReactNode;
+  message?: string;
+}) {
+  return (
+    <div className="relative">
+      {/* 中身は操作不可 */}
+      <div className="pointer-events-none opacity-60 grayscale">
+        {children}
+      </div>
+      {/* 説明オーバーレイ（ハンドルより下のz-indexにしてドラッグは妨げない） */}
+      <div className="absolute inset-0 rounded-lg bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-0">
+        <span className="text-sm text-gray-700">{message}</span>
       </div>
     </div>
   );
@@ -299,7 +321,7 @@ export default function HomeView() {
             ? (data.likedBy.filter((x) => typeof x === 'string') as string[])
             : [];
 
-        if (!dateStr) return;
+          if (!dateStr) return;
 
           const dateObj = parseISO(dateStr);
           const inThisWeek = isWithinInterval(dateObj, { start: weekStart, end: weekEnd });
@@ -375,6 +397,9 @@ export default function HomeView() {
     setCardOrder((prev) => arrayMove(prev, oldIndex, newIndex));
   };
 
+  /** ★追加: ペア未確定かどうかの共通フラグ */
+  const isPairInactive = !hasPairConfirmed;
+
   // ▼ ID → 実体
   const renderCardContent = (id: CardId): ReactNode => {
     switch (id) {
@@ -401,8 +426,15 @@ export default function HomeView() {
             </div>
           </div>
         );
-      case 'hearts':
-        return <HomeDashboardCard />;
+      case 'hearts': {
+        // ★変更: ペア未確定なら非活性表示（DnDハンドルは有効）
+        const node = <HomeDashboardCard />;
+        return isPairInactive ? (
+          <DisabledCardWrapper message="ペア設定完了後に利用できます。">
+            {node}
+          </DisabledCardWrapper>
+        ) : node;
+      }
       case 'calendar':
         return isLoading ? (
           <div className="space-y-2">
@@ -447,8 +479,15 @@ export default function HomeView() {
       //       )}
       //     </div>
       //   ) : null;
-      case 'todayDone':
-        return <PartnerCompletedTasksCard />;
+      case 'todayDone': {
+        // ★変更: ペア未確定なら非活性表示（DnDハンドルは有効）
+        const node = <PartnerCompletedTasksCard />;
+        return isPairInactive ? (
+          <DisabledCardWrapper message="ペア設定完了後に利用できます。">
+            {node}
+          </DisabledCardWrapper>
+        ) : node;
+      }
       case 'ad':
         return !isChecking && plan === 'free' ? <AdCard /> : null;
       default:
