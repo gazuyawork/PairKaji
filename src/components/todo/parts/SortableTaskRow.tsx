@@ -60,7 +60,7 @@ export default function SortableTaskRow({ task, onClickTitle, onHide }: Props) {
           {/* カテゴリ表示 */}
           <div className="flex items-center gap-1.5 shrink-0">
             <RowIcon size={16} className={rowColor} aria-label={`${rowLabel} カテゴリ`} />
-            <span className="text-xs text-gray-500">{rowLabel}</span>
+            {/* <span className="text-xs text-gray-500">{rowLabel}</span> */}
           </div>
 
           {/* タイトル */}

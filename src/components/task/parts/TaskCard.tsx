@@ -63,6 +63,7 @@ type Props = {
   deletingTaskId: string | null;
   onSwipeLeft: (taskId: string) => void;
   onSkip?: (taskId: string) => void;
+  isDragging?: boolean;
 };
 
 export default function TaskCard({
@@ -76,6 +77,7 @@ export default function TaskCard({
   onSwipeLeft,
   deletingTaskId,
   onSkip,
+  isDragging,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -296,12 +298,23 @@ export default function TaskCard({
           setShowActionButtons(true);
         }}
         className={clsx(
-          'w-full relative flex justify-between items-center px-2.5 py-2 rounded-2xl shadow-xs border overflow-hidden border-2',
+          // 新しいベースクラス
+          'w-full relative flex justify-between items-center px-2.5 py-2 overflow-hidden [touch-action:pan-y] cursor-pointer',
+
+          // 両方のデザイン統合
+          'group text-[#5E5E5E]',
+          'rounded-xl border border-gray-200 border-[#e5e5e5]',
+          'bg-gradient-to-b from-white to-gray-50 bg-white',
+          'shadow-[0_2px_1px_rgba(0,0,0,0.08)] hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)] hover:shadow-md',
+          'transition-all duration-300 will-change-transform',
+          'active:translate-y-[1px]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCB7D]/50',
+
+          // 状態による動的クラス
           task.done && 'opacity-50 scale-[0.99]',
-          'hover:shadow-md cursor-pointer',
-          'border-[#e5e5e5] bg-white',
-          '[touch-action:pan-y]'
+          isDragging && 'opacity-70'
         )}
+
       >
         {/* TODOバッジ（左上） */}
         {task.visible && (
@@ -523,11 +536,11 @@ export default function TaskCard({
                 </button>
               </div>
 
-{/* ★ 変更：URLをクリック可能に */}
-<LinkifiedText
-  text={(task as Task & { note?: string }).note?.trim() || ''}
-  className="whitespace-pre-wrap break-words text-[15px] leading-6 text-gray-700"
-/>
+              {/* ★ 変更：URLをクリック可能に */}
+              <LinkifiedText
+                text={(task as Task & { note?: string }).note?.trim() || ''}
+                className="whitespace-pre-wrap break-words text-[15px] leading-6 text-gray-700"
+              />
 
             </div>
           </div>,
