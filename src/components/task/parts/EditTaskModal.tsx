@@ -693,6 +693,13 @@ export default function EditTaskModal({
                 </option>
               ))}
             </select>
+
+            {/* ★ 追加: 0pt 選択時の補足表示 */}
+            {(((editedTask as unknown as { point?: number }).point ?? 0) === 0) && (
+              <span className="ml-2 text-xs text-gray-500 whitespace-nowrap">
+                （ポイントを使用しない）
+              </span>
+            )}
           </div>
         )}
 
@@ -735,22 +742,22 @@ export default function EditTaskModal({
             <div className="flex items-center gap-3 mt-2">
               <span className="text-sm text-gray-600 flex items-center">
                 プライベート
-  <HelpPopover
-    className="ml-1"
-    content={
-      <div className="space-y-2">
-        <p>
-          プライベートをオンにすると、このタスクは
-          <span className="font-semibold">自分だけ</span>の管理対象になります。
-        </p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>パートナーの画面には表示されません。</li>
-          <li>ポイント付与や担当者の選択は無効化されます。</li>
-          <li>後から共有に戻すこともできます。</li>
-        </ul>
-      </div>
-    }
-  />
+                <HelpPopover
+                  className="ml-1"
+                  content={
+                    <div className="space-y-2">
+                      <p>
+                        プライベートをオンにすると、このタスクは
+                        <span className="font-semibold">自分だけ</span>の管理対象になります。
+                      </p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>パートナーの画面には表示されません。</li>
+                        <li>ポイント付与や担当者の選択は無効化されます。</li>
+                        <li>後から共有に戻すこともできます。</li>
+                      </ul>
+                    </div>
+                  }
+                />
                 ：
               </span>
               <button
