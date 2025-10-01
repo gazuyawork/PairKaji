@@ -38,7 +38,8 @@ type Mode = 'all' | 'received' | 'given';
 
 /* =========================================================
    HeartGarden: 「ありがとう」が増えるほど“育つ”ミニガーデン
-   - growthHeight: 茎の高さ（%）
+   - ratio: 0〜1 の成長率（scaleYに使用／クランプ）
+   - heightPct: 見出しなどの表記用（%）
    - leaves: 葉っぱ数（しきい値で増える）
    - blossom: ハートの花が咲く（前週超え or ストリークしきい値）
    ========================================================= */
@@ -53,17 +54,22 @@ function HeartGarden({
   streak: number;
   burstKey: number;
 }) {
-  // 成長ロジック：今週カウントをベースに高さ・葉・花を決める
+  // 成長ロジック：今週カウントをベースに高さ・葉・花を決める（安全にクランプ）
   const growth = useMemo(() => {
     const base = totalThisWeek;
-    // 高さ（%）：最低20%から、カウントに応じて最大100%まで
-    const heightPct = Math.min(100, 20 + base * 6); // 0→20%、1→26%...
-    // 葉っぱは段階的に増える（1,3,5,7,9,11 で増加）
-    const thresholds = [1, 3, 5, 7, 9, 11];
+
+    // 20% を基準、1件ごとに +6%（最大100%でクランプ）
+    const ratio = Math.min(1, 0.2 + base * 0.06);
+    const heightPct = Math.round(ratio * 100);
+
+    // 葉っぱはやさしめの段階（1,2,4,6,8,10 で増加）
+    const thresholds = [1, 2, 4, 6, 8, 10];
     const leaves = thresholds.filter((t) => base >= t).length;
+
     // 花（ハート）は「前週超え」or「ストリーク3日以上」で咲く
     const blossom = base > totalPrevWeek || streak >= 3;
-    return { heightPct, leaves, blossom };
+
+    return { ratio, heightPct, leaves, blossom };
   }, [totalThisWeek, totalPrevWeek, streak]);
 
   const leafSlots = Array.from({ length: growth.leaves });
@@ -95,23 +101,38 @@ function HeartGarden({
           }}
         />
 
-        {/* 茎（伸びる） */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[3px] rounded-t-full"
+        {/* 茎トラック（固定高さ） */}
+        <div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[3px] rounded-t-full origin-bottom"
           style={{
-            background: 'linear-gradient(to right, rgb(16 185 129 / 90%), rgb(16 185 129 / 75%))',
-            boxShadow:
-              'inset 0 0 0 1px rgba(255,255,255,.3), 0 0 0 1px rgba(16,185,129,.15)',
+            // 土台(8px=2rem)ぶんを差し引いて、必ず収まる高さ領域を確保
+            height: 'calc(100% - 2rem)',
+            background: 'linear-gradient(to right, rgb(16 185 129 / 20%), rgb(16 185 129 / 20%))',
+            boxShadow: 'inset 0 0 0 1px rgba(16,185,129,.12)',
           }}
-          initial={{ height: 0 }}
-          animate={{ height: `${growth.heightPct}%` }}
-          transition={{ type: 'spring', stiffness: 120, damping: 22 }}
-        />
+        >
+          {/* 伸びる実体（scaleYで0→1。ratioで上限1にクランプ済み） */}
+          <motion.div
+            className="w-full h-full rounded-t-full origin-bottom"
+            style={{
+              background: 'linear-gradient(to right, rgb(16 185 129 / 95%), rgb(16 185 129 / 78%))',
+              boxShadow:
+                'inset 0 0 0 1px rgba(255,255,255,.3), 0 0 0 1px rgba(16,185,129,.15)',
+            }}
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: growth.ratio }}
+            transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+          />
+        </div>
 
-        {/* 葉っぱ（段階的に出現） */}
+        {/* 葉っぱ（左右交互・向き反転・ゆらゆら） */}
         {leafSlots.map((_, i) => {
           const side = i % 2 === 0 ? -1 : 1; // 左右交互
           const y = 12 + i * 16; // 下からの位置
+          const baseDeg = 12 + (i % 3); // 12〜14°
+          const rotate = side * baseDeg;
+          const mirror = side < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+
           return (
             <AnimatePresence key={`leaf-${i}`}>
               <motion.div
@@ -122,10 +143,20 @@ function HeartGarden({
                 className="absolute"
                 style={{
                   bottom: `${y}px`,
-                  left: `calc(50% + ${side * 9}px)`,
+                  left: `calc(50% + ${side * 10}px)`,
                 }}
               >
-                <Leaf className="w-4 h-4 text-emerald-500 drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]" />
+                {/* 親で鏡像・回転、子で translateY の“ゆらゆら”だけを付与して干渉を回避 */}
+                <div
+                  style={{
+                    transform: `${mirror} rotate(${rotate}deg)`,
+                    transformOrigin: side < 0 ? 'right center' : 'left center',
+                  }}
+                >
+                  <div className="leaf-bob">
+                    <Leaf className="w-4 h-4 text-emerald-500 drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]" />
+                  </div>
+                </div>
               </motion.div>
             </AnimatePresence>
           );
@@ -137,7 +168,12 @@ function HeartGarden({
             <motion.div
               key={`blossom-${burstKey}`}
               className="absolute"
-              style={{ bottom: `${growth.heightPct + 14}%`, left: '50%', transform: 'translateX(-50%)' }}
+              style={{
+                // 茎の先端＋少し上に配置しつつ、最大 96% で突き抜け防止
+                bottom: `${Math.min(growth.heightPct + 12, 96)}%`,
+                left: '50%',
+                transform: 'translateX(-50%)',
+              }}
               initial={{ opacity: 0, scale: 0.6, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: -6 }}
@@ -611,7 +647,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
           <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm text-gray-600">日別の推移</div>
-              <div className="flex items-center gap-3 text-[11px] text-gray-600">
+              <div className="flex items中心 gap-3 text-[11px] text-gray-600">
                 <span className="inline-flex items-center gap-1">
                   <span className="inline-block h-3 w-3 rounded-sm bg-rose-500/80" />
                   今週
@@ -700,7 +736,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
         </>
       )}
 
-      {/* スタイル：背景のハートきらめき（控えめに） */}
+      {/* スタイル：背景のハートきらめき（控えめに）＋ 葉のゆらぎ */}
       <style jsx>{`
         .floating-hearts {
           position: absolute;
@@ -715,6 +751,16 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
           0% { transform: translateY(0) scale(1); filter: saturate(1); }
           50% { transform: translateY(-3px) scale(1.005); filter: saturate(0.95); }
           100% { transform: translateY(0) scale(1); filter: saturate(1); }
+        }
+
+        /* 葉の“ゆらゆら”は子要素だけで translateY を付与（親の transform とは独立させる） */
+        .leaf-bob {
+          animation: leafBob 3.6s ease-in-out infinite;
+        }
+        @keyframes leafBob {
+          0%   { transform: translateY(0); }
+          50%  { transform: translateY(-1px); }
+          100% { transform: translateY(0); }
         }
       `}</style>
     </BaseModal>
