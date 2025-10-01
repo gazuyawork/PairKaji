@@ -71,7 +71,7 @@ function FloatingHearts({
     return Array.from({ length: n }).map((_, i) => {
       // 枠内の 6%〜94%（端に少し余白）でランダム配置
       const leftPct = 6 + Math.random() * 88;  // 6〜94%
-      const topPct = 8 + Math.random() * 84;  // 8〜92%
+      const topPct  = 8 + Math.random() * 84;  // 8〜92%
 
       // 漂いアニメ（長め）
       const dur = 10 + Math.random() * 8;      // 10〜18s
@@ -409,11 +409,8 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       {/* 成長イラスト + 最小カウンタ（説明文なし）
           ★ この枠内（div）をハートの可動領域とします（relative + overflow-hidden） */}
       <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden">
-        {/* 枠全体にふわふわハートを散らす（吸収後 or 変化なしの場合） */}
-        {showDrift && <FloatingHearts count={totalReceived} fadeInKey={driftKey} />}
-
         {/* 中央にステージ画像。吸収アニメはこの画像に向けて実施 */}
-        <div className="relative" style={{ width: 144, height: 144 }}>
+        <div className="relative z-0" style={{ width: 144, height: 144 }}>
           <StageImage
             stage={stage}
             sources={HEART_GARDEN_IMAGES as [string, string, string, string]}
@@ -424,6 +421,13 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
             <HeartNutrientFlow count={feedCount} targetSize={144} active={feedActive} />
           )}
         </div>
+
+        {/* 枠全体にふわふわハートを散らす（画像より前面に表示） */}
+        {showDrift && (
+          <div className="absolute inset-0 z-10">
+            <FloatingHearts count={totalReceived} fadeInKey={driftKey} />
+          </div>
+        )}
 
         {/* 数字のみ（ラベル最小化） */}
         <div className="flex items-center gap-6 text-base">
