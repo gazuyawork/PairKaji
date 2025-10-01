@@ -29,15 +29,6 @@ export default function RequireAuth({ children }: Props) {
     };
   }, []);
 
-  // 初回マウント直後：currentUser を即時確認して強制遷移
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const isPublic = PUBLIC_PATHS.has(pathname || '');
-    if (!isPublic && !auth.currentUser) {
-      window.location.replace(`/login?next=${encodeURIComponent(pathname || '/')}&reauth=1`);
-    }
-  }, [pathname]);
-
   // onAuthStateChanged でも未ログインを強制遷移（握りつぶし防止に window.location.replace）
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -62,6 +53,7 @@ export default function RequireAuth({ children }: Props) {
     return () => unsubscribe();
   }, [pathname]);
 
+  // ロード中はローディング画面
   if (!ready) {
     return (
       <div className="flex h-screen items-center justify-center">
