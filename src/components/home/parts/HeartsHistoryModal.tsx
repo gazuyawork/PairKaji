@@ -18,6 +18,7 @@ import { X, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUserUid } from '@/hooks/useUserUid';
 import StageImage from './StageImage';
 import PreloadHeartGardenImages from './PreloadHeartGardenImages';
+import HeartNutrientFlow from './HeartNutrientFlow';
 
 type Props = { isOpen: boolean; onClose: () => void };
 
@@ -49,6 +50,92 @@ function resolveStage(totalThisWeek: number): 0 | 1 | 2 | 3 {
   return 0;
 }
 
+/* =========================================================
+   枠の中を“ふわふわ”飛び回るハート（受け取った合計ぶんを表示）
+   - パフォーマンス配慮で最大 24 個に制限
+   - 親要素（枠）の中に絶対配置（inset-0）して、枠全体に散布
+   - 点滅（ゆっくり）+ 漂い（広めの可動域）
+   ========================================================= */
+function FloatingHearts({
+  count,
+  fadeInKey = 0,
+}: {
+  count: number;
+  fadeInKey?: number; // アニメ開始のキー（吸収→表示の切替タイミングで更新）
+}) {
+  const MAX = 24;
+  const n = Math.min(Math.max(count, 0), MAX);
+
+  // ハート毎のランダム・パラメータを安定生成（枠全体に散布）
+  const seeds = useMemo(() => {
+    return Array.from({ length: n }).map((_, i) => {
+      // 枠内の 6%〜94%（端に少し余白）でランダム配置
+      const leftPct = 6 + Math.random() * 88;  // 6〜94%
+      const topPct = 8 + Math.random() * 84;  // 8〜92%
+
+      // 漂いアニメ（長め）
+      const dur = 10 + Math.random() * 8;      // 10〜18s
+      const delay = Math.random() * 2;         // 0〜2s
+
+      // ゆっくり点滅（心拍のように）
+      const blinkDur = 3.5 + Math.random() * 3.5; // 3.5〜7s
+      const blinkDelay = Math.random() * 1.2;     // 0〜1.2s
+
+      const scale = 0.7 + Math.random() * 0.6; // 0.7〜1.3
+      return { id: `${fadeInKey}-${i}`, leftPct, topPct, dur, delay, blinkDur, blinkDelay, scale };
+    });
+  }, [n, fadeInKey]);
+
+  if (n === 0) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      {seeds.map((s) => (
+        <span
+          key={s.id}
+          className="absolute float-heart will-change-transform"
+          style={{
+            left: `${s.leftPct}%`,
+            top: `${s.topPct}%`,
+            animationDuration: `${s.dur}s, 0.6s, ${s.blinkDur}s`,
+            animationDelay: `${s.delay}s, 0s, ${0.6 + s.blinkDelay}s`,
+            transform: `translate(-50%, -50%) scale(${s.scale})`,
+            opacity: 0,
+          }}
+        >
+          <Heart className="w-4 h-4 text-rose-400/80" />
+        </span>
+      ))}
+
+      {/* スタイル：広い可動域のドリフト + フェードイン + ゆっくり点滅 */}
+      <style jsx>{`
+        .float-heart {
+          animation-name: heartDrift, heartFadeIn, heartBlink;
+          animation-timing-function: ease-in-out, ease-out, ease-in-out;
+          animation-iteration-count: infinite, 1, infinite;
+          animation-fill-mode: both, forwards, both;
+        }
+        @keyframes heartDrift {
+          0%   { transform: translate(calc(-50% +   0px), calc(-50% +   0px))  scale(1.00) rotate( 0deg); }
+          25%  { transform: translate(calc(-50% + +28px), calc(-50% -  36px))  scale(1.06) rotate( 8deg); }
+          50%  { transform: translate(calc(-50% +   0px), calc(-50% -  56px))  scale(0.97) rotate(-9deg); }
+          75%  { transform: translate(calc(-50% -  32px), calc(-50% -  22px))  scale(1.04) rotate( 7deg); }
+          100% { transform: translate(calc(-50% +   0px), calc(-50% +   0px))  scale(1.00) rotate( 0deg); }
+        }
+        @keyframes heartFadeIn {
+          0%   { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        @keyframes heartBlink {
+          0%   { opacity: 0.60; }
+          50%  { opacity: 1.00; }
+          100% { opacity: 0.60; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   const uid = useUserUid();
 
@@ -62,7 +149,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   // 送った側（相手のタスクに自分が「ありがとう」した）
   const [rawLikesGiven, setRawLikesGiven] = useState<LikeDoc[]>([]);
 
-  // 週切替（0=今週, -1=先週）
+  // 週切替（0=今週, -1=先週 など）
   const [weekOffset, setWeekOffset] = useState<number>(0);
 
   /* パートナーIDの取得 */
@@ -201,7 +288,76 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     };
   }, [rawLikesReceived, rawLikesGiven, weekBounds, partnerId, uid]);
 
-  const stage = resolveStage(totalReceived + totalGiven);
+  // ステージ（合計：受+送）
+  const totalThisWeek = totalReceived + totalGiven;
+  const stage = resolveStage(totalThisWeek);
+
+  /* =========================================================
+     「開いた時」に新規でもらっていれば → 吸収アニメ → ふわふわ表示
+     - localStorage に週ごとの「最後に見た受け取り合計」を記録
+     - 週移動（過去週）では吸収アニメは無効
+     ========================================================= */
+  const lastSeenKey = useMemo(() => {
+    const s = format(weekBounds.start, 'yyyy-MM-dd');
+    const e = format(weekBounds.end, 'yyyy-MM-dd');
+    return `hhm_last_seen_received_${s}_${e}`;
+  }, [weekBounds]);
+
+  // 吸収アニメ用
+  const [feedCount, setFeedCount] = useState(0);
+  const [feedActive, setFeedActive] = useState(false);
+
+  // ふわふわ表示のフェードインキー（吸収後に更新して、気持ちよく現れる）
+  const [driftKey, setDriftKey] = useState(0);
+
+  // モーダルを開いたときのみ判定（週オフセット 0 のみ）
+  useEffect(() => {
+    if (!isOpen) return;
+    if (weekOffset !== 0) {
+      setFeedActive(false);
+      setFeedCount(0);
+      // 過去週：吸収アニメなし、ただちにふわふわ表示
+      setDriftKey((k) => k + 1);
+      return;
+    }
+
+    let last = 0;
+    try {
+      const raw = localStorage.getItem(lastSeenKey);
+      if (raw) last = Math.max(0, Number(raw) || 0);
+    } catch {
+      // 何もしない
+    }
+
+    const delta = totalReceived - last;
+    if (delta > 0) {
+      // 新規で受け取りが増えていた → 吸収アニメ
+      setFeedCount(delta);
+      setFeedActive(true);
+
+      // アニメ後にフェードインでふわふわ表示・記録更新
+      const t = setTimeout(() => {
+        setFeedActive(false);
+        setDriftKey((k) => k + 1);
+        try {
+          localStorage.setItem(lastSeenKey, String(totalReceived));
+        } catch {
+          /* noop */
+        }
+      }, 1300); // HeartNutrientFlow の終了タイミングより少し後
+
+      return () => clearTimeout(t);
+    } else {
+      // 変化なし → そのままふわふわ表示
+      setFeedActive(false);
+      setFeedCount(0);
+      setDriftKey((k) => k + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, weekOffset, totalReceived, lastSeenKey]);
+
+  // 受け取り合計が 0 → ふわふわも非表示（静かな状態）
+  const showDrift = totalReceived > 0;
 
   return (
     <BaseModal
@@ -211,9 +367,10 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       onClose={onClose}
       hideActions
     >
+      {/* ステージ画像のプリロード */}
       <PreloadHeartGardenImages hrefs={[...HEART_GARDEN_IMAGES]} />
 
-      {/* ヘッダー（ナビのみ） */}
+      {/* ヘッダー（ナビ + 期間をタイトル右に表示） */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
@@ -224,7 +381,10 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
           >
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <h2 className="text-lg font-semibold text-gray-800">ありがとう</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            ありがとう
+            <span className="ml-2 text-sm font-normal text-gray-500">（ {weekRangeLabel} ）</span>
+          </h2>
           <button
             type="button"
             onClick={() => setWeekOffset((w) => Math.min(w + 1, 0))}
@@ -246,16 +406,26 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
         </button>
       </div>
 
-      {/* 週レンジ（最小表示） */}
-      <div className="mt-1 text-sm text-gray-600 text-center">{weekRangeLabel}</div>
+      {/* 成長イラスト + 最小カウンタ（説明文なし）
+          ★ この枠内（div）をハートの可動領域とします（relative + overflow-hidden） */}
+      <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden">
+        {/* 枠全体にふわふわハートを散らす（吸収後 or 変化なしの場合） */}
+        {showDrift && <FloatingHearts count={totalReceived} fadeInKey={driftKey} />}
 
-      {/* 成長イラスト + 最小カウンタ（説明文なし） */}
-      <div className="mt-3 flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4">
-        <StageImage
-          stage={stage}
-          sources={HEART_GARDEN_IMAGES as [string, string, string, string]}
-          size={144}
-        />
+        {/* 中央にステージ画像。吸収アニメはこの画像に向けて実施 */}
+        <div className="relative" style={{ width: 144, height: 144 }}>
+          <StageImage
+            stage={stage}
+            sources={HEART_GARDEN_IMAGES as [string, string, string, string]}
+            size={144}
+          />
+          {/* 開いた時に新規で増えていれば → 吸収アニメ（今週のみ） */}
+          {weekOffset === 0 && (
+            <HeartNutrientFlow count={feedCount} targetSize={144} active={feedActive} />
+          )}
+        </div>
+
+        {/* 数字のみ（ラベル最小化） */}
         <div className="flex items-center gap-6 text-base">
           <span className="inline-flex items-center gap-2">
             <Heart className="w-4 h-4 text-rose-500" />
