@@ -14,7 +14,16 @@ import {
   addDays,
   format,
 } from 'date-fns';
-import { X, Heart, ChevronLeft, ChevronRight, Sparkles, PartyPopper } from 'lucide-react';
+import {
+  X,
+  Heart,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  PartyPopper,
+  Sprout,
+  Leaf,
+} from 'lucide-react';
 import { useUserUid } from '@/hooks/useUserUid';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -27,6 +36,134 @@ type LikeDoc = {
 };
 
 type Mode = 'all' | 'received' | 'given';
+
+/* =========================================================
+   HeartGarden: 「ありがとう」が増えるほど“育つ”ミニガーデン
+   - growthHeight: 茎の高さ（%）
+   - leaves: 葉っぱ数（しきい値で増える）
+   - blossom: ハートの花が咲く（前週超え or ストリークしきい値）
+   ========================================================= */
+function HeartGarden({
+  totalThisWeek,
+  totalPrevWeek,
+  streak,
+  burstKey,
+}: {
+  totalThisWeek: number;
+  totalPrevWeek: number;
+  streak: number;
+  burstKey: number;
+}) {
+  // 成長ロジック：今週カウントをベースに高さ・葉・花を決める
+  const growth = useMemo(() => {
+    const base = totalThisWeek;
+    // 高さ（%）：最低20%から、カウントに応じて最大100%まで
+    const heightPct = Math.min(100, 20 + base * 6); // 0→20%、1→26%...
+    // 葉っぱは段階的に増える（1,3,5,7,9,11 で増加）
+    const thresholds = [1, 3, 5, 7, 9, 11];
+    const leaves = thresholds.filter((t) => base >= t).length;
+    // 花（ハート）は「前週超え」or「ストリーク3日以上」で咲く
+    const blossom = base > totalPrevWeek || streak >= 3;
+    return { heightPct, leaves, blossom };
+  }, [totalThisWeek, totalPrevWeek, streak]);
+
+  const leafSlots = Array.from({ length: growth.leaves });
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-b from-rose-50/60 to-white p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <Sprout className="w-4 h-4 text-emerald-600" />
+          <span>ハートガーデン</span>
+        </div>
+        <div className="text-xs text-gray-500">
+          今週：<span className="font-semibold text-gray-800">{totalThisWeek}</span> / 前週：{totalPrevWeek}・連続
+          <span className="font-semibold text-gray-800"> {streak} </span>日
+        </div>
+      </div>
+
+      {/* 土台 */}
+      <div className="relative mt-3 h-44">
+        <div className="absolute bottom-0 left-0 right-0 h-8 rounded-b-2xl bg-gradient-to-t from-amber-200 to-amber-100" />
+
+        {/* 茎（伸びる） */}
+        <motion.div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 w-1.5 rounded-t-full bg-emerald-600 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
+          initial={{ height: 0 }}
+          animate={{ height: `${growth.heightPct}%` }}
+          transition={{ type: 'spring', stiffness: 180, damping: 20 }}
+        />
+
+        {/* 葉っぱ（段階的に出現） */}
+        {leafSlots.map((_, i) => {
+          const side = i % 2 === 0 ? -1 : 1; // 左右交互
+          const y = 12 + i * 16; // 下からの位置
+          return (
+            <AnimatePresence key={`leaf-${i}`}>
+              <motion.div
+                initial={{ opacity: 0, x: side * 10, rotate: side * -10 }}
+                animate={{ opacity: 1, x: side * 0, rotate: side * 0 }}
+                exit={{ opacity: 0, x: side * -10 }}
+                transition={{ type: 'spring', stiffness: 180, damping: 18, delay: 0.03 * i }}
+                className="absolute"
+                style={{
+                  bottom: `${y}px`,
+                  left: `calc(50% + ${side * 10}px)`,
+                }}
+              >
+                <Leaf className="w-4 h-4 text-emerald-600" />
+              </motion.div>
+            </AnimatePresence>
+          );
+        })}
+
+        {/* 花（ハート） */}
+        <AnimatePresence mode="popLayout">
+          {growth.blossom && (
+            <motion.div
+              key={`blossom-${burstKey}`}
+              className="absolute"
+              style={{ bottom: `${growth.heightPct + 14}%`, left: '50%', transform: 'translateX(-50%)' }}
+              initial={{ opacity: 0, scale: 0.6, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -6 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 16 }}
+            >
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: [1, 1.06, 1] }}
+                transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+                className="inline-flex items-center justify-center rounded-full bg-white/80 shadow px-2.5 py-1.5"
+              >
+                <Heart className="w-4 h-4 text-rose-500" />
+                <span className="ml-1 text-sm font-semibold text-gray-800">咲いた！</span>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* きらめき（背景演出） */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="floating-hearts opacity-20" />
+        </div>
+      </div>
+
+      {/* レジェンド / ヒント */}
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-gray-600">
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
+          今週の数で茎が伸びます
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Leaf className="w-3 h-3" /> 増えるほど葉が増えます
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Heart className="w-3 h-3 text-rose-500" /> 前週超え or 連続3日で花が咲きます
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   const uid = useUserUid();
@@ -152,7 +289,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
      ========================= */
   const isReceivedFromPartner = (likedBy: string[]) => {
     if (partnerId) return likedBy.includes(partnerId);
-    return likedBy.some((u) => u && u !== uid); // フォールバック（理論上は未使用想定）
+    return likedBy.some((u) => u && u !== uid);
   };
   const isGivenByMe = (likedBy: string[]) => likedBy.includes(uid ?? '__unknown__');
 
@@ -175,13 +312,8 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     };
   }, [weekOffset]);
 
-  const daysThisWeek = useMemo(() => {
-    return Array.from({ length: 7 }).map((_, i) => addDays(weekBounds.start, i));
-  }, [weekBounds]);
-
-  const daysPrevWeek = useMemo(() => {
-    return Array.from({ length: 7 }).map((_, i) => addDays(prevWeekBounds.start, i));
-  }, [prevWeekBounds]);
+  const daysThisWeek = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(weekBounds.start, i)), [weekBounds]);
+  const daysPrevWeek = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(prevWeekBounds.start, i)), [prevWeekBounds]);
 
   const weekRangeLabel = useMemo(() => {
     const { start, end } = weekBounds;
@@ -191,27 +323,30 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   /* =========================
      日別集計（週ごと／モード別）
      ========================= */
-  const buildDailyCounts = (dates: Date[], mode: Mode) => {
-    return dates.map((d) => {
+  const buildDailyCounts = (dates: Date[], mode: Mode) =>
+    dates.map((d) => {
       const k = format(d, 'yyyy-MM-dd');
       const received = rawLikesReceived.reduce((acc, r) => {
         if (r.date !== k) return acc;
         return isReceivedFromPartner(r.likedBy) ? acc + 1 : acc;
-        // 1ドキュメント = 1つの「ありがとう」前提（複数 likedBy は複数人が同日同タスクに押した場合）
       }, 0);
       const given = rawLikesGiven.reduce((acc, r) => {
         if (r.date !== k) return acc;
         return isGivenByMe(r.likedBy) ? acc + 1 : acc;
       }, 0);
-
       if (mode === 'received') return received;
       if (mode === 'given') return given;
       return received + given;
     });
-  };
 
-  const dailyThisWeek = useMemo(() => buildDailyCounts(daysThisWeek, mode), [daysThisWeek, mode, rawLikesReceived, rawLikesGiven, partnerId, uid]);
-  const dailyPrevWeek = useMemo(() => buildDailyCounts(daysPrevWeek, mode), [daysPrevWeek, mode, rawLikesReceived, rawLikesGiven, partnerId, uid]);
+  const dailyThisWeek = useMemo(
+    () => buildDailyCounts(daysThisWeek, mode),
+    [daysThisWeek, mode, rawLikesReceived, rawLikesGiven, partnerId, uid]
+  );
+  const dailyPrevWeek = useMemo(
+    () => buildDailyCounts(daysPrevWeek, mode),
+    [daysPrevWeek, mode, rawLikesReceived, rawLikesGiven, partnerId, uid]
+  );
 
   const totalThisWeek = useMemo(() => dailyThisWeek.reduce((a, b) => a + b, 0), [dailyThisWeek]);
   const totalPrevWeek = useMemo(() => dailyPrevWeek.reduce((a, b) => a + b, 0), [dailyPrevWeek]);
@@ -233,17 +368,13 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     return { received, given, all: received + given };
   }, [rawLikesReceived, rawLikesGiven, partnerId, uid]);
 
-  // ストリーク（今週で連続 >0 日数）
+  // ストリーク（今週の連続 >0 日数）
   const streak = useMemo(() => {
     if (weekOffset !== 0) return 0;
-    // 今日までを対象（週の未来日は除外）
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const untilIndex = Math.min(
       6,
-      Math.max(
-        0,
-        daysThisWeek.findIndex((d) => format(d, 'yyyy-MM-dd') === todayStr)
-      )
+      Math.max(0, daysThisWeek.findIndex((d) => format(d, 'yyyy-MM-dd') === todayStr))
     );
     let s = 0;
     for (let i = untilIndex; i >= 0; i--) {
@@ -256,13 +387,11 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   // チャートスケール（当週＆前週の最大を基準）
   const chartMax = useMemo(() => {
     const m = Math.max(1, ...dailyThisWeek, ...dailyPrevWeek);
-    // 少し余白をもたせて伸びやすく
     return m < 5 ? 5 : m;
   }, [dailyThisWeek, dailyPrevWeek]);
 
   const showPairAlert = !partnerId;
-
-  const weekdayLabels = ['月', '火', '水', '木', '金', '土', '日'];
+  // const weekdayLabels = ['月', '火', '水', '木', '金', '土', '日'];
 
   return (
     <BaseModal
@@ -328,8 +457,18 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
         </div>
       ) : (
         <>
+          {/* ── New! 育つミニガーデン ───────────────── */}
+          <div className="mt-3">
+            <HeartGarden
+              totalThisWeek={totalThisWeek}
+              totalPrevWeek={totalPrevWeek}
+              streak={streak}
+              burstKey={burstKey}
+            />
+          </div>
+
           {/* 週レンジ & セグメント切替 */}
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-4 flex items-center justify-between">
             <div className="text-sm text-gray-600">{weekRangeLabel}</div>
             <div role="tablist" aria-label="表示モード" className="inline-flex rounded-full bg-gray-100 p-1">
               {([
@@ -407,9 +546,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
                   {totalThisWeek - totalPrevWeek > 0 ? '+' : ''}
                   {totalThisWeek - totalPrevWeek}
                 </span>
-                <span className="text-xs text-gray-500">
-                  （先週 {totalPrevWeek}）
-                </span>
+                <span className="text-xs text-gray-500">（先週 {totalPrevWeek}）</span>
               </div>
             </motion.div>
 
@@ -445,21 +582,6 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
             </motion.div>
           </div>
 
-          {/* ストリーク */}
-          <div className="mt-2">
-            <motion.div
-              layout
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700"
-            >
-              <span className="inline-flex items-center gap-1">
-                <Heart className="w-3.5 h-3.5 text-rose-500" />
-                連続日数
-              </span>
-              <span className="font-bold">{streak}</span>
-              <span className="text-gray-400">日</span>
-            </motion.div>
-          </div>
-
           {/* チャート（当週＋前週ゴースト） */}
           <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
             <div className="flex items-center justify-between mb-2">
@@ -477,9 +599,9 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
             </div>
 
             <div className="relative">
-              {/* ハートがふわっと漂う背景（さりげない遊び心） */}
+              {/* 背景のふわっと演出 */}
               <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                <div className="floating-hearts opacity-25" />
+                <div className="floating-hearts opacity-20" />
               </div>
 
               <div className="grid grid-cols-7 gap-2 h-40 relative">
@@ -498,7 +620,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
                         transition={{ type: 'spring', stiffness: 180, damping: 18 }}
                         className="absolute bottom-0 w-4 sm:w-6 bg-rose-500/80 rounded-t-md"
                       />
-                      {/* 値ラベル（0は非表示でスッキリ） */}
+                      {/* 値ラベル */}
                       <AnimatePresence>
                         {v > 0 && (
                           <motion.div
@@ -511,14 +633,13 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
                           </motion.div>
                         )}
                       </AnimatePresence>
-                      <div className="mt-1 text-[11px] text-gray-600">{weekdayLabels[i]}</div>
+                      <div className="mt-1 text-[11px] text-gray-600">{['月','火','水','木','金','土','日'][i]}</div>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* 軽いヒント */}
             <div className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-50 border border-gray-200">
                 ← / →
@@ -527,29 +648,29 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
             </div>
           </div>
 
-          {/* 小さなフッターバー（今週のハートを“押したい”気持ちを刺激） */}
+          {/* 小さなフッターバー（コピーを具体化） */}
           {weekOffset === 0 && (
             <div className="mt-3 flex items-center justify-between rounded-xl border border-rose-100 bg-rose-50 p-3">
               <div className="flex items-center gap-2 text-rose-700">
                 <Heart className="w-4 h-4" />
-                <span className="text-sm">“ありがとう”を伝えると、ここが育ちます。</span>
+                <span className="text-sm">“ありがとう”が増えるほど、ガーデンが育ちます。</span>
               </div>
               <div className="text-xs text-rose-700/80 flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                前週越えを目指そう！
+                前週越えで花が咲くよ
               </div>
             </div>
           )}
         </>
       )}
 
-      {/* スタイル（さりげないハート背景の演出） */}
+      {/* スタイル：背景のハートきらめき */}
       <style jsx>{`
         .floating-hearts {
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(circle at 10% 90%, rgba(244, 114, 182, 0.09) 0 8%, transparent 9%),
+            radial-gradient(circle at 10% 90%, rgba(244, 114, 182, 0.10) 0 8%, transparent 9%),
             radial-gradient(circle at 80% 20%, rgba(244, 63, 94, 0.08) 0 7%, transparent 8%),
             radial-gradient(circle at 30% 30%, rgba(244, 63, 94, 0.06) 0 10%, transparent 11%);
           animation: floatPulse 8s ease-in-out infinite;
