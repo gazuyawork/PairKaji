@@ -16,17 +16,7 @@ import {
   eachDayOfInterval,
   format,
 } from 'date-fns';
-import {
-  X,
-  Heart,
-  ChevronLeft,
-  ChevronRight,
-  Minus,
-  Flame,          // ★ 追加：Streak表示
-  TrendingUp,     // ★ 追加：合計トレンド表示
-  TrendingDown,   // ★ 追加：合計トレンド表示
-  Sparkles,       // ★ 追加：アクティブ日数の装飾
-} from 'lucide-react';
+import { X, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUserUid } from '@/hooks/useUserUid';
 
@@ -228,7 +218,6 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   const {
     totalReceived,
     totalGiven,
-    activeDays,
     seriesReceived,
     seriesGiven,
     weekRangeLabel,
@@ -255,15 +244,11 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       tg += g;
     }
 
-    const daysCount = dayKeys.filter(
-      (k) => (dailyAggregates.mapReceived[k] ?? 0) + (dailyAggregates.mapGiven[k] ?? 0) > 0
-    ).length;
     const label = `${format(start, 'M/d')} - ${format(end, 'M/d')}`;
 
     return {
       totalReceived: tr,
       totalGiven: tg,
-      activeDays: daysCount,
       seriesReceived: sr,
       seriesGiven: sg,
       weekRangeLabel: label,
@@ -272,81 +257,22 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   }, [dailyAggregates, weekBounds]);
 
   /* =========================
-     前週比較（受・送）
+     今週の「合計」（受＋送）
      ========================= */
-  const prevWeekTotals = useMemo(() => {
-    const prev = addWeeks(new Date(), weekOffset - 1);
-    const start = startOfWeek(prev, { weekStartsOn: 1 });
-    const end = endOfWeek(prev, { weekStartsOn: 1 });
-
-    // 受
-    const prevReceived = rawLikesReceived.reduce((acc, r) => {
-      if (!r.date) return acc;
-      const d = parseISO(r.date);
-      if (!isWithinInterval(d, { start, end })) return acc;
-      if (!isReceivedFromPartner(r.likedBy)) return acc;
-      return acc + 1;
-    }, 0);
-
-    // 送
-    const prevGiven = rawLikesGiven.reduce((acc, r) => {
-      if (!r.date) return acc;
-      const d = parseISO(r.date);
-      if (!isWithinInterval(d, { start, end })) return acc;
-      if (!isGivenByMe(r.likedBy)) return acc;
-      return acc + 1;
-    }, 0);
-
-    return { prevReceived, prevGiven };
-  }, [rawLikesReceived, rawLikesGiven, weekOffset, partnerId, uid]);
-
-  const deltaReceived = totalReceived - prevWeekTotals.prevReceived;
-  const deltaGiven = totalGiven - prevWeekTotals.prevGiven;
-  const dtR: 'up' | 'down' | 'flat' =
-    deltaReceived > 0 ? 'up' : deltaReceived < 0 ? 'down' : 'flat';
-  const dtG: 'up' | 'down' | 'flat' =
-    deltaGiven > 0 ? 'up' : deltaGiven < 0 ? 'down' : 'flat';
+  const totalAllThisWeek = useMemo(
+    () => totalReceived + totalGiven,
+    [totalReceived, totalGiven]
+  );
 
   /* =========================
-     累積（受・送）
+     グラフ用（合計のみの1系列）
      ========================= */
-  const cumulative = useMemo(() => {
-    const received = rawLikesReceived.reduce(
-      (acc, r) => (isReceivedFromPartner(r.likedBy) ? acc + 1 : acc),
-      0
-    );
-    const given = rawLikesGiven.reduce(
-      (acc, r) => (isGivenByMe(r.likedBy) ? acc + 1 : acc),
-      0
-    );
-    return { received, given };
-  }, [rawLikesReceived, rawLikesGiven, partnerId, uid]);
-
-  /* =========================
-     合計 & Streak（UIの楽しさUP用）
-     ========================= */
-  const totalAllThisWeek = totalReceived + totalGiven;
-
-  const streakThisWeek = useMemo(() => {
-    const len = Math.max(seriesReceived.length, seriesGiven.length);
-    let streak = 0;
-    for (let i = len - 1; i >= 0; i--) {
-      const dayTotal = (seriesReceived[i] ?? 0) + (seriesGiven[i] ?? 0);
-      if (dayTotal > 0) streak += 1;
-      else break;
-    }
-    return streak;
-  }, [seriesReceived, seriesGiven]);
-
-  const prevWeekTotalAll = prevWeekTotals.prevReceived + prevWeekTotals.prevGiven;
-  const deltaAll = totalAllThisWeek - prevWeekTotalAll;
-  const dtAll: 'up' | 'down' | 'flat' = deltaAll > 0 ? 'up' : deltaAll < 0 ? 'down' : 'flat';
-
-  /* =========================
-     グラフ用スケールとアニメーションキー
-     ========================= */
-  const maxBar = Math.max(1, ...seriesReceived, ...seriesGiven);
-  const barsKey = `bars-${weekOffset}-${maxBar}-${seriesReceived.join(',')}-${seriesGiven.join(',')}`;
+  const combinedSeries = useMemo(
+    () => seriesReceived.map((r, i) => r + (seriesGiven[i] ?? 0)),
+    [seriesReceived, seriesGiven]
+  );
+  const maxBarCombined = Math.max(1, ...combinedSeries);
+  const barsKey = `bars-${weekOffset}-${maxBarCombined}-${combinedSeries.join(',')}`;
 
   return (
     <BaseModal
@@ -356,7 +282,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       onClose={onClose}
       hideActions
     >
-      {/* ヘッダー（でか数字＆楽しい演出） */}
+      {/* ヘッダー（最小） */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
@@ -368,57 +294,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
 
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-800">ありがとう履歴</h2>
-
-            {/* 合計（受+送）表示：脈打つアニメ＆トレンド＆Streak */}
-            <motion.div
-              key={`sum-${totalAllThisWeek}`}
-              initial={{ scale: 0.96, opacity: 0.8 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 180, damping: 14 }}
-              className="ml-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-100"
-              title="今週 合計（受+送）"
-            >
-              <motion.span
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ repeat: 1, duration: 0.6 }}
-                className="inline-flex"
-              >
-                <Heart className="w-4 h-4 text-rose-500" />
-              </motion.span>
-              <span className="text-sm text-gray-700">今週</span>
-              <span className="text-base font-bold text-gray-900">{totalAllThisWeek}</span>
-
-              {/* 合計トレンド */}
-              <span
-                className={
-                  'ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ' +
-                  (dtAll === 'up'
-                    ? 'bg-green-100 text-green-700'
-                    : dtAll === 'down'
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-gray-100 text-gray-600')
-                }
-                title={`先週 合計: ${prevWeekTotalAll}`}
-              >
-                {dtAll === 'up' ? (
-                  <TrendingUp className="w-3 h-3" />
-                ) : dtAll === 'down' ? (
-                  <TrendingDown className="w-3 h-3" />
-                ) : (
-                  <Minus className="w-3 h-3" />
-                )}
-                {dtAll === 'flat' ? '±0' : `${deltaAll > 0 ? '+' : ''}${deltaAll}`}
-              </span>
-
-              {/* Streak（日数） */}
-              <span className="ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-amber-50 text-amber-700">
-                <Flame className="w-3 h-3" />
-                {streakThisWeek}日
-              </span>
-            </motion.div>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-800">ありがとう履歴</h2>
 
           <button
             type="button"
@@ -441,130 +317,31 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
         </button>
       </div>
 
-      {/* 週レンジ + サマリー（やさしいトーン） */}
-      <div className="mt-2 flex flex-col gap-2">
-        <div className="flex items-center justify-between text-sm text-gray-700">
-          <span className="font-medium text-gray-600">{weekRangeLabel}</span>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 受・送の合計 */}
-            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-100 px-2 py-0.5">
-              <Heart className="w-4 h-4 text-rose-500" aria-hidden />
-              受 <span className="font-semibold text-gray-900">{totalReceived}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-100 px-2 py-0.5">
-              <Heart className="w-4 h-4 text-sky-500" aria-hidden />
-              送 <span className="font-semibold text-gray-900">{totalGiven}</span>
-            </span>
-
-            {/* 前週比較（受） */}
-            <span
-              className={
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ' +
-                (dtR === 'up'
-                  ? 'bg-green-100 text-green-700'
-                  : dtR === 'down'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-gray-100 text-gray-600')
-              }
-              title={`先週(受): ${prevWeekTotals.prevReceived}`}
-            >
-              {dtR === 'up' ? (
-                <TrendingUp className="w-3 h-3" />
-              ) : dtR === 'down' ? (
-                <TrendingDown className="w-3 h-3" />
-              ) : (
-                <Minus className="w-3 h-3" />
-              )}
-              受 {dtR === 'flat' ? '±0' : `${deltaReceived > 0 ? '+' : ''}${deltaReceived}`}
-            </span>
-
-            {/* 前週比較（送） */}
-            <span
-              className={
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ' +
-                (dtG === 'up'
-                  ? 'bg-green-100 text-green-700'
-                  : dtG === 'down'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-gray-100 text-gray-600')
-              }
-              title={`先週(送): ${prevWeekTotals.prevGiven}`}
-            >
-              {dtG === 'up' ? (
-                <TrendingUp className="w-3 h-3" />
-              ) : dtG === 'down' ? (
-                <TrendingDown className="w-3 h-3" />
-              ) : (
-                <Minus className="w-3 h-3" />
-              )}
-              送 {dtG === 'flat' ? '±0' : `${deltaGiven > 0 ? '+' : ''}${deltaGiven}`}
-            </span>
-
-            {/* アクティブ日数 */}
-            <span className="inline-flex items-center gap-1 text-gray-600">
-              <Sparkles className="w-3 h-3 text-amber-500" />
-              日数 <span className="font-semibold text-gray-900">{activeDays}</span>/7
-            </span>
-
-            {/* 累積（従来表示） */}
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-rose-50 text-rose-700 border border-rose-100">
-              <Heart className="w-3 h-3" />
-              累積受 <span className="font-semibold">{cumulative.received}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-sky-50 text-sky-700 border border-sky-100">
-              <Heart className="w-3 h-3" />
-              累積送 <span className="font-semibold">{cumulative.given}</span>
-            </span>
-          </div>
+      {/* 週レンジ + 今週合計のみ */}
+      <div className="mt-2 flex items-end justify-between">
+        <span className="text-sm text-gray-600">{weekRangeLabel}</span>
+        <div className="inline-flex items-center gap-2 rounded-full bg-gray-50 border border-gray-200 px-3 py-1">
+          <Heart className="w-4 h-4 text-rose-500" aria-hidden />
+          <span className="text-sm text-gray-600">今週 合計</span>
+          <span className="text-lg font-bold text-gray-900">{totalAllThisWeek}</span>
         </div>
-
-        <p className="text-xs text-gray-500">
-          パートナーとの「ありがとう（ハート）」の週次サマリーです。やる気が出る指標だけをシンプルに表示しています。
-        </p>
       </div>
 
-      {/* ミニ棒グラフ（Mon–Sun）：グラデ + ホバー拡大 */}
-      <div className="mt-3 rounded-xl border border-gray-200 p-3 bg-white/70 backdrop-blur">
-        {/* 凡例 */}
-        <div className="mb-2 flex items-center gap-3 text-[11px] text-gray-600">
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded bg-gradient-to-t from-rose-300 to-rose-200" />
-            受
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded bg-gradient-to-t from-sky-300 to-sky-200" />
-            送
-          </span>
-        </div>
-
+      {/* 曜日別 合計バー（受＋送） */}
+      <div className="mt-3 rounded-xl border border-gray-200 p-3 bg-white">
         <div key={barsKey} className="grid grid-cols-7 gap-2 items-end h-28">
-          {seriesReceived.map((rv, i) => {
-            const gv = seriesGiven[i] ?? 0;
-            const rh = Math.round((rv / maxBar) * 80); // 最大80px
-            const gh = Math.round((gv / maxBar) * 80);
+          {combinedSeries.map((tv, i) => {
+            const h = Math.round((tv / maxBarCombined) * 80);
             return (
               <div key={i} className="flex flex-col items-center justify-end">
-                <div className="flex items-end gap-1">
-                  <motion.div
-                    initial={{ height: 0, opacity: 0.5, y: 6 }}
-                    animate={{ height: rh, opacity: 1, y: 0 }}
-                    whileHover={{ scaleY: 1.06 }}
-                    transition={{ type: 'spring', stiffness: 150, damping: 18 }}
-                    className="w-3 rounded-t-lg bg-gradient-to-t from-rose-300 to-rose-200 shadow-sm"
-                    aria-label={`受 ${rv} ハート`}
-                    title={`受 ${rv} ハート`}
-                  />
-                  <motion.div
-                    initial={{ height: 0, opacity: 0.5, y: 6 }}
-                    animate={{ height: gh, opacity: 1, y: 0 }}
-                    whileHover={{ scaleY: 1.06 }}
-                    transition={{ type: 'spring', stiffness: 150, damping: 18, delay: 0.02 }}
-                    className="w-3 rounded-t-lg bg-gradient-to-t from-sky-300 to-sky-200 shadow-sm"
-                    aria-label={`送 ${gv} ハート`}
-                    title={`送 ${gv} ハート`}
-                  />
-                </div>
+                <motion.div
+                  initial={{ height: 0, opacity: 0.5, y: 6 }}
+                  animate={{ height: h, opacity: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 150, damping: 18 }}
+                  className="w-3 rounded-t bg-gray-300"
+                  aria-label={`${dayLabels[i]} 合計 ${tv}`}
+                  title={`${dayLabels[i]} 合計 ${tv}`}
+                />
                 <span className="mt-1 text-[10px] text-gray-500">{dayLabels[i]}</span>
               </div>
             );
@@ -575,33 +352,23 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       {/* 履歴リスト（iOS スクロール可） */}
       <div
         data-scrollable="true"
-        className="mt-4 max-h[60vh] md:max-h-[60vh] overflow-y-auto divide-y divide-gray-200 rounded-md border border-gray-200"
+        className="mt-4 max-h-[60vh] md:max-h-[60vh] overflow-y-auto divide-y divide-gray-200 rounded-md border border-gray-200"
       >
         {dailyAggregates.list.length === 0 ? (
-          <div className="p-6 text-sm text-gray-500">
-            今週はまだハートがありません。いつもより少し「ありがとう」を伝えてみましょう 😊
-          </div>
+          <div className="p-6 text-sm text-gray-500">今週の記録はまだありません。</div>
         ) : (
-          dailyAggregates.list.map((e) => (
-            <motion.div
-              key={e.date}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="px-4 py-3 flex items-center justify-between hover:bg-white/60 transition"
-            >
-              <span className="text-sm text-gray-700">{e.date}</span>
-              <div className="flex items-center gap-3 text-gray-600">
-                <span className="inline-flex items-center gap-1">
-                  <Heart className="w-4 h-4 text-rose-400" aria-hidden />
-                  <span className="text-sm">受 × {e.received}</span>
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Heart className="w-4 h-4 text-sky-400" aria-hidden />
-                  <span className="text-sm">送 × {e.given}</span>
-                </span>
+          dailyAggregates.list.map((e) => {
+            const total = e.received + e.given;
+            return (
+              <div key={e.date} className="px-4 py-3 flex items-center justify-between">
+                <span className="text-sm text-gray-700">{e.date}</span>
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-gray-900">合計 × {total}</div>
+                  <div className="text-[11px] text-gray-500">（受 {e.received} / 送 {e.given}）</div>
+                </div>
               </div>
-            </motion.div>
-          ))
+            );
+          })
         )}
       </div>
     </BaseModal>
