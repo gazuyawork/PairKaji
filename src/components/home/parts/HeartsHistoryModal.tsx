@@ -1,4 +1,3 @@
-// src/components/home/parts/HeartsHistoryModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -70,7 +69,7 @@ function HeartGarden({
   const leafSlots = Array.from({ length: growth.leaves });
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-b from-rose-50/60 to-white p-4">
+    <div className="relative overflow-hidden rounded-2xl ring-1 ring-black/5 bg-white/60 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md shadow-sm p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-700">
           <Sprout className="w-4 h-4 text-emerald-600" />
@@ -84,14 +83,29 @@ function HeartGarden({
 
       {/* 土台 */}
       <div className="relative mt-3 h-44">
-        <div className="absolute bottom-0 left-0 right-0 h-8 rounded-b-2xl bg-gradient-to-t from-amber-200 to-amber-100" />
+        <div
+          className="absolute bottom-0 left-0 right-0 h-8 rounded-b-2xl"
+          style={{
+            background:
+              'linear-gradient(to top, rgb(190 140 90 / 35%), rgb(214 181 154 / 25%))',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+            backgroundImage:
+              'linear-gradient(to top, rgb(190 140 90 / 35%), rgb(214 181 154 / 25%)), radial-gradient(1px 1px at 10% 20%, rgba(0,0,0,.03) 1px, transparent 0), radial-gradient(1px 1px at 60% 80%, rgba(0,0,0,.03) 1px, transparent 0)',
+            backgroundSize: 'auto, 8px 8px, 8px 8px',
+          }}
+        />
 
         {/* 茎（伸びる） */}
         <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 w-1.5 rounded-t-full bg-emerald-600 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[3px] rounded-t-full"
+          style={{
+            background: 'linear-gradient(to right, rgb(16 185 129 / 90%), rgb(16 185 129 / 75%))',
+            boxShadow:
+              'inset 0 0 0 1px rgba(255,255,255,.3), 0 0 0 1px rgba(16,185,129,.15)',
+          }}
           initial={{ height: 0 }}
           animate={{ height: `${growth.heightPct}%` }}
-          transition={{ type: 'spring', stiffness: 180, damping: 20 }}
+          transition={{ type: 'spring', stiffness: 120, damping: 22 }}
         />
 
         {/* 葉っぱ（段階的に出現） */}
@@ -101,17 +115,17 @@ function HeartGarden({
           return (
             <AnimatePresence key={`leaf-${i}`}>
               <motion.div
-                initial={{ opacity: 0, x: side * 10, rotate: side * -10 }}
-                animate={{ opacity: 1, x: side * 0, rotate: side * 0 }}
-                exit={{ opacity: 0, x: side * -10 }}
-                transition={{ type: 'spring', stiffness: 180, damping: 18, delay: 0.03 * i }}
+                initial={{ opacity: 0, x: side * 6, rotate: side * -6 }}
+                animate={{ opacity: 1, x: 0, rotate: 0 }}
+                exit={{ opacity: 0, x: side * -6 }}
+                transition={{ type: 'spring', stiffness: 120, damping: 20, delay: 0.035 * i }}
                 className="absolute"
                 style={{
                   bottom: `${y}px`,
-                  left: `calc(50% + ${side * 10}px)`,
+                  left: `calc(50% + ${side * 9}px)`,
                 }}
               >
-                <Leaf className="w-4 h-4 text-emerald-600" />
+                <Leaf className="w-4 h-4 text-emerald-500 drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]" />
               </motion.div>
             </AnimatePresence>
           );
@@ -130,13 +144,18 @@ function HeartGarden({
               transition={{ type: 'spring', stiffness: 220, damping: 16 }}
             >
               <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
-                className="inline-flex items-center justify-center rounded-full bg-white/80 shadow px-2.5 py-1.5"
+                initial={{ scale: 0.96 }}
+                animate={{ scale: [1, 1.04, 1] }}
+                transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+                className="inline-flex items-center justify-center rounded-full px-2.5 py-1.5"
+                style={{
+                  background: 'rgba(255,255,255,0.7)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,.06), 0 0 0 8px rgba(244,63,94,0.06)',
+                  WebkitBackdropFilter: 'blur(2px)',
+                  backdropFilter: 'blur(2px)',
+                }}
               >
                 <Heart className="w-4 h-4 text-rose-500" />
-                <span className="ml-1 text-sm font-semibold text-gray-800">咲いた！</span>
               </motion.div>
             </motion.div>
           )}
@@ -391,7 +410,6 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   }, [dailyThisWeek, dailyPrevWeek]);
 
   const showPairAlert = !partnerId;
-  // const weekdayLabels = ['月', '火', '水', '木', '金', '土', '日'];
 
   return (
     <BaseModal
@@ -500,7 +518,14 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
             >
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-600">今週</div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-gray-50 border border-gray-200 px-3 py-1">
+                <div
+                  className="inline-flex items-center gap-2 rounded-full px-3 py-1"
+                  style={{
+                    background: 'rgba(255,255,255,0.6)',
+                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)',
+                    backdropFilter: 'blur(2px)',
+                  }}
+                >
                   <Heart className="w-4 h-4 text-rose-500" aria-hidden />
                   <span className="text-lg font-extrabold text-gray-900">× {totalThisWeek}</span>
                 </div>
@@ -611,14 +636,25 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
                   const ph = Math.round((pv / chartMax) * 100);
                   return (
                     <div key={i} className="flex flex-col justify-end items-center relative">
-                      {/* 前週ゴースト */}
-                      <div className="w-4 sm:w-6 bg-gray-200 rounded-t-md" style={{ height: `${ph}%` }} />
-                      {/* 今週バー（アニメ） */}
+                      {/* 前週ゴースト（アウトライン） */}
+                      <div
+                        className="w-4 sm:w-6 rounded-t-md"
+                        style={{
+                          height: `${ph}%`,
+                          boxShadow: 'inset 0 0 0 1.5px rgba(0,0,0,0.15)',
+                          background: 'transparent',
+                        }}
+                      />
+                      {/* 今週バー（アニメ・グラデ＋薄影） */}
                       <motion.div
                         initial={{ height: 0 }}
                         animate={{ height: `${h}%` }}
-                        transition={{ type: 'spring', stiffness: 180, damping: 18 }}
-                        className="absolute bottom-0 w-4 sm:w-6 bg-rose-500/80 rounded-t-md"
+                        transition={{ type: 'spring', stiffness: 140, damping: 20 }}
+                        className="absolute bottom-0 w-4 sm:w-6 rounded-t-md"
+                        style={{
+                          background: 'linear-gradient(to top, rgba(244,63,94,.85), rgba(244,63,94,.65))',
+                          boxShadow: '0 2px 4px rgba(0,0,0,.06)',
+                        }}
                       />
                       {/* 値ラベル */}
                       <AnimatePresence>
@@ -664,21 +700,21 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
         </>
       )}
 
-      {/* スタイル：背景のハートきらめき */}
+      {/* スタイル：背景のハートきらめき（控えめに） */}
       <style jsx>{`
         .floating-hearts {
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(circle at 10% 90%, rgba(244, 114, 182, 0.10) 0 8%, transparent 9%),
-            radial-gradient(circle at 80% 20%, rgba(244, 63, 94, 0.08) 0 7%, transparent 8%),
-            radial-gradient(circle at 30% 30%, rgba(244, 63, 94, 0.06) 0 10%, transparent 11%);
-          animation: floatPulse 8s ease-in-out infinite;
+            radial-gradient(40% 40% at 12% 82%, rgba(244, 63, 94, 0.06) 0 20%, transparent 21%),
+            radial-gradient(35% 35% at 78% 18%, rgba(244, 63, 94, 0.05) 0 18%, transparent 19%);
+          animation: floatPulse 14s ease-in-out infinite;
+          opacity: .12;
         }
         @keyframes floatPulse {
-          0% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-4px) scale(1.01); }
-          100% { transform: translateY(0px) scale(1); }
+          0% { transform: translateY(0) scale(1); filter: saturate(1); }
+          50% { transform: translateY(-3px) scale(1.005); filter: saturate(0.95); }
+          100% { transform: translateY(0) scale(1); filter: saturate(1); }
         }
       `}</style>
     </BaseModal>
