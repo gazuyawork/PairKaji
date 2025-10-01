@@ -453,9 +453,11 @@ export default function TaskCard({
               )}
 
 
-              <p className="text-[#5E5E5E] font-sans min-w-[34px] text-right">
-                {task.point} <span className="text-xs">pt</span>
-              </p>
+              {task.point > 0 && (
+                <p className="text-[#5E5E5E] font-sans min-w-[34px] text-right">
+                  {task.point} <span className="text-xs">pt</span>
+                </p>
+              )}
 
               {isPairConfirmed && (
                 <Image
