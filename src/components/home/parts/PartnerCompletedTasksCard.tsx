@@ -1,3 +1,4 @@
+// src/components/home/parts/PartnerCompletedTasksCard.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ import {
   setDoc,
   where,
   Timestamp,
+  serverTimestamp,
   getDoc,
 } from 'firebase/firestore';
 import { getConfirmedPartnerUid } from '@/lib/pairs';
@@ -38,12 +40,15 @@ type HeartStateMap = Record<string, boolean>; // key: taskId, value: liked?
  *    2) 「いいね済み」グループ（古い→新しいの昇順）
  * - 件数：制限なし（5件超もカードが縦に拡大して全件表示）
  * - 右端ハートで「いいね」トグル（自分→相手）
- * - hearts ドキュメントID：`${taskId}_${senderUid}` （重複登録防止）
- * - hearts スキーマ：{ taskId, senderId, receiverId, participants:[sender, receiver], createdAt }
+ * - taskLikes ドキュメントID：`${taskId}_${senderUid}` （重複登録防止）
+ * - スキーマ：{ taskId, senderId, receiverId, participants:[sender, receiver]（昇順）, createdAt }
  */
 export default function PartnerCompletedTasksCard() {
+  const COLLECTION = 'taskLikes' as const; // ← コレクション名を定数化
+
   const [rows, setRows] = useState<PartnerTask[]>([]);
   const [likedMap, setLikedMap] = useState<HeartStateMap>({});
+  const [pendingMap, setPendingMap] = useState<Record<string, boolean>>({});
   const [partnerUid, setPartnerUid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -78,7 +83,6 @@ export default function PartnerCompletedTasksCard() {
       // 念のため共有対象に自分を含むものに限定
       where('userIds', 'array-contains', me.uid),
       orderBy('completedAt', 'asc'),
-      // limit は撤廃（全件表示）
     );
 
     const unSub = onSnapshot(
@@ -114,7 +118,7 @@ export default function PartnerCompletedTasksCard() {
       const entries = await Promise.all(
         rows.map(async (r) => {
           const heartId = `${r.id}_${me.uid}`;
-          const ref = doc(db, 'hearts', heartId);
+          const ref = doc(db, COLLECTION, heartId);
           const snap = await getDoc(ref);
           return [r.id, snap.exists()] as const;
         }),
@@ -131,37 +135,55 @@ export default function PartnerCompletedTasksCard() {
       if (!me || !partnerUid) return;
 
       const heartId = `${taskId}_${me.uid}`;
-      const ref = doc(db, 'hearts', heartId);
+      const ref = doc(db, COLLECTION, heartId);
       const isLiked = likedMap[taskId] === true;
 
       try {
+        // 多重タップ防止
+        if (pendingMap[taskId]) return;
+        setPendingMap((p) => ({ ...p, [taskId]: true }));
+
         if (isLiked) {
-          await deleteDoc(ref);
+          // 楽観更新（取り消し）
           setLikedMap((prev) => ({ ...prev, [taskId]: false }));
+          await deleteDoc(ref);
         } else {
+          // participants は並び順を固定（昇順）
+          const participants = [me.uid, partnerUid].sort((a, b) => (a < b ? -1 : 1));
+
+          // 楽観更新（付与）
+          setLikedMap((prev) => ({ ...prev, [taskId]: true }));
           await setDoc(ref, {
             taskId,
             senderId: me.uid,
             receiverId: partnerUid,
-            participants: [me.uid, partnerUid],
-            createdAt: Timestamp.now(),
+            participants,
+            createdAt: serverTimestamp(), // サーバー時刻
           });
-          setLikedMap((prev) => ({ ...prev, [taskId]: true }));
         }
       } catch (e) {
         console.error('toggleLike error:', e);
+        // ロールバック
+        setLikedMap((prev) => ({ ...prev, [taskId]: isLiked }));
+      } finally {
+        setPendingMap((p) => ({ ...p, [taskId]: false }));
       }
     },
-    [likedMap, partnerUid],
+    [likedMap, partnerUid, pendingMap],
   );
 
   // いいねボタン（押下で回転＋拡大アニメーション）
-  const HeartButton: React.FC<{ liked: boolean; onClick: () => void }> = ({ liked, onClick }) => {
+  const HeartButton: React.FC<{ liked: boolean; onClick: () => void; disabled?: boolean }> = ({
+    liked,
+    onClick,
+    disabled,
+  }) => {
     return (
       <motion.button
         type="button"
         onClick={onClick}
-        className="p-2 rounded-full hover:bg-gray-100 focus:outline-none"
+        disabled={disabled}
+        className="p-2 rounded-full hover:bg-gray-100 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
         whileTap={{ scale: 0.9 }}
         animate={liked ? { rotate: [0, 20, -15, 0], scale: [1, 1.3, 1.05, 1] } : { scale: 1 }}
         transition={{ duration: 0.45 }}
@@ -190,10 +212,8 @@ export default function PartnerCompletedTasksCard() {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 max-w-xl m-auto">
       <div className="mb-3 flex items-center justify-center gap-2">
-        {/* <CheckCircle className="w-5 h-5 text-emerald-600" /> */}
         <h2 className="text-base font-semibold text-gray-800">パートナーの完了タスク</h2>
       </div>
-
 
       {!partnerUid ? (
         <p className="text-sm text-gray-500">ペア設定がありません。</p>
@@ -205,6 +225,7 @@ export default function PartnerCompletedTasksCard() {
         <ul className="space-y-2">
           {displayRows.map((t) => {
             const liked = likedMap[t.id] === true;
+            const disabled = pendingMap[t.id] === true;
             return (
               <li
                 key={t.id}
@@ -214,7 +235,7 @@ export default function PartnerCompletedTasksCard() {
                   <CheckCircle className="w-4 h-4 text-emerald-700" />
                   <span className="text-sm text-gray-800">{t.name}</span>
                 </div>
-                <HeartButton liked={liked} onClick={() => toggleLike(t.id)} />
+                <HeartButton liked={liked} onClick={() => toggleLike(t.id)} disabled={disabled} />
               </li>
             );
           })}

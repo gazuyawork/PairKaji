@@ -1,3 +1,4 @@
+// src/components/home/parts/HeartsHistoryModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -5,7 +6,14 @@ export const dynamic = 'force-dynamic';
 import React, { useEffect, useMemo, useState } from 'react';
 import BaseModal from '@/components/common/modals/BaseModal';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, type DocumentData } from 'firebase/firestore';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  type DocumentData,
+  Timestamp,
+} from 'firebase/firestore';
 import {
   startOfWeek,
   endOfWeek,
@@ -22,26 +30,42 @@ import HeartNutrientFlow from './HeartNutrientFlow';
 
 type Props = { isOpen: boolean; onClose: () => void };
 
+// --- debug helpers ---
+const DEBUG_HEARTS = true;
+const dbg = (...args: unknown[]) => {
+  if (DEBUG_HEARTS) console.debug('[HeartsHistoryModal]', ...args);
+};
+const group = (label: string) => DEBUG_HEARTS && console.group(label);
+const groupEnd = () => DEBUG_HEARTS && console.groupEnd();
+const time = (label: string) => DEBUG_HEARTS && console.time(label);
+const timeEnd = (label: string) => DEBUG_HEARTS && console.timeEnd(label);
+
+/**
+ * Firestore の taskLikes の型（添付スクショ準拠）
+ * 例：
+ * - participants: [receiverId, senderId] など 2人の uid
+ * - senderId: 送信者 uid
+ * - receiverId: 受信者 uid
+ * - createdAt: Timestamp
+ * - taskId: string
+ */
 type LikeDoc = {
   id: string;
-  date: string; // "YYYY-MM-DD"
-  likedBy: string[]; // ユーザーID配列
+  createdAt?: unknown;
+  senderId?: string | null;
+  receiverId?: string | null;
+  participants?: string[];
+  taskId?: string | null;
 };
 
-// 画像（public/assets/heart-garden/ に 4 枚配置してください）
 const HEART_GARDEN_IMAGES = [
-  '/assets/heart-garden/stage1.png', // 芽
-  '/assets/heart-garden/stage2.png', // 若葉
-  '/assets/heart-garden/stage3.png', // つぼみ
-  '/assets/heart-garden/stage4.png', // 開花（花びらがハート）
+  '/assets/heart-garden/stage1.png',
+  '/assets/heart-garden/stage2.png',
+  '/assets/heart-garden/stage3.png',
+  '/assets/heart-garden/stage4.png',
 ] as const;
 
-// ステージしきい値（合計：受+送）
-const STAGE_THRESHOLDS = {
-  leaf: 2,     // 2件〜：若葉
-  grow: 5,     // 5件〜：成長
-  blossom: 10, // 10件〜：開花
-} as const;
+const STAGE_THRESHOLDS = { leaf: 2, grow: 5, blossom: 10 } as const;
 
 function resolveStage(totalThisWeek: number): 0 | 1 | 2 | 3 {
   if (totalThisWeek >= STAGE_THRESHOLDS.blossom) return 3;
@@ -50,38 +74,78 @@ function resolveStage(totalThisWeek: number): 0 | 1 | 2 | 3 {
   return 0;
 }
 
-/* =========================================================
-   枠の中を“ふわふわ”飛び回るハート（受け取った合計ぶんを表示）
-   - パフォーマンス配慮で最大 24 個に制限
-   - 親要素（枠）の中に絶対配置（inset-0）して、枠全体に散布
-   - 点滅（ゆっくり）+ 漂い（広めの可動域）
-   ========================================================= */
-function FloatingHearts({
-  count,
-  fadeInKey = 0,
-}: {
-  count: number;
-  fadeInKey?: number; // アニメ開始のキー（吸収→表示の切替タイミングで更新）
-}) {
+// id 末尾の `YYYY-MM-DD` を拾う（古い実装保険）
+function toDateFromIdSuffix(id: string): Date | null {
+  const m = id.match(/(\d{4}-\d{2}-\d{2})$/);
+  if (!m) return null;
+  const d = parseISO(m[1]);
+  const ok = !Number.isNaN(d.getTime());
+  dbg('toDateFromIdSuffix:', id, '->', ok ? d : null);
+  return ok ? d : null;
+}
+
+// 任意の値を Date へ（ログ付き）
+function toDateFromLikeDate(val: unknown, keyLabel: string): Date | null {
+  if (!val) {
+    dbg(`toDateFromLikeDate[${keyLabel}]: null`);
+    return null;
+  }
+  try {
+    if (val instanceof Timestamp) {
+      const d = val.toDate();
+      dbg(`toDateFromLikeDate[${keyLabel}]: Timestamp ->`, d);
+      return d;
+    }
+    if (typeof val === 'object' && val !== null && 'seconds' in (val as any)) {
+      const { seconds, nanoseconds } = val as { seconds: number; nanoseconds?: number };
+      const d = new Date(seconds * 1000 + Math.floor((nanoseconds ?? 0) / 1e6));
+      dbg(`toDateFromLikeDate[${keyLabel}]: seconds/nanos ->`, d);
+      return d;
+    }
+    if (val instanceof Date) {
+      if (!Number.isNaN(val.getTime())) {
+        dbg(`toDateFromLikeDate[${keyLabel}]: Date ->`, val);
+        return val;
+      }
+      dbg(`toDateFromLikeDate[${keyLabel}]: Date invalid`, val);
+      return null;
+    }
+    if (typeof val === 'number') {
+      const d = new Date(val);
+      dbg(`toDateFromLikeDate[${keyLabel}]: number(ms) ->`, d);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof val === 'string' && val.length > 0) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        const d = parseISO(val);
+        dbg(`toDateFromLikeDate[${keyLabel}]: YYYY-MM-DD ->`, d);
+        return Number.isNaN(d.getTime()) ? null : d;
+      } else {
+        const d = new Date(val);
+        dbg(`toDateFromLikeDate[${keyLabel}]: string(ISO?) ->`, d);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+    }
+  } catch (e) {
+    dbg(`toDateFromLikeDate[${keyLabel}]: error`, e);
+  }
+  dbg(`toDateFromLikeDate[${keyLabel}]: unrecognized`, val);
+  return null;
+}
+
+function FloatingHearts({ count, fadeInKey = 0 }: { count: number; fadeInKey?: number }) {
   const MAX = 24;
   const n = Math.min(Math.max(count, 0), MAX);
 
-  // ハート毎のランダム・パラメータを安定生成（枠全体に散布）
-  const seeds = useMemo(() => {
+  const seeds = React.useMemo(() => {
     return Array.from({ length: n }).map((_, i) => {
-      // 枠内の 6%〜94%（端に少し余白）でランダム配置
-      const leftPct = 6 + Math.random() * 88;  // 6〜94%
-      const topPct  = 8 + Math.random() * 84;  // 8〜92%
-
-      // 漂いアニメ（長め）
-      const dur = 10 + Math.random() * 8;      // 10〜18s
-      const delay = Math.random() * 2;         // 0〜2s
-
-      // ゆっくり点滅（心拍のように）
-      const blinkDur = 3.5 + Math.random() * 3.5; // 3.5〜7s
-      const blinkDelay = Math.random() * 1.2;     // 0〜1.2s
-
-      const scale = 0.7 + Math.random() * 0.6; // 0.7〜1.3
+      const leftPct = 6 + Math.random() * 88;
+      const topPct = 8 + Math.random() * 84;
+      const dur = 10 + Math.random() * 8;
+      const delay = Math.random() * 2;
+      const blinkDur = 3.5 + Math.random() * 3.5;
+      const blinkDelay = Math.random() * 1.2;
+      const scale = 0.7 + Math.random() * 0.6;
       return { id: `${fadeInKey}-${i}`, leftPct, topPct, dur, delay, blinkDur, blinkDelay, scale };
     });
   }, [n, fadeInKey]);
@@ -107,7 +171,6 @@ function FloatingHearts({
         </span>
       ))}
 
-      {/* スタイル：広い可動域のドリフト + フェードイン + ゆっくり点滅 */}
       <style jsx>{`
         .float-heart {
           animation-name: heartDrift, heartFadeIn, heartBlink;
@@ -116,21 +179,14 @@ function FloatingHearts({
           animation-fill-mode: both, forwards, both;
         }
         @keyframes heartDrift {
-          0%   { transform: translate(calc(-50% +   0px), calc(-50% +   0px))  scale(1.00) rotate( 0deg); }
-          25%  { transform: translate(calc(-50% + +28px), calc(-50% -  36px))  scale(1.06) rotate( 8deg); }
-          50%  { transform: translate(calc(-50% +   0px), calc(-50% -  56px))  scale(0.97) rotate(-9deg); }
-          75%  { transform: translate(calc(-50% -  32px), calc(-50% -  22px))  scale(1.04) rotate( 7deg); }
-          100% { transform: translate(calc(-50% +   0px), calc(-50% +   0px))  scale(1.00) rotate( 0deg); }
+          0% { transform: translate(calc(-50% + 0px), calc(-50% + 0px)) scale(1) rotate(0deg); }
+          25% { transform: translate(calc(-50% + 28px), calc(-50% - 36px)) scale(1.06) rotate(8deg); }
+          50% { transform: translate(calc(-50% + 0px), calc(-50% - 56px)) scale(0.97) rotate(-9deg); }
+          75% { transform: translate(calc(-50% - 32px), calc(-50% - 22px)) scale(1.04) rotate(7deg); }
+          100% { transform: translate(calc(-50% + 0px), calc(-50% + 0px)) scale(1) rotate(0deg); }
         }
-        @keyframes heartFadeIn {
-          0%   { opacity: 0; }
-          100% { opacity: 1; }
-        }
-        @keyframes heartBlink {
-          0%   { opacity: 0.60; }
-          50%  { opacity: 1.00; }
-          100% { opacity: 0.60; }
-        }
+        @keyframes heartFadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes heartBlink { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
       `}</style>
     </div>
   );
@@ -143,181 +199,245 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   const [saveComplete] = useState(false);
 
   const [partnerId, setPartnerId] = useState<string | null>(null);
-
-  // 受け取った側（自分のタスクが相手に「ありがとう」された）
   const [rawLikesReceived, setRawLikesReceived] = useState<LikeDoc[]>([]);
-  // 送った側（相手のタスクに自分が「ありがとう」した）
   const [rawLikesGiven, setRawLikesGiven] = useState<LikeDoc[]>([]);
-
-  // 週切替（0=今週, -1=先週 など）
   const [weekOffset, setWeekOffset] = useState<number>(0);
 
-  /* パートナーIDの取得 */
+  // partner
   useEffect(() => {
     if (!uid || !isOpen) return;
-
     const qConfirmed = query(
       collection(db, 'pairs'),
       where('status', '==', 'confirmed'),
       where('userIds', 'array-contains', uid)
     );
 
+    dbg('subscribe pairs.confirmed for uid=', uid);
     const unsub = onSnapshot(
       qConfirmed,
+      { includeMetadataChanges: true },
       (snapshot) => {
+        group('pairs onSnapshot');
+        dbg('empty=', snapshot.empty, 'size=', snapshot.size, 'pendingWrites=', snapshot.metadata.hasPendingWrites);
         if (snapshot.empty) {
           setPartnerId(null);
+          groupEnd();
           return;
         }
         const d0 = snapshot.docs[0].data() as DocumentData;
         const ids = Array.isArray(d0.userIds) ? (d0.userIds as unknown[]) : [];
-        let other =
-          (ids.find((x) => typeof x === 'string' && x !== uid) as string | undefined) ?? undefined;
+        let other = (ids.find((x) => typeof x === 'string' && x !== uid) as string | undefined) ?? undefined;
         if (!other) {
           const a = typeof d0.userAId === 'string' ? (d0.userAId as string) : undefined;
           const b = typeof d0.userBId === 'string' ? (d0.userBId as string) : undefined;
           other = a && a !== uid ? a : b && b !== uid ? b : undefined;
         }
         setPartnerId(other ?? null);
+        dbg('partnerId ->', other ?? null);
+        groupEnd();
       },
-      (err) => console.warn('[HeartsHistoryModal] pairs(confirmed) onSnapshot error:', err)
+      (err) => console.warn('[HeartsHistoryModal] pairs onSnapshot error:', err)
     );
-
     return () => unsub();
   }, [uid, isOpen]);
 
-  /* 受け取った側の購読（ownerId==uid） */
+  // received (= 自分が受信者)
   useEffect(() => {
     if (!uid || !isOpen) return;
+    const qLikes = query(collection(db, 'taskLikes'), where('participants', 'array-contains', uid));
+    dbg('subscribe taskLikes(received) participants contains', uid);
 
-    const qLikes = query(collection(db, 'taskLikes'), where('ownerId', '==', uid));
     const unsub = onSnapshot(
       qLikes,
+      { includeMetadataChanges: true },
       (snap) => {
+        group('taskLikes(received) onSnapshot');
+        dbg('empty=', snap.empty, 'size=', snap.size, 'pendingWrites=', snap.metadata.hasPendingWrites);
         const likes: LikeDoc[] = [];
-        snap.forEach((doc) => {
-          const d = doc.data() as Record<string, unknown>;
-          likes.push({
-            id: doc.id,
-            date: (d.date as string) ?? '',
-            likedBy: Array.isArray(d.likedBy)
-              ? (d.likedBy.filter((x) => typeof x === 'string') as string[])
-              : [],
-          });
+        snap.forEach((docSnap) => {
+          const d = docSnap.data() as Record<string, unknown>;
+          const receiverId = typeof d.receiverId === 'string' ? (d.receiverId as string) : null;
+          const senderId = typeof d.senderId === 'string' ? (d.senderId as string) : null;
+          if (receiverId === uid) {
+            likes.push({
+              id: docSnap.id,
+              createdAt: d.createdAt ?? null,
+              senderId,
+              receiverId,
+              participants: Array.isArray(d.participants) ? (d.participants as string[]) : [],
+              taskId: typeof d.taskId === 'string' ? (d.taskId as string) : null,
+            });
+          }
         });
+        dbg('received docs count=', likes.length);
         setRawLikesReceived(likes);
+        groupEnd();
       },
-      (err) => console.warn('[HeartsHistoryModal] received taskLikes onSnapshot error:', err)
+      (err) => console.warn('[HeartsHistoryModal] received onSnapshot error:', err)
     );
-
     return () => unsub();
   }, [uid, isOpen]);
 
-  /* 送った側の購読（ownerId==partnerId） */
+  // given (= 自分が送信者)
   useEffect(() => {
-    if (!uid || !isOpen || !partnerId) {
-      setRawLikesGiven([]); // パートナー未確定時は空
-      return;
-    }
+    if (!uid || !isOpen) return;
+    const qLikes = query(collection(db, 'taskLikes'), where('participants', 'array-contains', uid));
+    dbg('subscribe taskLikes(given) participants contains', uid);
 
-    const qLikes = query(collection(db, 'taskLikes'), where('ownerId', '==', partnerId));
     const unsub = onSnapshot(
       qLikes,
+      { includeMetadataChanges: true },
       (snap) => {
+        group('taskLikes(given) onSnapshot');
+        dbg('empty=', snap.empty, 'size=', snap.size, 'pendingWrites=', snap.metadata.hasPendingWrites);
         const likes: LikeDoc[] = [];
-        snap.forEach((doc) => {
-          const d = doc.data() as Record<string, unknown>;
-          likes.push({
-            id: doc.id,
-            date: (d.date as string) ?? '',
-            likedBy: Array.isArray(d.likedBy)
-              ? (d.likedBy.filter((x) => typeof x === 'string') as string[])
-              : [],
-          });
+        snap.forEach((docSnap) => {
+          const d = docSnap.data() as Record<string, unknown>;
+          const senderId = typeof d.senderId === 'string' ? (d.senderId as string) : null;
+          const receiverId = typeof d.receiverId === 'string' ? (d.receiverId as string) : null;
+          if (senderId === uid) {
+            likes.push({
+              id: docSnap.id,
+              createdAt: d.createdAt ?? null,
+              senderId,
+              receiverId,
+              participants: Array.isArray(d.participants) ? (d.participants as string[]) : [],
+              taskId: typeof d.taskId === 'string' ? (d.taskId as string) : null,
+            });
+          }
         });
+        dbg('given docs count=', likes.length);
         setRawLikesGiven(likes);
+        groupEnd();
       },
-      (err) => console.warn('[HeartsHistoryModal] given taskLikes onSnapshot error:', err)
+      (err) => console.warn('[HeartsHistoryModal] given onSnapshot error:', err)
     );
-
     return () => unsub();
-  }, [uid, isOpen, partnerId]);
+  }, [uid, isOpen]);
 
-  /* 受/送の判定ヘルパ */
-  const isReceivedFromPartner = (likedBy: string[]) => {
-    if (partnerId) return likedBy.includes(partnerId);
-    return likedBy.some((u) => u && u !== uid);
+  const isReceivedFromPartner = (senderId?: string | null) => {
+    if (!senderId) return false;
+    if (partnerId) return senderId === partnerId;
+    return senderId !== uid;
   };
-  const isGivenByMe = (likedBy: string[]) => likedBy.includes(uid ?? '__unknown__');
+  const isGivenByMe = (receiverId?: string | null) => {
+    if (!receiverId || !uid) return false;
+    if (partnerId) return receiverId === partnerId;
+    return receiverId !== uid;
+  };
 
-  /* 週範囲 */
   const weekBounds = useMemo(() => {
     const base = addWeeks(new Date(), weekOffset);
-    return {
-      start: startOfWeek(base, { weekStartsOn: 1 }),
-      end: endOfWeek(base, { weekStartsOn: 1 }),
-    };
+    const start = startOfWeek(base, { weekStartsOn: 1 });
+    const end = endOfWeek(base, { weekStartsOn: 1 });
+    dbg('weekBounds:', { start, end, weekOffset });
+    return { start, end };
   }, [weekOffset]);
 
-  /* 合計算出（今週範囲のみ） */
-  const { totalReceived, totalGiven, weekRangeLabel } = useMemo(() => {
+  /** 日付抽出：createdAt を最優先。互換目的で id 末尾日付にフォールバック */
+  const extractDate = (r: LikeDoc): Date | null => {
+    const candsRaw = [
+      { key: 'createdAt', value: toDateFromLikeDate(r.createdAt, 'createdAt') },
+      { key: 'id-suffix', value: toDateFromIdSuffix(r.id) },
+    ] as const;
+
+    const cands: Array<{ key: string; value: Date }> = candsRaw.filter(
+      (x) => x.value instanceof Date
+    ) as Array<{ key: string; value: Date }>;
+
+    if (cands.length === 0) {
+      dbg(`extractDate[id=${r.id}] -> null (no date fields)`);
+      return null;
+    }
+
+    const created = cands.find((c) => c.key === 'createdAt');
+    const chosen = created ?? cands[0];
+    dbg(`extractDate[id=${r.id}] use ${chosen.key} ->`, chosen.value);
+    return chosen.value;
+  };
+
+  // 集計
+  const { totalReceived, totalGiven, weekRangeLabel, stage, totalThisWeek } = useMemo(() => {
+    time('calc totals');
+
     const { start, end } = weekBounds;
+    const inRange = (d: Date | null) => !!d && isWithinInterval(d, { start, end });
+
     let tr = 0;
     let tg = 0;
 
+    group('iterate received');
     for (const r of rawLikesReceived) {
-      if (!r.date) continue;
-      const d = parseISO(r.date);
-      if (!isWithinInterval(d, { start, end })) continue;
-      if (!isReceivedFromPartner(r.likedBy)) continue;
+      const d = extractDate(r);
+      const okRange = inRange(d);
+      const okFromPartner = isReceivedFromPartner(r.senderId);
+      dbg('received item', {
+        id: r.id,
+        d,
+        okRange,
+        okFromPartner,
+        senderId: r.senderId,
+        receiverId: r.receiverId,
+      });
+      if (!okRange) continue;
+      if (!okFromPartner) continue;
       tr += 1;
     }
+    groupEnd();
 
+    group('iterate given');
     for (const r of rawLikesGiven) {
-      if (!r.date) continue;
-      const d = parseISO(r.date);
-      if (!isWithinInterval(d, { start, end })) continue;
-      if (!isGivenByMe(r.likedBy)) continue;
+      const d = extractDate(r);
+      const okRange = inRange(d);
+      const okByMe = isGivenByMe(r.receiverId);
+      dbg('given item', {
+        id: r.id,
+        d,
+        okRange,
+        okByMe,
+        senderId: r.senderId,
+        receiverId: r.receiverId,
+      });
+      if (!okRange) continue;
+      if (!okByMe) continue;
       tg += 1;
     }
+    groupEnd();
 
-    return {
-      totalReceived: tr,
-      totalGiven: tg,
-      weekRangeLabel: `${format(start, 'M/d')} - ${format(end, 'M/d')}`,
-    };
+    const total = tr + tg;
+    const stg = resolveStage(total);
+    const label = `${format(start, 'M/d')} - ${format(end, 'M/d')}`;
+
+    dbg('totals ->', { totalReceived: tr, totalGiven: tg, totalThisWeek: total, stage: stg, weekRangeLabel: label });
+    timeEnd('calc totals');
+
+    return { totalReceived: tr, totalGiven: tg, totalThisWeek: total, stage: stg, weekRangeLabel: label };
   }, [rawLikesReceived, rawLikesGiven, weekBounds, partnerId, uid]);
 
-  // ステージ（合計：受+送）
-  const totalThisWeek = totalReceived + totalGiven;
-  const stage = resolveStage(totalThisWeek);
-
-  /* =========================================================
-     「開いた時」に新規でもらっていれば → 吸収アニメ → ふわふわ表示
-     - localStorage に週ごとの「最後に見た受け取り合計」を記録
-     - 週移動（過去週）では吸収アニメは無効
-     ========================================================= */
+  // 吸収アニメ
   const lastSeenKey = useMemo(() => {
     const s = format(weekBounds.start, 'yyyy-MM-dd');
     const e = format(weekBounds.end, 'yyyy-MM-dd');
-    return `hhm_last_seen_received_${s}_${e}`;
+    const key = `hhm_last_seen_received_${s}_${e}`;
+    dbg('lastSeenKey=', key);
+    return key;
   }, [weekBounds]);
 
-  // 吸収アニメ用
   const [feedCount, setFeedCount] = useState(0);
   const [feedActive, setFeedActive] = useState(false);
-
-  // ふわふわ表示のフェードインキー（吸収後に更新して、気持ちよく現れる）
   const [driftKey, setDriftKey] = useState(0);
 
-  // モーダルを開いたときのみ判定（週オフセット 0 のみ）
   useEffect(() => {
     if (!isOpen) return;
+    group('open effect');
+    dbg('isOpen=', isOpen, 'weekOffset=', weekOffset, 'totalReceived=', totalReceived);
+
     if (weekOffset !== 0) {
       setFeedActive(false);
       setFeedCount(0);
-      // 過去週：吸収アニメなし、ただちにふわふわ表示
       setDriftKey((k) => k + 1);
+      dbg('past week -> no feed animation, driftKey++');
+      groupEnd();
       return;
     }
 
@@ -325,52 +445,54 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     try {
       const raw = localStorage.getItem(lastSeenKey);
       if (raw) last = Math.max(0, Number(raw) || 0);
-    } catch {
-      // 何もしない
+    } catch (e) {
+      dbg('localStorage read error', e);
     }
+    dbg('lastSeen=', last);
 
     const delta = totalReceived - last;
+    dbg('delta=', delta);
+
     if (delta > 0) {
-      // 新規で受け取りが増えていた → 吸収アニメ
       setFeedCount(delta);
       setFeedActive(true);
-
-      // アニメ後にフェードインでふわふわ表示・記録更新
+      dbg('start feed animation. count=', delta);
       const t = setTimeout(() => {
         setFeedActive(false);
         setDriftKey((k) => k + 1);
+        dbg('end feed animation, driftKey++ and persist lastSeen');
         try {
           localStorage.setItem(lastSeenKey, String(totalReceived));
-        } catch {
-          /* noop */
+        } catch (e) {
+          dbg('localStorage write error', e);
         }
-      }, 1300); // HeartNutrientFlow の終了タイミングより少し後
-
+      }, 1300);
+      groupEnd();
       return () => clearTimeout(t);
-    } else {
-      // 変化なし → そのままふわふわ表示
-      setFeedActive(false);
-      setFeedCount(0);
-      setDriftKey((k) => k + 1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    setFeedActive(false);
+    setFeedCount(0);
+    setDriftKey((k) => k + 1);
+    dbg('no new received -> just driftKey++');
+    groupEnd();
   }, [isOpen, weekOffset, totalReceived, lastSeenKey]);
 
-  // 受け取り合計が 0 → ふわふわも非表示（静かな状態）
   const showDrift = totalReceived > 0;
 
+  useEffect(() => {
+    if (!isOpen) return;
+    group('open summary');
+    dbg('uid=', uid, 'partnerId=', partnerId, 'weekOffset=', weekOffset);
+    dbg('weekRangeLabel=', weekRangeLabel);
+    dbg('counts:', { totalReceived, totalGiven, totalThisWeek, stage });
+    groupEnd();
+  }, [isOpen, uid, partnerId, weekOffset, weekRangeLabel, totalReceived, totalGiven, totalThisWeek, stage]);
+
   return (
-    <BaseModal
-      isOpen={isOpen}
-      isSaving={isSaving}
-      saveComplete={saveComplete}
-      onClose={onClose}
-      hideActions
-    >
-      {/* ステージ画像のプリロード */}
+    <BaseModal isOpen={isOpen} isSaving={isSaving} saveComplete={saveComplete} onClose={onClose} hideActions>
       <PreloadHeartGardenImages hrefs={[...HEART_GARDEN_IMAGES]} />
 
-      {/* ヘッダー（ナビ + 期間をタイトル右に表示） */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
@@ -395,41 +517,23 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
             <ChevronRight className="w-5 h-5 text-gray-600" />
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 rounded hover:bg-gray-100"
-          aria-label="閉じる"
-        >
+        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="閉じる">
           <X className="w-5 h-5 text-gray-500" />
         </button>
       </div>
 
-      {/* 成長イラスト + 最小カウンタ（説明文なし）
-          ★ この枠内（div）をハートの可動領域とします（relative + overflow-hidden） */}
       <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden">
-        {/* 中央にステージ画像。吸収アニメはこの画像に向けて実施 */}
         <div className="relative z-0" style={{ width: 144, height: 144 }}>
-          <StageImage
-            stage={stage}
-            sources={HEART_GARDEN_IMAGES as [string, string, string, string]}
-            size={144}
-          />
-          {/* 開いた時に新規で増えていれば → 吸収アニメ（今週のみ） */}
-          {weekOffset === 0 && (
-            <HeartNutrientFlow count={feedCount} targetSize={144} active={feedActive} />
-          )}
+          <StageImage stage={resolveStage(totalThisWeek)} sources={HEART_GARDEN_IMAGES as [string, string, string, string]} size={144} />
+          {weekOffset === 0 && <HeartNutrientFlow count={feedCount} targetSize={144} active={feedActive} />}
         </div>
 
-        {/* 枠全体にふわふわハートを散らす（画像より前面に表示） */}
         {showDrift && (
           <div className="absolute inset-0 z-10">
             <FloatingHearts count={totalReceived} fadeInKey={driftKey} />
           </div>
         )}
 
-        {/* 数字のみ（ラベル最小化） */}
         <div className="flex items-center gap-6 text-base">
           <span className="inline-flex items-center gap-2">
             <Heart className="w-4 h-4 text-rose-500" />
