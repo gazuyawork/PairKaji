@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CardMini } from './parts_internal/CardMini';
 import TaskHistoryModal from './TaskHistoryModal';
 import HeartsHistoryModal from '@/components/home/parts/HeartsHistoryModal';
@@ -11,7 +11,7 @@ import { Heart, CheckCircle } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import {
   collection,
-  onSnapshot, // ← リアルタイム購読（変更点）
+  onSnapshot,
   query,
   where,
   Timestamp,
@@ -32,6 +32,11 @@ export default function HomeDashboardCard() {
   const [heartCount, setHeartCount] = useState<number | null>(null);
   const [taskCount, setTaskCount] = useState<number | null>(null);
 
+  // 追加: 直前の heartCount を保持
+  const prevHeartCountRef = useRef<number | null>(null);
+  // 追加: ハート鼓動アニメーションON/OFF
+  const [isHeartAnimating, setIsHeartAnimating] = useState(false);
+
   const loading = useMemo(
     () => heartCount === null || taskCount === null,
     [heartCount, taskCount],
@@ -47,18 +52,26 @@ export default function HomeDashboardCard() {
     const user = auth.currentUser;
     if (!user) return;
 
-    // ありがとう（hearts）リアルタイム購読
+    // ありがとう（taskLikes）リアルタイム購読：受け取った数をカウント
     const heartsQ = query(
-      collection(db, 'hearts'),
+      collection(db, 'taskLikes'),
       where('createdAt', '>=', weekStartTs),
       where('createdAt', '<',  weekEndTs),
-      where('participants', 'array-contains', user.uid),
+      where('receiverId', '==', user.uid),
     );
     const unsubHearts = onSnapshot(
       heartsQ,
-      (snap) => setHeartCount(snap.size),
+      (snap) => {
+        const newCount = snap.size;
+        // 新規ありがとう受信を検知
+        if (prevHeartCountRef.current !== null && newCount > prevHeartCountRef.current) {
+          setIsHeartAnimating(true);
+        }
+        prevHeartCountRef.current = newCount;
+        setHeartCount(newCount);
+      },
       (e) => {
-        console.error('hearts onSnapshot error:', e);
+        console.error('taskLikes onSnapshot error:', e);
         setHeartCount(0);
       }
     );
@@ -86,6 +99,13 @@ export default function HomeDashboardCard() {
     };
   }, [weekStartTs, weekEndTs]);
 
+  // モーダルを開いたら鼓動を止める
+  useEffect(() => {
+    if (isHeartsOpen) {
+      setIsHeartAnimating(false);
+    }
+  }, [isHeartsOpen]);
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 max-w-3xl m-auto">
       <div className="mb-3">
@@ -103,9 +123,18 @@ export default function HomeDashboardCard() {
           <CardMini
             label="ありがとう"
             value={loading ? '—' : `${heartCount}`}
-            onClick={() => setHeartsOpen(true)}
+            onClick={() => {
+              setHeartsOpen(true);
+              setIsHeartAnimating(false); // モーダル開いたら停止
+            }}
             bgClass="bg-rose-50"
-            valueIcon={<Heart className="w-4 h-4 text-rose-400" />}
+            valueIcon={
+              <Heart
+                className={`w-4 h-4 text-rose-400 transition-transform ${
+                  isHeartAnimating ? 'animate-heartbeat' : ''
+                }`}
+              />
+            }
           />
           <CardMini
             label="タスク"
