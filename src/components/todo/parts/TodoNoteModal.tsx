@@ -10,7 +10,7 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import { ChevronDown, ChevronUp, Eye, Pencil, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, Pencil, Plus, GripVertical } from 'lucide-react';
 import RecipeEditor, {
   type Recipe,
   type RecipeEditorHandle,
@@ -35,9 +35,29 @@ import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceA
 import BaseModal from '../../common/modals/BaseModal';
 import NextImage from 'next/image';
 
+// ▼▼ dnd-kit（参考URLの並び替え用） ▼▼
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DraggableAttributes,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+// ▲▲ dnd-kit ▲▲
+
 /* ---------------- Types & guards ---------------- */
 
-// ★ 旅行を追加
 type Category = '料理' | '買い物' | '旅行';
 
 type Ingredient = {
@@ -52,7 +72,6 @@ type TaskDoc = {
   todos?: TodoDoc[];
 };
 
-// ★ TodoDocにも時間帯を追加（読み込みのため）
 type TodoDoc = {
   id: string;
   text?: string;
@@ -85,12 +104,10 @@ function isTodoArray(v: unknown): v is TodoDoc[] {
 
 /* ---------------- Constants ---------------- */
 
-// 表示上限: 画面高の 50%（vh基準）
 const MAX_TEXTAREA_VH = 50;
 
 /* ---------------- Helpers (time validation) ---------------- */
 
-// ★ 旅行時の時間帯入力検証
 const isHHmm = (s: string) => /^\d{1,2}:\d{2}$/.test(s);
 const toMinutes = (s: string) => {
   if (!isHHmm(s)) return null;
@@ -108,10 +125,7 @@ const validateTimeRange = (start: string, end: string): string => {
   return '';
 };
 
-// ★ 追加: HH:mm に分を加算して HH:mm に戻す（24時超過は 23:59 にクランプ）
-const clampToDayMinutes = (mins: number) => {
-  return Math.max(0, Math.min(23 * 60 + 59, mins));
-};
+const clampToDayMinutes = (mins: number) => Math.max(0, Math.min(23 * 60 + 59, mins));
 const addMinutesToHHmm = (hhmm: string, deltaMin: number): string => {
   const base = toMinutes(hhmm);
   if (base == null || !Number.isFinite(deltaMin)) return '';
@@ -120,8 +134,6 @@ const addMinutesToHHmm = (hhmm: string, deltaMin: number): string => {
   const m = next % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
-
-// ★ 追加: HH:mm 同士の差分（分）を返す。無効なら null
 const minutesBetweenHHmm = (start: string, end: string): number | null => {
   if (!isHHmm(start) || !isHHmm(end)) return null;
   const s = toMinutes(start);
@@ -132,12 +144,6 @@ const minutesBetweenHHmm = (start: string, end: string): number | null => {
 
 /* ---------------- Image compression ---------------- */
 
-/**
- * クライアント側で画像を圧縮して Blob を返す。
- * - 最大辺 1600px に収まるよう等比縮小
- * - WebP(0.7) と JPEG(0.7) を生成して小さい方を採用
- * - もともと十分小さい場合は再圧縮スキップ
- */
 async function compressImage(
   file: File,
   opts: { maxWidth?: number; maxHeight?: number; quality?: number } = {}
@@ -146,7 +152,6 @@ async function compressImage(
   const maxHeight = opts.maxHeight ?? 1600;
   const quality = opts.quality ?? 0.7;
 
-  // 200KB 未満はそのまま使う（品質劣化・再圧縮コストを避ける）
   if (file.size < 200 * 1024) {
     return {
       blob: file,
@@ -154,7 +159,6 @@ async function compressImage(
     };
   }
 
-  // 画像読み込み（ImageBitmap がだめなら <img> フォールバック）
   const bitmapOrImg: ImageBitmap | HTMLImageElement = await (async () => {
     try {
       return await createImageBitmap(file);
@@ -169,7 +173,6 @@ async function compressImage(
     }
   })();
 
-  // サイズ取得（HTMLImageElement / ImageBitmap 両対応）
   const width = 'naturalWidth' in bitmapOrImg ? bitmapOrImg.naturalWidth : (bitmapOrImg as ImageBitmap).width;
   const height = 'naturalHeight' in bitmapOrImg ? bitmapOrImg.naturalHeight : (bitmapOrImg as ImageBitmap).height;
 
@@ -219,9 +222,30 @@ interface TodoNoteModalProps {
 }
 
 type PendingUpload = { blob: Blob; mime: 'image/webp' | 'image/jpeg' };
-
-// ★ updateTodoInTask の第三引数の型をそのまま利用（payload 赤線の根対策）
 type TodoUpdates = Parameters<typeof updateTodoInTask>[2];
+
+// dnd のドラッグハンドル型（URL用）
+type DragHandleRenderProps = {
+  attributes: DraggableAttributes;
+  listeners: ReturnType<typeof useSortable>['listeners'];
+};
+
+// 参考URL用の Sortable 行
+function SortableUrlRow({
+  id,
+  children,
+}: { id: string; children: (p: DragHandleRenderProps) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="grid grid-cols-12 gap-2 items-center">
+      {children({ attributes, listeners })}
+    </div>
+  );
+}
 
 export default function TodoNoteModal({
   isOpen,
@@ -250,36 +274,32 @@ export default function TodoNoteModal({
   const [isPreview, setIsPreview] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
 
-  // ★ compareQuantity の現在値をエフェクト外で参照するための Ref（依存配列回避）
   const compareQuantityRef = useRef<string>('');
-  useEffect(() => {
-    compareQuantityRef.current = compareQuantity;
-  }, [compareQuantity]);
+  useEffect(() => { compareQuantityRef.current = compareQuantity; }, [compareQuantity]);
 
-  // ★ 旅行時間帯の状態とエラー
+  // 旅行
   const [timeStart, setTimeStart] = useState<string>('');
   const [timeEnd, setTimeEnd] = useState<string>('');
   const [timeError, setTimeError] = useState<string>('');
-  // ★ 追加: 所要時間（分）— 編集時のみ使用／DB保存対象外
-  const [durationMin, setDurationMin] = useState<string>(''); // ← 新規
+  const [durationMin, setDurationMin] = useState<string>('');
 
+  // レシピ（※ referenceUrls はここでは持たない）
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
-  // 保存済みURL（Firestore側の値）
+  // 画像
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  // 差分削除用：直前に保存されていたURL
   const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null);
-  // 選択後～保存前までの状態
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isImageRemoved, setIsImageRemoved] = useState(false);
 
-  // 参考URL
+  // 参考URL（移植先：ここで管理）
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
-  const [newRefUrl, setNewRefUrl] = useState('');
+  const [urlIds, setUrlIds] = useState<string[]>([]);
+  const urlRefs = useRef<Array<HTMLInputElement | null>>([]);
 
-  // フェードイン用
+  // プレビュー用
   const [imgReady, setImgReady] = useState(false);
   const displaySrc = previewUrl ?? imageUrl;
   const showMediaFrame = isOpen && !!displaySrc;
@@ -309,7 +329,12 @@ export default function TodoNoteModal({
     return validPrice || validQty;
   }, [category, price, quantity]);
 
-  const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || referenceUrls.length > 0 || (!!timeStart && !!timeEnd);
+  const hasReference = useMemo(
+    () => referenceUrls.some((u) => u.trim() !== ''),
+    [referenceUrls]
+  );
+
+  const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || hasReference || (!!timeStart && !!timeEnd);
   const showMemo = useMemo(() => !isPreview || hasMemo, [isPreview, hasMemo]);
 
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
@@ -323,9 +348,7 @@ export default function TodoNoteModal({
         return false;
     }
     if (a.steps.length !== b.steps.length) return false;
-    for (let i = 0; i < a.steps.length; i++) {
-      if (a.steps[i] !== b.steps[i]) return false;
-    }
+    for (let i = 0; i < a.steps.length; i++) if (a.steps[i] !== b.steps[i]) return false;
     return true;
   }, []);
 
@@ -379,13 +402,12 @@ export default function TodoNoteModal({
   }, [timeStart, timeEnd]);
 
   useEffect(() => setMounted(true), []);
-
   useEffect(() => {
     const parsed = Number.parseFloat(comparePrice);
     setSaveLabel(!Number.isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
   }, [comparePrice]);
 
-  // 初期データの取得
+  // --- 初期データの取得
   useEffect(() => {
     const fetchTodoData = async () => {
       if (!taskId || !todoId) return;
@@ -406,7 +428,6 @@ export default function TodoNoteModal({
         setQuantity(isNumber(todo.quantity) ? String(todo.quantity) : '');
         setUnit(todo.unit ?? 'g');
 
-        // ★ 修正: compareQuantity の初期反映は Ref を使って依存配列を汚さない
         if ((!compareQuantityRef.current || compareQuantityRef.current === '') && isNumber(todo.quantity)) {
           setCompareQuantity(String(todo.quantity));
         }
@@ -439,16 +460,24 @@ export default function TodoNoteModal({
         setPreviewUrl(null);
         setIsImageRemoved(false);
 
-        setReferenceUrls(asStringArray(todo.referenceUrls));
+        // 参考URL（移植先）をロード
+        const refs = asStringArray(todo.referenceUrls);
+        setReferenceUrls(refs.length === 0 ? [''] : refs);
+        setUrlIds((prev) => {
+          const arr = [...prev];
+          arr.length = 0;
+          for (let i = 0; i < (refs.length === 0 ? 1 : refs.length); i++) {
+            arr.push(`url_${i}_${Math.random().toString(16).slice(2)}`);
+          }
+          return [...arr];
+        });
 
-        // ★ 旅行の時間帯をロード
+        // 旅行
         const loadedStart = isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '';
         const loadedEnd = isString((todo as TodoDoc).timeEnd) ? (todo as TodoDoc).timeEnd! : '';
         setTimeStart(loadedStart);
         setTimeEnd(loadedEnd);
         setTimeError('');
-
-        // ★ 追加: 再表示時に開始・終了の差分（分）を所要に表示（DB保存なし）
         const diffMin = minutesBetweenHHmm(loadedStart, loadedEnd);
         setDurationMin(diffMin != null ? String(diffMin) : '');
       } catch (e) {
@@ -459,9 +488,28 @@ export default function TodoNoteModal({
       }
     };
     fetchTodoData();
-    // ★ compareQuantity を依存に入れず、Ref 経由で参照することで再フェッチループを回避
   }, [taskId, todoId, updateHints]);
 
+  // 参考URL：編集モードでは最低1行を保証
+  useEffect(() => {
+    if (!isPreview && referenceUrls.length === 0) {
+      setReferenceUrls(['']);
+      setUrlIds(['url_init_' + Math.random().toString(16).slice(2)]);
+    }
+  }, [isPreview, referenceUrls.length]);
+
+  // urlIds の長さを referenceUrls に同期
+  useEffect(() => {
+    setUrlIds((prev) => {
+      if (prev.length === referenceUrls.length) return prev;
+      const next = [...prev];
+      while (next.length < referenceUrls.length) next.push(`url_${Math.random().toString(16).slice(2)}`);
+      while (next.length > referenceUrls.length) next.pop();
+      return next;
+    });
+  }, [referenceUrls]);
+
+  // テキストエリアのリサイズ等
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
     if (!el) return;
@@ -515,14 +563,13 @@ export default function TodoNoteModal({
     return () => window.removeEventListener('resize', onResize);
   }, [resizeTextarea]);
 
-  // 画像選択→圧縮（アップロードは保存時）
+  // 画像選択
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const user = auth.currentUser;
     if (!user) {
       console.warn('未ログインのため画像選択不可');
       return;
     }
-
     const inputEl = e.currentTarget;
     const file = inputEl.files?.[0];
     if (!file || !taskId || !todoId) return;
@@ -536,15 +583,12 @@ export default function TodoNoteModal({
         quality: 0.7,
       });
 
-      // 未アップロードとして保持
       setPendingUpload({ blob, mime });
 
-      // プレビューURLを作成（前回があれば解放）
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       const localUrl = URL.createObjectURL(blob);
       setPreviewUrl(localUrl);
 
-      // 新規選択なので削除予約は解除
       setIsImageRemoved(false);
     } catch (err) {
       console.error('画像の読み込み/圧縮に失敗しました:', err);
@@ -553,14 +597,11 @@ export default function TodoNoteModal({
       try {
         if (fileInputRef.current) fileInputRef.current.value = '';
         else inputEl.value = '';
-      } catch {
-        // noop
-      }
+      } catch { }
     }
   };
 
   const handleClearImage = () => {
-    // 即時に Storage を削除せず、保存時にクリーンアップ（整合性のため）
     setIsImageRemoved(true);
     setPendingUpload(null);
     if (previewUrl) {
@@ -570,11 +611,70 @@ export default function TodoNoteModal({
     setImageUrl(null);
   };
 
-  // 保存処理
+  // --- 参考URL：操作系（材料と同じ“動き”） ----------------------
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
+  );
+
+  const addUrlAt = useCallback((index: number) => {
+    setReferenceUrls((prev) => {
+      const arr = [...prev];
+      arr.splice(index + 1, 0, '');
+      return arr;
+    });
+    setUrlIds((prev) => {
+      const arr = [...prev];
+      arr.splice(index + 1, 0, `url_${Math.random().toString(16).slice(2)}`);
+      return arr;
+    });
+    setTimeout(() => { urlRefs.current[index + 1]?.focus(); }, 0);
+  }, []);
+
+  const addUrl = useCallback(() => {
+    setReferenceUrls((prev) => [...prev, '']);
+    setUrlIds((prev) => [...prev, `url_${Math.random().toString(16).slice(2)}`]);
+    setTimeout(() => { urlRefs.current[referenceUrls.length]?.focus(); }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const removeUrl = (idx: number) => {
+    setReferenceUrls((prev) => {
+      if (prev.length <= 1) return ['']; // 最後の1件は空行に戻す
+      return prev.filter((_, i) => i !== idx);
+    });
+    setUrlIds((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const changeUrl = (idx: number, val: string) => {
+    setReferenceUrls((prev) => prev.map((u, i) => (i === idx ? val : u)));
+  };
+
+  const onUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    addUrlAt(idx);
+  };
+  // ---------------------------------------------------------
+
+  // 保存
   const handleSave = async () => {
     const user = auth.currentUser;
     if (!user) return;
+
+    if (category === '料理') {
+      const result = recipeEditorRef.current?.validateAndShowErrors();
+      if (!result || result.hasErrors) {
+        // 任意: トーストなどで result.messages[0] を通知してもOK
+        return; // ★ 保存中断
+      }
+    }
+
     setIsSaving(true);
+
     const committedIngredients = recipeEditorRef.current?.commitAllAmounts();
 
     const nPrice = Number.parseFloat(price);
@@ -600,7 +700,6 @@ export default function TodoNoteModal({
     const totalDifferenceCalced =
       unitPriceDiffCalced !== null ? unitPriceDiffCalced * safeCmpQty : null;
 
-    // ★ 旅行カテゴリの時間帯チェック（エラー時は保存中断）
     if (category === '旅行') {
       const err = validateTimeRange(timeStart, timeEnd);
       if (err) {
@@ -611,9 +710,8 @@ export default function TodoNoteModal({
     }
 
     try {
-      // アップロード（必要時）
+      // 画像アップロード
       let nextImage: string | null = imageUrl;
-
       if (!isImageRemoved && pendingUpload) {
         const ext = pendingUpload.mime === 'image/webp' ? 'webp' : 'jpg';
         const path = `task_todos/${taskId}/${todoId}/${Date.now()}.${ext}`;
@@ -625,27 +723,22 @@ export default function TodoNoteModal({
         nextImage = await getDownloadURL(fileRef);
       }
 
-      // Firestore 更新 payload（型は updateTodoInTask から取得）
+      // Firestore 更新 payload
       const payload: TodoUpdates = {
         memo,
         price: Number.isFinite(appliedPrice) && appliedPrice! > 0 ? appliedPrice : null,
         quantity: validQuantity,
-        referenceUrls: referenceUrls.filter((u) => isString(u) && u.trim() !== ''),
+        referenceUrls: referenceUrls.filter((u) => isString(u) && u.trim() !== ''), // ← TodoNoteModal の state を保存
       };
 
-      // unit は数量があるときだけ付ける（undefined ならキーを作らない）
-      if (appliedUnit) {
-        (payload as { unit?: string }).unit = appliedUnit;
-      }
+      if (appliedUnit) (payload as { unit?: string }).unit = appliedUnit;
 
-      // 画像の扱い
       if (isImageRemoved) {
         (payload as { imageUrl?: string | null }).imageUrl = null;
       } else if (nextImage) {
         (payload as { imageUrl?: string | null }).imageUrl = nextImage;
       }
 
-      // 料理のときだけレシピを保存
       if (category === '料理') {
         const finalIngredients = committedIngredients ?? recipe.ingredients;
         (payload as { recipe?: Recipe }).recipe = {
@@ -661,29 +754,22 @@ export default function TodoNoteModal({
         };
       }
 
-      // ★ 旅行のときだけ時間範囲を保存（空なら null で削除）
       if (category === '旅行') {
         (payload as { timeStart?: string | null }).timeStart = timeStart || null;
         (payload as { timeEnd?: string | null }).timeEnd = timeEnd || null;
       }
 
-      // ① Firestore 更新
       await updateTodoInTask(taskId, todoId, payload);
 
-      // ② Storage クリーンアップ
+      // Storage クリーンアップ
       try {
         const urlsToDelete: string[] = [];
-
-        // 差し替え: 前回URLがあり、今回URLと異なる → 前回を削除
         if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImage) {
           urlsToDelete.push(previousImageUrl);
         }
-
-        // 明示削除
         if (isImageRemoved && previousImageUrl) {
           urlsToDelete.push(previousImageUrl);
         }
-
         await Promise.all(
           urlsToDelete.map(async (url) => {
             try {
@@ -694,13 +780,11 @@ export default function TodoNoteModal({
             }
           })
         );
-
         setPreviousImageUrl(isImageRemoved ? null : nextImage ?? null);
       } catch (e) {
         console.warn('Storage クリーンアップ処理で警告:', e);
       }
 
-      // 節約ログ
       if (totalDifferenceCalced !== null) {
         await addDoc(collection(db, 'savings'), {
           userId: user.uid,
@@ -712,7 +796,6 @@ export default function TodoNoteModal({
         });
       }
 
-      // 後片付け
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
@@ -737,20 +820,16 @@ export default function TodoNoteModal({
 
   useEffect(() => {
     if (!isOpen || initialLoad || previewInitRef.current) return;
-
-    // メモがある/他の内容がある場合はプレビュー開始
     if (hasMemo || hasContent) {
       setIsPreview(true);
     } else {
       setIsPreview(false);
     }
-
     previewInitRef.current = true;
   }, [isOpen, initialLoad, hasMemo, hasContent]);
 
   useEffect(() => {
     if (!isOpen) {
-      // モーダルが閉じられたらローカルプレビューを解放し、未アップロードも破棄
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
@@ -761,7 +840,7 @@ export default function TodoNoteModal({
     }
   }, [isOpen, previewUrl]);
 
-  // 画像のプレロード（中身だけフェードイン）
+  // 画像のプレロード
   useEffect(() => {
     if (!displaySrc) {
       setImgReady(false);
@@ -770,7 +849,7 @@ export default function TodoNoteModal({
     setImgReady(false);
     const img = document.createElement('img');
     img.onload = () => setImgReady(true);
-    img.onerror = () => setImgReady(true); // エラー時も遷移終了扱い
+    img.onerror = () => setImgReady(true);
     img.src = displaySrc;
     return () => {
       img.onload = null;
@@ -783,24 +862,18 @@ export default function TodoNoteModal({
   const showPreviewToggle = hasContent;
 
   return (
-    // 修正後（該当箇所のみ）
     <BaseModal
       isOpen={isOpen}
       isSaving={isSaving}
       saveComplete={saveComplete}
       onClose={onClose}
-      onSaveClick={handleSave}          // ← いつでも保存可能に
-      saveLabel={saveLabel}             // ← いつでもラベル表示
+      onSaveClick={handleSave}
+      saveLabel={saveLabel}
       hideActions={false}
     >
-
-      {/* ヘッダー行 */}
+      {/* ヘッダー */}
       <div className="flex items-start justify-between ml-2 mr-1">
-        {/* todo名は複数行OK・折返し表示 */}
-        <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">
-          {todoText}
-        </h1>
-
+        <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">{todoText}</h1>
         {showPreviewToggle && (
           <button
             type="button"
@@ -810,21 +883,10 @@ export default function TodoNoteModal({
             aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
             title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
           >
-            {isPreview ? (
-              <>
-                <Pencil size={16} />
-                <span>編集</span>
-              </>
-            ) : (
-              <>
-                <Eye size={16} />
-                <span>プレビュー</span>
-              </>
-            )}
+            {isPreview ? (<><Pencil size={16} /><span>編集</span></>) : (<><Eye size={16} /><span>プレビュー</span></>)}
           </button>
         )}
       </div>
-
 
       {/* 画像挿入UI */}
       <div className="mb-3 ml-2">
@@ -856,12 +918,9 @@ export default function TodoNoteModal({
           </div>
         )}
 
-        {/* 画像表示エリア：画像がある時だけ枠を出す（Next/Image 使用） */}
         {showMediaFrame && (
           <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
-            {/* 高さ予約（4:3） */}
             <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
-            {/* 実画像（fill） */}
             <div className="absolute inset-0">
               <NextImage
                 src={displaySrc!}
@@ -879,256 +938,267 @@ export default function TodoNoteModal({
       </div>
 
       {/* textarea（備考） */}
-      {
-        showMemo && (
-          <div className="relative pr-8 mt-4">
-            <textarea
-              ref={memoRef}
-              data-scrollable="true"
-              onScroll={onTextareaScroll}
-              value={memo}
-              rows={1}
-              placeholder="備考を入力"
-              onChange={(e) => setMemo(e.target.value)}
-              onTouchMove={(e) => e.stopPropagation()}
-              readOnly={isPreview}
-              aria-readonly={isPreview}
-              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-2 ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-            />
+      {showMemo && (
+        <div className="relative pr-8 mt-6">
+          <textarea
+            ref={memoRef}
+            data-scrollable="true"
+            onScroll={onTextareaScroll}
+            value={memo}
+            rows={1}
+            placeholder="備考を入力"
+            onChange={(e) => setMemo(e.target.value)}
+            onTouchMove={(e) => e.stopPropagation()}
+            readOnly={isPreview}
+            aria-readonly={isPreview}
+            className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+          />
 
-            {isIOS && showScrollHint && (
-              <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-                <ChevronDown size={16} className="text-white" />
-              </div>
-            )}
-            {isIOS && showScrollUpHint && (
-              <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-                <ChevronUp size={16} className="text-white" />
-              </div>
-            )}
-          </div>
-        )
-      }
+          {isIOS && showScrollHint && (
+            <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronDown size={16} className="text-white" />
+            </div>
+          )}
+          {isIOS && showScrollUpHint && (
+            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+              <ChevronUp size={16} className="text-white" />
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* ▼▼▼ 参考URL（プレビュー時は「追加項目」を非表示にする） ▼▼▼ */}
-      <div className="mt-2 ml-2">
-        {(!isPreview || referenceUrls.length > 0) && <h3 className="font-medium">参考URL</h3>}
-
-        {!isPreview && (
-          <div className="flex gap-2">
-            <input
-              type="url"
-              inputMode="url"
-              placeholder="https://example.com/ ..."
-              value={newRefUrl}
-              onChange={(e) => setNewRefUrl(e.target.value)}
-              className="flex-1 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1"
-            />
-            <button
-              type="button"
-              disabled={!/^https?:\/\/\S+/i.test(newRefUrl)}
-              onClick={() => {
-                const v = newRefUrl.trim();
-                if (!/^https?:\/\/\S+/i.test(v)) return;
-                setReferenceUrls((prev) => (prev.includes(v) ? prev : [...prev, v]));
-                setNewRefUrl('');
-              }}
-              className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500 mr-1 mt-2"
-              aria-label="参考URLを追加"
-              title="参考URLを追加"
-            >
-              <Plus size={16} />
-              追加
-            </button>
-          </div>
-        )}
-
-        {referenceUrls.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {referenceUrls.map((url) => (
-              <li key={url} className="flex items-center justify-between gap-2">
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 underline underline-offset-2 break-all flex-1 min-w-0"
+      {/* ▼▼ 参考URL（画像選択の直下：編集モードは1件の空行を常に表示） ▼▼ */}
+      {(!isPreview || hasReference) && (
+        <div className="px-2 pb-2">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium">参考URL</h3>
+            {!isPreview && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addUrl}
+                  className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500 mr-[-10px] mt-2"
                 >
-                  {url}
-                </a>
-                {!isPreview && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setReferenceUrls((prev) => prev.filter((u) => u !== url))
+                  <Plus size={16} />
+                  追加
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!isPreview ? (
+            <>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                onDragEnd={(e: DragEndEvent) => {
+                  const { active, over } = e;
+                  if (!over || active.id === over.id) return;
+                  const oldIndex = urlIds.findIndex((id) => id === active.id);
+                  const newIndex = urlIds.findIndex((id) => id === over.id);
+                  if (oldIndex < 0 || newIndex < 0) return;
+                  setUrlIds((prev) => arrayMove(prev, oldIndex, newIndex));
+                  setReferenceUrls((prev) => arrayMove(prev, oldIndex, newIndex));
+                }}
+              >
+                <SortableContext items={urlIds} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    {referenceUrls.map((u, idx) => (
+                      <SortableUrlRow key={urlIds[idx] ?? `url_k_${idx}`} id={urlIds[idx] ?? `url_id_${idx}`}>
+                        {({ attributes, listeners }) => (
+                          <>
+                            {/* ドラッグハンドル */}
+                            <button
+                              type="button"
+                              className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
+                              aria-label="行を並び替え"
+                              {...attributes}
+                              {...listeners}
+                            >
+                              <GripVertical size={16} />
+                            </button>
+
+                            {/* 行番号 */}
+                            <div className="col-span-1 pt-1 text-sm text-gray-500 select-none text-center">
+                              {idx + 1}.
+                            </div>
+
+                            {/* 入力（入力した瞬間に保存対象に反映） */}
+                            <input
+                              ref={(el) => { urlRefs.current[idx] = el; }}
+                              value={u}
+                              onChange={(e) => changeUrl(idx, e.target.value)}
+                              onKeyDown={(e) => onUrlKeyDown(e, idx)}
+                              placeholder="https://example.com/..."
+                              className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500"
+                              inputMode="url"
+                            />
+
+                            {/* 削除（×）：2件以上のとき表示。最後の1件は空行に戻す */}
+                            {referenceUrls.length >= 2 && (
+                              <button
+                                type="button"
+                                onClick={() => removeUrl(idx)}
+                                aria-label="URLを削除"
+                                className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
+                              >
+                                <span aria-hidden className="text-lg leading-none">×</span>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </SortableUrlRow>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </>
+          ) : (
+            // プレビュー（URLが1件以上ある場合のみ）
+            <ul className="list-disc list-inside text-sm text-blue-500">
+              {referenceUrls.filter((u) => u.trim() !== '').map((u, i) => (
+                <li key={`pv_url_${i}`} className="mb-1">
+                  <a href={u} target="_blank" rel="noreferrer" className="underline break-all">{u}</a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {/* ▲▲ 参考URLここまで ▲▲ */}
+
+      {/* 旅行カテゴリ */}
+      {category === '旅行' && (
+        <div className="mt-4 ml-2">
+          <h3 className="font-medium">時間帯</h3>
+          <div className="flex items-center gap-2 mt-1">
+            {/* 開始 */}
+            <div className="relative">
+              {isPreview ? (
+                <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                  {timeStart || '— —'}
+                </span>
+              ) : (
+                <input
+                  type="time"
+                  value={timeStart}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTimeStart(v);
+                    const n = Number.parseInt(durationMin, 10);
+                    if (Number.isFinite(n) && n > 0) {
+                      const autoEnd = addMinutesToHHmm(v, n);
+                      setTimeEnd(autoEnd);
+                      setTimeError(validateTimeRange(v, autoEnd));
+                    } else {
+                      setTimeError(validateTimeRange(v, timeEnd));
                     }
-                    className="inline-flex items-center justify-center w-7 h-7 hover:bg-gray-50 mr-1 shrink-0"
-                    aria-label="このURLを削除"
-                    title="このURLを削除"
-                  >
-                    <span aria-hidden="true" className="text-lg leading-none">
-                      ×
-                    </span>
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      {/* ▲▲▲ 参考URLここまで ▲▲▲ */}
-
-      {/* ★ 旅行カテゴリ：時間帯入力（開始〜終了 + 所要分） */}
-      {
-        category === '旅行' && (
-          <div className="mt-4 ml-2">
-            <h3 className="font-medium">時間帯</h3>
-            <div className="flex items-center gap-2 mt-1">
-              {/* 開始 */}
-              <div className="relative">
-                {isPreview ? (
-                  <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                    {timeStart || '— —'}
-                  </span>
-                ) : (
-                  <input
-                    type="time"
-                    value={timeStart}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setTimeStart(v);
-
-                      // ★ 修正: 所要分が入っていれば自動で終了を更新
-                      const n = Number.parseInt(durationMin, 10);
-                      if (Number.isFinite(n) && n > 0) {
-                        const autoEnd = addMinutesToHHmm(v, n);
-                        setTimeEnd(autoEnd);
-                        setTimeError(validateTimeRange(v, autoEnd));
-                      } else {
-                        setTimeError(validateTimeRange(v, timeEnd));
-                      }
-
-                      // ★ 追加: すでに終了が入っている場合、所要分を開始～終了差で同期
-                      const diff2 = minutesBetweenHHmm(v, timeEnd);
-                      if (diff2 != null) {
-                        setDurationMin(String(diff2));
-                      }
-                    }}
-                    className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
-                    aria-label="開始時刻"
-                  />
-                )}
-              </div>
-
-              <span className="text-gray-500">~</span>
-
-              {/* 終了 */}
-              <div className="relative">
-                {isPreview ? (
-                  <>
-                    <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                      {timeEnd || '— —'}
-                    </span>
-                    {/* ★ 追加: プレビュー時のみ所要時間を併記（有効な時間帯かつエラーなし時） */}
-                    {previewDurationMin !== null && !timeError && (
-                      <span className="ml-2 text-gray-700">
-                        （所要時間：{previewDurationMin}分）
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <input
-                    type="time"
-                    value={timeEnd}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setTimeEnd(v);
-                      setTimeError(validateTimeRange(timeStart, v));
-
-                      // （既存）終了手入力時に所要分を同期
-                      const diff = minutesBetweenHHmm(timeStart, v);
-                      if (diff != null) {
-                        setDurationMin(String(diff));
-                      }
-                    }}
-                    className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
-                    aria-label="終了時刻"
-                  />
-                )}
-
-              </div>
-
-              {/* ★ 追加: 終了の右隣に「所要（分）」入力（DB保存なし） */}
-              {!isPreview && (
-                <div className="flex items-center gap-1 ml-2">
-                  <span className="text-gray-500 text-sm">所要</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    step={1}
-                    value={durationMin}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/[^\d]/g, '');
-                      setDurationMin(v);
-                      const n = Number.parseInt(v, 10);
-                      // 開始が妥当 & 所要分が正のとき、終了を自動計算
-                      if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
-                        const autoEnd = addMinutesToHHmm(timeStart, n);
-                        setTimeEnd(autoEnd);
-                        setTimeError(validateTimeRange(timeStart, autoEnd));
-                      } else {
-                        setTimeError(validateTimeRange(timeStart, timeEnd));
-                      }
-                    }}
-                    placeholder="分"
-                    className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
-                    aria-label="所要時間（分）"
-                  />
-                  <span className="text-gray-500 text-sm">分</span>
-                </div>
+                    const diff2 = minutesBetweenHHmm(v, timeEnd);
+                    if (diff2 != null) setDurationMin(String(diff2));
+                  }}
+                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                  aria-label="開始時刻"
+                />
               )}
             </div>
-            {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
+
+            <span className="text-gray-500">~</span>
+
+            {/* 終了 */}
+            <div className="relative">
+              {isPreview ? (
+                <>
+                  <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                    {timeEnd || '— —'}
+                  </span>
+                  {previewDurationMin !== null && !timeError && (
+                    <span className="ml-2 text-gray-700">（所要時間：{previewDurationMin}分）</span>
+                  )}
+                </>
+              ) : (
+                <input
+                  type="time"
+                  value={timeEnd}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTimeEnd(v);
+                    setTimeError(validateTimeRange(timeStart, v));
+                    const diff = minutesBetweenHHmm(timeStart, v);
+                    if (diff != null) setDurationMin(String(diff));
+                  }}
+                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                  aria-label="終了時刻"
+                />
+              )}
+            </div>
+
+            {/* 所要（分） */}
+            {!isPreview && (
+              <div className="flex items-center gap-1 ml-2">
+                <span className="text-gray-500 text-sm">所要</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={durationMin}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    setDurationMin(v);
+                    const n = Number.parseInt(v, 10);
+                    if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
+                      const autoEnd = addMinutesToHHmm(timeStart, n);
+                      setTimeEnd(autoEnd);
+                      setTimeError(validateTimeRange(timeStart, autoEnd));
+                    } else {
+                      setTimeError(validateTimeRange(timeStart, timeEnd));
+                    }
+                  }}
+                  placeholder="分"
+                  className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
+                  aria-label="所要時間（分）"
+                />
+                <span className="text-gray-500 text-sm">分</span>
+              </div>
+            )}
           </div>
-        )
-      }
+          {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
+        </div>
+      )}
 
       {/* 買い物カテゴリ */}
-      {
-        category === '買い物' && (
-          <ShoppingDetailsEditor
-            price={price}
-            quantity={quantity}
-            unit={unit}
-            compareMode={compareMode}
-            comparePrice={comparePrice}
-            compareQuantity={compareQuantity}
-            onChangePrice={setPrice}
-            onChangeQuantity={setQuantity}
-            onChangeUnit={setUnit}
-            onToggleCompareMode={(next) => setCompareMode(next)}
-            onChangeComparePrice={setComparePrice}
-            onChangeCompareQuantity={setCompareQuantity}
-            animatedDifference={animatedDifference}
-            animationComplete={diffAnimationComplete}
-            isPreview={isPreview}
-            onRequestEditMode={() => setIsPreview(false)}
-          />
-        )
-      }
+      {category === '買い物' && (
+        <ShoppingDetailsEditor
+          price={price}
+          quantity={quantity}
+          unit={unit}
+          compareMode={compareMode}
+          comparePrice={comparePrice}
+          compareQuantity={compareQuantity}
+          onChangePrice={setPrice}
+          onChangeQuantity={setQuantity}
+          onChangeUnit={setUnit}
+          onToggleCompareMode={(next) => setCompareMode(next)}
+          onChangeComparePrice={setComparePrice}
+          onChangeCompareQuantity={setCompareQuantity}
+          animatedDifference={animatedDifference}
+          animationComplete={diffAnimationComplete}
+          isPreview={isPreview}
+          onRequestEditMode={() => setIsPreview(false)}
+        />
+      )}
 
       {/* 料理カテゴリ */}
-      {
-        category === '料理' && (
-          <RecipeEditor
-            ref={recipeEditorRef}
-            headerNote=""
-            value={recipe}
-            onChange={handleRecipeChange}
-            isPreview={isPreview}
-          />
-        )
-      }
-    </BaseModal >
+      {category === '料理' && (
+        <RecipeEditor
+          ref={recipeEditorRef}
+          headerNote=""
+          value={recipe}
+          onChange={handleRecipeChange}
+          isPreview={isPreview}
+        />
+      )}
+    </BaseModal>
   );
 }
