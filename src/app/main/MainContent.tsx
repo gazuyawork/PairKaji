@@ -22,25 +22,25 @@ import { Plus } from 'lucide-react';
  * 本コンポーネントは UI 制御の Hook だけを常に同順で実行する。
  */
 export default function MainContent() {
-  const searchParams = useSearchParams();
-  const searchKeyword = searchParams.get('search') ?? '';
+  const params = useSearchParams(); // ReadonlyURLSearchParams | null でも安全に扱う
+  const searchKeyword = params?.get('search') ?? '';
   const { index, setIndex } = useView();
 
   const [showQuickSplash, setShowQuickSplash] = useState(false);
   const [contentVisible, setContentVisible] = useState(false);
 
-  // クエリ view による初期タブ設定（常に実行）
+  // クエリ view による初期タブ設定
   useEffect(() => {
-    const view = searchParams.get('view');
+    const view = params?.get('view');
     if (view === 'task') setIndex(1);
     else if (view === 'home') setIndex(0);
     else if (view === 'todo') setIndex(2);
-  }, [searchParams, setIndex]);
+  }, [params, setIndex]);
 
-  // QuickSplash の制御（常に実行）
+  // QuickSplash の制御
   useEffect(() => {
-    const withSplash = searchParams.get('withQuickSplash');
-    const skipSplash = searchParams.get('skipQuickSplash');
+    const withSplash = params?.get('withQuickSplash');
+    const skipSplash = params?.get('skipQuickSplash');
 
     if (withSplash === 'true') {
       setShowQuickSplash(true);
@@ -58,7 +58,7 @@ export default function MainContent() {
     } else {
       setContentVisible(true);
     }
-  }, [searchParams]);
+  }, [params]);
 
   // タイトルは index から算出（メモ化）
   const currentTitle = useMemo(() => {

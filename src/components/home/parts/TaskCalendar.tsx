@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { format, addDays, isSameDay, parseISO, startOfDay, isBefore } from 'date-fns';
 import { dayNumberToName } from '@/lib/constants';
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, type TouchEvent } from 'react';
 import { ja } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
@@ -17,7 +17,7 @@ type CalendarTask = {
   period: '毎日' | '週次' | '不定期';
   dates?: string[];      // 'YYYY-MM-DD' などの ISO 文字列想定
   daysOfWeek?: string[]; // dayNumberToName の値に一致する曜日文字列
-  done: boolean;         // ✅ 追加: 未処理判定に使用（false のみ表示）
+  done: boolean;         // 完了フラグ
 };
 
 type Props = {
@@ -32,7 +32,7 @@ export default function TaskCalendar({ tasks }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const startToday = startOfDay(today);
 
-  // ✅ day の赤線対策：型注釈を明示
+  // ✅ 1週間分（本日含む7日）
   const days: Date[] = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -48,7 +48,7 @@ export default function TaskCalendar({ tasks }: Props) {
     }, 300);
   };
 
-  const preventScrollPropagation = (e: React.TouchEvent<HTMLDivElement>) => {
+  const preventScrollPropagation = (e: TouchEvent<HTMLDivElement>) => {
     if (isTouchScrollingRef.current) {
       e.stopPropagation();
     }
@@ -81,9 +81,16 @@ export default function TaskCalendar({ tasks }: Props) {
     exit: { opacity: 0, scale: 0.98, y: -4, transition: { duration: 0.12 } },
   };
 
+  // ★ 追加: 当日列だけ完了状態を反映する
+  const isDoneOnThisDay = (task: CalendarTask, day: Date) => {
+    // 当日列なら task.done を反映、当日以外では常に未完了扱いで表示
+    return isSameDay(day, today) ? task.done === true : false;
+  };
+
   return (
     <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center mb-3 shadow-md border border-[#e5e5e5]">
       <h2 className="text-base font-bold text-[#5E5E5E] mb-4">スケジュール {weekLabel}</h2>
+
       <div
         className="overflow-x-auto horizontal-scroll"
         ref={containerRef}
@@ -94,9 +101,9 @@ export default function TaskCalendar({ tasks }: Props) {
         <div className="flex w-full text-xs text-center gap-2">
           {days.map((day: Date, idx: number) => {
             // ✅ 表示条件：
-            //  1) period が「毎日」 or dates に当日含む or 週次で曜日一致
-            //  2) かつ done === false（未処理のみ表示）
-            //  3) ＋ 不定期の期限切れ（今日より前の期日がある）は「今日の列」に表示
+            //  1) period が「毎日」 or dates に該当日を含む or 週次で曜日一致
+            //  2) ＋ 不定期の期限切れ（今日より前の期日がある）は「今日の列」に表示
+            //  3) ★ 当日列だけ完了フラグを反映して非表示にする（他日は表示）
             const dailyTasks = tasks.filter((task) => {
               const isDaily = task.period === '毎日';
 
@@ -106,11 +113,9 @@ export default function TaskCalendar({ tasks }: Props) {
 
               const isWeeklyTask =
                 task.period === '週次' &&
-                task.daysOfWeek?.includes(
-                  dayNumberToName[String(day.getDay())]
-                );
+                task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
 
-              // ▼ 追加：不定期の「期限切れ」を今日の列に表示
+              // ▼ 不定期の「期限切れ」を今日の列に表示
               const isOverdueIrregularToday =
                 task.period === '不定期' &&
                 task.done === false &&
@@ -119,11 +124,14 @@ export default function TaskCalendar({ tasks }: Props) {
 
               const isTargetDay = isDaily || isDateTask || isWeeklyTask || isOverdueIrregularToday;
 
-              return isTargetDay && task.done === false;
+              // ★ 当日列のみ完了を非表示にする
+              const shouldHide = isDoneOnThisDay(task, day);
+
+              return isTargetDay && !shouldHide;
             });
 
             // ★ 並び替え：
-            //   1) 期限切れ（不定期）を最優先
+            //   1) 期限切れ（不定期）を最優先（今日カラムのみ）
             //   2) periodRank（毎日→週次→不定期）
             //   3) 同 period 内は “かな順”
             const sortedTasks = dailyTasks
@@ -151,14 +159,11 @@ export default function TaskCalendar({ tasks }: Props) {
             const hasTask = sortedTasks.length > 0;
             const bgColor = hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]';
 
-            const isExpanded =
-              !!selectedDate && isSameDay(day, selectedDate as Date);
+            const isExpanded = !!selectedDate && isSameDay(day, selectedDate as Date);
 
             // ▼ 5件制限 & 全件表示トグル
             const MAX_VISIBLE = 5;
-            const visibleTasks = isExpanded
-              ? sortedTasks
-              : sortedTasks.slice(0, MAX_VISIBLE);
+            const visibleTasks = isExpanded ? sortedTasks : sortedTasks.slice(0, MAX_VISIBLE);
             const hiddenCount = Math.max(sortedTasks.length - visibleTasks.length, 0);
 
             return (
@@ -168,8 +173,7 @@ export default function TaskCalendar({ tasks }: Props) {
                 variants={containerVariants}
                 initial="collapsed"
                 animate={isExpanded ? 'expanded' : 'collapsed'}
-                // className={`w-[100px] flex-shrink-0 rounded-lg p-2 min-h[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
-                className={`w-2/5 sm:w-[100px] flex-shrink-0 rounded-lg p-2 min-h[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
+                className={`w-2/5 sm:w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
                 onClick={() =>
                   isSameDay(selectedDate ?? new Date(0), day)
                     ? setSelectedDate(null) // 同じ日ならトグルで閉じる
@@ -189,9 +193,7 @@ export default function TaskCalendar({ tasks }: Props) {
                     visibleTasks.map((task) => {
                       const isWeeklyTask =
                         task.period === '週次' &&
-                        task.daysOfWeek?.includes(
-                          dayNumberToName[String(day.getDay())]
-                        );
+                        task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
 
                       const isDateTask = task.dates?.some((dateStr) =>
                         isSameDay(parseISO(dateStr), day)
@@ -213,14 +215,15 @@ export default function TaskCalendar({ tasks }: Props) {
                           exit="exit"
                           className={`mt-1 text-[12px] rounded px-1.5 py-[3px] font-semibold border border-white/30
                           ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
-                          ${isOverdue
+                          ${
+                            isOverdue
                               ? 'bg-gradient-to-b from-red-300 to-red-500 text-white' // ← 赤系グラデ
                               : isWeeklyTask
                                 ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
                                 : isDateTask
                                   ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
                                   : 'bg-gradient-to-b from-blue-300 to-blue-500 text-white'
-                            }
+                          }
                           `}
                         >
                           {task.name}

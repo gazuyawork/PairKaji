@@ -150,7 +150,7 @@ const getComparableDateTimeMs = (
     }
   }
 
-  if (explicitDateMsCandidates.length > 0)    {
+  if (explicitDateMsCandidates.length > 0) {
     explicitDateMsCandidates.sort((a, b) => a - b);
     return { hasDate: true, hasTimeOnly: false, ms: explicitDateMsCandidates[0] };
   }
@@ -183,7 +183,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const keyboardSummonerRef = useRef<HTMLInputElement>(null);
   const { profileImage, partnerImage } = useProfileImages();
   const { plan, isChecking } = useUserPlan();
-  const searchParams = useSearchParams();
+  const params = useSearchParams(); // ReadonlyURLSearchParams | null を想定して安全に扱う
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(INITIAL_TASK_GROUPS);
@@ -213,8 +213,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
 
   /* ★ 追加: URLクエリから検索語とフォーカス指示を取得して反映 */
-  const urlSearch = (searchParams.get('search') ?? '').trim();
-  const urlFocusSearch = searchParams.get('focus') === 'search';
+  const urlSearch = (params?.get('search') ?? '').trim();
+  const urlFocusSearch = params?.get('focus') === 'search';
 
   useEffect(() => {
     // クエリに search があるときは、表示時点で検索欄を出し、語句を投入
@@ -251,11 +251,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   };
 
   useEffect(() => {
-    const flaggedParam = searchParams.get('flagged');
+    const flaggedParam = params?.get('flagged');
     if (flaggedParam === 'true') {
       setFlaggedFilter(true);
     }
-  }, [searchParams]);
+  }, [params]);
+
 
   // 「パートナー解除後の孤児データ削除」案内の判定
   useEffect(() => {

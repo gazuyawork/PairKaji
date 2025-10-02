@@ -29,7 +29,7 @@ async function sendTestNotification(): Promise<{ ok: boolean; message: string }>
 
 function LineLinkHandler() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const params = useSearchParams();
 
   // 連携処理の状態
   const [status, setStatus] = useState<'loading' | 'success' | string>('loading');
@@ -72,9 +72,9 @@ function LineLinkHandler() {
         return;
       }
 
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-      const error = searchParams.get('error');
+      const code = params?.get('code') ?? null;
+      const state = params?.get('state') ?? null;
+      const error = params?.get('error') ?? null;
 
       console.log('[LINE連携] URLパラメータ取得');
       console.log('[LINE連携] code:', code);
@@ -212,7 +212,7 @@ function LineLinkHandler() {
       console.log('[LINE連携] useEffect cleanup');
       unsubscribe();
     };
-  }, [searchParams, router]);
+  }, [params, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-4 py-10">

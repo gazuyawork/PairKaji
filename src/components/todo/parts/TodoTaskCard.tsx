@@ -389,7 +389,8 @@ export default function TodoTaskCard({
 
     // 2) URLクエリを更新（既存クエリは維持しつつ必要なキーを上書き）
     try {
-      const q = new URLSearchParams(Array.from(params.entries()));
+      // useSearchParams() が null でも安全に扱えるよう toString() を経由
+      const q = new URLSearchParams(params?.toString() ?? '');
       q.set('index', '1');
       q.set('search', name);
       q.set('focus', 'search');

@@ -47,11 +47,11 @@ export default function LoginPage() {
  */
 function LoginInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const params = useSearchParams(); // ReadonlyURLSearchParams | null と推論されるケースに対応
 
-  // 遷移先と再認証フラグ
-  const next = searchParams.get('next') || '/main';
-  const reauth = searchParams.get('reauth') === '1';
+  // 遷移先と再認証フラグ（null 安全に取得）
+  const next = params?.get('next') ?? '/main';
+  const reauth = params?.get('reauth') === '1';
 
   // UI state
   const [email, setEmail] = useState('');
