@@ -1,11 +1,10 @@
-// src/components/todo/DetailInputFields.tsx
-
+// 変更後の import（フォーカス用フックは不要）
 'use client';
 
 export const dynamic = 'force-dynamic'
 
-// ★ 変更: フォーカス制御のためにフックを追加
-import { useEffect, useRef } from 'react';
+// ※ useEffect / useRef は削除
+// import { useEffect, useRef } from 'react';
 
 interface Props {
   price: string;
@@ -26,63 +25,8 @@ export default function DetailInputFields({
   onChangeUnit,
   currentUnitPrice,
 }: Props) {
-  // ★ 変更: 数量入力の参照・タイマー参照
-  const quantityInputRef = useRef<HTMLInputElement>(null);
-  const focusTimerRef = useRef<number | null>(null);
-  const didMountRef = useRef(false);
 
-  // ★ 変更: フォーカス処理（モバイルでの取りこぼしを減らすため複数回試行）
-  const focusQuantityInput = () => {
-    // 既存のタイマーがあればクリア
-    if (focusTimerRef.current) {
-      window.clearTimeout(focusTimerRef.current);
-      focusTimerRef.current = null;
-    }
-
-    // 即時（次フレーム）試行
-    requestAnimationFrame(() => {
-      quantityInputRef.current?.focus({ preventScroll: true });
-      quantityInputRef.current?.select();
-    });
-
-    // OSピッカーが閉じ切るのを待ってから再試行（iOS対策）
-    focusTimerRef.current = window.setTimeout(() => {
-      quantityInputRef.current?.focus({ preventScroll: true });
-      quantityInputRef.current?.select();
-
-      // 念のためもう一段（ごく稀に必要）
-      window.setTimeout(() => {
-        quantityInputRef.current?.focus({ preventScroll: true });
-        quantityInputRef.current?.select();
-      }, 120);
-    }, 160);
-  };
-
-  // ★ 変更: 単位変更時のハンドラ（親ステート更新 → フォーカス）
-  const handleUnitChange: React.ChangeEventHandler<HTMLSelectElement> = (e) => {
-    const next = e.target.value;
-    onChangeUnit(next);
-    focusQuantityInput();
-  };
-
-  // ★ 変更: unit が外部更新で変わった場合もフォーカス維持（初回マウントは除外）
-  useEffect(() => {
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
-    }
-    focusQuantityInput();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unit]);
-
-  // ★ 変更: アンマウント時にタイマーをクリーンアップ
-  useEffect(() => {
-    return () => {
-      if (focusTimerRef.current) {
-        window.clearTimeout(focusTimerRef.current);
-      }
-    };
-  }, []);
+  // ※ フォーカス関連の変数・関数・useEffect は全削除
 
   return (
     <div>
@@ -102,8 +46,7 @@ export default function DetailInputFields({
 
         <div className="flex gap-2 items-end mb-4">
           <input
-            // ★ 変更: ref を付与してフォーカスターゲットに
-            ref={quantityInputRef}
+            // ref は削除（自動フォーカスしない）
             type="number"
             value={quantity}
             onChange={(e) => onChangeQuantity(e.target.value)}
@@ -111,15 +54,15 @@ export default function DetailInputFields({
             className="w-1/2 border-b border-gray-300 focus:outline-none focus:border-blue-500 text-2xl text-center placeholder:text-[17px]"
             inputMode="decimal"
             autoComplete="off"
-            // ★ 変更: 万が一フォーカスが外れてもタップで全選択 → 入力しやすく
+            // 手動でタップしたときは選択のまま（使いやすさのため残しています）
             onFocus={(e) => e.currentTarget.select()}
-            // ★ 変更: キーボードの「決定」表示を数量入力向けに
             enterKeyHint="done"
           />
 
           <select
             value={unit}
-            onChange={handleUnitChange} // ★ 変更: ハンドラ差し替え
+            // 単位変更時はステート更新のみ（フォーカス移動しない）
+            onChange={(e) => onChangeUnit(e.target.value)}
             className="border-b border-gray-300 focus:outline-none focus:border-blue-500"
           >
             <option value="g">g</option>
@@ -132,7 +75,6 @@ export default function DetailInputFields({
         </div>
       </div>
 
-      {/* ★ 変更: 0 も表示できるように null 判定 */}
       {currentUnitPrice !== null && (
         <div className="text-gray-600 ml-2 text-center">
           単価: <span className="text-lg">{Number(currentUnitPrice.toFixed(2)).toLocaleString()}</span> 円 / {unit}

@@ -461,7 +461,8 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     (index: number) => {
       if (isPreview) return;
       const id = `ing_${genId()}`;
-      const next: Ingredient = { id, name: '', amount: null, unit: '適量' };
+      // ★ 変更: デフォルト単位を 'g' に
+      const next: Ingredient = { id, name: '', amount: null, unit: 'g' };
       setIngredients((prev) => {
         const arr = [...prev];
         arr.splice(index + 1, 0, next);
@@ -479,7 +480,8 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   const addIngredient = useCallback(() => {
     if (isPreview) return;
     const id = `ing_${genId()}`;
-    const next: Ingredient = { id, name: '', amount: null, unit: '適量' };
+    // ★ 変更: デフォルト単位を 'g' に
+    const next: Ingredient = { id, name: '', amount: null, unit: 'g' };
     setIngredients((prev) => [...prev, next]);
     setAmountText((m) => ({ ...m, [id]: '' }));
     setNameText((m) => ({ ...m, [id]: '' }));
@@ -533,22 +535,13 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     }));
   };
 
-  // 単位変更：適量以外なら毎回 数量へフォーカス
+  // ★ 変更: 単位変更時の数量フォーカス自動移動を削除
   const changeIngredientUnit = (id: string, unit: string) => {
     setIngredients((prev) => {
       const next = prev.map((i) =>
         i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i
       );
-
-      if (unit !== '適量') {
-        setTimeout(() => {
-          const el = amountRefs.current[id];
-          if (el) {
-            el.focus();
-            el.select?.();
-          }
-        }, 0);
-      }
+      // ★ 削除: ここにあった数量入力へ focus()/select() する処理を削除しました
       return next;
     });
 
@@ -888,7 +881,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
 
       {/* 手順セクション */}
       {(!isPreview || visibleSteps.length > 0) && (
-        <div className="px-2 pb-2">
+        <div className="px-2 pb-2 pt-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">手順</h3>
 
