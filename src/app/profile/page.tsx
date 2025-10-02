@@ -482,7 +482,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
-      <Header title="Profile" />
+      <Header title="Setting" />
       <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center w-full h-[60vh]">
