@@ -16,13 +16,6 @@ interface Props {
   setAlloc: (next: Record<string, number>) => void;
   point: number;
   selfId: string | null;
-  /**
-   * true の場合：
-   *   users が 2 人かつ selfId が指定され、かつ両者が users 内に実在すれば
-   *   「自分のみ入力可／相手は 合計 - 自分 の自動値」になります。
-   * false の場合：
-   *   全員自由入力（従来どおり）
-   */
   autoPartner?: boolean;
 }
 
@@ -35,7 +28,6 @@ export default function PointAllocInputs({
   autoPartner = false,
 }: Props) {
   const isPair = Array.isArray(users) && users.length === 2;
-
   const selfUser = isPair && selfId ? users.find((u) => u.id === selfId) ?? null : null;
   const partnerUser =
     isPair && selfId ? users.find((u) => u.id !== selfId) ?? null : null;
@@ -48,7 +40,7 @@ export default function PointAllocInputs({
       ? Math.max(point - selfVal, 0)
       : null;
 
-  // 合計（表示用）
+  // ✅ useMemo を必ずトップレベルで呼ぶ
   const sumAlloc = useMemo(() => {
     if (autoPartner && isPair && selfUser && partnerUser) {
       return Math.min(point, selfVal + (derivedPartnerVal ?? 0));
@@ -70,19 +62,11 @@ export default function PointAllocInputs({
     }
   };
 
-  // --- users が 0 件のときのプレースホルダー ---
+  // ✅ Hooks の後で分岐 return
   if (!Array.isArray(users) || users.length === 0) {
-    return (
-      <div className="flex mt-2">
-        <p className="text-gray-600 font-bold pt-2 pl-2 pr-4">内訳</p>
-        <div className="text-sm text-gray-500 pt-2">
-          ユーザー情報がありません。
-        </div>
-      </div>
-    );
+    return null;
   }
 
-  // --- ペア＆自動差し引きモード（両ユーザーを正しく取得できた場合のみ） ---
   if (autoPartner && isPair && selfUser && partnerUser) {
     const ordered = [selfUser, partnerUser];
 
@@ -135,7 +119,7 @@ export default function PointAllocInputs({
     );
   }
 
-  // --- フォールバック：通常（全員自由入力） ---
+  // --- 通常（全員自由入力） ---
   return (
     <div className="flex mt-2">
       <p className="text-gray-600 font-bold pt-2 pl-2 pr-4">内訳</p>

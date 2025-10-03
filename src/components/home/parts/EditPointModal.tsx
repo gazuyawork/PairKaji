@@ -55,10 +55,29 @@ export default function EditPointModal({
     return !hasAtLeastOne || hasEmpty;
   };
 
+  // ===== users フォールバック（空でもログイン中なら自分1人で表示可能にする） =====
+  const meUid = auth.currentUser?.uid ?? null;
+  const safeUsers = useMemo<UserInfo[]>(() => {
+    if (Array.isArray(users) && users.length > 0) return users;
+    if (meUid) {
+      return [
+        {
+          id: meUid,
+          name: auth.currentUser?.displayName || 'あなた',
+          imageUrl: auth.currentUser?.photoURL || '/images/default.png',
+        },
+      ];
+    }
+    return [];
+  }, [users, meUid]);
+
+  // 自分のID（safeUsers から算出）
+  const selfId = safeUsers.find((u) => u.id === meUid)?.id ?? safeUsers[0]?.id ?? null;
+
   // ===== ユーザー別割当（内訳） =====
   const [alloc, setAlloc] = useState<Record<string, number>>({});
 
-  // 合計計算のヘルパー（通常時の検証用、UI 側では自動相手値も考慮表示）
+  // 合計（UI確認用。ペア自動モード時は PointAllocInputs 内で自動表示されるが、汎用チェック用に維持）
   const sumAlloc = useMemo(
     () =>
       Object.values(alloc).reduce(
@@ -68,23 +87,18 @@ export default function EditPointModal({
     [alloc],
   );
 
-  // 自分のID（なければ先頭を自分扱い）
-  const meUid = auth.currentUser?.uid ?? null;
-  const selfId = users.find((u) => u.id === meUid)?.id ?? users[0]?.id ?? null;
-
   // 初期化 & 目標変更時の再配分（自分に selfPoint、最初の相手に残り）
   useEffect(() => {
-    if (!isOpen || !users?.length || !selfId) return;
+    if (!isOpen || !safeUsers.length || !selfId) return;
 
     const selfVal = Math.min(selfPoint, point);
     let remaining = Math.max(point - selfVal, 0);
 
     const next: Record<string, number> = {};
-    users.forEach((u, ) => {
+    safeUsers.forEach((u) => {
       if (u.id === selfId) {
         next[u.id] = selfVal;
       } else if (remaining > 0) {
-        // 最初に見つかった相手へ残りすべて（ペア前提の自動差し引きでは UI 側で固定表示）
         next[u.id] = remaining;
         remaining = 0;
       } else {
@@ -92,17 +106,17 @@ export default function EditPointModal({
       }
     });
     setAlloc(next);
-  }, [isOpen, users, point, selfPoint, selfId]);
+  }, [isOpen, safeUsers, point, selfPoint, selfId]);
 
-  // alloc 変更時に selfPoint に同期（既存 onSave(total, selfPoint) を維持）
+  // alloc が変わったら selfPoint に同期（onSave(total, selfPoint) の仕様を維持）
   useEffect(() => {
-    if (!users?.length || !selfId) return;
+    if (!safeUsers.length || !selfId) return;
     const val = alloc[selfId];
     if (typeof val === 'number' && Number.isFinite(val)) {
       setSelfPoint(val);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alloc, users, selfId]);
+  }, [alloc, safeUsers, selfId]);
 
   const handleSave = async () => {
     if (point < 1) {
@@ -110,10 +124,10 @@ export default function EditPointModal({
       return;
     }
 
-    // ペアかつ自動差し引き表示の場合は、alloc は常に合計＝point になる設計
-    // 念のため汎用チェックも残す（3人以上のケースや自動OFF時に備える）
-    if (sumAlloc !== point && users.length !== 2) {
-      setError(`内訳の合計 (${sumAlloc}pt) が目標ポイント (${point}pt) と一致しません`);
+    // ペア＝2人のときは UI 側で相手が自動差し引きになるため合計は常に一致する想定。
+    // 1人 or 3人以上のときのみ汎用チェックを行う。
+    if (sumAlloc !== point && safeUsers.length !== 2) {
+      setError(`内訳の合計 (${sumAlloc}pt) が週間目標ポイント (${point}pt) と一致しません`);
       return;
     }
 
@@ -125,9 +139,10 @@ export default function EditPointModal({
     setError('');
     setIsSaving(true);
 
+    // ★ 保存は現行 handleSavePoints.ts のシグネチャをそのまま利用
     await handleSavePoints(
       point,
-      selfPoint, // alloc から同期済み
+      selfPoint,
       onSave,
       onClose,
       setIsSaving,
@@ -148,12 +163,11 @@ export default function EditPointModal({
     const nextSelf = half + extra;
     setSelfPoint(nextSelf);
 
-    // alloc も同様に自動再配分（自分に nextSelf、最初の相手に残り）
-    if (!users?.length || !selfId) return;
+    if (!safeUsers.length || !selfId) return;
 
     let remaining = Math.max(value - nextSelf, 0);
     const nextAlloc: Record<string, number> = {};
-    users.forEach((u) => {
+    safeUsers.forEach((u) => {
       if (u.id === selfId) {
         nextAlloc[u.id] = nextSelf;
       } else if (remaining > 0) {
@@ -188,9 +202,9 @@ export default function EditPointModal({
         {/* 設定：ポイント入力（折りたたみ） */}
         <PointInputRow point={point} onChange={handlePointChange} onAuto={handleAuto} />
 
-        {/* 設定：内訳（ペアのときは「自分のみ入力可／相手は自動」） */}
+        {/* 設定：内訳（ペアなら自動差し引き、自分のみ入力可） */}
         <PointAllocInputs
-          users={users}
+          users={safeUsers}
           alloc={alloc}
           setAlloc={setAlloc}
           point={point}
