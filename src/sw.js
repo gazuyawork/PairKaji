@@ -2,42 +2,66 @@
 
 /* global self, clients */
 
-import { clientsClaim } from 'workbox-core';
-import { precacheAndRoute } from 'workbox-precaching';
+// ---------------- Install / Activate ----------------
+self.addEventListener('install', () => {
+  if (self.skipWaiting) self.skipWaiting();
+});
 
-// ---- Workbox 初期化（InjectManifest 必須）----
-self.skipWaiting();
-clientsClaim();
-precacheAndRoute(self.__WB_MANIFEST || []);
+self.addEventListener('activate', (event) => {
+  if (self.clients && self.clients.claim) {
+    event.waitUntil(self.clients.claim());
+  }
+});
 
-// ---- Badging API ユーティリティ（対応環境のみ実行）----
+// ---------------- Workbox（InjectManifest用の最小プリキャッシュ） ----------------
+// ESM import は使わず、CDN から読み込む。
+// ※ InjectManifest は SW 内に `self.__WB_MANIFEST` の “文字列” が存在することを前提にします。
+try {
+  importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
+  // debug ログ抑制（任意）
+  if (self.workbox && self.workbox.setConfig) {
+    self.workbox.setConfig({ debug: false });
+  }
+
+  // ★ この行が重要：self.__WB_MANIFEST がビルド時に差し込まれます
+  const __WB_MANIFEST_PLACEHOLDER__ = self.__WB_MANIFEST;
+
+  // workbox が読めていれば precache 実行（MANIFEST が空でもOK）
+  if (self.workbox && self.workbox.precaching && Array.isArray(__WB_MANIFEST_PLACEHOLDER__)) {
+    self.workbox.precaching.precacheAndRoute(__WB_MANIFEST_PLACEHOLDER__);
+  }
+} catch {
+  // noop
+}
+
+// ---------------- Badging API（対応環境のみ） ----------------
 async function setBadge(count) {
   try {
-    const nav = self.navigator;
-    if (nav && typeof nav.setAppBadge === 'function') {
+    const reg = self.registration;
+    if (reg && typeof reg.setAppBadge === 'function') {
       if (typeof count === 'number' && count > 0) {
-        await nav.setAppBadge(count);
-      } else if (typeof nav.clearAppBadge === 'function') {
-        await nav.clearAppBadge();
+        await reg.setAppBadge(count);
+      } else if (typeof reg.clearAppBadge === 'function') {
+        await reg.clearAppBadge();
       }
     }
   } catch {
-    // 対応外/失敗時は黙って無視
+    // 非対応 / 失敗は無視
   }
 }
 
 async function clearBadge() {
   try {
-    const nav = self.navigator;
-    if (nav && typeof nav.clearAppBadge === 'function') {
-      await nav.clearAppBadge();
+    const reg = self.registration;
+    if (reg && typeof reg.clearAppBadge === 'function') {
+      await reg.clearAppBadge();
     }
   } catch {
     // noop
   }
 }
 
-// ---- Web Push 受信 ----
+// ---------------- Web Push 受信 ----------------
 // 期待 payload 例:
 // { "type":"flag", "taskId":"...", "title":"...", "body":"...", "badgeCount":3, "url":"/main?task=...&from=flag" }
 self.addEventListener('push', (event) => {
@@ -49,8 +73,7 @@ self.addEventListener('push', (event) => {
     }
   })();
 
-  // ▼ 追加: 種別と taskId を取り出しておく（UI 側へ渡す用途）
-  const type = data.type || 'generic';         // ← 'flag' など
+  const type = data.type || 'generic';
   const taskId = data.taskId || null;
 
   const title = data.title || (type === 'flag' ? '🚩 フラグ' : '通知');
@@ -61,10 +84,9 @@ self.addEventListener('push', (event) => {
   /** @type {NotificationOptions} */
   const options = {
     body,
-    // 通知カードの見た目用アイコン（数値バッジではありません）
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-72x72.png',
-    data: { url, badgeCount, type, taskId }, // ▼ 変更: type と taskId を渡す
+    data: { url, badgeCount, type, taskId },
     requireInteraction: true,
     silent: false,
     tag: 'pairkaji-default',
@@ -79,7 +101,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(Promise.all([showNotificationPromise, updateBadgePromise]));
 });
 
-// ---- 通知クリック：既存タブへフォーカス or 新規オープン ----
+// ---------------- 通知クリック：既存タブへフォーカス or 新規オープン ----------------
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url =
@@ -89,7 +111,6 @@ self.addEventListener('notificationclick', (event) => {
     const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
     const matched = windowClients.find((c) => c.url && c.url.includes(url));
     if (matched && 'focus' in matched) {
-      // ▼ 追加: クリック情報をフロントへ渡す（必要なら利用）
       try {
         matched.postMessage({
           type: 'notification-click',
@@ -104,7 +125,3 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(openOrFocus);
 });
-
-// ---- install / activate（必要なら拡張）----
-self.addEventListener('install', () => { });
-self.addEventListener('activate', () => { });

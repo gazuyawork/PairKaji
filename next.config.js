@@ -6,17 +6,20 @@ const isProd = process.env.NODE_ENV === 'production';
 /** @type {any} */
 const pwaOptions = {
   dest: 'public',
-  register: isProd, // ✅ 本番のみ SW 登録
+
+  // ▼ 変更: 自動登録は一旦オフ（安定後に true/ isProd へ戻せます）
+  register: false,
+
   skipWaiting: true,
 
-  // ✅ InjectManifest（推奨方式）：カスタム SW を取り込む
-  //   ※ TypeScript (.ts) ではなく .js を指定してください
+  // InjectManifest（推奨）：カスタム SW を取り込む
+  // ※ TypeScript (.ts) ではなく .js を指定してください
   swSrc: 'src/sw.js',
 
-  // ✅ dev は必ず無効化
+  // dev は必ず無効化（本番のみ SW をビルドに含める）
   disable: !isProd,
 
-  // ✅ 生成物の一部を precache から除外（存在しない場合の衝突回避）
+  // 生成物の一部を precache から除外（存在しない場合の衝突回避）
   buildExcludes: [
     /middleware-manifest\.json$/,
     /app-build-manifest\.json$/, // dev では存在しないことがあるので除外
@@ -35,7 +38,7 @@ const withPWA =
 const nextConfig = {
   reactStrictMode: true,
 
-  // ❗️images.domains は非推奨なので、remotePatterns に移行
+  // images.domains は非推奨のため、remotePatterns を使用
   images: {
     remotePatterns: [
       {

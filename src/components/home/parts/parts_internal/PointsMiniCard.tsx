@@ -244,7 +244,7 @@ export default function PointsMiniCard() {
           {/* <span className="rounded-md border border-gray-300 bg-white p-1 group-hover:shadow-sm">
             <Star className="w-4 h-4" />
           </span> */}
-          <span className="text-xs pb-2">ポイント</span>
+          <span className="text-xs pb-2">今週の目標ポイント</span>
         </div>
 
         {/* 合計 / 目標（パーセンテージは出さない） */}
