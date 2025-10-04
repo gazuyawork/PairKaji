@@ -24,7 +24,7 @@ import {
   isWithinInterval,
   format,
 } from 'date-fns';
-import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'; // ★ 変更: Check を追加
 import { motion } from 'framer-motion';
 
 type TaskHistoryModalProps = {
@@ -32,23 +32,24 @@ type TaskHistoryModalProps = {
   onClose: () => void;
 };
 
-type TaskRow = {
+// 履歴（taskCompletions）用の型
+type CompletionRow = {
   id: string;
-  name: string;
-  completedAt?: Date | null;
-  completedBy?: string | null;
+  taskId: string;
+  taskName: string;
+  createdAt: Date | null;   // createdAt(Timestamp) を Date に変換
+  person: string | null;    // 担当者（表示用 / 集計には使用しない）
+  userId: string | null;    // 実際に完了したユーザー UID（集計はコレを使用）
+  point: number;            // ポイント（未定義は 0 扱い）
 };
 
 export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalProps) {
-  const [rows, setRows] = useState<TaskRow[]>([]);
+  const [rows, setRows] = useState<CompletionRow[]>([]);
   const [isSaving] = useState(false);
   const [saveComplete] = useState(false);
 
-  // 追加: 週切り替え（0=今週, -1=先週 ...）
+  // 週切り替え（0=今週, -1=先週 ...）
   const [weekOffset, setWeekOffset] = useState<number>(0);
-
-  // 追加: パートナーID
-  const [, setPartnerId] = useState<string | null>(null);
 
   // 週の開始/終了を算出（JST週次の代替: 月曜始まり）
   const weekBounds = useMemo(() => {
@@ -59,44 +60,7 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
     };
   }, [weekOffset]);
 
-  // 追加: パートナーIDの購読
-  useEffect(() => {
-    if (!isOpen) return;
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const qConfirmed = query(
-      collection(db, 'pairs'),
-      where('status', '==', 'confirmed'),
-      where('userIds', 'array-contains', user.uid)
-    );
-
-    const unsub = onSnapshot(
-      qConfirmed,
-      (snapshot) => {
-        if (snapshot.empty) {
-          setPartnerId(null);
-          return;
-        }
-        const d0 = snapshot.docs[0].data() as DocumentData;
-        const ids = Array.isArray(d0.userIds) ? (d0.userIds as unknown[]) : [];
-        let other =
-          (ids.find((x) => typeof x === 'string' && x !== user.uid) as string | undefined) ??
-          undefined;
-        if (!other) {
-          const a = typeof d0.userAId === 'string' ? (d0.userAId as string) : undefined;
-          const b = typeof d0.userBId === 'string' ? (d0.userBId as string) : undefined;
-          other = a && a !== user.uid ? a : b && b !== user.uid ? b : undefined;
-        }
-        setPartnerId(other ?? null);
-      },
-      (err) => console.warn('[TaskHistoryModal] pairs(confirmed) onSnapshot error:', err)
-    );
-
-    return () => unsub();
-  }, [isOpen]);
-
-  // 指定週の完了タスク（done == true かつ completedAt ∈ [start, end) かつ userIds に自分を含む）
+  // 指定週の履歴（taskCompletions）を購読
   useEffect(() => {
     if (!isOpen) return;
     const user = auth.currentUser;
@@ -104,39 +68,42 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
 
     const { start, end } = weekBounds;
 
-    const col = collection(db, 'tasks');
+    // userIds に自分が含まれる履歴のうち、週の範囲に入るもの
+    const col = collection(db, 'taskCompletions');
     const qWeek = query(
       col,
-      where('done', '==', true),
-      where('completedAt', '>=', Timestamp.fromDate(start)),
-      where('completedAt', '<', Timestamp.fromDate(end)),
+      where('createdAt', '>=', Timestamp.fromDate(start)),
+      where('createdAt', '<', Timestamp.fromDate(end)),
       where('userIds', 'array-contains', user.uid),
-      orderBy('completedAt', 'desc')
+      orderBy('createdAt', 'desc')
     );
 
     const unSub = onSnapshot(
       qWeek,
       (snap) => {
-        const list: TaskRow[] = snap.docs.map((doc) => {
+        const list: CompletionRow[] = snap.docs.map((doc) => {
           const d = doc.data() as DocumentData;
           return {
             id: doc.id,
-            name: (d.name as string) ?? '(名称未設定)',
-            completedAt: d.completedAt ? (d.completedAt as Timestamp).toDate() : null,
-            completedBy: (d.completedBy as string) ?? null,
+            taskId: (d.taskId as string) ?? '',
+            taskName: (d.taskName as string) ?? '(名称未設定)',
+            createdAt: d.createdAt ? (d.createdAt as Timestamp).toDate() : null,
+            person: (d.person as string) ?? null,                 // 担当者（表示用に保持）
+            userId: (d.userId as string) ?? null,                 // 実際に完了したユーザー
+            point: typeof d.point === 'number' ? (d.point as number) : 0,
           };
         });
         setRows(list);
       },
       (err) => {
-        console.error('TaskHistoryModal onSnapshot error:', err);
+        console.error('TaskHistoryModal onSnapshot(taskCompletions) error:', err);
       }
     );
 
     return () => unSub();
   }, [isOpen, weekBounds]);
 
-  // 追加: 前週比較用に先週トータルを取得（単発フェッチ）
+  // 前週比較（ポイント合計で集計）
   const [prevWeekTotals, setPrevWeekTotals] = useState<{ me: number; partner: number }>({
     me: 0,
     partner: 0,
@@ -154,23 +121,26 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
 
     const fetchPrev = async () => {
       try {
-        const col = collection(db, 'tasks');
+        const col = collection(db, 'taskCompletions');
         const qPrev = query(
           col,
-          where('done', '==', true),
-          where('completedAt', '>=', Timestamp.fromDate(pStart)),
-          where('completedAt', '<', Timestamp.fromDate(pEnd)),
+          where('createdAt', '>=', Timestamp.fromDate(pStart)),
+          where('createdAt', '<', Timestamp.fromDate(pEnd)),
           where('userIds', 'array-contains', user.uid)
         );
         const snap = await getDocs(qPrev);
+
         let me = 0;
         let partner = 0;
+
         snap.forEach((doc) => {
           const d = doc.data() as DocumentData;
-          const by = (d.completedBy as string | undefined) ?? null;
-          if (by === user.uid) me += 1;
-          else if (by) partner += 1; // パートナーID一致かは不問（片側のみ保持へのフォールバック）
+          const by = (d.userId as string | undefined) ?? null;   // 実際の完了者
+          const pt = typeof d.point === 'number' ? (d.point as number) : 0;
+          if (by === user.uid) me += pt;
+          else if (by) partner += pt;
         });
+
         setPrevWeekTotals({ me, partner });
       } catch (e) {
         console.warn('[TaskHistoryModal] fetch prev totals error:', e);
@@ -185,11 +155,11 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
 
   // 日別グループ（YYYY/MM/DD）
   const grouped = useMemo(() => {
-    const g = new Map<string, TaskRow[]>();
+    const g = new Map<string, CompletionRow[]>();
     rows.forEach((r) => {
-      const key = r.completedAt
-        ? `${r.completedAt.getFullYear()}/${String(r.completedAt.getMonth() + 1).padStart(2, '0')}/${String(
-            r.completedAt.getDate()
+      const key = r.createdAt
+        ? `${r.createdAt.getFullYear()}/${String(r.createdAt.getMonth() + 1).padStart(2, '0')}/${String(
+            r.createdAt.getDate()
           ).padStart(2, '0')}`
         : '未設定';
       if (!g.has(key)) g.set(key, []);
@@ -199,7 +169,7 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
     return sorted;
   }, [rows]);
 
-  // サマリー・曜日別系列
+  // サマリー・曜日別系列（ポイント合計で集計）
   const { totalMe, totalPartner, activeDays, seriesMe, seriesPartner, weekRangeLabel, dayLabels } =
     useMemo(() => {
       const user = auth.currentUser;
@@ -217,18 +187,19 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
       let tPartner = 0;
 
       for (const r of rows) {
-        if (!r.completedAt) continue;
-        if (!isWithinInterval(r.completedAt, { start, end })) continue;
+        if (!r.createdAt) continue;
+        if (!isWithinInterval(r.createdAt, { start, end })) continue;
 
-        const key = format(r.completedAt, 'yyyy/MM/dd');
-        const by = r.completedBy ?? null;
+        const key = format(r.createdAt, 'yyyy/MM/dd');
+        const by = r.userId ?? null;                               // 実際の完了者
+        const pt = typeof r.point === 'number' ? r.point : 0;
 
         if (by === meUid) {
-          perDayMe[key] = (perDayMe[key] ?? 0) + 1;
-          tMe += 1;
+          perDayMe[key] = (perDayMe[key] ?? 0) + pt;
+          tMe += pt;
         } else if (by) {
-          perDayPartner[key] = (perDayPartner[key] ?? 0) + 1;
-          tPartner += 1;
+          perDayPartner[key] = (perDayPartner[key] ?? 0) + pt;
+          tPartner += pt;
         }
       }
 
@@ -239,12 +210,13 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
         sPa.push(perDayPartner[k] ?? 0);
       }
 
+      // いずれかのポイントが発生した日の数
       const daysCount = dayKeys.filter((k) => (perDayMe[k] ?? 0) + (perDayPartner[k] ?? 0) > 0).length;
       const label = `${format(start, 'M/d')} - ${format(end, 'M/d')}`;
 
       return {
-        totalMe: tMe,
-        totalPartner: tPartner,
+        totalMe: tMe,                 // 合計ポイント（自分）
+        totalPartner: tPartner,       // 合計ポイント（相手）
         activeDays: daysCount,
         seriesMe: sMe,
         seriesPartner: sPa,
@@ -253,13 +225,13 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
       };
     }, [rows, weekBounds]);
 
-  // 前週比
+  // 前週比（ポイント差）
   const deltaMe = totalMe - prevWeekTotals.me;
   const deltaPartner = totalPartner - prevWeekTotals.partner;
   const dtM: 'up' | 'down' | 'flat' = deltaMe > 0 ? 'up' : deltaMe < 0 ? 'down' : 'flat';
   const dtP: 'up' | 'down' | 'flat' = deltaPartner > 0 ? 'up' : deltaPartner < 0 ? 'down' : 'flat';
 
-  // グラフ用スケール
+  // グラフ用スケール（ポイントの最大値）
   const maxBar = Math.max(1, ...seriesMe, ...seriesPartner);
   const barsKey = `bars-${weekOffset}-${maxBar}-${seriesMe.join(',')}-${seriesPartner.join(',')}`;
 
@@ -309,18 +281,32 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
         </button>
       </div>
 
-      {/* 週レンジ + サマリー */}
+      {/* 週レンジ + サマリー（ポイント版） */}
       <div className="mt-1 text-sm text-gray-700 flex items-center justify-between flex-wrap gap-2">
         <span className="font-medium text-gray-600">{weekRangeLabel}</span>
 
         <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded bg-emerald-300" />
-            自分 <span className="font-semibold">{totalMe}</span>
+          {/* ★ 変更（編集対象）: 丸い色見本をチェックマーク表示に置換 */}
+          {/* 削除対象（旧）:
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded bg-emerald-300" />
+                自分 <span className="font-semibold">{totalMe}</span> pt
+              </span>
+          */}
+          <span className="inline-flex items-center gap-1"> {/* 自分 */}
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> {/* チェックマーク */}
+            自分 <span className="font-semibold">{totalMe}</span> pt
           </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded bg-amber-300" />
-            相手 <span className="font-semibold">{totalPartner}</span>
+
+          {/* 削除対象（旧）:
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded bg-amber-300" />
+                相手 <span className="font-semibold">{totalPartner}</span> pt
+              </span>
+          */}
+          <span className="inline-flex items-center gap-1"> {/* 相手 */}
+            <CheckCircle className="w-3.5 h-3.5 text-amber-600" />   {/* チェックマーク */}
+            相手 <span className="font-semibold">{totalPartner}</span> pt
           </span>
 
           {/* 前週比較（自分） */}
@@ -333,9 +319,10 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
                 ? 'bg-red-50 text-red-700'
                 : 'bg-gray-50 text-gray-600')
             }
-            title={`先週(自分): ${prevWeekTotals.me}`}
+            title={`先週(自分): ${prevWeekTotals.me} pt`}
           >
-            {dtM === 'up' ? '↑' : dtM === 'down' ? '↓' : '±'} {dtM === 'flat' ? '0' : `${deltaMe > 0 ? '+' : ''}${deltaMe}`}
+            {dtM === 'up' ? '↑' : dtM === 'down' ? '↓' : '±'}{' '}
+            {dtM === 'flat' ? '0' : `${deltaMe > 0 ? '+' : ''}${deltaMe}`} pt
           </span>
 
           {/* 前週比較（相手） */}
@@ -348,9 +335,10 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
                 ? 'bg-red-50 text-red-700'
                 : 'bg-gray-50 text-gray-600')
             }
-            title={`先週(相手): ${prevWeekTotals.partner}`}
+            title={`先週(相手): ${prevWeekTotals.partner} pt`}
           >
-            {dtP === 'up' ? '↑' : dtP === 'down' ? '↓' : '±'} {dtP === 'flat' ? '0' : `${deltaPartner > 0 ? '+' : ''}${deltaPartner}`}
+            {dtP === 'up' ? '↑' : dtP === 'down' ? '↓' : '±'}{' '}
+            {dtP === 'flat' ? '0' : `${deltaPartner > 0 ? '+' : ''}${deltaPartner}`} pt
           </span>
 
           {/* アクティブ日数 */}
@@ -361,22 +349,36 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
       </div>
 
       <p className="text-xs text-gray-500 mt-1">
-        週次の完了タスクサマリー（自分=あなたが完了、相手=パートナーが完了）。`completedBy` を基準に判定しています。
+        週次の完了タスクサマリー（自分=あなたが完了、相手=パートナーが完了）。表示は
+        <code>taskCompletions</code> の <code>userId</code>（実際の完了者）と <code>point</code> を用いたポイント集計です。
       </p>
 
-      {/* ミニ棒グラフ（Mon–Sun）：自分/相手 */}
+      {/* ミニ棒グラフ（Mon–Sun）：「ポイント合計」を表示 */}
       <div className="mt-3 rounded-md border border-gray-200 p-3">
-        {/* 凡例 */}
+        {/* ★ 変更（編集対象）: 凡例の丸色 → チェックマークに置換 */}
         <div className="mb-2 flex items-center gap-3 text-[11px] text-gray-600">
+          {/* 削除対象（旧）:
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded bg-emerald-200/80" />
+                自分（pt）
+              </span>
+          */}
           <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded bg-emerald-200/80" />
-            自分
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+            自分（pt）
           </span>
+          {/* 削除対象（旧）:
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded bg-amber-200/80" />
+                相手（pt）
+              </span>
+          */}
           <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded bg-amber-200/80" />
-            相手
+            <CheckCircle className="w-3.5 h-3.5 text-amber-600" />
+            相手（pt）
           </span>
         </div>
+
         <div key={barsKey} className="grid grid-cols-7 gap-2 items-end h-28">
           {seriesMe.map((mv, i) => {
             const pv = seriesPartner[i] ?? 0;
@@ -390,16 +392,16 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
                     animate={{ height: mh, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 120, damping: 16 }}
                     className="w-3 rounded-t bg-emerald-300"
-                    aria-label={`自分 ${mv} 件`}
-                    title={`自分 ${mv} 件`}
+                    aria-label={`自分 ${mv} pt`}
+                    title={`自分 ${mv} pt`}
                   />
                   <motion.div
                     initial={{ height: 0, opacity: 0.4 }}
                     animate={{ height: ph, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.02 }}
                     className="w-3 rounded-t bg-amber-300"
-                    aria-label={`相手 ${pv} 件`}
-                    title={`相手 ${pv} 件`}
+                    aria-label={`相手 ${pv} pt`}
+                    title={`相手 ${pv} pt`}
                   />
                 </div>
                 <span className="mt-1 text-[10px] text-gray-500">{dayLabels[i]}</span>
@@ -409,30 +411,46 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
         </div>
       </div>
 
-      {/* 既存の履歴表示（強化: 見出しに自分/相手の件数を追加） */}
+      {/* 履歴リスト（ヘッダに「ポイント合計」） */}
       <div className="mt-4 max-h-[60vh] overflow-y-auto divide-y divide-gray-200 rounded-md border border-gray-200">
         {grouped.length === 0 ? (
-          <div className="p-6 text-sm text-gray-500">この週の完了タスクはまだありません。</div>
+          <div className="p-6 text-sm text-gray-500">この週の履歴はまだありません。</div>
         ) : (
           grouped.map(([date, items]) => {
-            // 当日内の自分/相手の件数（見出し用）
             const user = auth.currentUser;
             const meUid = user?.uid ?? '__unknown__';
-            const meCount = items.filter((r) => r.completedBy === meUid).length;
-            const partnerCount = items.filter((r) => r.completedBy && r.completedBy !== meUid).length;
+            // 当日内のポイント合計（自分/相手）— 完了者は userId で判定
+            const mePointSum = items.reduce((acc, r) => acc + (r.userId === meUid ? r.point : 0), 0);
+            const partnerPointSum = items.reduce(
+              (acc, r) => acc + (r.userId && r.userId !== meUid ? r.point : 0),
+              0
+            );
 
             return (
               <div key={date} className="px-4 py-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-700">{date}</span>
                   <div className="flex items-center gap-3 text-gray-600">
+                    {/* ★ 変更（編集対象）: 丸色 → チェックマーク */}
+                    {/* 削除対象（旧）:
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block w-2.5 h-2.5 rounded bg-emerald-300" />
+                          <span className="text-sm">自分 × {mePointSum} pt</span>
+                        </span>
+                    */}
                     <span className="inline-flex items-center gap-1">
-                      <span className="inline-block w-2.5 h-2.5 rounded bg-emerald-300" />
-                      <span className="text-sm">自分 × {meCount}</span>
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-sm">自分 × {mePointSum} pt</span>
                     </span>
+                    {/* 削除対象（旧）:
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block w-2.5 h-2.5 rounded bg-amber-300" />
+                          <span className="text-sm">相手 × {partnerPointSum} pt</span>
+                        </span>
+                    */}
                     <span className="inline-flex items-center gap-1">
-                      <span className="inline-block w-2.5 h-2.5 rounded bg-amber-300" />
-                      <span className="text-sm">相手 × {partnerCount}</span>
+                      <CheckCircle className="w-3.5 h-3.5 text-amber-600" />
+                      <span className="text-sm">相手 × {partnerPointSum} pt</span>
                     </span>
                   </div>
                 </div>
@@ -441,16 +459,20 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
                   {items.map((r) => (
                     <li
                       key={r.id}
-                      className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 bg-white"
-                      title={r.completedBy === auth.currentUser?.uid ? '自分が完了' : '相手が完了'}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2 bg-white"
+                      title={r.userId === auth.currentUser?.uid ? '自分が完了' : '相手が完了'}
                     >
-                      <CheckCircle
-                        className={
-                          'w-4 h-4 ' +
-                          (r.completedBy === auth.currentUser?.uid ? 'text-emerald-600' : 'text-amber-600')
-                        }
-                      />
-                      <span className="text-sm text-gray-800">{r.name}</span>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle
+                          className={
+                            'w-4 h-4 ' +
+                            (r.userId === auth.currentUser?.uid ? 'text-emerald-600' : 'text-amber-600')
+                          }
+                        />
+                        <span className="text-sm text-gray-800">{r.taskName}</span>
+                      </div>
+                      {/* 各行のポイント表示 */}
+                      <span className="text-xs font-semibold text-gray-700">{r.point} pt</span>
                     </li>
                   ))}
                 </ul>
