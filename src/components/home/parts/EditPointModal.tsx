@@ -9,13 +9,21 @@ import PointInputRow from '@/components/home/parts/PointInputRow';
 import PointAllocInputs from '@/components/home/parts/PointAllocInputs';
 import { useEditPointData } from '@/hooks/useEditPointData';
 import { handleSavePoints } from '@/utils/handleSavePoints';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { getConfirmedPartnerUid } from '@/lib/pairs';
+import { doc, getDoc } from 'firebase/firestore';
 
 type UserInfo = {
   id: string;
   name: string;
   imageUrl: string;
 };
+
+type PartnerProfile = {
+  id: string;
+  name: string;
+  imageUrl: string;
+} | null;
 
 interface Props {
   isOpen: boolean;
@@ -45,7 +53,7 @@ export default function EditPointModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
 
-  const { point, selfPoint, setPoint, setSelfPoint, calculatePoints } =
+  const { point, setPoint, setSelfPoint, calculatePoints } =
     useEditPointData(initialPoint, setRouletteEnabled, setRouletteOptions);
 
   const invalidRouletteConditions = (): boolean => {
@@ -57,19 +65,90 @@ export default function EditPointModal({
 
   // ===== users フォールバック（空でもログイン中なら自分1人で表示可能にする） =====
   const meUid = auth.currentUser?.uid ?? null;
-  const safeUsers = useMemo<UserInfo[]>(() => {
-    if (Array.isArray(users) && users.length > 0) return users;
-    if (meUid) {
-      return [
-        {
-          id: meUid,
-          name: auth.currentUser?.displayName || 'あなた',
-          imageUrl: auth.currentUser?.photoURL || '/images/default.png',
-        },
-      ];
-    }
-    return [];
+
+  // ペアプロフィール（親が1名だけ渡してくるケースで合成するための情報）
+  const [partnerUser, setPartnerUser] = useState<PartnerProfile>(null);
+
+  // 親が1名（あるいは0名）しか渡していない場合は、確定ペアを探してもう1名ぶんを合成
+  useEffect(() => {
+    const run = async () => {
+      if (!meUid) {
+        setPartnerUser(null);
+        return;
+      }
+      // 親から2名以上来ていれば合成不要
+      if (Array.isArray(users) && users.length >= 2) {
+        setPartnerUser(null);
+        return;
+      }
+
+      // 確定しているパートナーUIDを取得
+      let partnerUid: string | null = null;
+      try {
+        partnerUid = await getConfirmedPartnerUid(meUid);
+      } catch {
+        partnerUid = null;
+      }
+      if (!partnerUid) {
+        setPartnerUser(null);
+        return;
+      }
+
+      // Firestoreの users/{uid} からプロフィールを試行取得
+      try {
+        const snap = await getDoc(doc(db, 'users', partnerUid));
+        const data = snap.exists() ? (snap.data() as any) : null;
+        setPartnerUser({
+          id: partnerUid,
+          name: (data?.displayName || data?.name || 'パートナー') as string,
+          imageUrl: (data?.photoURL || data?.imageUrl || '/images/default.png') as string,
+        });
+      } catch {
+        // 取得できなくても行だけは合成して表示できるようにする
+        setPartnerUser({
+          id: partnerUid,
+          name: 'パートナー',
+          imageUrl: '/images/default.png',
+        });
+      }
+    };
+
+    run();
   }, [users, meUid]);
+
+  // safeUsers 構築（親が2名以上 → そのまま / それ以外 → 自分 + 合成パートナー）
+  const safeUsers = useMemo<UserInfo[]>(() => {
+    // 親が2名以上ならそれを尊重
+    if (Array.isArray(users) && users.length >= 2) return users;
+
+    const base: UserInfo[] = meUid
+      ? [
+          {
+            id: meUid,
+            name: auth.currentUser?.displayName || 'あなた',
+            imageUrl: auth.currentUser?.photoURL || '/images/default.png',
+          },
+        ]
+      : [];
+
+    // 合成したパートナーを追加（重複は避ける）
+    if (partnerUser && !base.some((b) => b.id === partnerUser!.id)) {
+      base.push({
+        id: partnerUser.id,
+        name: partnerUser.name,
+        imageUrl: partnerUser.imageUrl,
+      });
+    }
+
+    // 親が1名（＝自分以外）だけ渡してくるケースにも対応しておく
+    if (Array.isArray(users) && users.length === 1) {
+      users.forEach((u) => {
+        if (!base.some((b) => b.id === u.id)) base.push(u);
+      });
+    }
+
+    return base;
+  }, [users, meUid, partnerUser]);
 
   // 自分のID（safeUsers から算出）
   const selfId = safeUsers.find((u) => u.id === meUid)?.id ?? safeUsers[0]?.id ?? null;
@@ -87,17 +166,19 @@ export default function EditPointModal({
     [alloc],
   );
 
-  // 初期化 & 目標変更時の再配分（自分に selfPoint、最初の相手に残り）
+  // 初期化 & 目標変更時の再配分（点滅防止のため selfPoint 依存は持たない）
   useEffect(() => {
     if (!isOpen || !safeUsers.length || !selfId) return;
 
-    const selfVal = Math.min(selfPoint, point);
-    let remaining = Math.max(point - selfVal, 0);
+    // 自分は切り上げで半分（端数は自分） … 既存仕様踏襲
+    const nextSelf = Math.ceil(point / 2);
 
+    let remaining = Math.max(point - nextSelf, 0);
     const next: Record<string, number> = {};
+
     safeUsers.forEach((u) => {
       if (u.id === selfId) {
-        next[u.id] = selfVal;
+        next[u.id] = nextSelf;
       } else if (remaining > 0) {
         next[u.id] = remaining;
         remaining = 0;
@@ -105,18 +186,14 @@ export default function EditPointModal({
         next[u.id] = 0;
       }
     });
-    setAlloc(next);
-  }, [isOpen, safeUsers, point, selfPoint, selfId]);
 
-  // alloc が変わったら selfPoint に同期（onSave(total, selfPoint) の仕様を維持）
-  useEffect(() => {
-    if (!safeUsers.length || !selfId) return;
-    const val = alloc[selfId];
-    if (typeof val === 'number' && Number.isFinite(val)) {
-      setSelfPoint(val);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alloc, safeUsers, selfId]);
+    setAlloc(next);
+    // selfPoint 同期はここでは行わない（alloc を唯一のソースに）
+  }, [isOpen, safeUsers, point, selfId]);
+
+  // ★ 以前は alloc 変更時に selfPoint を同期していたが、
+  //    再配分ループとチカチカの原因になるため削除。
+  //    selfPoint は保存直前に alloc[selfId] から一度だけ確定する。
 
   const handleSave = async () => {
     if (point < 1) {
@@ -139,10 +216,13 @@ export default function EditPointModal({
     setError('');
     setIsSaving(true);
 
-    // ★ 保存は現行 handleSavePoints.ts のシグネチャをそのまま利用
+    // 自分のポイントは alloc から確定（同期ループを避ける）
+    const finalSelfPoint =
+      selfId && Number.isFinite(alloc[selfId]!) ? Number(alloc[selfId]) : 0;
+
     await handleSavePoints(
       point,
-      selfPoint,
+      finalSelfPoint,
       onSave,
       onClose,
       setIsSaving,
@@ -152,6 +232,25 @@ export default function EditPointModal({
 
   const handleAuto = () => {
     calculatePoints();
+    // 自動計算結果に合わせて alloc も再配分（自分多めルール）
+    if (!safeUsers.length || !selfId) return;
+    const half = Math.floor(point / 2);
+    const extra = point % 2;
+    const nextSelf = half + extra;
+
+    let remaining = Math.max(point - nextSelf, 0);
+    const nextAlloc: Record<string, number> = {};
+    safeUsers.forEach((u) => {
+      if (u.id === selfId) {
+        nextAlloc[u.id] = nextSelf;
+      } else if (remaining > 0) {
+        nextAlloc[u.id] = remaining;
+        remaining = 0;
+      } else {
+        nextAlloc[u.id] = 0;
+      }
+    });
+    setAlloc(nextAlloc);
   };
 
   const handlePointChange = (value: number) => {
@@ -161,7 +260,7 @@ export default function EditPointModal({
     const half = Math.floor(value / 2);
     const extra = value % 2;
     const nextSelf = half + extra;
-    setSelfPoint(nextSelf);
+    setSelfPoint(nextSelf); // ← これは表示値のために残すが、保存時は alloc から最終確定
 
     if (!safeUsers.length || !selfId) return;
 
