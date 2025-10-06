@@ -4,15 +4,19 @@ import type { Firestore } from 'firebase-admin/firestore';
 
 /**
  * Firebase Auth のユーザー削除時に発火するトリガー
- * - 解析段階の実行を避けるため、Admin SDK はコールバック内で「動的 import + 初期化」
- * - users/{uid} … ドキュメントがあれば削除
- * - userId == uid の各コレクション … バッチ削除
- * - tasks … userIds から uid を除外（空になれば削除）
- * - pairs … userIds から uid を除外（片側のみなら status='none'）
+ * - Admin SDK はコールバック内で「動的 import + 初期化」
+ * - users/{uid} … ドキュメント削除
+ * - points … userId == uid のドキュメント削除
+ * - push_subscriptions … uid == uid のドキュメント削除
+ * - saving … userId == uid のドキュメント削除
+ * - taskCompletions … usersIds array-contains uid のドキュメント削除
+ * - taskLikes … participants array-contains uid のドキュメント削除
+ * - tasks … userIds から uid を除外（空なら削除）＋ userId == uid のドキュメント削除
+ * - pairs … userIds に uid を含むドキュメントを削除
  * - Storage … users/{uid}/ 配下のファイル削除
  */
 export const onAuthUserDelete = auth.user().onDelete(async (user) => {
-  // 🔑 ここでのみ Admin SDK を読み込む（トップレベル副作用なし）
+  // 🔑 Admin SDK をここでのみ読み込む（トップレベル副作用なし）
   const admin = await import('firebase-admin');
 
   // 二重初期化防止
@@ -27,29 +31,33 @@ export const onAuthUserDelete = auth.user().onDelete(async (user) => {
   // 1) users/{uid} を削除（存在すれば）
   await deleteUserDocIfExists(db, uid);
 
-  // 2) userId == uid のコレクションを一括削除（仮）
-  const collectionsByUserId: string[] = [
-    'points',
-    'taskCompletions',
-    'hearts',
-    'notifications',
-    // TODO: 必要コレクションを追加
-  ];
-  for (const col of collectionsByUserId) {
-    await deleteCollectionWhereEquals(db, col, 'userId', uid, 400);
-  }
+  // 2) 「field == uid」で削除
+  //    - points.userId == uid
+  //    - saving.userId == uid
+  //    - tasks.userId == uid
+  //    - push_subscriptions.uid == uid
+  await deleteCollectionWhereEquals(db, 'points', 'userId', uid, 400);
+  await deleteCollectionWhereEquals(db, 'saving', 'userId', uid, 400);
+  await deleteCollectionWhereEquals(db, 'tasks', 'userId', uid, 400);
+  await deleteCollectionWhereEquals(db, 'push_subscriptions', 'uid', uid, 400);
 
-  // 3) 共有タスク整理
+  // 3) 配列に uid を含むドキュメントを削除
+  //    - taskCompletions.usersIds array-contains uid
+  //    - taskLikes.participants  array-contains uid
+  await deleteCollectionWhereArrayContains(db, 'taskCompletions', 'usersIds', uid, 400);
+  await deleteCollectionWhereArrayContains(db, 'taskLikes', 'participants', uid, 400);
+
+  // 4) tasks.userIds から uid を外す（空になればドキュメント削除）
   await cleanupSharedTasks(db, uid);
 
-  // 4) pairs 整合
-  await cleanupPairs(db, uid);
+  // 5) pairs.userIds に uid を含むドキュメントは削除
+  await deletePairsContainingUser(db, uid);
 
-  // 5) Storage（users/{uid}/ 以下）削除
+  // 6) Storage（users/{uid}/ 以下）削除
   await bucket.deleteFiles({ prefix: `users/${uid}/` });
 });
 
-/* ========== helpers（型は admin SDK に準拠、any は不使用） ========== */
+/* ======================== helpers ======================== */
 
 async function deleteUserDocIfExists(database: Firestore, uid: string): Promise<void> {
   const ref = database.collection('users').doc(uid);
@@ -70,15 +78,44 @@ async function deleteCollectionWhereEquals(
   value: string,
   batchSize = 400,
 ): Promise<void> {
-  // 取り切るまでループ
   for (;;) {
     const q = database.collection(collectionName).where(field, '==', value).limit(batchSize);
     const snap = await q.get();
     if (snap.empty) break;
 
     const batch = database.batch();
-    for (const doc of snap.docs) {
-      batch.delete(doc.ref);
+    for (const d of snap.docs) {
+      batch.delete(d.ref);
+    }
+    await batch.commit();
+
+    if (snap.size < batchSize) break;
+  }
+}
+
+/**
+ * 指定コレクションから「arrayField array-contains value」で一致するドキュメントをバッチ削除
+ * @param batchSize 最大500。既定400で安全運用
+ */
+async function deleteCollectionWhereArrayContains(
+  database: Firestore,
+  collectionName: string,
+  arrayField: string,
+  value: string,
+  batchSize = 400,
+): Promise<void> {
+  for (;;) {
+    const q = database
+      .collection(collectionName)
+      .where(arrayField, 'array-contains', value)
+      .limit(batchSize);
+
+    const snap = await q.get();
+    if (snap.empty) break;
+
+    const batch = database.batch();
+    for (const d of snap.docs) {
+      batch.delete(d.ref);
     }
     await batch.commit();
 
@@ -108,27 +145,17 @@ async function cleanupSharedTasks(database: Firestore, uid: string): Promise<voi
 }
 
 /**
- * pairs の整合:
+ * pairs:
  * - 条件: pairs.userIds に uid を含む
- * - 処理: userIds から uid を外す。片側だけなら status を 'none'（仮仕様）
+ * - 処理: ドキュメントを削除
  */
-async function cleanupPairs(database: Firestore, uid: string): Promise<void> {
+async function deletePairsContainingUser(database: Firestore, uid: string): Promise<void> {
   const snap = await database.collection('pairs').where('userIds', 'array-contains', uid).get();
+  if (snap.empty) return;
 
-  for (const doc of snap.docs) {
-    const data = doc.data() as { userIds?: string[]; status?: string };
-    const current = Array.isArray(data.userIds) ? data.userIds : [];
-    const next = current.filter((v) => v !== uid);
-
-    if (next.length === current.length) continue;
-
-    if (next.length >= 1) {
-      await doc.ref.update({
-        userIds: next,
-        status: 'none', // 仮仕様。要件に合わせて調整
-      });
-    } else {
-      await doc.ref.delete();
-    }
+  const batch = database.batch();
+  for (const d of snap.docs) {
+    batch.delete(d.ref);
   }
+  await batch.commit();
 }

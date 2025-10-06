@@ -495,18 +495,23 @@ export const saveTaskToFirestore = async (
         finalTime = newTimeInput;
       }
 
+      // ★ 修正：所有者（userId）は更新時に上書きしない（＝奪わない）
+      const { userId: _ignoredUserId, ...commonDataWithoutOwner } = commonData;
+      // eslint対策：未使用変数を明示的に使用（副作用なし）
+      void _ignoredUserId;
+
       await updateDoc(taskRef, {
-        ...commonData,
+        ...commonDataWithoutOwner,
         dates: finalDates,
         time: finalTime,
-        userId: uid,
         updatedAt: serverTimestamp(),
       });
+
     } else {
       // 新規作成
       await addDoc(collection(db, 'tasks'), {
         ...commonData,
-        userId: uid,
+        userId: uid, // 新規作成は自分所有でOK
         done: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -874,4 +879,69 @@ export const updateTodoTextInTask = async (
   // 置換保存
   const next = todos.map((t, i) => (i === idx ? { ...t, text: newText } : t));
   await updateDoc(taskRef, { todos: next });
+};
+
+/* =========================================================
+ * 相手のタスクを「奪わずに」自分専用のプライベートタスクとして複製
+ * （元タスクは共有のまま／userIdsを変更しない）
+ * =======================================================*/
+export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<string> => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('ログインしていません');
+
+  // 元タスク取得
+  const sourceRef = doc(db, 'tasks', sourceTaskId);
+  const snap = await getDoc(sourceRef);
+  if (!snap.exists()) throw new Error('タスクが存在しません');
+
+  const src = snap.data() as TaskDocMinimal;
+
+  // 新しい自分専用タスクの作成データ
+  const newTaskPayload = {
+    // 所有・共有
+    userId: user.uid,
+    userIds: [user.uid],
+    private: true,
+
+    // 基本情報
+    name: typeof src.name === 'string' ? src.name : (typeof src.title === 'string' ? src.title : ''),
+    title: typeof src.title === 'string' ? src.title : '',
+    period:
+      src.period === '毎日' || src.period === '週次' || src.period === '不定期'
+        ? src.period
+        : '毎日',
+    point: typeof src.point === 'number' ? src.point : (src.point == null ? 0 : Number(src.point) || 0),
+    daysOfWeek: Array.isArray(src.daysOfWeek) ? src.daysOfWeek : [],
+    dates: Array.isArray(src.dates) ? src.dates : [],
+    time: typeof src.time === 'string' ? src.time : '',
+    isTodo: src.isTodo === true,
+
+    // 表示・分類
+    visible: src.visible === true,
+    category: src.category,
+
+    // メモ・TODO
+    note: typeof src.note === 'string' ? src.note : (src.note == null ? '' : String(src.note)),
+    users: Array.isArray(src.users) ? src.users : [],
+    todos: isTodoArray(src.todos) ? src.todos : [],
+
+    // 履歴リセット
+    done: false,
+    skipped: false,
+    completedAt: null,
+    completedBy: '',
+
+    // 付帯情報
+    groupId: null,
+
+    // 監査フィールド
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  } as Record<string, unknown>;
+
+  // Firestore に追加（新しい自分用タスク）
+  const newDocRef = await addDoc(collection(db, 'tasks'), newTaskPayload);
+
+  // 元タスクは一切変更しない（共有のまま残す）
+  return newDocRef.id;
 };

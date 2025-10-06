@@ -21,13 +21,12 @@ export default function DeleteAccountPage() {
 
   // --- 状態管理 ---
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [agreeLoss, setAgreeLoss] = useState<boolean>(false); // すべての情報喪失に同意
-  const [agreeIrreversible, setAgreeIrreversible] = useState<boolean>(false); // 復元不可に同意
+  const [agreeAll, setAgreeAll] = useState<boolean>(false); // 同意チェック
   const [confirmText, setConfirmText] = useState<string>(''); // 「退会します」確認入力
 
   const canDelete = useMemo(
-    () => !isLoading && agreeLoss && agreeIrreversible && confirmText === '退会します',
-    [isLoading, agreeLoss, agreeIrreversible, confirmText],
+    () => !isLoading && agreeAll && confirmText === '退会します',
+    [isLoading, agreeAll, confirmText],
   );
 
   // --- 削除ボタン押下時の処理 ---
@@ -76,7 +75,6 @@ export default function DeleteAccountPage() {
       toast.success('アカウントを削除しました');
       router.push('/register');
     } catch (error: unknown) {
-      // 失敗時のメッセージ整形
       const message =
         error instanceof Error ? error.message : '予期せぬエラーが発生しました';
       console.error(error);
@@ -88,7 +86,7 @@ export default function DeleteAccountPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
-      <Header title="Withdrawal" />
+      <Header title="Delete Account" />
 
       <main className="mx-auto flex w-full max-w-xl flex-1 space-y-6 px-6 py-10">
         <div className="w-full space-y-6">
@@ -119,29 +117,17 @@ export default function DeleteAccountPage() {
               </li>
             </ul>
 
+            {/* ✅ チェックボックスを1つに統合 */}
             <div className="flex items-start gap-2">
               <input
-                id="agreeLoss"
+                id="agreeAll"
                 type="checkbox"
                 className="mt-1 h-4 w-4 rounded border-gray-300"
-                checked={agreeLoss}
-                onChange={(e) => setAgreeLoss(e.target.checked)}
+                checked={agreeAll}
+                onChange={(e) => setAgreeAll(e.target.checked)}
               />
-              <label htmlFor="agreeLoss" className="text-sm text-[#333]">
-                すべての情報が失われ、復元できないことに同意します
-              </label>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <input
-                id="agreeIrreversible"
-                type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-gray-300"
-                checked={agreeIrreversible}
-                onChange={(e) => setAgreeIrreversible(e.target.checked)}
-              />
-              <label htmlFor="agreeIrreversible" className="text-sm text-[#333]">
-                この操作が元に戻せないことを理解し、同意します
+              <label htmlFor="agreeAll" className="text-sm text-[#333]">
+                上記に同意します。
               </label>
             </div>
 

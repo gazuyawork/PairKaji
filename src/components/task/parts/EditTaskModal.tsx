@@ -21,7 +21,10 @@ import {
 } from 'lucide-react';
 import UrlAwareTextarea from '@/components/common/UrlAwareTextarea';
 import HelpPopover from '@/components/common/HelpPopover';
+import { forkTaskAsPrivateForSelf } from '@/lib/firebaseUtils';
 
+// ★ 追加：現在のユーザー判定に使用
+import { auth } from '@/lib/firebase';
 
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
@@ -314,6 +317,7 @@ export default function EditTaskModal({
     [editedTask, update]
   );
 
+  // ★ 修正：プライベートONかつ元所有者≠自分 の場合は複製して保存
   const handleSave = useCallback(() => {
     if (!editedTask) return;
 
@@ -356,6 +360,45 @@ export default function EditTaskModal({
     } as Task;
 
     setIsSaving(true);
+
+    // ▼ 追加分岐：相手作成タスクをプライベートONで保存 → 複製して新IDで保存
+    const currentUid = auth.currentUser?.uid;
+    const originalOwner = (task as unknown as { userId?: string }).userId;
+
+    const shouldForkPrivate =
+      isPrivate &&
+      !!task.id &&
+      !!originalOwner &&
+      !!currentUid &&
+      originalOwner !== currentUid;
+
+    if (shouldForkPrivate) {
+      forkTaskAsPrivateForSelf(task.id!)
+        .then((newId) => {
+          onSave({ ...transformed, id: newId });
+
+          if (closeTimerRef.current) {
+            clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+          }
+          setTimeout(() => {
+            setIsSaving(false);
+            setSaveComplete(true);
+            closeTimerRef.current = setTimeout(() => {
+              setSaveComplete(false);
+              setShouldClose(true);
+            }, 1500);
+          }, 300);
+        })
+        .catch((e) => {
+          console.error(e);
+          setIsSaving(false);
+        });
+
+      return; // 既存タスクへの onSave はここでは行わない
+    }
+
+    // 通常保存（自分作成 or 共有のまま）
     onSave(transformed);
 
     if (closeTimerRef.current) {
@@ -371,7 +414,7 @@ export default function EditTaskModal({
         setShouldClose(true);
       }, 1500);
     }, 300);
-  }, [editedTask, existingTasks, isPrivate, onSave]);
+  }, [editedTask, existingTasks, isPrivate, onSave, task]);
 
   // ★ 追加: カテゴリのオーバーフローチェック
   const measureCatOverflow = useCallback(() => {
@@ -582,10 +625,11 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-6 h-6 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                    ? 'bg-[#5E5E5E] text-white'
-                    : 'bg-gray-200 text-gray-600'
-                    }`}
+                  className={`w-6 h-6 rounded-full text-xs font-bold ${
+                    editedTask.daysOfWeek.includes(day)
+                      ? 'bg-[#5E5E5E] text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}
                 >
                   {day}
                 </button>
@@ -718,8 +762,9 @@ export default function EditTaskModal({
                         key={user.id}
                         type="button"
                         onClick={() => toggleUser(user.id)}
-                        className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
-                          }`}
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${
+                          isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                        }`}
                         title={`${user.name}`}
                       >
                         <Image
@@ -765,16 +810,17 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isPrivate}
                 onClick={() => setIsPrivate((v) => !v)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
-                  }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                  isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : ''
-                    }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                    isPrivate ? 'translate-x-6' : ''
+                  }`}
                 />
               </button>
             </div>
-
           </>
         )}
 
@@ -794,12 +840,14 @@ export default function EditTaskModal({
                     (!isVisible) as unknown as TaskWithNote[keyof TaskWithNote]
                   )
                 }
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isVisible ? 'bg-yellow-500' : 'bg-gray-300'
-                  }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                  isVisible ? 'bg-yellow-500' : 'bg-gray-300'
+                }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isVisible ? 'translate-x-6' : ''
-                    }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                    isVisible ? 'translate-x-6' : ''
+                  }`}
                 />
               </button>
             </div>
@@ -849,13 +897,12 @@ export default function EditTaskModal({
               onTouchMove={(e) => e.stopPropagation()}
               className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-0 ml-0 pb-0 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
             />
-
-
           </div>
           <div className="mt-1 pr-1 flex justify-end">
             <span
-              className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'
-                } text-xs`}
+              className={`${
+                (editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'
+              } text-xs`}
             >
               {(editedTask.note?.length ?? 0)}/{NOTE_MAX}
             </span>
