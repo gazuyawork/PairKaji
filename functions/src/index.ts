@@ -10,6 +10,7 @@ export { sendDailyTaskReminder } from './sendDailyTaskReminder';
 export { onTaskDeletedCleanup } from './onTaskDeletedCleanup';
 export { onTodoRemovedCleanup } from './onTodoRemovedCleanup';
 export { notifyOnTaskFlag } from './notifyOnTaskFlag';
+export { onAuthUserDelete } from './onAuthUserDelete';
 
 // --- スケジュール関数（v2）---
 import { onSchedule } from 'firebase-functions/v2/scheduler';
