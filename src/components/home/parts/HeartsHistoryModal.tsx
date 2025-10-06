@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import BaseModal from '@/components/common/modals/BaseModal';
 import { db } from '@/lib/firebase';
 import {
@@ -84,7 +84,17 @@ function toDateFromIdSuffix(id: string): Date | null {
   return ok ? d : null;
 }
 
-// 任意の値を Date へ（ログ付き）
+// seconds フィールドを持つ Firestore タイムスタンプ相当の型ガード
+function hasSeconds(obj: unknown): obj is { seconds: number; nanoseconds?: number } {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'seconds' in obj &&
+    typeof (obj as { seconds?: unknown }).seconds === 'number'
+  );
+}
+
+// 任意の値を Date へ（ログ付き） — any を使わない実装
 function toDateFromLikeDate(val: unknown, keyLabel: string): Date | null {
   if (!val) {
     dbg(`toDateFromLikeDate[${keyLabel}]: null`);
@@ -96,8 +106,8 @@ function toDateFromLikeDate(val: unknown, keyLabel: string): Date | null {
       dbg(`toDateFromLikeDate[${keyLabel}]: Timestamp ->`, d);
       return d;
     }
-    if (typeof val === 'object' && val !== null && 'seconds' in (val as any)) {
-      const { seconds, nanoseconds } = val as { seconds: number; nanoseconds?: number };
+    if (hasSeconds(val)) {
+      const { seconds, nanoseconds } = val;
       const d = new Date(seconds * 1000 + Math.floor((nanoseconds ?? 0) / 1e6));
       dbg(`toDateFromLikeDate[${keyLabel}]: seconds/nanos ->`, d);
       return d;
@@ -315,16 +325,18 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     return () => unsub();
   }, [uid, isOpen]);
 
-  const isReceivedFromPartner = (senderId?: string | null) => {
+  // ← ここを useCallback でメモ化（uid / partnerId に依存）
+  const isReceivedFromPartner = useCallback((senderId?: string | null) => {
     if (!senderId) return false;
     if (partnerId) return senderId === partnerId;
     return senderId !== uid;
-  };
-  const isGivenByMe = (receiverId?: string | null) => {
+  }, [partnerId, uid]);
+
+  const isGivenByMe = useCallback((receiverId?: string | null) => {
     if (!receiverId || !uid) return false;
     if (partnerId) return receiverId === partnerId;
     return receiverId !== uid;
-  };
+  }, [partnerId, uid]);
 
   const weekBounds = useMemo(() => {
     const base = addWeeks(new Date(), weekOffset);
@@ -412,7 +424,8 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     timeEnd('calc totals');
 
     return { totalReceived: tr, totalGiven: tg, totalThisWeek: total, stage: stg, weekRangeLabel: label };
-  }, [rawLikesReceived, rawLikesGiven, weekBounds, partnerId, uid]);
+    // 依存配列：uid/partnerId は useCallback に含まれているため **不要**。
+  }, [rawLikesReceived, rawLikesGiven, weekBounds, isReceivedFromPartner, isGivenByMe]);
 
   // 吸収アニメ
   const lastSeenKey = useMemo(() => {

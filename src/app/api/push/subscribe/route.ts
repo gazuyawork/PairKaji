@@ -1,4 +1,3 @@
-// src/app/api/push/subscribe/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import admin, { adminDb } from '@/lib/server/firebaseAdmin'; // ← default + named import
 import crypto from 'crypto';
@@ -15,6 +14,29 @@ type Body = {
   uid: string;
   subscription: PushSubscriptionJSON;
 };
+
+// any 回避のためのエラー正規化ヘルパ
+function normalizeError(err: unknown): {
+  name: string;
+  message: string;
+  stack?: string;
+} {
+  if (err instanceof Error) {
+    return {
+      name: err.name ?? 'Error',
+      message: err.message ?? 'Unknown error',
+      stack:
+        typeof err.stack === 'string'
+          ? err.stack.split('\n').slice(0, 5).join('\n')
+          : undefined,
+    };
+  }
+  try {
+    return { name: 'Error', message: JSON.stringify(err) };
+  } catch {
+    return { name: 'Error', message: String(err) };
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -80,12 +102,8 @@ export async function POST(req: NextRequest) {
       );
 
     return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (err) {
-    // ▼ デバッグ強化：エラーの型・メッセージ・スタックを返す（機密は含めない）
-    const e = err as any;
-    const name = e?.name ?? 'Error';
-    const message = e?.message ?? String(e);
-    const stack = typeof e?.stack === 'string' ? e.stack.split('\n').slice(0, 5).join('\n') : undefined;
+  } catch (err: unknown) {
+    const { name, message, stack } = normalizeError(err);
 
     console.error('[api/push/subscribe] error:', name, message);
     return NextResponse.json(

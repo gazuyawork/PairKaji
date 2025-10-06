@@ -1,4 +1,3 @@
-// src/components/common/OnboardingModal.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -128,6 +127,14 @@ const DEFAULT_PAGES: SlidePage[] = [
 ];
 
 /* ----------------------------------------------------------------
+   ヘルパー: 型ガード
+------------------------------------------------------------------*/
+function isSlidePageArray(arr: SlideInput[] | SlidePage[]): arr is SlidePage[] {
+  const first = (arr as Array<SlideInput | SlidePage>)[0];
+  return typeof first === 'object' && first !== null && 'blocks' in (first as SlidePage);
+}
+
+/* ----------------------------------------------------------------
    正規化
    - 受け取った slides を SlidePage[] に正規化
    - 旧形式は 1ブロック構成のページへ変換し、title はページタイトルへ昇格
@@ -137,8 +144,8 @@ function normalizeToPages(slides?: SlideInput[] | SlidePage[], captions?: string
   if (!slides || slides.length === 0) return DEFAULT_PAGES;
 
   // 新形式（SlidePage[]: blocks を持つ）ならそのまま整形して返す
-  if (typeof slides[0] === 'object' && slides[0] !== null && 'blocks' in (slides[0] as any)) {
-    return (slides as SlidePage[]).map((p) => ({
+  if (isSlidePageArray(slides)) {
+    return slides.map((p) => ({
       title: p.title,
       blocks: (p.blocks ?? []).map((b) => ({
         subtitle: b.subtitle,
@@ -206,8 +213,8 @@ function parseImgOpts(raw?: string): ImgOpts {
 
 /**
  * 説明文中の画像トークン [[img:/path|alt=...|h=24|w=80]] をインラインで描画
- * - 画像は <img> を使用（インライン組版向け）
- * - 戻り値を React.ReactNode[] にすることで JSX 名前空間依存を避ける
+ * - Next.js のルールに従い <Image> を使用（LCP/帯域最適化）
+ * - インライン用途のため display:inline-block を付与
  */
 function renderRichText(text: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
@@ -221,19 +228,19 @@ function renderRichText(text: string): React.ReactNode[] {
     if (m.index > last) out.push(text.slice(last, m.index));
 
     const opts = parseImgOpts(rawOpts);
-    const style: React.CSSProperties = {};
-    if (opts.h) style.height = `${opts.h}px`;
-    if (opts.w) style.width = `${opts.w}px`;
+    // width/height のどちらかが省略された場合は 16px を既定値に
+    const width = typeof opts.w === 'number' ? Math.max(1, Math.round(opts.w)) : 16;
+    const height = typeof opts.h === 'number' ? Math.max(1, Math.round(opts.h)) : 16;
 
     out.push(
-      <img
+      <Image
         key={`inline-img-${m.index}`}
         src={src}
         alt={opts.alt ?? ''}
-        style={style}
+        width={width}
+        height={height}
         className="inline-block align-middle mx-1"
-        loading="eager"
-        decoding="async"
+        priority
       />
     );
     last = m.index + raw.length;
@@ -289,7 +296,7 @@ export default function OnboardingModal(props: Props) {
 
   // ×/スキップ/背景クリック時の確認（ConfirmModal を表示）
   const handleCloseWithConfirm = () => {
-    setShowConfirm(true); // ★変更（window.confirm を廃止）
+    setShowConfirm(true); // ★window.confirm を廃止
   };
 
   // ブロック数に応じた画像コンテナの高さ（目安）
@@ -297,6 +304,7 @@ export default function OnboardingModal(props: Props) {
     if (count <= 1) return { height: 'min(60dvh, 600px)' }; // 以前: 70dvh / 720px
     if (count === 2) return { height: 'min(34dvh, 420px)' }; // 以前: 40dvh / 480px
     return { height: 'min(22dvh, 300px)' }; // 以前: 28dvh / 360px
+    // ※ 画像自体は object-contain で枠内にフィット
   };
 
   if (typeof window === 'undefined') return null; // SSR ガード
@@ -305,7 +313,7 @@ export default function OnboardingModal(props: Props) {
   return createPortal(
     <>
       <motion.div
-        className="fixed inset-0 z-[9998] bg-white/60" // ★変更：ConfirmModal(9999)より下
+        className="fixed inset-0 z-[9998] bg-white/60" // ★ConfirmModal(9999)より下
         role="dialog"
         aria-modal="true"
         onClick={handleCloseWithConfirm}
@@ -383,7 +391,7 @@ export default function OnboardingModal(props: Props) {
 
                       {/* 説明（任意） */}
                       {b.description && (
-                        <p className="px-4 py-4 text-sm sm:text[15px] leading-6 text-gray-700 whitespace-pre-wrap">
+                        <p className="px-4 py-4 text-sm sm:text-[15px] leading-6 text-gray-700 whitespace-pre-wrap">
                           {renderRichText(b.description)}
                         </p>
                       )}
@@ -394,7 +402,7 @@ export default function OnboardingModal(props: Props) {
           </div>
 
           {/* フッター：ページネーション＋操作ボタン（セーフエリア対応） */}
-          <div className="px-4 pt-8 mb-4 pb[calc(env(safe-area-inset-bottom)+12px)] border-t border-gray-200 bg-white">
+          <div className="px-4 pt-8 mb-4 pb-[calc(env(safe-area-inset-bottom)+12px)] border-t border-gray-200 bg-white">
             {/* ページネーションドット（ページ単位） */}
             <div className="flex items-center justify-center gap-2 mb-4">
               {pages.map((_, i) => (

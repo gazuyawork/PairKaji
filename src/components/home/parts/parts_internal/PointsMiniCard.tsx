@@ -1,4 +1,3 @@
-// src/components/home/parts/parts_internal/PointsMiniCard.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +12,8 @@ import {
   onSnapshot,
   doc,
   setDoc,
+  Timestamp,
+  DocumentData,
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from '@/components/home/parts/EditPointModal';
@@ -24,6 +25,49 @@ type UserInfo = {
   name: string;
   imageUrl: string;
 };
+
+type PairDoc = {
+  userIds?: unknown;
+  userAId?: unknown;
+  userBId?: unknown;
+};
+
+type TaskCompletion = {
+  id?: string;
+  userId?: string;
+  userIds?: string[];
+  point?: number;
+  completedAt?: Timestamp | string;
+  /** 後方互換用: "YYYY-MM-DD" */
+  date?: string;
+};
+
+type PointsDoc = {
+  weeklyTargetPoint?: number;
+  selfPoint?: number;
+};
+
+/* ----------------------------------------------------------------
+   型ユーティリティ（型ガード）
+------------------------------------------------------------------*/
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+function hasToDate(v: unknown): v is { toDate: () => Date } {
+  return isRecord(v) && typeof (v as { toDate?: unknown }).toDate === 'function';
+}
+/** completedAt 相当（Timestamp / {toDate} / string / number(ms)）から ms を取得 */
+function toMillis(v: unknown): number | null {
+  try {
+    if (v instanceof Timestamp) return v.toDate().getTime();
+    if (hasToDate(v)) return v.toDate().getTime();
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.length > 0) return new Date(v).getTime();
+  } catch {
+    /* noop */
+  }
+  return null;
+}
 
 /**
  * ミニカード：提供いただいた棒グラフスタイルをそのまま採用
@@ -67,8 +111,11 @@ export default function PointsMiniCard() {
         setTargetIds([uid]);
         return;
       }
-      const data = snap.docs[0].data() as any;
-      const arr = Array.isArray(data.userIds) ? (data.userIds as string[]) : [uid];
+      const data = snap.docs[0].data() as PairDoc;
+      const arr = Array.isArray(data.userIds)
+        ? (data.userIds as unknown[]).filter((x): x is string => typeof x === 'string')
+        : [uid];
+
       const unique = Array.from(new Set(arr));
       setHasPartner(unique.length > 1);
       setTargetIds(unique);
@@ -82,22 +129,36 @@ export default function PointsMiniCard() {
     if (!uid || targetIds.length === 0) return;
 
     // 週の境界（JSTローカル）をミリ秒で比較
-    const weekStartMs = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 0).getTime();
-    const weekEndMs   = new Date(weekEnd.getFullYear(),   weekEnd.getMonth(),   weekEnd.getDate(),   23, 59, 59, 999).getTime();
+    const weekStartMs = new Date(
+      weekStart.getFullYear(),
+      weekStart.getMonth(),
+      weekStart.getDate(),
+      0,
+      0,
+      0,
+      0
+    ).getTime();
+    const weekEndMs = new Date(
+      weekEnd.getFullYear(),
+      weekEnd.getMonth(),
+      weekEnd.getDate(),
+      23,
+      59,
+      59,
+      999
+    ).getTime();
 
-    const withinWeek = (data: any): boolean => {
-      // 1) completedAt（Timestamp or string）優先
-      if (data?.completedAt) {
-        const v = data.completedAt;
-        // Firestore Timestamp
-        if (typeof v?.toDate === 'function') {
-          const t = v.toDate().getTime();
+    const withinWeek = (data: TaskCompletion): boolean => {
+      // 1) completedAt（Timestamp / {toDate} / string / number）優先
+      if (data?.completedAt != null) {
+        const t = toMillis(data.completedAt);
+        if (typeof t === 'number' && Number.isFinite(t)) {
           return t >= weekStartMs && t <= weekEndMs;
         }
-        // 文字列（ISO/日付）として入っている場合もケア
-        if (typeof v === 'string') {
-          const t = new Date(`${v}T00:00:00+09:00`).getTime();
-          return t >= weekStartMs && t <= weekEndMs;
+        // 文字列（ISO/日付）として入っている場合もケア（toMillisが失敗したときのフォールバック）
+        if (typeof data.completedAt === 'string') {
+          const t2 = new Date(`${data.completedAt}T00:00:00+09:00`).getTime();
+          return t2 >= weekStartMs && t2 <= weekEndMs;
         }
       }
       // 2) 後方互換：date (YYYY-MM-DD) での保存にも対応
@@ -109,7 +170,7 @@ export default function PointsMiniCard() {
     };
 
     const col = collection(db, 'taskCompletions');
-    const acc = new Map<string, any>(); // 重複排除用のバッファ
+    const acc = new Map<string, TaskCompletion>(); // 重複排除用のバッファ
 
     const recompute = () => {
       let bufferSelf = 0;
@@ -123,7 +184,9 @@ export default function PointsMiniCard() {
         const ownerId: string | undefined =
           typeof data.userId === 'string'
             ? data.userId
-            : (Array.isArray(data.userIds) && data.userIds.length === 1 ? data.userIds[0] : data.userId);
+            : Array.isArray(data.userIds) && data.userIds.length === 1
+            ? data.userIds[0]
+            : undefined;
 
         if (!ownerId) return;
 
@@ -144,7 +207,11 @@ export default function PointsMiniCard() {
         onSnapshot(qA, (snap) => {
           snap.docChanges().forEach((ch) => {
             if (ch.type === 'removed') acc.delete(ch.doc.id);
-            else acc.set(ch.doc.id, { id: ch.doc.id, ...(ch.doc.data() as any) });
+            else
+              acc.set(ch.doc.id, {
+                id: ch.doc.id,
+                ...(ch.doc.data() as DocumentData as TaskCompletion),
+              });
           });
           recompute();
         })
@@ -158,7 +225,11 @@ export default function PointsMiniCard() {
         onSnapshot(qB, (snap) => {
           snap.docChanges().forEach((ch) => {
             if (ch.type === 'removed') acc.delete(ch.doc.id);
-            else acc.set(ch.doc.id, { id: ch.doc.id, ...(ch.doc.data() as any) });
+            else
+              acc.set(ch.doc.id, {
+                id: ch.doc.id,
+                ...(ch.doc.data() as DocumentData as TaskCompletion),
+              });
           });
           recompute();
         })
@@ -180,7 +251,7 @@ export default function PointsMiniCard() {
     const selfRef = doc(db, 'points', uid);
     const unsubSelf = onSnapshot(selfRef, (snap) => {
       if (!snap.exists()) return;
-      const data = snap.data() as any;
+      const data = snap.data() as PointsDoc;
       if (typeof data.weeklyTargetPoint === 'number') setMaxPoints(data.weeklyTargetPoint);
       if (typeof data.selfPoint === 'number') setSelfTargetPoint(data.selfPoint);
     });
@@ -192,7 +263,7 @@ export default function PointsMiniCard() {
       const partnerRef = doc(db, 'points', partnerUid);
       const unsubPartner = onSnapshot(partnerRef, (snap) => {
         if (!snap.exists()) return;
-        const data = snap.data() as any;
+        const data = snap.data() as PointsDoc;
         if (typeof data.selfPoint === 'number') setPartnerTargetPoint(data.selfPoint);
       });
       unsubscribers.push(unsubPartner);
@@ -221,11 +292,11 @@ export default function PointsMiniCard() {
       {
         userId: uid,
         userIds: partnerUids,
-        selfPoint: newSelfPoint,      // 自分の内訳ポイント
-        weeklyTargetPoint: newPoint,  // 合計目標ポイント
+        selfPoint: newSelfPoint, // 自分の内訳ポイント
+        weeklyTargetPoint: newPoint, // 合計目標ポイント
         updatedAt: new Date(),
       },
-      { merge: true },
+      { merge: true }
     );
   };
 
@@ -240,7 +311,7 @@ export default function PointsMiniCard() {
         title={`今週の合計ポイント ${weekLabel}`}
       >
         {/* 見出し */}
-        <div className="flex items-center gap-2 text-gray-700">
+        <div className="flex items中心 gap-2 text-gray-700">
           {/* <span className="rounded-md border border-gray-300 bg-white p-1 group-hover:shadow-sm">
             <Star className="w-4 h-4" />
           </span> */}
@@ -273,14 +344,16 @@ export default function PointsMiniCard() {
           <div className="flex items-center gap-1">
             <span className="inline-block w-3 h-3 rounded-full bg-[#FFA552]" />
             <span>
-              あなた（{selfPoints}{selfTargetPoint != null ? ` / ${selfTargetPoint}` : ''} pt）
+              あなた（{selfPoints}
+              {selfTargetPoint != null ? ` / ${selfTargetPoint}` : ''} pt）
             </span>
           </div>
           {hasPartner && (
             <div className="flex items-center gap-1">
               <span className="inline-block w-3 h-3 rounded-full bg-[#FFD97A]" />
               <span>
-                パートナー（{partnerPoints}{partnerTargetPoint != null ? ` / ${partnerTargetPoint}` : ''} pt）
+                パートナー（{partnerPoints}
+                {partnerTargetPoint != null ? ` / ${partnerTargetPoint}` : ''} pt）
               </span>
             </div>
           )}
@@ -295,9 +368,9 @@ export default function PointsMiniCard() {
         onSave={handleSave}
         // ルーレット等はミニカードでは扱わない前提
         rouletteOptions={['ご褒美A', 'ご褒美B', 'ご褒美C']}
-        setRouletteOptions={() => { }}
+        setRouletteOptions={() => {}}
         rouletteEnabled={true}
-        setRouletteEnabled={() => { }}
+        setRouletteEnabled={() => {}}
         users={users}
       />
     </>

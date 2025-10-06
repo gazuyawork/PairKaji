@@ -41,6 +41,12 @@ const PUBLIC_PATHS = new Set<string>(['/login', '/signup', '/verify', '/terms', 
 /** 破損時に Firebase 関連の IndexedDB を可能な範囲で削除（非同期・失敗しても続行）
  *  ※ Auth の永続 DB は削除しない（リロードでログアウトを誘発するため）
  */
+
+// IDBFactory に非標準の databases() が存在する実装向けの拡張型
+type IDBFactoryWithDatabases = IDBFactory & {
+  databases?: () => Promise<Array<{ name?: string }>>;
+};
+
 async function nukeCorruptedFirebaseIndexedDB(projectId?: string) {
   if (typeof window === 'undefined' || !('indexedDB' in window)) return;
 
@@ -66,9 +72,10 @@ async function nukeCorruptedFirebaseIndexedDB(projectId?: string) {
     });
 
   try {
-    const anyIDB: any = indexedDB as any;
-    if (typeof anyIDB.databases === 'function') {
-      const dbs: Array<{ name?: string }> = (await anyIDB.databases()) || [];
+    // 非標準の databases() があれば利用する（型を拡張して安全に参照）
+    const idb = indexedDB as IDBFactoryWithDatabases;
+    if (typeof idb.databases === 'function') {
+      const dbs = (await idb.databases()) ?? [];
       for (const db of dbs) {
         const name = db.name ?? '';
         // Firestore 系のみ削除。Auth 永続 DB は削除しない。

@@ -6,12 +6,11 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, SquareUser, Heart } from 'lucide-react';
 import type { Task } from '@/types/Task';
-// import { format } from 'date-fns'; // 時刻関連は停止
 import Image from 'next/image';
 import { db, auth } from '@/lib/firebase';
 import {
   doc, getDoc, collection, query, where, limit, getDocs,
-  setDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove
+  setDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, type DocumentData
 } from 'firebase/firestore';
 
 /* =========================
@@ -34,6 +33,32 @@ type MaybeCompleted = {
 };
 
 type FirestoreDocData = Record<string, unknown>;
+
+/** taskLikes コレクション用の型 */
+type TaskLikeDoc = {
+  taskId?: string;
+  date?: string;
+  ownerId?: string | null;
+  likedBy?: string[];
+};
+
+/** 型ガード・補助 */
+function getStr(obj: Record<string, unknown> | null | undefined, key: string): string | undefined {
+  const v = obj?.[key];
+  return typeof v === 'string' ? v : undefined;
+}
+function getBool(obj: Record<string, unknown> | null | undefined, key: string): boolean | undefined {
+  const v = obj?.[key];
+  return typeof v === 'boolean' ? v : undefined;
+}
+function getStrArray(obj: Record<string, unknown> | null | undefined, key: string): string[] | undefined {
+  const v = obj?.[key];
+  if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v as string[];
+  return undefined;
+}
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
 
 function isTaskPrivate(task: Task | MaybePrivate): boolean {
   const t = task as MaybePrivate;
@@ -59,10 +84,10 @@ function getCompletedUserId(task: Task | MaybeCompleted): string | null {
 
 /** プロフィール画像URL候補から最適なものを選択 */
 function resolveUserImageSrc(profile: FirestoreDocData | null): string {
-  const pick = (k: string): string | undefined => {
-    const v = profile?.[k];
-    return typeof v === 'string' && v.trim().length > 0 ? v : undefined;
-  };
+  const pick = (k: string): string | undefined => getStr(profile, k);
+  const nestedProfile = isRecord(profile?.profile) ? (profile!.profile as Record<string, unknown>) : null;
+  const pickNested = (k: string): string | undefined => getStr(nestedProfile, k);
+
   const candidates = [
     pick('imageUrl'),
     pick('photoURL'),
@@ -76,15 +101,9 @@ function resolveUserImageSrc(profile: FirestoreDocData | null): string {
     pick('avatar'),
     pick('picture'),
     pick('photo'),
-    typeof profile?.profile === 'object' && profile?.profile
-      ? ((): string | undefined => {
-          const p = profile!.profile as Record<string, unknown>;
-          const cands = ['imageUrl', 'photoURL', 'avatarUrl']
-            .map((kk) => (typeof p[kk] === 'string' && (p[kk] as string).trim() ? (p[kk] as string) : undefined))
-            .filter(Boolean) as string[];
-          return cands[0];
-        })()
-      : undefined,
+    pickNested('imageUrl'),
+    pickNested('photoURL'),
+    pickNested('avatarUrl'),
   ].filter(Boolean) as string[];
 
   let src = candidates[0] ?? '';
@@ -95,17 +114,16 @@ function resolveUserImageSrc(profile: FirestoreDocData | null): string {
 }
 
 function getDisplayName(data: FirestoreDocData | null): string {
-  const dn = (data as any)?.displayName;
-  if (typeof dn === 'string' && dn.trim()) return dn;
-  const name = (data as any)?.name;
-  if (typeof name === 'string' && name.trim()) return name;
+  const dn = getStr(data ?? null, 'displayName');
+  if (dn && dn.trim()) return dn;
+  const name = getStr(data ?? null, 'name');
+  if (name && name.trim()) return name;
   return '';
 }
 
 /** イニシャル文字（フォールバック） */
 function initialOf(idOrName?: string | null): string {
-  if (!idOrName) return 'U';
-  const s = String(idOrName).trim();
+  const s = String(idOrName ?? '').trim();
   return s ? s[0]!.toUpperCase() : 'U';
 }
 
@@ -143,6 +161,9 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
 
   const currentUid = auth.currentUser?.uid ?? null;
 
+  // 当日のキーは「当日中は固定」
+  const dateKey = useMemo(() => todayKey(), []);
+
   // パートナー設定の検出
   useEffect(() => {
     let cancelled = false;
@@ -151,37 +172,41 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
       let confirmed = false;
       let partner: string | null = null;
       try {
-        const direct = await getDoc(doc(db, 'pairs', currentUid));
-        if (direct.exists()) {
-          const d = direct.data() as any;
-          const status = d?.status ?? d?.state ?? d?.pairStatus;
-          const confirmedLike = status === 'confirmed' || d?.confirmed === true;
-          if (confirmedLike) {
+        // 1) 直接ドキュメント
+        const directSnap = await getDoc(doc(db, 'pairs', currentUid));
+        if (directSnap.exists()) {
+          const d = directSnap.data() as DocumentData;
+          const status = getStr(d, 'status') ?? getStr(d, 'state') ?? getStr(d, 'pairStatus');
+          const confirmedFlag = status === 'confirmed' || getBool(d, 'confirmed') === true;
+          if (confirmedFlag) {
             confirmed = true;
             partner =
-              d?.partnerId ??
-              d?.partnerUid ??
-              (Array.isArray(d?.userIds) ? (d.userIds as string[]).find((x) => x !== currentUid) ?? null : null);
+              getStr(d, 'partnerId') ??
+              getStr(d, 'partnerUid') ??
+              ((getStrArray(d, 'userIds') ?? []).find((x) => x !== currentUid) ?? null);
           }
         }
+        // 2) userIds に自分が含まれるドキュメントを検索
         if (!confirmed) {
           const q = query(collection(db, 'pairs'), where('userIds', 'array-contains', currentUid), limit(5));
-          const snap = await getDocs(q);
-          for (const s of snap.docs) {
-            const d = s.data() as any;
-            const status = d?.status ?? d?.state ?? d?.pairStatus;
-            const confirmedLike = status === 'confirmed' || d?.confirmed === true;
-            if (confirmedLike) {
+          const list = await getDocs(q);
+          for (const s of list.docs) {
+            const d = s.data() as DocumentData;
+            const status = getStr(d, 'status') ?? getStr(d, 'state') ?? getStr(d, 'pairStatus');
+            const confirmedFlag = status === 'confirmed' || getBool(d, 'confirmed') === true;
+            if (confirmedFlag) {
               confirmed = true;
               partner =
-                d?.partnerId ??
-                d?.partnerUid ??
-                (Array.isArray(d?.userIds) ? (d.userIds as string[]).find((x) => x !== currentUid) ?? null : null);
+                getStr(d, 'partnerId') ??
+                getStr(d, 'partnerUid') ??
+                ((getStrArray(d, 'userIds') ?? []).find((x) => x !== currentUid) ?? null);
               break;
             }
           }
         }
-      } catch {}
+      } catch {
+        // 失敗しても無視（UIは単に pairEnabled=false で進む）
+      }
       if (!cancelled) {
         setPairEnabled(confirmed);
         setPartnerUid(partner ?? null);
@@ -214,16 +239,20 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
         pendingRef.current.add(uid);
         try {
           let data: FirestoreDocData | null = null;
-          let snap = await getDoc(doc(db, 'users', uid));
-          data = snap.exists() ? (snap.data() as FirestoreDocData) : null;
 
+          // users
+          const snapUsers = await getDoc(doc(db, 'users', uid));
+          data = snapUsers.exists() ? (snapUsers.data() as FirestoreDocData) : null;
+
+          // profiles
           if (!data) {
-            snap = await getDoc(doc(db, 'profiles', uid));
-            data = snap.exists() ? (snap.data() as FirestoreDocData) : null;
+            const snapProfiles = await getDoc(doc(db, 'profiles', uid));
+            data = snapProfiles.exists() ? (snapProfiles.data() as FirestoreDocData) : null;
           }
+          // app_users
           if (!data) {
-            snap = await getDoc(doc(db, 'app_users', uid));
-            data = snap.exists() ? (snap.data() as FirestoreDocData) : null;
+            const snapAppUsers = await getDoc(doc(db, 'app_users', uid));
+            data = snapAppUsers.exists() ? (snapAppUsers.data() as FirestoreDocData) : null;
           }
 
           const img = resolveUserImageSrc(data);
@@ -248,50 +277,56 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
   // いいね購読
   useEffect(() => {
     if (!pairEnabled) return;
-    const date = todayKey();
+    if (!tasks || tasks.length === 0) return;
     const unsubs: Array<() => void> = [];
     for (const t of tasks) {
       const id = t.id;
       if (!id) continue;
-      const ref = doc(db, 'taskLikes', likeDocId(id, date));
+      const ref = doc(db, 'taskLikes', likeDocId(id, dateKey));
       const unsub = onSnapshot(ref, (snap) => {
-        const data = snap.data() as any | undefined;
-        const likedBy: string[] = Array.isArray(data?.likedBy) ? data!.likedBy as string[] : [];
+        const data = snap.data() as TaskLikeDoc | undefined;
+        const likedBy = Array.isArray(data?.likedBy) ? (data!.likedBy as string[]) : [];
         setLikesMap((prev) => ({ ...prev, [id]: likedBy }));
       });
       unsubs.push(unsub);
     }
     return () => { unsubs.forEach((f) => f()); };
-  }, [pairEnabled, tasks]);
+  }, [pairEnabled, tasks, dateKey]);
 
   // ハートON/OFF切り替え
   const toggleLike = async (taskId?: string, ownerId?: string | null) => {
     if (!taskId || !pairEnabled || !currentUid) return;
     if (ownerId && currentUid === ownerId) return;
-    const date = todayKey();
-    const ref = doc(db, 'taskLikes', likeDocId(taskId, date));
-    const snap = await getDoc(ref);
-    const exists = snap.exists();
-    const current = (exists ? snap.data()?.likedBy : []) as string[] | undefined;
-    const already = Array.isArray(current) ? current.includes(currentUid) : false;
 
-    if (!exists) {
-      await setDoc(ref, { taskId, date, ownerId: ownerId ?? null, likedBy: [currentUid] }, { merge: true });
-    } else if (already) {
-      await updateDoc(ref, { likedBy: arrayRemove(currentUid) });
-    } else {
-      await updateDoc(ref, { likedBy: arrayUnion(currentUid) });
-    }
+    try {
+      const ref = doc(db, 'taskLikes', likeDocId(taskId, dateKey));
+      const snap = await getDoc(ref);
+      const exists = snap.exists();
+      const current = (exists ? (snap.data() as TaskLikeDoc | undefined)?.likedBy : []) as string[] | undefined;
+      const already = Array.isArray(current) ? current.includes(currentUid) : false;
 
-    if (!already) {
-      setAnimatingIds((a) => new Set(a).add(taskId));
-      setTimeout(() => {
-        setAnimatingIds((a) => {
-          const b = new Set(a);
-          b.delete(taskId);
-          return b;
-        });
-      }, 450);
+      if (!exists) {
+        const newDoc: TaskLikeDoc = { taskId, date: dateKey, ownerId: ownerId ?? null, likedBy: [currentUid] };
+        await setDoc(ref, newDoc, { merge: true });
+      } else if (already) {
+        await updateDoc(ref, { likedBy: arrayRemove(currentUid) });
+      } else {
+        await updateDoc(ref, { likedBy: arrayUnion(currentUid) });
+      }
+
+      if (!already) {
+        setAnimatingIds((a) => new Set(a).add(taskId));
+        setTimeout(() => {
+          setAnimatingIds((a) => {
+            const b = new Set(a);
+            b.delete(taskId);
+            return b;
+          });
+        }, 450);
+      }
+    } catch (e) {
+      // Firestore 権限やネットワーク失敗などのときに無音にならないようログ
+      console.error('[toggleLike] failed:', e);
     }
   };
 

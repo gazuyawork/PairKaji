@@ -19,6 +19,7 @@ import {
   Timestamp,
   serverTimestamp,
   getDoc,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { getConfirmedPartnerUid } from '@/lib/pairs';
 import { getThisWeekRangeJST } from '@/lib/weeklyRange';
@@ -31,6 +32,25 @@ type PartnerTask = {
 };
 
 type HeartStateMap = Record<string, boolean>; // key: taskId, value: liked?
+
+// Firestoreの tasks ドキュメントで本コンポーネントが参照する最小フィールド
+type FirestoreTask = {
+  name?: unknown;
+  completedAt?: Timestamp | null;
+  completedBy?: unknown;
+  done?: unknown;
+  userIds?: unknown;
+};
+
+function toStringOr<T extends string | null>(v: unknown, fallback: T): string | T {
+  return typeof v === 'string' ? v : fallback;
+}
+function toBoolean(v: unknown, fallback = false): boolean {
+  return typeof v === 'boolean' ? v : fallback;
+}
+function toStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? (v.filter((x) => typeof x === 'string') as string[]) : [];
+}
 
 /**
  * 仕様（2025-09 反映）
@@ -88,15 +108,30 @@ export default function PartnerCompletedTasksCard() {
     const unSub = onSnapshot(
       qTasks,
       (snap) => {
-        const list: PartnerTask[] = snap.docs.map((d) => {
-          const data = d.data() as any;
+        const list: PartnerTask[] = snap.docs.map((d: QueryDocumentSnapshot) => {
+          const data = d.data() as FirestoreTask;
+
+          const name = toStringOr(data.name, '(名称未設定)');
+          const completedBy = toStringOr(data.completedBy, null);
+          const completedAt = data.completedAt instanceof Timestamp ? data.completedAt.toDate() : null;
+
+          // 一応のバリデーション（done=true, 自分が共有対象）
+          const okDone = toBoolean(data.done, true);
+          const okShared = toStringArray(data.userIds).includes(me.uid);
+          if (!okDone || !okShared) {
+            // 条件外は除外（map段階ではreturnしづらいので後続filterで落とす）
+          }
+
           return {
             id: d.id,
-            name: (data.name as string) ?? '(名称未設定)',
-            completedAt: data.completedAt ? (data.completedAt as Timestamp).toDate() : null,
-            completedBy: (data.completedBy as string) ?? null,
+            name,
+            completedAt,
+            completedBy,
           };
-        });
+        })
+        // 念のため completedAt が null のものは末尾へ
+        .sort((a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0));
+
         setRows(list);
         setLoading(false);
       },
@@ -161,7 +196,7 @@ export default function PartnerCompletedTasksCard() {
             createdAt: serverTimestamp(), // サーバー時刻
           });
         }
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('toggleLike error:', e);
         // ロールバック
         setLikedMap((prev) => ({ ...prev, [taskId]: isLiked }));

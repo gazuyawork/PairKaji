@@ -25,6 +25,14 @@ type PartnerProfile = {
   imageUrl: string;
 } | null;
 
+// Firestore users ドキュメントの想定フィールド（必要最小限）
+type FirestoreUserDoc = {
+  displayName?: string;
+  name?: string;
+  photoURL?: string;
+  imageUrl?: string;
+};
+
 interface Props {
   isOpen: boolean;
   initialPoint: number;
@@ -94,10 +102,13 @@ export default function EditPointModal({
         return;
       }
 
-      // Firestoreの users/{uid} からプロフィールを試行取得
+      // Firestoreの users/{uid} からプロフィールを取得（型を明確化）
       try {
         const snap = await getDoc(doc(db, 'users', partnerUid));
-        const data = snap.exists() ? (snap.data() as any) : null;
+        const data: FirestoreUserDoc | null = snap.exists()
+          ? (snap.data() as FirestoreUserDoc)
+          : null;
+
         setPartnerUser({
           id: partnerUid,
           name: (data?.displayName || data?.name || 'パートナー') as string,
@@ -132,7 +143,7 @@ export default function EditPointModal({
       : [];
 
     // 合成したパートナーを追加（重複は避ける）
-    if (partnerUser && !base.some((b) => b.id === partnerUser!.id)) {
+    if (partnerUser && !base.some((b) => b.id === partnerUser.id)) {
       base.push({
         id: partnerUser.id,
         name: partnerUser.name,
@@ -151,7 +162,8 @@ export default function EditPointModal({
   }, [users, meUid, partnerUser]);
 
   // 自分のID（safeUsers から算出）
-  const selfId = safeUsers.find((u) => u.id === meUid)?.id ?? safeUsers[0]?.id ?? null;
+  const selfId: string | null =
+    safeUsers.find((u) => u.id === meUid)?.id ?? safeUsers[0]?.id ?? null;
 
   // ===== ユーザー別割当（内訳） =====
   const [alloc, setAlloc] = useState<Record<string, number>>({});
@@ -195,7 +207,7 @@ export default function EditPointModal({
   //    再配分ループとチカチカの原因になるため削除。
   //    selfPoint は保存直前に alloc[selfId] から一度だけ確定する。
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (point < 1) {
       setError('1以上の数値を入力してください');
       return;
@@ -218,7 +230,7 @@ export default function EditPointModal({
 
     // 自分のポイントは alloc から確定（同期ループを避ける）
     const finalSelfPoint =
-      selfId && Number.isFinite(alloc[selfId]!) ? Number(alloc[selfId]) : 0;
+      selfId && Number.isFinite(alloc[selfId]) ? Number(alloc[selfId]) : 0;
 
     await handleSavePoints(
       point,
@@ -230,7 +242,7 @@ export default function EditPointModal({
     );
   };
 
-  const handleAuto = () => {
+  const handleAuto = (): void => {
     calculatePoints();
     // 自動計算結果に合わせて alloc も再配分（自分多めルール）
     if (!safeUsers.length || !selfId) return;
@@ -253,7 +265,7 @@ export default function EditPointModal({
     setAlloc(nextAlloc);
   };
 
-  const handlePointChange = (value: number) => {
+  const handlePointChange = (value: number): void => {
     setPoint(value);
 
     // 「自分多め（端数は自分）」の既存ロジックを維持

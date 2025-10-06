@@ -36,7 +36,11 @@ const SHAKE_VARIANTS: Variants = {
 };
 
 function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
-  return Array.isArray(arr) && arr.every((t) => !!t && typeof t === 'object' && 'id' in (t as object));
+  return Array.isArray(arr) && arr.every((t) => {
+    if (!t || typeof t !== 'object') return false;
+    const o = t as Record<string, unknown>;
+    return typeof o.id === 'string';
+  });
 }
 
 /** 'HH:mm' → minutes, invalid => Infinity */
@@ -155,8 +159,6 @@ export default function TodoTaskCard({
     return copy;
   }
 
-  const handleDragStart = () => { };
-
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
@@ -217,17 +219,20 @@ export default function TodoTaskCard({
   // [ADD] 入力ボックス外クリックでクローズ（クリックアウェイ）
   useEffect(() => {
     if (!isInputOpen) return;
+
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
       if (!target) return;
       if (inputWrapRef.current && inputWrapRef.current.contains(target)) return;
       closeAddInput();
     };
-    document.addEventListener('mousedown', onPointerDown, { capture: true });
-    document.addEventListener('touchstart', onPointerDown, { capture: true });
+
+    const captureOpts: AddEventListenerOptions = { capture: true };
+    document.addEventListener('mousedown', onPointerDown, captureOpts);
+    document.addEventListener('touchstart', onPointerDown, captureOpts);
     return () => {
-      document.removeEventListener('mousedown', onPointerDown, { capture: true } as any);
-      document.removeEventListener('touchstart', onPointerDown, { capture: true } as any);
+      document.removeEventListener('mousedown', onPointerDown, captureOpts);
+      document.removeEventListener('touchstart', onPointerDown, captureOpts);
     };
   }, [isInputOpen]);
 
@@ -359,7 +364,7 @@ export default function TodoTaskCard({
   const [headerH, setHeaderH] = useState<number>(56);
   useEffect(() => {
     if (!headerRef.current) return;
-    const ro = new ResizeObserver((entries) => {
+    const ro = new ResizeObserver((entries: readonly ResizeObserverEntry[]) => {
       for (const entry of entries) {
         setHeaderH(Math.max(40, Math.round(entry.contentRect.height)));
       }
@@ -692,7 +697,7 @@ export default function TodoTaskCard({
                 <div className="text-gray-400 italic pl-2">該当する未処理のタスクはありません</div>
               )}
 
-              <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
                 <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
                   {finalFilteredTodos.map((todo) => {
                     const hasMemo = typeof todo.memo === 'string' && todo.memo.trim() !== '';
