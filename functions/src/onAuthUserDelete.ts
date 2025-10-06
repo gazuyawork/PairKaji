@@ -1,55 +1,55 @@
-// Authユーザー削除トリガー（v1, 赤線なし安定版）
-import * as functionsV1 from 'firebase-functions/v1';
-import { initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
-import type { UserRecord } from 'firebase-admin/auth';
-
-initializeApp();
-const db = getFirestore();
-const bucket = getStorage().bucket();
+// 退会トリガー：Authユーザー削除時に関連データを片付ける（赤線ゼロ／デプロイ安定版）
+import { auth } from 'firebase-functions/v1';
+import type { Firestore } from 'firebase-admin/firestore';
 
 /**
  * Firebase Auth のユーザー削除時に発火するトリガー
- * - users/{uid} を削除（存在すれば）
- * - userId == uid のコレクションを一括削除（仮の一覧）
- * - tasks: userIds から uid を除外。空ならタスク自体を削除
- * - pairs: userIds から uid を除外。片側のみなら status を 'none'（仮）
- * - Storage: users/{uid}/ 配下を削除
- *
- * ※ 地域指定は外しています（IDEの赤線回避のため）。必要なら firebase.json 側で region を設定してください。
+ * - 解析段階の実行を避けるため、Admin SDK はコールバック内で「動的 import + 初期化」
+ * - users/{uid} … ドキュメントがあれば削除
+ * - userId == uid の各コレクション … バッチ削除
+ * - tasks … userIds から uid を除外（空になれば削除）
+ * - pairs … userIds から uid を除外（片側のみなら status='none'）
+ * - Storage … users/{uid}/ 配下のファイル削除
  */
-export const onAuthUserDelete = functionsV1
-  .auth.user()
-  .onDelete(async (user: UserRecord) => {
-    const uid = user.uid;
+export const onAuthUserDelete = auth.user().onDelete(async (user) => {
+  // 🔑 ここでのみ Admin SDK を読み込む（トップレベル副作用なし）
+  const admin = await import('firebase-admin');
 
-    // 1) users/{uid} を削除（存在すれば）
-    await deleteUserDocIfExists(db, uid);
+  // 二重初期化防止
+  if (admin.apps.length === 0) {
+    admin.initializeApp();
+  }
 
-    // 2) userId == uid のコレクションを一括削除（仮）
-    const collectionsByUserId: readonly string[] = [
-      'points',
-      'taskCompletions',
-      'hearts',
-      'notifications',
-      // TODO: 必要に応じて追加
-    ];
-    for (const col of collectionsByUserId) {
-      await deleteCollectionWhereEquals(db, col, 'userId', uid, 400);
-    }
+  const db = admin.firestore();
+  const bucket = admin.storage().bucket();
+  const uid = user.uid;
 
-    // 3) 共有タスクの整理（userIds から uid を除去。空なら削除）
-    await cleanupSharedTasks(db, uid);
+  // 1) users/{uid} を削除（存在すれば）
+  await deleteUserDocIfExists(db, uid);
 
-    // 4) pairs の整合（userIds から uid を除去。片側のみなら status を 'none'）
-    await cleanupPairs(db, uid);
+  // 2) userId == uid のコレクションを一括削除（仮）
+  const collectionsByUserId: string[] = [
+    'points',
+    'taskCompletions',
+    'hearts',
+    'notifications',
+    // TODO: 必要コレクションを追加
+  ];
+  for (const col of collectionsByUserId) {
+    await deleteCollectionWhereEquals(db, col, 'userId', uid, 400);
+  }
 
-    // 5) Storage（users/{uid}/ 以下）削除
-    await deleteUserStorageFiles(uid);
-  });
+  // 3) 共有タスク整理
+  await cleanupSharedTasks(db, uid);
 
-/* ========== helpers ========== */
+  // 4) pairs 整合
+  await cleanupPairs(db, uid);
+
+  // 5) Storage（users/{uid}/ 以下）削除
+  await bucket.deleteFiles({ prefix: `users/${uid}/` });
+});
+
+/* ========== helpers（型は admin SDK に準拠、any は不使用） ========== */
 
 async function deleteUserDocIfExists(database: Firestore, uid: string): Promise<void> {
   const ref = database.collection('users').doc(uid);
@@ -68,11 +68,10 @@ async function deleteCollectionWhereEquals(
   collectionName: string,
   field: string,
   value: string,
-  batchSize: number = 400,
+  batchSize = 400,
 ): Promise<void> {
   // 取り切るまでループ
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
+  for (;;) {
     const q = database.collection(collectionName).where(field, '==', value).limit(batchSize);
     const snap = await q.get();
     if (snap.empty) break;
@@ -97,7 +96,7 @@ async function cleanupSharedTasks(database: Firestore, uid: string): Promise<voi
 
   for (const doc of snap.docs) {
     const data = doc.data() as { userIds?: string[] };
-    const current: readonly string[] = Array.isArray(data.userIds) ? data.userIds : [];
+    const current = Array.isArray(data.userIds) ? data.userIds : [];
     const next = current.filter((v) => v !== uid);
 
     if (next.length > 0) {
@@ -118,7 +117,7 @@ async function cleanupPairs(database: Firestore, uid: string): Promise<void> {
 
   for (const doc of snap.docs) {
     const data = doc.data() as { userIds?: string[]; status?: string };
-    const current: readonly string[] = Array.isArray(data.userIds) ? data.userIds : [];
+    const current = Array.isArray(data.userIds) ? data.userIds : [];
     const next = current.filter((v) => v !== uid);
 
     if (next.length === current.length) continue;
@@ -126,20 +125,10 @@ async function cleanupPairs(database: Firestore, uid: string): Promise<void> {
     if (next.length >= 1) {
       await doc.ref.update({
         userIds: next,
-        status: 'none', // 仮仕様。要件に合わせて調整してください
+        status: 'none', // 仮仕様。要件に合わせて調整
       });
     } else {
       await doc.ref.delete();
     }
   }
-}
-
-/**
- * Storage のユーザーファイル削除（仮）
- * - 規約: users/{uid}/ 以下を全削除
- * - 実際の保存パスに合わせて prefix を調整してください
- */
-async function deleteUserStorageFiles(uid: string): Promise<void> {
-  const prefix = `users/${uid}/`;
-  await bucket.deleteFiles({ prefix });
 }
