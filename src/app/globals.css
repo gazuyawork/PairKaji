@@ -143,7 +143,6 @@ html, body {
   }
 }
 
-
 html, body {
   height: 100%;
   margin: 0;
@@ -195,4 +194,31 @@ html, body {
 
 .animate-heartbeat {
   animation: heartbeat 0.8s ease-in-out infinite;
+}
+
+/* =========================================================
+   スプラッシュ中のヘッダー/フッター表示制御 + ディレイつきフェードイン
+   =======================================================*/
+.site-header,
+.site-footer {
+  transition: opacity .4s ease, transform .4s ease;
+  opacity: 1;
+  transform: translateY(0);
+  will-change: opacity, transform;
+}
+html[data-splash="1"] .site-header {
+  opacity: 0 !important;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+html[data-splash="1"] .site-footer {
+  opacity: 0 !important;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+html:not([data-splash="1"]) .site-header { transition-delay: .25s; }
+html:not([data-splash="1"]) .site-footer { transition-delay: .35s; }
+html[data-splash="1"],
+html[data-splash="1"] body {
+  overflow: hidden !important;
 }

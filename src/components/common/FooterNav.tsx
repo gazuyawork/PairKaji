@@ -1,3 +1,4 @@
+// src/components/common/FooterNav.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
@@ -12,12 +13,13 @@ type Props = {
 export default function FooterNav({ currentIndex, setIndex }: Props) {
   const navItems = [
     { name: 'Home', icon: Home },
-    { name: 'Task', icon: BookOpenCheck  }, // 中央アイコンは画像
+    { name: 'Task', icon: BookOpenCheck  },
     { name: 'Todo', icon: ListTodo },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 shadow-inner pt-2 pb-6">
+    // フック用クラス site-footer を付与
+    <nav className="site-footer fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 shadow-inner pt-2 pb-6">
       <ul className="max-w-xl relative flex justify-around items-end mx-auto">
         {navItems.map((item, index) => {
           const isActive = currentIndex === index;

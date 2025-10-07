@@ -20,12 +20,11 @@ const pacifico = Pacifico({
   variable: '--font-pacifico',
 });
 
-// ★追加: APPのベースURL（OG/Twitter画像の絶対URL解決に使用）
+// ★ APPのベースURL（OG/Twitter画像の絶対URL解決に使用）
 const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
-// 変更後（置換）
 export const metadata: Metadata = {
-  // ★追加: metadataBase（警告の解消ポイント）
+  // metadataBase（警告の解消ポイント）
   metadataBase: new URL(appUrl),
 
   // LP側の値を反映
@@ -55,7 +54,7 @@ export const viewport: Viewport = {
   themeColor: '#ffffff',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1, // ← これで user-scalable=no 相当になる
+  maximumScale: 1, // ← user-scalable=no 相当
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -65,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
       <body className="font-sans bg-white text-gray-800 h-full antialiased">
-        {/* ▼ 追加：起動直後にローカルキャッシュの未読数でバッジを即時反映 */}
+        {/* 起動直後にローカルキャッシュの未読数でバッジを即時反映 */}
         <AppBadgeInitializer />
 
         {/* AdSenseローダーはアプリ全体で1回だけ読み込む */}

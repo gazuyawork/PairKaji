@@ -21,7 +21,7 @@ import PairInit from '@/components/common/PairInit';
 import PreventBounce from '@/components/common/PreventBounce';
 import SetViewportHeight from '@/components/common/SetViewportHeight';
 import TaskSplitMonitor from '@/components/common/TaskSplitMonitor';
-import { usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation'
 
 /* ★ 追加: body ロック解除のクリーンアップ */
 function useUnlockBodyOnUnmount() {

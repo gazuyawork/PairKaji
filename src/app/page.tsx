@@ -1,44 +1,52 @@
 // src/app/page.tsx
-'use client';
-
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { shouldShowSplash } from '@/lib/storageUtils';
+import { headers as nextHeaders } from 'next/headers';
+import { redirect } from 'next/navigation';
 import SplashScreen from './splash/SplashScreen';
 
+// 型を明示して Headers.get を安全に使えるようにする
+type HeadersLike = { get(name: string): string | null };
+
+// Cookieヘッダーを自前でパース（暗黙anyを出さない実装）
+function readCookieFromHeader(name: string): string | undefined {
+  const hdrs = nextHeaders() as unknown as HeadersLike;
+  const cookieHeader = typeof hdrs?.get === 'function' ? (hdrs.get('cookie') ?? '') : '';
+  if (!cookieHeader) return undefined;
+
+  const segments: string[] = cookieHeader.split(';');
+  for (const seg of segments) {
+    const trimmed = seg.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+
+    const key = trimmed.slice(0, eq);
+    if (key !== name) continue;
+
+    const rawVal = trimmed.slice(eq + 1);
+    try {
+      return decodeURIComponent(rawVal);
+    } catch {
+      return rawVal;
+    }
+  }
+  return undefined;
+}
+
 export default function Home() {
-  const router = useRouter();
-  const [showSplash, setShowSplash] = useState<boolean | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  // ★ 初回表示済みか（2回目以降なら即サーバーリダイレクト）
+  const hasSeenSplash = readCookieFromHeader('pk_splash_shown') === '1';
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      if (!user) {
-        router.replace('/login');
-        return; // ✅ ここで処理を中断することで再描画を防ぐ
-      }
+  if (hasSeenSplash) {
+    const lastDest = readCookieFromHeader('pk_last_dest');
+    if (lastDest && (lastDest.startsWith('/main') || lastDest.startsWith('/login'))) {
+      redirect(lastDest);
+    }
+    // フォールバック（未設定/不正時）
+    redirect('/main?skipQuickSplash=true');
+  }
 
-      const needSplash = shouldShowSplash();
-      if (needSplash) {
-        setShowSplash(true);
-        setCheckingAuth(false); // ✅ スプラッシュ表示フローでも解除
-      } else {
-        router.replace('/main?withQuickSplash=true');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [router]);
-
-  // ✅ ログイン確認 or スプラッシュ判断中は何も表示しない
-  if (checkingAuth || showSplash === null) return null;
-
-  // ✅ スプラッシュが必要なら表示
-  if (showSplash) return <SplashScreen />;
-
-  return null;
+  // ★ 初回は必ずスプラッシュのみをSSRで描画
+  return <SplashScreen />;
 }

@@ -1,6 +1,7 @@
+// src/app/splash/SplashScreen.tsx
 'use client';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -17,17 +18,11 @@ const container = {
   hidden: { opacity: 1 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.8,
-    },
+    transition: { staggerChildren: 0.1, delayChildren: 0.8 },
   },
 };
 
-const letter = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-};
+const letter = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -38,12 +33,30 @@ export default function SplashScreen() {
   const [showSpinner, setShowSpinner] = useState(false);
   const [loadingDone, setLoadingDone] = useState(false);
 
-  // ✅ スプラッシュ表示フラグを保存（最初のマウント時に一度だけ）
+  // 既存: スプラッシュ表示フラグ（ローカル）
   useEffect(() => {
     markSplashAsShown();
   }, []);
 
-  // 認証状態の確認
+  // ★追加: 初回表示フラグ（サーバー判定用Cookie）
+  useEffect(() => {
+    document.cookie = 'pk_splash_shown=1; Path=/; Max-Age=15552000; SameSite=Lax';
+  }, []);
+
+  // 既存: スプラッシュ中はスクロール抑止
+  useEffect(() => {
+    const html = document.documentElement;
+    html.setAttribute('data-splash', '1');
+    html.style.overflow = 'hidden';
+    if (document.body) document.body.style.overflow = 'hidden';
+    return () => {
+      html.removeAttribute('data-splash');
+      html.style.overflow = '';
+      if (document.body) document.body.style.overflow = '';
+    };
+  }, []);
+
+  // 既存: 認証状態の確認
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsAuthenticated(!!user);
@@ -52,28 +65,21 @@ export default function SplashScreen() {
     return () => unsubscribe();
   }, []);
 
+  // 既存: 演出 → 遷移（★遷移直前に Cookie で行き先を保存）
   useEffect(() => {
     if (!authChecked || isAuthenticated === null) return;
 
-    // ステップ①：テキストフェードアウト
-    const step1 = setTimeout(() => {
-      setFadeOutText(true);
-    }, 2000);
-
-    // ステップ②：スピナー表示
-    const step2 = setTimeout(() => {
-      setShowSpinner(true);
-    }, 2700);
-
-    // ステップ③：ローディング完了アニメーション（拡大＋フェードアウト）
-    const step3 = setTimeout(() => {
-      setLoadingDone(true);
-    }, 3900);
-
-    // ステップ④：画面遷移
+    const step1 = setTimeout(() => setFadeOutText(true), 2000);
+    const step2 = setTimeout(() => setShowSpinner(true), 2700);
+    const step3 = setTimeout(() => setLoadingDone(true), 3900);
     const step4 = setTimeout(() => {
+      const dest = isAuthenticated ? '/main?skipQuickSplash=true' : '/login';
+
+      // ★追加: 直前の遷移先を Cookie 保存（サーバー即リダイレクト用）
+      document.cookie = `pk_last_dest=${encodeURIComponent(dest)}; Path=/; Max-Age=604800; SameSite=Lax`;
+
       sessionStorage.setItem('fromSplash', '1');
-      router.replace(isAuthenticated ? '/main?skipQuickSplash=true' : '/login');
+      router.replace(dest);
     }, 4300);
 
     return () => {
@@ -85,10 +91,10 @@ export default function SplashScreen() {
   }, [authChecked, isAuthenticated, router]);
 
   return (
-    <div className="relative flex flex-col items-center justify-between h-screen w-full bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-6 py-12 cursor-default">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-6 py-12 cursor-default">
       <div />
 
-      {/* 中央タイトル・メッセージ */}
+      {/* タイトル・コピー */}
       <motion.div
         className={clsx(
           'flex flex-col items-center text-center transition-opacity duration-700 ease-in-out',
@@ -118,22 +124,18 @@ export default function SplashScreen() {
         </motion.p>
       </motion.div>
 
-      {/* 中央スピナー（絶対位置で中央固定） */}
+      {/* スピナー */}
       <AnimatePresence>
         {showSpinner && (
           <motion.div
             key="spinner"
             className="absolute inset-0 flex items-center justify-center z-50"
             initial={{ opacity: 0, scale: 1 }}
-            animate={{
-              opacity: loadingDone ? 0 : 1,
-              scale: loadingDone ? 1.8 : 1,
-            }}
+            animate={{ opacity: loadingDone ? 0 : 1, scale: loadingDone ? 1.8 : 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
           >
             <LoadingSpinner size={48} />
-
           </motion.div>
         )}
       </AnimatePresence>
