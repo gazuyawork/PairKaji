@@ -26,14 +26,10 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
  * ラッパー: Suspense で useSearchParams を含む内側を包む
  */
 export default function LoginPage() {
+  // Next.js の要件: useSearchParams を使うページは Suspense 境界が必要
+  // ただし起動時の二重表示を防ぐため fallback は null にする
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner size={48} />
-        </div>
-      }
-    >
+    <Suspense fallback={null}>
       <LoginInner />
     </Suspense>
   );
