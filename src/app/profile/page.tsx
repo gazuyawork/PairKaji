@@ -4,7 +4,8 @@
 export const dynamic = 'force-dynamic';
 
 import Header from '@/components/common/Header';
-import { useEffect, useState } from 'react';
+// ★ 変更: startTransition / useRef / MutableRefObject を追加
+import { useEffect, useState, startTransition, useRef, type MutableRefObject } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/profile/EmailEditModal';
@@ -13,7 +14,19 @@ import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
 import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
-import { collection, onSnapshot, query, where, doc, getDoc, getDocs, type Query, type QuerySnapshot, updateDoc, type Unsubscribe } from 'firebase/firestore';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  doc,
+  getDoc,
+  getDocs,
+  type Query,
+  type QuerySnapshot,
+  updateDoc,
+  type Unsubscribe,
+} from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
 import {
   getUserProfile,
@@ -62,6 +75,26 @@ export default function ProfilePage() {
 
   const uid = useUserUid(); // ★ auth.currentUser ではなく React state な uid を利用
 
+  // ★ 変更: 値が変わる時だけ set するヘルパ（慣性スクロール中のレイアウト再計算を抑制）
+  const setIfChanged = <T,>(
+    next: T,
+    setter: (v: T) => void,
+    prevRef: MutableRefObject<T>
+  ) => {
+    if (Object.is(prevRef.current, next)) return;
+    prevRef.current = next;
+    startTransition(() => setter(next));
+  };
+
+  // ★ 変更: 前回値の保持用 ref（使用するプロパティのみ）
+  const prevName = useRef(name);
+  const prevProfileImage = useRef(profileImage);
+  const prevPartnerImage = useRef(partnerImage);
+  const prevInviteCode = useRef(inviteCode);
+  const prevPartnerEmail = useRef(partnerEmail);
+  const prevPlan = useRef(plan);
+  const prevIsPairConfirmed = useRef(isPairConfirmed);
+
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -105,7 +138,7 @@ export default function ProfilePage() {
     return () => unsub();
   }, []);
 
-  // ★ 再構成: uid と email が確定してから Firestore 初期取得 & 購読を開始
+  // ★ 変更: uid と email が確定してから Firestore 初期取得 & 購読を開始
   useEffect(() => {
     if (!uid) return; // uid 未確定なら何もしない
 
@@ -122,12 +155,13 @@ export default function ProfilePage() {
         if (snap.exists()) {
           const data = snap.data();
 
-          setName(data.name || (email ? email.split('@')[0] : '') || '');
+          const nextName = data.name || (email ? email.split('@')[0] : '') || '';
+          setIfChanged(nextName, setName, prevName);
 
-          if (data.plan) setPlan(data.plan);
+          if (data.plan) setIfChanged(String(data.plan), setPlan, prevPlan);
 
           if (data.imageUrl) {
-            setProfileImage(data.imageUrl);
+            setIfChanged(String(data.imageUrl), setProfileImage, prevProfileImage);
             if (typeof window !== 'undefined') {
               localStorage.setItem('profileImage', data.imageUrl);
             }
@@ -143,7 +177,7 @@ export default function ProfilePage() {
           // プロフィールが無ければ作成
           const fallbackName = email ? email.split('@')[0] : '';
           await createUserProfile(uid, fallbackName);
-          setName(fallbackName);
+          setIfChanged(fallbackName, setName, prevName);
         }
 
         // ------- pairs 初期読込 -------
@@ -157,28 +191,28 @@ export default function ProfilePage() {
           const pairDoc = pairSnap.docs[0];
           const pair = pairDoc.data() as Pair;
 
-          setInviteCode(pair.inviteCode);
-          setPartnerEmail(pair.emailB ?? '');
+          setIfChanged(pair.inviteCode ?? '', setInviteCode, prevInviteCode);
+          setIfChanged(pair.emailB ?? '', setPartnerEmail, prevPartnerEmail);
           setPairDocId(pairDoc.id);
-          setIsPairConfirmed(pair.status === 'confirmed');
+          setIfChanged(pair.status === 'confirmed', setIsPairConfirmed, prevIsPairConfirmed);
 
           if (pair.partnerImageUrl) {
-            setPartnerImage(pair.partnerImageUrl);
+            setIfChanged(String(pair.partnerImageUrl), setPartnerImage, prevPartnerImage);
             if (typeof window !== 'undefined') {
               localStorage.setItem('partnerImage', pair.partnerImageUrl);
             }
           } else {
-            setPartnerImage(null);
+            setIfChanged(null, setPartnerImage, prevPartnerImage);
             if (typeof window !== 'undefined') {
               localStorage.removeItem('partnerImage');
             }
           }
         } else {
-          setInviteCode('');
-          setPartnerEmail('');
+          setIfChanged('', setInviteCode, prevInviteCode);
+          setIfChanged('', setPartnerEmail, prevPartnerEmail);
           setPairDocId(null);
-          setIsPairConfirmed(false);
-          setPartnerImage(null);
+          setIfChanged(false, setIsPairConfirmed, prevIsPairConfirmed);
+          setIfChanged(null, setPartnerImage, prevPartnerImage);
           if (typeof window !== 'undefined') {
             localStorage.removeItem('partnerImage');
           }
@@ -219,38 +253,35 @@ export default function ProfilePage() {
     })();
 
     // ------- リアルタイム購読（pairs） -------
-    const pairsQ = query(
-      collection(db, 'pairs'),
-      where('userIds', 'array-contains', uid)
-    );
+    const pairsQ = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
     unsubscribePairs = onSnapshot(
       pairsQ,
       (snapshot) => {
         if (!snapshot.empty) {
           const pairDoc = snapshot.docs[0];
           const pair = pairDoc.data() as Pair;
-          setInviteCode(pair.inviteCode);
-          setPartnerEmail(pair.emailB ?? '');
+          setIfChanged(pair.inviteCode ?? '', setInviteCode, prevInviteCode);
+          setIfChanged(pair.emailB ?? '', setPartnerEmail, prevPartnerEmail);
           setPairDocId(pairDoc.id);
-          setIsPairConfirmed(pair.status === 'confirmed');
+          setIfChanged(pair.status === 'confirmed', setIsPairConfirmed, prevIsPairConfirmed);
 
           if (pair.partnerImageUrl) {
-            setPartnerImage(pair.partnerImageUrl);
+            setIfChanged(String(pair.partnerImageUrl), setPartnerImage, prevPartnerImage);
             if (typeof window !== 'undefined') {
               localStorage.setItem('partnerImage', pair.partnerImageUrl);
             }
           } else {
-            setPartnerImage(null);
+            setIfChanged(null, setPartnerImage, prevPartnerImage);
             if (typeof window !== 'undefined') {
               localStorage.removeItem('partnerImage');
             }
           }
         } else {
-          setInviteCode('');
-          setPartnerEmail('');
+          setIfChanged('', setInviteCode, prevInviteCode);
+          setIfChanged('', setPartnerEmail, prevPartnerEmail);
           setPairDocId(null);
-          setIsPairConfirmed(false);
-          setPartnerImage(null);
+          setIfChanged(false, setIsPairConfirmed, prevIsPairConfirmed);
+          setIfChanged(null, setPartnerImage, prevPartnerImage);
           if (typeof window !== 'undefined') {
             localStorage.removeItem('partnerImage');
           }
@@ -268,16 +299,16 @@ export default function ProfilePage() {
         const data = snap.data();
         if (!data) return;
 
-        if (typeof data.plan === 'string') setPlan(data.plan);
+        if (typeof data.plan === 'string') setIfChanged(String(data.plan), setPlan, prevPlan);
 
         if (typeof data.imageUrl === 'string') {
-          setProfileImage(data.imageUrl);
+          setIfChanged(String(data.imageUrl), setProfileImage, prevProfileImage);
           if (typeof window !== 'undefined') {
             localStorage.setItem('profileImage', data.imageUrl);
           }
         }
 
-        // Stripe カスタマーIDの反映
+        // Stripe カスタマーIDの反映（ここは頻繁に変わらないため通常更新でOK）
         if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
           setStripeCustomerId(data.stripeCustomerId);
         } else {
@@ -357,7 +388,9 @@ export default function ProfilePage() {
     const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
     if (!partnerId) return;
 
-    const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。');
+    const confirmed = confirm(
+      'ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。'
+    );
     if (!confirmed) return;
 
     setIsRemoving(true);
@@ -462,8 +495,10 @@ export default function ProfilePage() {
   };
 
   return (
+    // ★ 変更: min-h-screen w-screen -> min-h-[100dvh] w-full（vh問題/横はみ出し対策）
     <div className="flex flex-col min-h-[100dvh] w-full bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Setting" />
+      {/* ★ 変更: 二重スクロール回避のため overflow-y-auto を削除（ClientLayout側に統一） */}
       <main className="flex-1 px-4 py-6 space-y-6">
         {isLoading ? (
           <div className="flex items-center justify-center w-full h-[60vh]">
@@ -539,14 +574,8 @@ export default function ProfilePage() {
         )}
       </main>
 
-      <EmailEditModal
-        open={isEmailModalOpen}
-        onClose={() => setIsEmailModalOpen(false)}
-      />
-      <PasswordEditModal
-        open={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
-      />
+      <EmailEditModal open={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} />
+      <PasswordEditModal open={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} />
     </div>
   );
 }
