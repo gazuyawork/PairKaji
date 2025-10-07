@@ -5,12 +5,11 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import clsx from 'clsx';
 import { markSplashAsShown } from '@/lib/storageUtils';
-import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 const sentence = '家事をわけて、やさしさふえる。';
 
@@ -30,20 +29,18 @@ export default function SplashScreen() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [fadeOutText, setFadeOutText] = useState(false);
-  const [showSpinner, setShowSpinner] = useState(false);
-  const [loadingDone, setLoadingDone] = useState(false);
 
-  // 既存: スプラッシュ表示フラグ（ローカル）
+  // 初回表示記録（localStorage）
   useEffect(() => {
     markSplashAsShown();
   }, []);
 
-  // ★追加: 初回表示フラグ（サーバー判定用Cookie）
+  // 初回表示フラグをCookieにも保存（以降はQuickSplashへ）
   useEffect(() => {
     document.cookie = 'pk_splash_shown=1; Path=/; Max-Age=15552000; SameSite=Lax';
   }, []);
 
-  // 既存: スプラッシュ中はスクロール抑止
+  // スプラッシュ中はスクロール抑止＆ヘッダー/フッター非表示
   useEffect(() => {
     const html = document.documentElement;
     html.setAttribute('data-splash', '1');
@@ -56,7 +53,7 @@ export default function SplashScreen() {
     };
   }, []);
 
-  // 既存: 認証状態の確認
+  // 認証状態の確認
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsAuthenticated(!!user);
@@ -65,39 +62,27 @@ export default function SplashScreen() {
     return () => unsubscribe();
   }, []);
 
-  // 既存: 演出 → 遷移（★遷移直前に Cookie で行き先を保存）
+  // テキスト演出のみ → すぐ遷移（スピナーは出さない）
   useEffect(() => {
     if (!authChecked || isAuthenticated === null) return;
 
-    const step1 = setTimeout(() => setFadeOutText(true), 2000);
-    const step2 = setTimeout(() => setShowSpinner(true), 2700);
-    const step3 = setTimeout(() => setLoadingDone(true), 3900);
-    const step4 = setTimeout(() => {
+    const t1 = setTimeout(() => setFadeOutText(true), 2000); // テキスト2秒表示
+    const t2 = setTimeout(() => {
       const dest = isAuthenticated ? '/main?skipQuickSplash=true' : '/login';
-
-      // ★追加: 直前の遷移先を Cookie 保存（サーバー即リダイレクト用）
+      // 次回の遷移先ヒント（任意）
       document.cookie = `pk_last_dest=${encodeURIComponent(dest)}; Path=/; Max-Age=604800; SameSite=Lax`;
-
-      sessionStorage.setItem('fromSplash', '1');
       router.replace(dest);
-    }, 4300);
+    }, 2400); // 少しフェードアウトして遷移
 
-    return () => {
-      clearTimeout(step1);
-      clearTimeout(step2);
-      clearTimeout(step3);
-      clearTimeout(step4);
-    };
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [authChecked, isAuthenticated, router]);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-6 py-12 cursor-default">
-      <div />
-
-      {/* タイトル・コピー */}
+    // 全面レイヤ（ヘッダーのチラ見え防止）※表示要素はテキストのみ
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] px-6 py-12 cursor-default">
       <motion.div
         className={clsx(
-          'flex flex-col items-center text-center transition-opacity duration-700 ease-in-out',
+          'flex flex-col items-center text-center transition-opacity duration-500 ease-in-out',
           fadeOutText ? 'opacity-0' : 'opacity-100'
         )}
       >
@@ -123,24 +108,6 @@ export default function SplashScreen() {
           ))}
         </motion.p>
       </motion.div>
-
-      {/* スピナー */}
-      <AnimatePresence>
-        {showSpinner && (
-          <motion.div
-            key="spinner"
-            className="absolute inset-0 flex items-center justify-center z-50"
-            initial={{ opacity: 0, scale: 1 }}
-            animate={{ opacity: loadingDone ? 0 : 1, scale: loadingDone ? 1.8 : 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <LoadingSpinner size={48} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div />
     </div>
   );
 }
