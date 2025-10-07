@@ -1,4 +1,4 @@
-// ★ 変更あり：isPreview / onRequestEditMode を追加し、onClick ロジックを改修
+// isPreview / onRequestEditMode を追加し、onClick ロジックを改修
 'use client';
 
 import { CheckCircle } from 'lucide-react';
@@ -22,7 +22,7 @@ type Props = {
   onChangeComparePrice: (v: string) => void;
   onChangeCompareQuantity: (v: string) => void;
 
-  // ★ 追加：プレビュー判定と編集切替要求（任意）
+  // プレビュー判定と編集切替要求（任意）
   isPreview?: boolean;
   onRequestEditMode?: () => void;
 
@@ -49,7 +49,7 @@ export default function ShoppingDetailsEditor({
   onToggleCompareMode,
   onChangeComparePrice,
   onChangeCompareQuantity,
-  // ★ 追加：デフォルト値で no-op にすることで親の既存実装を壊さない
+  // デフォルト値で no-op にすることで親の既存実装を壊さない
   isPreview = false,
   onRequestEditMode = () => {},
   animatedDifference,
@@ -79,7 +79,7 @@ export default function ShoppingDetailsEditor({
       <div className="flex items-center justify-between mb-4 ml-2">
         <h3 className="font-medium">購入価格</h3>
         <button
-          // ★ 変更：プレビュー中は編集モードへ切替後、差額確認を強制的に ON
+          // プレビュー中は編集モードへ切替後、差額確認を強制的に ON
           onClick={() => {
             if (!canToggleCompare) return;
             if (isPreview) {

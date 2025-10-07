@@ -112,7 +112,7 @@ const fetchSubscriptions = async (uid: string): Promise<SubRow[]> => {
 /* =========================
  * ペイロード（Web Push）
  * ========================= */
-// ▼ 変更: taskId と type を含め、URL にディープリンクを付与
+// taskId と type を含め、URL にディープリンクを付与
 const buildFlagPayload = (taskId: string, taskName: string, raisedBy?: string) => {
   const title = '🚩 フラグが付きました';
   const body = `${taskName} にフラグが付きました${raisedBy ? `（by ${raisedBy}）` : ''}`;
@@ -204,7 +204,7 @@ export const notifyOnTaskFlag = onDocumentUpdated(
       safPri: VAPID_PRIVATE_KEY_SAFARI.value() || null,
     };
 
-    // ▼ 変更: taskId を渡して type/URL 付きの Push ペイロードを生成
+    // taskId を渡して type/URL 付きの Push ペイロードを生成
     const pushPayload = buildFlagPayload(taskId, taskName, raisedBy);
 
     // アプリ内メッセージ（全ユーザー共通テキスト）
@@ -228,7 +228,7 @@ export const notifyOnTaskFlag = onDocumentUpdated(
             title: messageTitle,
             body: messageBody,
             from: raisedBy ?? 'system', // 誰が立てたか（不明なら system）
-            url: `/main?task=${encodeURIComponent(taskId)}&from=flag`, // ▼ 変更: 同期したURL
+            url: `/main?task=${encodeURIComponent(taskId)}&from=flag`, // 同期したURL
             read: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           },

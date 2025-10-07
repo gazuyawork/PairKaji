@@ -32,9 +32,9 @@ export default function HomeDashboardCard() {
   const [heartCount, setHeartCount] = useState<number | null>(null);
   const [taskCount, setTaskCount] = useState<number | null>(null);
 
-  // 追加: 直前の heartCount を保持
+  // 直前の heartCount を保持
   const prevHeartCountRef = useRef<number | null>(null);
-  // 追加: ハート鼓動アニメーションON/OFF
+  // ハート鼓動アニメーションON/OFF
   const [isHeartAnimating, setIsHeartAnimating] = useState(false);
 
   const loading = useMemo(

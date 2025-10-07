@@ -88,8 +88,8 @@ export default function LandingPage() {
       icon: CheckCircle,
     },
     {
-      title: 'リマインド（LINE通知）',
-      desc: '毎朝の予定タスクや直近のタスクをLINEに通知します。※当日のタスクが存在しない場合は送信されません。',
+      title: 'リマインド（プッシュ通知）',
+      desc: '毎朝の予定タスクや直近のタスクをプッシュ通知します。※当日のタスクが存在しない場合は送信されません。',
       icon: BellRing,
       badge: 'Premium',
     },
@@ -155,7 +155,7 @@ export default function LandingPage() {
     },
     {
       title: '通知は何で届きますか？',
-      desc: '現在はLINE通知に対応しています。週次または日付指定のタスクが送信の対象となります。時間指定をしているタスクは、指定時間の30分程度前に通知が届きます。',
+      desc: '現在はプッシュ通知に対応しています。週次または日付指定のタスクが送信の対象となります。時間指定をしているタスクは、指定時間の30分程度前に通知が届きます。',
       icon: BellRing,
     },
     {
@@ -211,7 +211,7 @@ export default function LandingPage() {
         <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-blue-200/40 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-amber-200/40 blur-3xl" />
 
-        {/* ▼ 追加：薄いウォーターマーク（アイコン） */}
+        {/* 薄いウォーターマーク（アイコン） */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.06]">
           <div className="relative w-[520px] max-w-[75vw] aspect-square -z-10">
             <Image

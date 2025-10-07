@@ -1,11 +1,11 @@
 // src/app/landing/LandingAnimations.tsx
 'use client';
 
-/* ✅ 変更: <Script> ではなく React の useEffect で初期化する */
+/* <Script> ではなく React の useEffect で初期化する */
 import { useEffect } from 'react';
 
 export default function LandingAnimations() {
-  /* ✅ 追加: マウント時に必ず初期化が走るようにする（/landing 再訪・BFCache対応） */
+  /* マウント時に必ず初期化が走るようにする（/landing 再訪・BFCache対応） */
   useEffect(() => {
     // JSが有効なときだけ初期非表示ルールを適用するためのフラグ
     document.documentElement.classList.add('js-animate');
@@ -27,7 +27,7 @@ export default function LandingAnimations() {
         )
       : null;
 
-    // ✅ 追加: 既に画面内にある要素は即時表示（戻り時に非表示のままを防止）
+    // 既に画面内にある要素は即時表示（戻り時に非表示のままを防止）
     const vpH = window.innerHeight || document.documentElement.clientHeight || 0;
     els.forEach((el) => {
       const rect = el.getBoundingClientRect();
@@ -38,7 +38,7 @@ export default function LandingAnimations() {
       }
     });
 
-    // ✅ 追加(① any除去): BFCache 復帰（iOS/Safari で発生）時も全表示にする安全弁
+    // (① any除去): BFCache 復帰（iOS/Safari で発生）時も全表示にする安全弁
     // 'pageshow' は PageTransitionEvent（lib.dom）で型が提供されている
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
@@ -47,7 +47,7 @@ export default function LandingAnimations() {
     };
     window.addEventListener('pageshow', onPageShow);
 
-    // ✅ 追加: フォールバック（300ms 後も誰も可視化されていなければ全表示）
+    // フォールバック（300ms 後も誰も可視化されていなければ全表示）
     const fallbackTimer = window.setTimeout(() => {
       const anyVisible = els.some((el) => el.classList.contains('is-inview'));
       if (!anyVisible) {
@@ -55,7 +55,7 @@ export default function LandingAnimations() {
       }
     }, 300);
 
-    // ✅ 追加: 軽いパララックス（存在すれば適用）
+    // 軽いパララックス（存在すれば適用）
     const p = document.querySelector<HTMLElement>('.parallax');
     let ticking = false;
     const onScroll = () => {
@@ -73,7 +73,7 @@ export default function LandingAnimations() {
 
     return () => {
       window.clearTimeout(fallbackTimer);
-      // ✅ 変更(② any除去): 明示型を付けたハンドラをそのまま渡す
+      // (② any除去): 明示型を付けたハンドラをそのまま渡す
       window.removeEventListener('pageshow', onPageShow);
       if (p) window.removeEventListener('scroll', onScroll);
       io?.disconnect();
@@ -83,7 +83,7 @@ export default function LandingAnimations() {
 
   return (
     <>
-      {/* ✅ 変更: 初期非表示は「JS有効時のみ」適用する（.js-animate） */}
+      {/* 初期非表示は「JS有効時のみ」適用する（.js-animate） */}
       <style jsx global>{`
         /* ロゴ：左から順に跳ねる（現状維持） */
         @keyframes logo-bounce {
@@ -107,7 +107,7 @@ export default function LandingAnimations() {
           to   { opacity: 1; }
         }
 
-        /* ✅ 変更: data-animate の初期非表示は JS 有効時のみ（js-animate 配下に限定） */
+        /* data-animate の初期非表示は JS 有効時のみ（js-animate 配下に限定） */
         .js-animate [data-animate] {
           opacity: 0;
           transform: translateY(18px) scale(0.995);

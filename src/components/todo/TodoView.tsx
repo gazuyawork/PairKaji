@@ -39,7 +39,7 @@ import { updateTodoTextInTask } from '@/lib/taskUtils';
 import { createPortal } from 'react-dom';
 // UI
 import { motion, AnimatePresence } from 'framer-motion';
-// ★ 変更: カテゴリアイコンを追加（絞り込みボタンで使用）
+// カテゴリアイコンを追加（絞り込みボタンで使用）
 import { Eye, X, Search, ShoppingCart, Utensils, MapPin, Briefcase, Home, Tag } from 'lucide-react';
 // dnd-kit
 import {
@@ -76,7 +76,7 @@ const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown 
   typeof e === 'object' && e !== null && ('code' in e || 'message' in e);
 
 /* =========================
-   ★ 追加: カテゴリメタ（GroupSelectorと同等）
+   カテゴリメタ（GroupSelectorと同等）
    ========================= */
 function getCategoryMeta(raw?: string | null) {
   const category = (raw ?? '').trim() || '未分類';
@@ -134,7 +134,7 @@ function getCategoryMeta(raw?: string | null) {
 }
 
 /* =========================================================
-   ★追加: 特定カテゴリを末尾へ送るための優先度マップ
+   特定カテゴリを末尾へ送るための優先度マップ
    値が大きいほど後ろに並ぶ。未指定は 0（通常の五十音順）
    今回は「未分類」を末尾へ。
    複数末尾送りしたい場合は同様に 1 を指定可。
@@ -166,10 +166,10 @@ export default function TodoView() {
 
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [addQuery, setAddQuery] = useState('');
-  // ★ 追加: 再表示シート用 カテゴリ選択（null = すべて）
+  // 再表示シート用 カテゴリ選択（null = すべて）
   const [addSelectedCategoryId, setAddSelectedCategoryId] = useState<string | null>(null);
 
-  // ★ 追加: 検索ボックスの表示切替（左下パネルの虫眼鏡でトグル）
+  // 検索ボックスの表示切替（左下パネルの虫眼鏡でトグル）
   const [showSearch, setShowSearch] = useState(false);
 
   // 追加するstate（※ 既存のuseState群の近くに追記してください）
@@ -181,7 +181,7 @@ export default function TodoView() {
   const [isConfirmProcessing, setIsConfirmProcessing] = useState(false);
 
 
-  // ★ 追加: メモモーダル開閉ハンドラ
+  // メモモーダル開閉ハンドラ
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
     setNoteModalTodo(todo);
@@ -313,7 +313,7 @@ export default function TodoView() {
       // 詳細オーバーレイを開く
       setSelectedTaskId(matched.id);
       setFilterText('');
-      setSelectedCategoryId(null); // ★ 追加: カテゴリも解除
+      setSelectedCategoryId(null); // カテゴリも解除
     } else {
       // フォールバック：テキストフィルタにかける
       setFilterText(selectedTaskName);
@@ -381,7 +381,7 @@ export default function TodoView() {
     [selectedTaskId, tasks]
   );
 
-  // ★ 変更: 詳細を閉じたらフィルタも解除（カテゴリ含む）
+  //  詳細を閉じたらフィルタも解除（カテゴリ含む）
   // const handleCloseDetail = useCallback(() => {
   //   setSelectedTaskId(null);
   //   setFilterText('');
@@ -390,12 +390,12 @@ export default function TodoView() {
   // }, []);
 
   /* =========================
-     ★ 追加: 一覧側カテゴリ選択 state
+     一覧側カテゴリ選択 state
      ========================= */
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   /* ===========================================
-     ★ 追加: 表示用カテゴリ一覧（重複排除＋昇順）
+     表示用カテゴリ一覧（重複排除＋昇順）
      =========================================== */
   const availableCategories = useMemo(() => {
     type TaskCategoryShape = {
@@ -423,7 +423,7 @@ export default function TodoView() {
   }, [tasks, uid]);
 
   /* ===========================================
-     ★ 変更: カテゴリ・テキスト・Group選択を反映した一覧
+     ★ カテゴリ・テキスト・Group選択を反映した一覧
      カテゴリ見出しのソートを「優先度→五十音順」に変更
      =========================================== */
   const categorized = useMemo(() => {
@@ -453,7 +453,7 @@ export default function TodoView() {
       map.set(key, arr);
     }
 
-    // ★変更: 優先度（CATEGORY_ORDER）→ 同一優先度内は五十音
+    // 優先度（CATEGORY_ORDER）→ 同一優先度内は五十音
     const entries = Array.from(map.entries()).sort((a, b) => {
       const aKey = a[0];
       const bKey = b[0];
@@ -470,7 +470,7 @@ export default function TodoView() {
   const allVisibleIds = useMemo(() => categorized.flatMap((g) => g.items.map((t) => t.id)), [categorized]);
 
   /* ===========================================
-     ★ 追加: 再表示シート用の「非表示タスク」カテゴリ一覧
+     再表示シート用の「非表示タスク」カテゴリ一覧
      =========================================== */
   const addAvailableCategories = useMemo(() => {
     type TaskCategoryShape = {
@@ -512,7 +512,7 @@ export default function TodoView() {
             />
           )}
 
-          {/* ★ 変更: Sticky 検索のみ（カテゴリは左下固定に移動） */}
+          {/* Sticky 検索のみ（カテゴリは左下固定に移動） */}
           {showSearch && (
             <div className="sticky top-0 z-[999] w-full bg-transparent">
               <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg px-2 pt-2 pb-3">
@@ -747,7 +747,7 @@ export default function TodoView() {
                     </button>
                     <h2 className="text-base font-semibold text-[#5E5E5E]">非表示のTodoを再表示</h2>
                     <span className="ml-auto text-xs text-gray-500">
-                      {/* ★ 変更: キーワード＆カテゴリでフィルタ後の件数を表示 */}
+                      {/* キーワード＆カテゴリでフィルタ後の件数を表示 */}
                       {(() => {
                         const q = addQuery.trim().toLowerCase();
                         // 非表示の中からカテゴリでフィルタ
@@ -800,7 +800,7 @@ export default function TodoView() {
                       )}
                     </div>
 
-                    {/* ★ 追加: カテゴリチップ（再表示シート） */}
+                    {/* カテゴリチップ（再表示シート） */}
                     <div className="mt-3">
                       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
                         {/* すべて */}
@@ -916,7 +916,7 @@ export default function TodoView() {
                                 title={t.name ?? ''}
                               >
                                 <span className="line-clamp-2">{t.name}</span>
-                                {/* ★ 追加: カテゴリ名の前にアイコン＋色 */}
+                                {/* カテゴリ名の前にアイコン＋色 */}
                                 <span className="mt-1 block text-[11px] text-gray-500">
                                   <span className="inline-flex items-center gap-1">
                                     <Icon className={`w-3.5 h-3.5 ${colorClass}`} />

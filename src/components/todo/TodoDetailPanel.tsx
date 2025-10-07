@@ -1,4 +1,4 @@
-// 追加: 選択タスクの詳細を全画面で見せる器（中身は既存コンポを流用）
+// 選択タスクの詳細を全画面で見せる器（中身は既存コンポを流用）
 import { X } from 'lucide-react';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 

@@ -90,7 +90,7 @@ export default function TaskCard({
   const pendingConfirmResolver = useRef<((ok: boolean) => void) | null>(null);
   const [localDone, setLocalDone] = useState(task.done);
 
-  // ★ 変更: 備考モーダル開閉
+  // 備考モーダル開閉
   const [showNote, setShowNote] = useState(false);
 
   const noteText = (task as TaskWithNote).note?.trim();
@@ -117,7 +117,7 @@ export default function TaskCard({
     );
   }, [task.daysOfWeek]);
 
-  // ★ 追加: 日付/時間の表示用フォーマッタ
+  // 日付/時間の表示用フォーマッタ
   const dateStr = useMemo(() => {
     const d = task.dates?.[0];
     if (!d) return '';
@@ -362,18 +362,18 @@ export default function TaskCard({
               {/* ★ 削除: 以前ここにあった備考Infoアイコンは右側（ポイント左）へ移動 */}
             </div>
 
-            {/* 2行目：日付（📅） + 時刻（🕒） + 曜日 */}
+            {/* 2行目：日付 + 時刻 + 曜日 */}
             <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
               {(dateStr || timeStr) && (
                 <div className="flex items-center gap-2">
-                  {/* ★ 変更: 日付の前にカレンダーアイコンを常に表示（dateStrがある時） */}
+                  {/* 日付の前にカレンダーアイコンを常に表示（dateStrがある時） */}
                   {dateStr && (
                     <span className="inline-flex items-center gap-1 leading-none">
                       <Calendar size={12} className="text-gray-600" />
                       <span className="leading-none">{dateStr}</span>
                     </span>
                   )}
-                  {/* ★ 追加: 時間の前に時計アイコンを表示（timeStrがある時） */}
+                  {/* 時間の前に時計アイコンを表示（timeStrがある時） */}
                   {timeStr && (
                     <span className="inline-flex items-center gap-1 leading-none">
                       <Clock size={12} className="text-gray-600" />
@@ -415,7 +415,7 @@ export default function TaskCard({
         <div className="flex items-center gap-1">
           {task.private && isPairConfirmed ? (
             <div className="flex items-center gap-2">
-              {/* ★ 追加: 備考がある時だけ Info を表示（privateでも表示） */}
+              {/* 備考がある時だけ Info を表示（privateでも表示） */}
               {noteText && (
                 <button
                   type="button"
@@ -472,7 +472,7 @@ export default function TaskCard({
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              {/* ★ 追加: private かつ not confirmed でも備考があれば Info を表示 */}
+              {/* private かつ not confirmed でも備考があれば Info を表示 */}
               {noteText && (
                 <button
                   type="button"
@@ -495,8 +495,8 @@ export default function TaskCard({
         </div>
       </motion.div>
 
-      {/* ★ 変更: 備考モーダル（トリガー位置を右へ移したがモーダル本体は従来通り） */}
-      {/* ★ 追加：備考モーダルを body 直下へポータル */}
+      {/* 備考モーダル（トリガー位置を右へ移したがモーダル本体は従来通り） */}
+      {/* 備考モーダルを body 直下へポータル */}
       {showNote &&
         typeof window !== 'undefined' &&
         createPortal(

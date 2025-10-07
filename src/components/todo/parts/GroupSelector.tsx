@@ -119,7 +119,7 @@ const GroupSelector = forwardRef<GroupSelectorHandle, Props>(
     const [mounted, setMounted] = useState(false); // Portal用（SSR対策）
     const uid = useUserUid();
 
-    // ★ 追加: モバイル判定（SPではautoFocus無効にする）
+    // モバイル判定（SPではautoFocus無効にする）
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {

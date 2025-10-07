@@ -43,7 +43,7 @@ function toApplicationServerArrayBuffer(vapidBase64: string): ArrayBuffer {
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
   }
 
-  // ★ 変更箇所：slice を使わず、明示コピーで新しい ArrayBuffer を作成
+  // slice を使わず、明示コピーで新しい ArrayBuffer を作成
   const copy = new Uint8Array(u8.byteLength);
   copy.set(u8);
   return copy.buffer;

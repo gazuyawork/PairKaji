@@ -81,7 +81,7 @@ export default function TaskCalendar({ tasks }: Props) {
     exit: { opacity: 0, scale: 0.98, y: -4, transition: { duration: 0.12 } },
   };
 
-  // ★ 追加: 当日列だけ完了状態を反映する
+  // 当日列だけ完了状態を反映する
   const isDoneOnThisDay = (task: CalendarTask, day: Date) => {
     // 当日列なら task.done を反映、当日以外では常に未完了扱いで表示
     return isSameDay(day, today) ? task.done === true : false;

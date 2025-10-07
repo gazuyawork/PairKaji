@@ -27,14 +27,11 @@ import {
   approvePair,
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
-// import { splitSharedTasksOnPairRemoval } from '@/lib/firebaseUtils';
-import LineLinkCard from '@/components/profile/LineLinkCard';
 
 import PushToggle from '@/components/settings/PushToggle'; // ★ PushToggle を使用
 import { useUserUid } from '@/hooks/useUserUid';           // ★ uid を React state として取得
-import { onAuthStateChanged } from 'firebase/auth';        // ★ 追加
+import { onAuthStateChanged } from 'firebase/auth';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -58,13 +55,7 @@ export default function ProfilePage() {
   const [pairDocId, setPairDocId] = useState<string | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
-
   const [plan, setPlan] = useState<string>(''); // プラン
-  // ▼ LINE連携用の状態（Firestore users/{uid} 由来）
-  const [lineLinked, setLineLinked] = useState<boolean>(false);
-  const [lineDisplayName, setLineDisplayName] = useState<string | null>(null);
-  const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
-
   // ★ Stripe カスタマーポータル用状態
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [isPortalOpening, setIsPortalOpening] = useState(false);
@@ -100,7 +91,7 @@ export default function ProfilePage() {
     setIsPasswordModalOpen(true);
   };
 
-  // ★ 追加: リロード直後の auth.currentUser=null を吸収し、email / provider を安定取得
+  // リロード直後の auth.currentUser=null を吸収し、email / provider を安定取得
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -141,11 +132,6 @@ export default function ProfilePage() {
               localStorage.setItem('profileImage', data.imageUrl);
             }
           }
-
-          // LINE 連携
-          setLineLinked(Boolean(data.lineLinked));
-          setLineDisplayName(data.lineDisplayName ?? null);
-          setLinePictureUrl(data.linePictureUrl ?? null);
 
           // Stripe
           if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
@@ -290,10 +276,6 @@ export default function ProfilePage() {
             localStorage.setItem('profileImage', data.imageUrl);
           }
         }
-
-        setLineLinked(Boolean(data.lineLinked));
-        setLineDisplayName(data.lineDisplayName ?? null);
-        setLinePictureUrl(data.linePictureUrl ?? null);
 
         // Stripe カスタマーIDの反映
         if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
@@ -441,7 +423,6 @@ export default function ProfilePage() {
     try {
       await updateDoc(doc(db, 'users', user.uid), {
         plan: 'free',
-        lineLinked: false,
       });
       toast.success('プランをFreeに戻しました');
       setPlan('free');
@@ -491,10 +472,6 @@ export default function ProfilePage() {
         ) : (
           <>
             <ProfileCard
-              // ▼ Auth user ではなく Firestore の値を渡す
-              isLineLinked={lineLinked}
-              lineDisplayName={lineDisplayName}
-              linePictureUrl={linePictureUrl}
               profileImage={profileImage}
               setProfileImage={setProfileImage}
               name={name}
@@ -529,8 +506,6 @@ export default function ProfilePage() {
               {/* ★ auth.currentUser 依存をやめ、uid 判定で確実に表示 */}
               {uid && <PushToggle uid={uid} />}
             </section>
-
-            {plan === 'premium' && !lineLinked && <LineLinkCard />}
 
             {plan !== 'free' && (
               <div className="flex flex-col items-center gap-2">

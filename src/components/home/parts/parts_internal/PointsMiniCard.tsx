@@ -90,7 +90,7 @@ export default function PointsMiniCard() {
   const [partnerTargetPoint, setPartnerTargetPoint] = useState<number | null>(null);
   const [users] = useState<UserInfo[]>([]);
 
-  // 追加: 集計対象UID（自分 or 自分+パートナー）をリアルタイム維持
+  // 集計対象UID（自分 or 自分+パートナー）をリアルタイム維持
   const [targetIds, setTargetIds] = useState<string[]>([]);
 
   const today = new Date();
@@ -98,7 +98,7 @@ export default function PointsMiniCard() {
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
 
-  // 追加: pairs を購読して targetIds / hasPartner をリアルタイム更新
+  // pairs を購読して targetIds / hasPartner をリアルタイム更新
   useEffect(() => {
     if (!uid) return;
 

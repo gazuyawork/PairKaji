@@ -51,12 +51,12 @@ export default function SubscribeConfirm({ plan }: Props) {
     return {
       title: 'Premium プランの確認',
       price: '300円 / 月',
-      bullets: ['基本機能', '広告なし', 'LINE通知 機能'],
+      bullets: ['基本機能', '広告なし', 'プッシュ通知 機能'],
       cta: '支払いへ進む（300円 / 月）',
       gradientFrom: '#2c3e50',
       gradientTo: '#000000',
       apiPlan: 'premium' as const,
-      note: 'パートナー利用でも 2人で 300円 / 月。広告非表示に加えて、便利なLINE通知がご利用いただけます。',
+      note: 'パートナー利用でも 2人で 300円 / 月。広告非表示などの拡張機能をご利用いただけます。',
     };
   }, [plan]);
 
@@ -125,22 +125,6 @@ export default function SubscribeConfirm({ plan }: Props) {
               </li>
             ))}
           </ul>
-
-          {plan === 'premium' && (
-            <div className="border border-gray-300 rounded-lg p-4 bg-yellow-50 space-y-2 ml-0 mb-4 text-sm">
-              <div className="flex items-start gap-2">
-                <span className="shrink-0">①</span>
-                <span className="flex-1">毎朝8時に当日のタスク一覧が通知されます。</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="shrink-0">②</span>
-                <span className="flex-1">当日のタスクで、時間指定がある場合は30分前に通知されます。</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                ※ ① の通知には頻度を毎日に設定しているタスクは含まれません。
-              </div>
-            </div>
-          )}
 
           <div className="text-xs text-gray-500 space-y-1 mb-4">
             <p>・定期課金（サブスクリプション）です。いつでも解約できます。</p>

@@ -5,8 +5,6 @@ if (process.env.FUNCTIONS_EMULATOR === 'true' || process.env.FUNCTIONS_EMULATOR)
 }
 
 // --- 直接再エクスポート（未使用 import を避ける）---
-export { sendDailyTaskReminder } from './sendDailyTaskReminder';
-// export { sendUpcomingTaskReminder } from './sendUpcomingTaskReminder'; // 使う場合は拡張子 .ts は付けない
 export { onTaskDeletedCleanup } from './onTaskDeletedCleanup';
 export { onTodoRemovedCleanup } from './onTodoRemovedCleanup';
 export { notifyOnTaskFlag } from './notifyOnTaskFlag';

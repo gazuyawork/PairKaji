@@ -50,7 +50,7 @@ type IDBFactoryWithDatabases = IDBFactory & {
 async function nukeCorruptedFirebaseIndexedDB(projectId?: string) {
   if (typeof window === 'undefined' || !('indexedDB' in window)) return;
 
-  // ★ 追加: 同セッションでの多重削除を防止（再ログイン直後の連続ログアウト防止）
+  // 同セッションでの多重削除を防止（再ログイン直後の連続ログアウト防止）
   try {
     const KEY = '__firebase_idb_nuked_v1__';
     if (sessionStorage.getItem(KEY) === '1') return;
@@ -110,7 +110,7 @@ async function nukeCorruptedFirebaseIndexedDB(projectId?: string) {
 /* ------------------------------ Auth 永続化 ------------------------------ */
 const auth = getAuth(app);
 if (typeof window !== 'undefined') {
-  // ★ 変更: browserLocalPersistence を最優先にして、IndexedDB 依存を回避
+  // browserLocalPersistence を最優先にして、IndexedDB 依存を回避
   setPersistence(auth, browserLocalPersistence)
     .catch((e1) => {
       console.warn('[Auth] browserLocalPersistence failed. Fallback to indexedDBLocalPersistence.', e1);

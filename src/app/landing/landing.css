@@ -39,7 +39,7 @@ details[open] summary::after {
 .hide-scroll::-webkit-scrollbar { display: none; }
 .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* --- 追加：ロゴメダリオン ---------------------------------------- */
+/* --- ロゴメダリオン ---------------------------------------- */
 .logo-medallion {
   width: 72px;
   height: 72px;

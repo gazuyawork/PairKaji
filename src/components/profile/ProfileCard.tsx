@@ -21,10 +21,6 @@ type ProfileCardProps = {
   email: string;
   isLoading: boolean;
   nameUpdateStatus: 'idle' | 'loading' | 'success';
-  /** ▼ LINE連携情報 */
-  isLineLinked: boolean;
-  lineDisplayName?: string | null;
-  linePictureUrl?: string | null;
 };
 
 export default function ProfileCard({
@@ -39,9 +35,6 @@ export default function ProfileCard({
   email,
   isLoading,
   nameUpdateStatus,
-  isLineLinked,
-  lineDisplayName,
-  linePictureUrl,
 }: ProfileCardProps) {
   const renderEditButtonContent = () => {
     switch (nameUpdateStatus) {
@@ -55,49 +48,6 @@ export default function ProfileCard({
   };
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isSyncingWithLine, setIsSyncingWithLine] = useState(false);
-
-  // ▼ 最短修正：スプレッドで更新データを合成して即保存
-  const handleSyncWithLine = async () => {
-    if (!isLineLinked) return;
-
-    const user = auth.currentUser;
-    if (!user) {
-      toast.error('ログイン状態が確認できません');
-      return;
-    }
-
-    const nextName = lineDisplayName?.trim();
-    const nextImage = linePictureUrl?.trim();
-
-    if (!nextName && !nextImage) {
-      toast.error('LINEの表示名・画像URLが取得できませんでした。');
-      return;
-    }
-
-    try {
-      setIsSyncingWithLine(true);
-
-      const updateData = {
-        ...(nextName ? { name: nextName } : {}),
-        ...(nextImage ? { imageUrl: nextImage } : {}),
-        updatedAt: serverTimestamp(),
-      };
-
-      await updateDoc(doc(db, 'users', user.uid), updateData);
-
-      // ローカル状態も同期
-      if (nextName) setName(nextName);
-      if (nextImage) setProfileImage(nextImage);
-
-      toast.success('LINEの情報で保存しました');
-    } catch (err) {
-      console.error('LINE同期保存に失敗:', err);
-      toast.error('保存に失敗しました。時間をおいて再度お試しください。');
-    } finally {
-      setIsSyncingWithLine(false);
-    }
-  };
 
   return (
     <motion.div
@@ -106,20 +56,6 @@ export default function ProfileCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      {/* 右上：LINEに合わせる（連携時のみ） */}
-      {Boolean(isLineLinked) && (
-        <button
-          type="button"
-          onClick={handleSyncWithLine}
-          disabled={isUploadingImage || isSyncingWithLine || isLoading}  // ← 読み込み中は無効化
-          className="absolute top-3 right-3 z-20 h-8 px-3 rounded-md text-sm font-semibold text-white bg-[#06C755] shadow hover:opacity-90 active:opacity-80 disabled:opacity-60 inline-flex items-center gap-2"
-          title="LINEの表示名と画像に合わせて保存"
-        >
-          {isSyncingWithLine ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          <span>LINEに合わせる</span>
-        </button>
-      )}
-
       <p className="ml-4 mb-6">
         <label className="text-[#5E5E5E] font-semibold">プロフィール</label>
       </p>

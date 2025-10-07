@@ -6,9 +6,7 @@ export const dynamic = 'force-dynamic';
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
-// 変更後（相対パス）
 import HeartsHistoryModal from './HeartsHistoryModal';
-
 
 /**
  * Props

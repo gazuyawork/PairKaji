@@ -160,7 +160,7 @@ const UrlAwareTextarea = forwardRef<HTMLTextAreaElement, Props>(function UrlAwar
           'min-h-[1.5rem]',
           'font-sans',
           'text-transparent caret-[#111]',
-          'pr-2', // ★ 追加：ハイライトと折り返し位置を揃える
+          'pr-2', // ハイライトと折り返し位置を揃える
           '[-webkit-overflow-scrolling:touch]',
           className ?? '',
         ].join(' ')}

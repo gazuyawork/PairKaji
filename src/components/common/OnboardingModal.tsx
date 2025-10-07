@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import ConfirmModal from '@/components/common/modals/ConfirmModal'; // ★追加
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
 /* ----------------------------------------------------------------
    型定義
@@ -268,7 +268,7 @@ export default function OnboardingModal(props: Props) {
   const pages = normalizeToPages(slides, captions);
   const [current, setCurrent] = useState(0);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false); // ★追加
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // 初期フォーカス（アクセシビリティ）
   useEffect(() => {
@@ -449,7 +449,7 @@ export default function OnboardingModal(props: Props) {
         </motion.div>
       </motion.div>
 
-      {/* ★追加：説明を閉じる確認モーダル（ConfirmModal を使用） */}
+      {/* 説明を閉じる確認モーダル（ConfirmModal を使用） */}
       <ConfirmModal
         isOpen={showConfirm}
         title="確認"

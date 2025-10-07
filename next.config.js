@@ -7,7 +7,7 @@ const isProd = process.env.NODE_ENV === 'production';
 const pwaOptions = {
   dest: 'public',
 
-  // ▼ 変更: 自動登録は一旦オフ（安定後に true/ isProd へ戻せます）
+  // 自動登録は一旦オフ（安定後に true/ isProd へ戻せます）
   register: false,
 
   skipWaiting: true,
@@ -46,12 +46,6 @@ const nextConfig = {
         hostname: 'firebasestorage.googleapis.com',
         port: '',
         pathname: '/**', // 例: /v0/b/<bucket>/o/** を包括
-      },
-      {
-        protocol: 'https',
-        hostname: 'profile.line-scdn.net',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',

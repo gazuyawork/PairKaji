@@ -33,7 +33,7 @@ export default function BaseModal({
   saveLabel = '保存',
   onCompleteAnimation,
   saveDisabled,
-  hideActions = false,        // ★ 追加: デフォルト false にして参照
+  hideActions = false,        // デフォルト false にして参照
 }: BaseModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -137,7 +137,7 @@ export default function BaseModal({
         <div className="space-y-6">
           {children}
 
-          {/* ★ ここを追加：hideActions が true のとき、フッター（保存/キャンセル）を描画しない */}
+          {/* hideActions が true のとき、フッター（保存/キャンセル）を描画しない */}
           {!hideActions && (
             <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
               {/* 保存ボタン：onSaveClick が指定されているときだけ表示（保険） */}

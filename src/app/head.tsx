@@ -12,7 +12,7 @@ export default function Head() {
       {/* ✅ AdSenseのサイト所有確認用 metaタグ（これが必要です） */}
       <meta name="google-adsense-account" content="ca-pub-5428928410579937" />
 
-      {/* iOS向け追加 */}
+      {/* iOS向け */}
       <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />

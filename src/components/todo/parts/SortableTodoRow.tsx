@@ -281,7 +281,7 @@ export default function SortableTodoRow({
         {/* ゴミ箱（1回クリック→確認ダイアログ） */}
         <motion.button
           type="button"
-          onClick={handleTodoDeleteClick}  // ★ 変更: 1回クリックで確認→削除
+          onClick={handleTodoDeleteClick}  // 1回クリックで確認→削除
           variants={SHAKE_VARIANTS}        // （今後使う可能性に備え残すが、animateは指定しない）
           disabled={isLocked}
           className={clsx(

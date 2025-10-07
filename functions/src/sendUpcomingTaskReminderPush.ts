@@ -37,7 +37,7 @@ const getJstHm = (d = new Date()) =>
     minute: '2-digit',
   }).format(d); // "HH:mm"
 
-// ▼ 追加: HH:mm → 分
+// HH:mm → 分
 const parseHmToMinutes = (hm: string): number | null => {
   const [h, m] = String(hm).split(':').map((v) => parseInt(v, 10));
   if (Number.isNaN(h) || Number.isNaN(m)) return null;
@@ -49,7 +49,7 @@ const getJstDayNumber = (ymd: string): number => {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0..6
 };
 
-// ▼ 追加: 当日スロットキー（再送防止の粒度）
+// 当日スロットキー（再送防止の粒度）
 // 例: 2025-09-14 の "21:30" 通知 → "20250914-2130"
 const buildSlotKey = (ymd: string, hm: string): string => {
   const y = ymd.slice(0, 4);
@@ -63,7 +63,7 @@ const buildSlotKey = (ymd: string, hm: string): string => {
 /* =========================================================
  * 型
  * =======================================================*/
-type TaskUserEntry = { uid?: string; time?: string }; // ▼ 追加
+type TaskUserEntry = { uid?: string; time?: string };
 
 type TaskDoc = {
   id: string;
@@ -71,7 +71,7 @@ type TaskDoc = {
   time?: string;            // タスク共通の時刻（従来）
   userId: string;           // 旧スキーマ（作成者/本人）
   userIds?: string[];       // 共有ユーザー（本人＋パートナー）
-  // ▼ 追加: ユーザー別時刻の候補
+  // ユーザー別時刻の候補
   userTimeMap?: Record<string, unknown>; // { [uid]: "HH:mm" }
   users?: TaskUserEntry[];               // [{ uid, time }, ...]
 };
@@ -363,10 +363,10 @@ export const sendUpcomingTaskReminderPush = onSchedule(
 
       /* ========== 3) ユーザーごとに送信（当日再送防止を「タスク×スロット」へ） ========== */
       for (const [uid, tasks] of byUser.entries()) {
-        // ▼ 変更: 旧 taskIds ではなく "taskId#slotKey" を使った抑止
+        // 旧 taskIds ではなく "taskId#slotKey" を使った抑止
         const already = await readNotifiedEntryKeys(uid, todayJst);
 
-        // ▼ 追加: fresh 判定は entryKey（taskId#slotKey）で実施
+        // fresh 判定は entryKey（taskId#slotKey）で実施
         const pairs = tasks.map((t) => {
           const slotKey = buildSlotKey(todayJst, t.time);
           return { ...t, slotKey, entryKey: `${t.id}#${slotKey}` };
@@ -418,7 +418,7 @@ export const sendUpcomingTaskReminderPush = onSchedule(
         console.info(`[USER ${uid}] sent=${sentCount}/${subs.length}`);
 
         if (sentCount > 0) {
-          // ▼ 変更: entries に entryKey を保存（旧 taskIds も併記して下位互換）
+          // entries に entryKey を保存（旧 taskIds も併記して下位互換）
           await appendNotifiedEntries(
             uid,
             todayJst,

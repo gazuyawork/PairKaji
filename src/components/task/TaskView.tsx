@@ -212,7 +212,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const { index } = useView();
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
 
-  /* ★ 追加: URLクエリから検索語とフォーカス指示を取得して反映 */
+  /* URLクエリから検索語とフォーカス指示を取得して反映 */
   const urlSearch = (params?.get('search') ?? '').trim();
   const urlFocusSearch = params?.get('focus') === 'search';
 
@@ -620,7 +620,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     ];
   }, [uid, partnerUserId, profileImage, partnerImage]);
 
-  // ▼ 追加：虫眼鏡ボタンで検索UIをトグル（閉じる時は検索語をクリア）
+  // 虫眼鏡ボタンで検索UIをトグル（閉じる時は検索語をクリア）
   const handleToggleSearch = useCallback(() => {
     if (isSearchVisible) {
       // すでに表示中 → 非表示にして検索語をクリア
@@ -739,7 +739,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
                     {isSearchVisible && (
                       <div className="mb-3">
-                        {/* ★ 変更: URL反映に合わせ ref と value/onChange を使用 */}
+                        {/* URL反映に合わせ ref と value/onChange を使用 */}
                         <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
                       </div>
                     )}

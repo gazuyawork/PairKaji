@@ -6,12 +6,12 @@ export const dynamic = 'force-dynamic';
 import { Flag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useEffect, useMemo, useState, useCallback } from 'react'; // ▼ 変更: useCallback 追加
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { getViewedFlaggedTaskIds, markTaskAsViewed } from '@/utils/viewedTasks';
 import type { Task } from '@/types/Task';
 import { auth } from '@/lib/firebase';
 
-// ▼ 追加: Badgingユーティリティ（PWA判定・ローカル保持込み）
+// Badgingユーティリティ（PWA判定・ローカル保持込み）
 import {
   setAppBadgeSafe,
   clearAppBadgeSafe,
@@ -25,7 +25,7 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
   const router = useRouter();
   const [isNew, setIsNew] = useState(false);
 
-  // ▼ 変更: 未閲覧件数（=バッジ数）を算出
+  // 未閲覧件数（=バッジ数）を算出
   const unviewedCount = useMemo(() => {
     const viewed = getViewedFlaggedTaskIds();
     const currentUserId = auth.currentUser?.uid;
@@ -45,12 +45,12 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
     }, 0);
   }, [flaggedTasks]);
 
-  // ▼ 変更: New表示の制御を未閲覧件数で行う
+  // New表示の制御を未閲覧件数で行う
   useEffect(() => {
     setIsNew(unviewedCount > 0);
   }, [unviewedCount]);
 
-  // ▼ 追加: バッジ反映（未読>0 → set、==0 → clear）
+  // バッジ反映（未読>0 → set、==0 → clear）
   useEffect(() => {
     if (unviewedCount > 0) {
       void setAppBadgeSafe(unviewedCount);
@@ -68,7 +68,7 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
     });
     setIsNew(false);
 
-    // ▼ 追加: 既読化直後にバッジもクリア
+    // 既読化直後にバッジもクリア
     void clearAppBadgeSafe();
 
     const timestamp = new Date().getTime();

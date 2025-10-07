@@ -69,7 +69,7 @@ export default function PricingPage() {
                             <CheckCircle className="h-4 w-4 text-green-500" /> 広告なし
                         </li>
                         <li className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500 mt-1" />LINE通知機能
+                            <CheckCircle className="h-4 w-4 text-green-500 mt-1" />通知機能
                         </li>
                     </ul>
                     <ul className="border border-gray-300 rounded-lg p-4 bg-yellow-50 space-y-2 ml-0 mb-6 text-sm ">

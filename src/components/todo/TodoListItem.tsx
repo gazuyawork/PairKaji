@@ -1,4 +1,4 @@
-// 追加: タイトルだけの1行カード
+// タイトルだけの1行カード
 import clsx from 'clsx';
 import { GripVertical as Grip } from 'lucide-react';
 import { useCategoryIcon } from './parts/hooks/useTodoSearchAndSort';

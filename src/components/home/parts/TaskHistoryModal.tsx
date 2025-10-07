@@ -24,7 +24,7 @@ import {
   isWithinInterval,
   format,
 } from 'date-fns';
-import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'; // ★ 変更: Check を追加
+import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 type TaskHistoryModalProps = {
@@ -286,24 +286,11 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
         <span className="font-medium text-gray-600">{weekRangeLabel}</span>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* ★ 変更（編集対象）: 丸い色見本をチェックマーク表示に置換 */}
-          {/* 削除対象（旧）:
-              <span className="inline-flex items-center gap-1">
-                <span className="inline-block w-2.5 h-2.5 rounded bg-emerald-300" />
-                自分 <span className="font-semibold">{totalMe}</span> pt
-              </span>
-          */}
+          {/* 編集対象: 丸い色見本をチェックマーク表示に置換 */}
           <span className="inline-flex items-center gap-1"> {/* 自分 */}
             <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> {/* チェックマーク */}
             自分 <span className="font-semibold">{totalMe}</span> pt
           </span>
-
-          {/* 削除対象（旧）:
-              <span className="inline-flex items-center gap-1">
-                <span className="inline-block w-2.5 h-2.5 rounded bg-amber-300" />
-                相手 <span className="font-semibold">{totalPartner}</span> pt
-              </span>
-          */}
           <span className="inline-flex items-center gap-1"> {/* 相手 */}
             <CheckCircle className="w-3.5 h-3.5 text-amber-600" />   {/* チェックマーク */}
             相手 <span className="font-semibold">{totalPartner}</span> pt
@@ -355,7 +342,7 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
 
       {/* ミニ棒グラフ（Mon–Sun）：「ポイント合計」を表示 */}
       <div className="mt-3 rounded-md border border-gray-200 p-3">
-        {/* ★ 変更（編集対象）: 凡例の丸色 → チェックマークに置換 */}
+        {/* 編集対象: 凡例の丸色 → チェックマークに置換 */}
         <div className="mb-2 flex items-center gap-3 text-[11px] text-gray-600">
           {/* 削除対象（旧）:
               <span className="inline-flex items-center gap-1">
@@ -431,23 +418,11 @@ export default function TaskHistoryModal({ isOpen, onClose }: TaskHistoryModalPr
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-700">{date}</span>
                   <div className="flex items-center gap-3 text-gray-600">
-                    {/* ★ 変更（編集対象）: 丸色 → チェックマーク */}
-                    {/* 削除対象（旧）:
-                        <span className="inline-flex items-center gap-1">
-                          <span className="inline-block w-2.5 h-2.5 rounded bg-emerald-300" />
-                          <span className="text-sm">自分 × {mePointSum} pt</span>
-                        </span>
-                    */}
+                    {/* 編集対象: 丸色 → チェックマーク */}
                     <span className="inline-flex items-center gap-1">
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                       <span className="text-sm">自分 × {mePointSum} pt</span>
                     </span>
-                    {/* 削除対象（旧）:
-                        <span className="inline-flex items-center gap-1">
-                          <span className="inline-block w-2.5 h-2.5 rounded bg-amber-300" />
-                          <span className="text-sm">相手 × {partnerPointSum} pt</span>
-                        </span>
-                    */}
                     <span className="inline-flex items-center gap-1">
                       <CheckCircle className="w-3.5 h-3.5 text-amber-600" />
                       <span className="text-sm">相手 × {partnerPointSum} pt</span>

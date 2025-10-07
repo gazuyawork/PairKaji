@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'; // ★ 変更: useLayoutEffect を追加
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
 import { dayNameToNumber, dayNumberToName } from '@/lib/constants';
@@ -17,13 +17,13 @@ import {
   ShoppingCart,
   Plane,
   type LucideIcon,
-  ChevronRight, // ★ 追加：横スクロールヒント用
+  ChevronRight, // 横スクロールヒント用
 } from 'lucide-react';
 import UrlAwareTextarea from '@/components/common/UrlAwareTextarea';
 import HelpPopover from '@/components/common/HelpPopover';
 import { forkTaskAsPrivateForSelf } from '@/lib/firebaseUtils';
 
-// ★ 追加：現在のユーザー判定に使用
+// 現在のユーザー判定に使用
 import { auth } from '@/lib/firebase';
 
 const MAX_TEXTAREA_VH = 50;
@@ -147,10 +147,10 @@ export default function EditTaskModal({
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
   const isIOS = isIOSMobileSafari;
 
-  // ★ 追加: 改行時のキャレット復元用
+  // 改行時のキャレット復元用
   const caretRef = useRef<{ start: number; end: number } | null>(null);
 
-  // ★ 追加: カテゴリ行の横スクロール関連
+  // カテゴリ行の横スクロール関連
   const catScrollRef = useRef<HTMLDivElement | null>(null); // 横スクロールDOM参照
   const [catOverflow, setCatOverflow] = useState(false); // 溢れているかどうか
 
@@ -361,7 +361,7 @@ export default function EditTaskModal({
 
     setIsSaving(true);
 
-    // ▼ 追加分岐：相手作成タスクをプライベートONで保存 → 複製して新IDで保存
+    // 相手作成タスクをプライベートONで保存 → 複製して新IDで保存
     const currentUid = auth.currentUser?.uid;
     const originalOwner = (task as unknown as { userId?: string }).userId;
 
@@ -416,7 +416,7 @@ export default function EditTaskModal({
     }, 300);
   }, [editedTask, existingTasks, isPrivate, onSave, task]);
 
-  // ★ 追加: カテゴリのオーバーフローチェック
+  // カテゴリのオーバーフローチェック
   const measureCatOverflow = useCallback(() => {
     const el = catScrollRef.current;
     if (!el) return;
@@ -424,7 +424,7 @@ export default function EditTaskModal({
     setCatOverflow(hasOverflow);
   }, []);
 
-  // ★ 追加: モーダルオープン時にオーバーフロー測定 & “揺らぎ”でスクロールを示唆
+  // モーダルオープン時にオーバーフロー測定 & “揺らぎ”でスクロールを示唆
   useEffect(() => {
     if (!isOpen) return;
     requestAnimationFrame(() => {
@@ -440,14 +440,14 @@ export default function EditTaskModal({
     });
   }, [isOpen, measureCatOverflow]);
 
-  // ★ 追加: リサイズ時に再測定
+  // リサイズ時に再測定
   useEffect(() => {
     const onResize = () => measureCatOverflow();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [measureCatOverflow]);
 
-  // ★ 追加: 備考テキスト変更後にキャレット位置を復元
+  // 備考テキスト変更後にキャレット位置を復元
   useLayoutEffect(() => {
     const el = memoRef.current;
     const caret = caretRef.current;
@@ -467,7 +467,7 @@ export default function EditTaskModal({
     }
   }, [editedTask?.note]);
 
-  // ★ 追加（任意）: フォーカス時に末尾へ
+  // フォーカス時に末尾へ
   const handleMemoFocus = useCallback(() => {
     const el = memoRef.current;
     if (!el) return;
@@ -560,7 +560,7 @@ export default function EditTaskModal({
                     ].join(' ')}
                     title={label}
                   >
-                    {/* ★ 変更点: className で色を指定（selected時は selectedIconColor か text-white） */}
+                    {/* className で色を指定（selected時は selectedIconColor か text-white） */}
                     <Icon
                       size={18}
                       className={selected ? (selectedIconColor ?? 'text-white') : iconColor}
@@ -738,7 +738,7 @@ export default function EditTaskModal({
               ))}
             </select>
 
-            {/* ★ 追加: 0pt 選択時の補足表示 */}
+            {/* 0pt 選択時の補足表示 */}
             {(((editedTask as unknown as { point?: number }).point ?? 0) === 0) && (
               <span className="ml-2 text-xs text-gray-500 whitespace-nowrap">
                 （ポイントを使用しない）
@@ -867,14 +867,13 @@ export default function EditTaskModal({
               rows={1}
               placeholder="備考を入力"
               onChange={(e) => {
-                // ▼ 変更開始：キャレット位置の取得を currentTarget ベースに
                 const el = e.currentTarget; // HTMLTextAreaElement
                 const native = e.nativeEvent as unknown as { inputType?: string; isComposing?: boolean };
 
                 let start = el.selectionStart ?? el.value.length;
                 let end = el.selectionEnd ?? el.value.length;
 
-                // ▼ 追加: Enter による改行（insertLineBreak）が原因の 1文字前ズレを補正
+                // Enter による改行（insertLineBreak）が原因の 1文字前ズレを補正
                 //   - IME変換中は補正しない（isComposing）
                 const isLineBreak =
                   native?.inputType === 'insertLineBreak' && native?.isComposing !== true;
@@ -886,7 +885,6 @@ export default function EditTaskModal({
                 }
 
                 caretRef.current = { start, end };
-                // ▲ 変更終了
 
                 const nextV = el.value;
                 if (nextV.length > NOTE_MAX) setNoteError('500文字以内で入力してください。');

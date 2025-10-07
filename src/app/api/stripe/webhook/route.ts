@@ -1,4 +1,3 @@
-// src/app/api/stripe/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/billing/stripe';
@@ -23,27 +22,31 @@ async function findUidByCustomerId(customerId: string): Promise<string | null> {
       .get();
     if (snap.empty) return null;
     return snap.docs[0].id;
-  } catch (e) {
-    console.error('[webhook] findUidByCustomerId error:', e);
+  } catch (e: unknown) {
+    console.error('[webhook] findUidByCustomerId error:', e instanceof Error ? e.message : String(e));
     return null;
   }
 }
 
-// 置き換え対象：resolvePlanByPriceId を下記に差し替え
-// ※ Stripe.Price を受け取って ID/金額/通貨/間隔 を総合判定します。
+/**
+ * Price 情報からプランを解決
+ * - まず Price ID 環境変数と厳密一致
+ * - それが無ければ JPY / 月額 の金額でフォールバック（100=lite, 300=premium）
+ * - それ以外は free
+ */
 function resolvePlanByPrice(price?: Stripe.Price | null): 'lite' | 'premium' | 'free' {
   if (!price) return 'free';
 
   const id = price.id;
-  const amt = price.unit_amount ?? null;      // 例: 100, 300（JPYの最小単位=円）
-  const cur = price.currency;                 // 'jpy' など
+  const amt = price.unit_amount ?? null; // 例: 100, 300（JPYの最小単位=円）
+  const cur = price.currency; // 'jpy' など
   const interval = price.recurring?.interval; // 'month' など
 
-  // 1) まずは Price ID で厳密一致
+  // 1) Price ID で厳密一致
   if (id === process.env.STRIPE_PRICE_LITE) return 'lite';
   if (id === process.env.STRIPE_PRICE_PREMIUM) return 'premium';
 
-  // 2) 月額・JPY なら金額でフォールバック（100=Lite, 300=Premium）
+  // 2) フォールバック: 月額 JPY の金額で判定
   if (interval === 'month' && cur === 'jpy' && typeof amt === 'number') {
     if (amt === 100) return 'lite';
     if (amt === 300) return 'premium';
@@ -56,7 +59,6 @@ function resolvePlanByPrice(price?: Stripe.Price | null): 'lite' | 'premium' | '
   });
   return 'free';
 }
-
 
 // ------------------------------
 // Webhook エンドポイント
@@ -76,7 +78,6 @@ export async function POST(req: NextRequest) {
   try {
     event = Stripe.webhooks.constructEvent(rawBody, sig, whSecret);
   } catch (err: unknown) {
-    // ✅ any → unknown に変更し、安全に絞り込み
     const message = err instanceof Error ? err.message : String(err);
     console.error('[webhook] signature verification failed:', message);
     return NextResponse.json({ error: 'invalid signature' }, { status: 400 });
@@ -104,12 +105,13 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        // line_items の price.id で plan 判定
+        // line_items の price.id で plan 判定（堅牢化：空配列/未展開の考慮）
         const full = await stripe.checkout.sessions.retrieve(session.id, {
           expand: ['line_items.data.price'],
         });
-        const price = full.line_items?.data?.[0]?.price as Stripe.Price | undefined;
-        const plan = resolvePlanByPrice(price ?? null);
+        const line = Array.isArray(full.line_items?.data) ? full.line_items!.data[0] : undefined;
+        const price = (line?.price as Stripe.Price | undefined) ?? null;
+        const plan = resolvePlanByPrice(price);
 
         // 以後の subscription.* イベントで uid を辿れるよう、subscription に uid をメタデータ付与
         if (subscriptionId) {
@@ -117,20 +119,24 @@ export async function POST(req: NextRequest) {
             await stripe.subscriptions.update(subscriptionId, {
               metadata: { uid },
             });
-          } catch (e) {
-            console.warn('[webhook] failed to attach uid to subscription metadata:', e);
+          } catch (e: unknown) {
+            console.warn(
+              '[webhook] failed to attach uid to subscription metadata:',
+              e instanceof Error ? e.message : String(e)
+            );
           }
         }
 
-        // Firestore 反映
+        // Firestore 反映（updatedAt はサーバー時刻）
         const db = await getAdminDb();
+        const { FieldValue } = await import('firebase-admin/firestore');
         await db.collection('users').doc(uid).set(
           {
             stripeCustomerId: customerId,
             subscriptionId: subscriptionId,
             subscriptionStatus: 'active',
             plan,
-            updatedAt: new Date(),
+            updatedAt: FieldValue.serverTimestamp(),
           },
           { merge: true }
         );
@@ -161,7 +167,10 @@ export async function POST(req: NextRequest) {
         });
 
         if (!uid) {
-          console.warn('[webhook] subscription event: uid not found', { customerId, subId: sub.id });
+          console.warn('[webhook] subscription event: uid not found', {
+            customerId,
+            subId: sub.id,
+          });
           break;
         }
 
@@ -169,8 +178,11 @@ export async function POST(req: NextRequest) {
         if (!uidMeta) {
           try {
             await stripe.subscriptions.update(sub.id, { metadata: { uid } });
-          } catch (e) {
-            console.warn('[webhook] failed to backfill uid into subscription metadata:', e);
+          } catch (e: unknown) {
+            console.warn(
+              '[webhook] failed to backfill uid into subscription metadata:',
+              e instanceof Error ? e.message : String(e)
+            );
           }
         }
 
@@ -181,12 +193,13 @@ export async function POST(req: NextRequest) {
             : resolvePlanByPrice(price ?? null);
 
         const db = await getAdminDb();
+        const { FieldValue } = await import('firebase-admin/firestore');
         await db.collection('users').doc(uid).set(
           {
             plan,
             subscriptionStatus: sub.status, // 'active' | 'canceled' | 'past_due' など
             subscriptionId: sub.id,
-            updatedAt: new Date(),
+            updatedAt: FieldValue.serverTimestamp(),
           },
           { merge: true }
         );
@@ -201,7 +214,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (e: unknown) {
-    // ✅ any → unknown に変更し、安全に絞り込み
     const message = e instanceof Error ? e.message : String(e);
     console.error('[webhook] handler error:', message);
     return NextResponse.json({ error: 'webhook handler failed' }, { status: 500 });

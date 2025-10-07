@@ -15,7 +15,7 @@ export default function PairInviteCard({ mode }: Props) {
   const router = useRouter();
   const [isDismissed, setIsDismissed] = useState(false);
   
-  // 追加：ConfirmModal表示状態管理
+  // ConfirmModal表示状態管理
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {

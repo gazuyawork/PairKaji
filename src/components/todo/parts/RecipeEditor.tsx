@@ -461,7 +461,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     (index: number) => {
       if (isPreview) return;
       const id = `ing_${genId()}`;
-      // ★ 変更: デフォルト単位を 'g' に
+      // デフォルト単位を 'g' に
       const next: Ingredient = { id, name: '', amount: null, unit: 'g' };
       setIngredients((prev) => {
         const arr = [...prev];
@@ -480,7 +480,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   const addIngredient = useCallback(() => {
     if (isPreview) return;
     const id = `ing_${genId()}`;
-    // ★ 変更: デフォルト単位を 'g' に
+    // デフォルト単位を 'g' に
     const next: Ingredient = { id, name: '', amount: null, unit: 'g' };
     setIngredients((prev) => [...prev, next]);
     setAmountText((m) => ({ ...m, [id]: '' }));
@@ -535,7 +535,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     }));
   };
 
-  // ★ 変更: 単位変更時の数量フォーカス自動移動を削除
+  // 単位変更時の数量フォーカス自動移動を削除
   const changeIngredientUnit = (id: string, unit: string) => {
     setIngredients((prev) => {
       const next = prev.map((i) =>

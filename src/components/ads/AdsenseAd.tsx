@@ -25,7 +25,7 @@ export default function AdsenseAd({
   const client = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
   const isReady = Boolean(client && slot);
 
-  // ▼ 変更①: ref で対象の <ins> を特定
+  // ref で対象の <ins> を特定
   const insRef = useRef<HTMLModElement | null>(null);
 
   // 既存: StrictMode の二重実行対策
@@ -35,12 +35,12 @@ export default function AdsenseAd({
     try {
       if (!isReady) return;
 
-      // ▼ 変更②: 自分の <ins> が未初期化か確認
+      // 自分の <ins> が未初期化か確認
       const isThisInsInitialized =
         insRef.current?.getAttribute('data-adsbygoogle-status') === 'done';
       if (isThisInsInitialized) return;
 
-      // ▼ 変更③: ドキュメント全体にも「未初期化の adsbygoogle 枠」があるか確認
+      // ドキュメント全体にも「未初期化の adsbygoogle 枠」があるか確認
       const hasUninitializedAny =
         !!document.querySelector('ins.adsbygoogle:not([data-adsbygoogle-status="done"])');
       if (!hasUninitializedAny) return;

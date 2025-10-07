@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
-// import WeeklyPoints from '@/components/home/parts/WeeklyPoints';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
@@ -13,7 +12,6 @@ import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 import AdCard from '@/components/home/parts/AdCard';
-// import LineLinkCard from '@/components/home/parts/LineLinkCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import OnboardingModal from '@/components/common/OnboardingModal';
@@ -29,7 +27,6 @@ import {
   query,
   where,
   onSnapshot,
-  doc,
   type DocumentData,
 } from 'firebase/firestore';
 
@@ -105,7 +102,7 @@ function SortableCard({
   );
 }
 
-/** ★追加: ペア未確定時にカード内を非活性化するラッパー（DnDハンドルは有効のまま） */
+/** ペア未確定時にカード内を非活性化するラッパー（DnDハンドルは有効のまま） */
 function DisabledCardWrapper({
   children,
   message = 'ペア設定完了後に利用できます。',
@@ -138,11 +135,8 @@ export default function HomeView() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [, setIsWeeklyPointsHidden] = useState(false);
   const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
-
   const { plan, isChecking } = useUserPlan();
   const uid = useUserUid();
-
-  const [isLineLinked, setIsLineLinked] = useState<boolean>(false);
 
   // オンボーディング
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -167,23 +161,6 @@ export default function HomeView() {
     localStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
     setShowOnboarding(false);
   };
-
-  // users/{uid} の lineLinked を購読
-  useEffect(() => {
-    if (!uid) return;
-    const userRef = doc(db, 'users', uid);
-    const unsubscribe = onSnapshot(
-      userRef,
-      (snap) => {
-        if (snap.exists()) {
-          const userData = snap.data() as Record<string, unknown>;
-          setIsLineLinked(Boolean(userData.lineLinked));
-        }
-      },
-      (err) => console.warn('[HomeView] users onSnapshot error:', err)
-    );
-    return () => unsubscribe();
-  }, [uid]);
 
   useEffect(() => {
     const stored = localStorage.getItem(WEEKLY_POINTS_HIDE_KEY);
@@ -348,7 +325,6 @@ export default function HomeView() {
    * -------------------------------------*/
   const HOME_CARD_ORDER_KEY = 'homeCardOrderV1';
   const DEFAULT_ORDER = [
-    'lineLink',
     'pairInvite',
     'pairInviteNone',
     'expandableInfo',
@@ -397,14 +373,12 @@ export default function HomeView() {
     setCardOrder((prev) => arrayMove(prev, oldIndex, newIndex));
   };
 
-  /** ★追加: ペア未確定かどうかの共通フラグ */
+  /** ペア未確定かどうかの共通フラグ */
   const isPairInactive = !hasPairConfirmed;
 
   // ▼ ID → 実体
   const renderCardContent = (id: CardId): ReactNode => {
     switch (id) {
-      // case 'lineLink':
-      //   return <LineLinkCard />;
       case 'pairInvite':
         return <PairInviteCard mode="invite-received" />;
       case 'pairInviteNone':
@@ -427,7 +401,7 @@ export default function HomeView() {
           </div>
         );
       case 'hearts': {
-        // ★変更: ペア未確定なら非活性表示（DnDハンドルは有効）
+        // ペア未確定なら非活性表示（DnDハンドルは有効）
         const node = <HomeDashboardCard />;
         return isPairInactive ? (
           <DisabledCardWrapper message="ペア設定完了後に利用できます。">
@@ -453,34 +427,8 @@ export default function HomeView() {
             }))}
           />
         );
-      // case 'weeklyPoints':
-      //   return isLoading ? (
-      //     <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
-      //   ) : !isWeeklyPointsHidden ? (
-      //     <div className="relative">
-      //       <WeeklyPoints />
-      //       {!hasPairConfirmed && (
-      //         <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-700 rounded-md z-10 px-4 mx-auto w-full max-w-xl">
-      //           <button
-      //             onClick={() => {
-      //               localStorage.setItem(WEEKLY_POINTS_HIDE_KEY, 'true');
-      //               setIsWeeklyPointsHidden(true);
-      //             }}
-      //             className="absolute top-2 right-3 text-gray-400 hover:text-gray-800 text-3xl"
-      //             aria-label="閉じる"
-      //           >
-      //             ×
-      //           </button>
-      //           <p className="text-md font-semibold text-center flex items-center gap-1">
-      //             <Info className="w-4 h-4 text-gray-700" />
-      //             パートナー設定完了後に使用できます。
-      //           </p>
-      //         </div>
-      //       )}
-      //     </div>
-      //   ) : null;
       case 'todayDone': {
-        // ★変更: ペア未確定なら非活性表示（DnDハンドルは有効）
+        // ペア未確定なら非活性表示（DnDハンドルは有効）
         const node = <PartnerCompletedTasksCard />;
         return isPairInactive ? (
           <DisabledCardWrapper message="ペア設定完了後に利用できます。">
@@ -553,9 +501,6 @@ export default function HomeView() {
               {(() => {
                 // 1) 表示条件に合う候補
                 const candidateSet = new Set<CardId>();
-                if (!isLoading && !isChecking && plan === 'premium' && !isLineLinked) {
-                  candidateSet.add('lineLink');
-                }
                 if (!isLoading && hasPairInvite) {
                   candidateSet.add('pairInvite');
                 } else if (!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed) {

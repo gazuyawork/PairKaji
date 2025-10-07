@@ -22,7 +22,7 @@ import { useTodoSearchAndSort, useCategoryIcon, type SimpleTodo } from './hooks/
 import { useScrollMeter } from './hooks/useScrollMeter';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
-// ★ 追加: ルーティング & ビューコンテキスト
+// ルーティング & ビューコンテキスト
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useView } from '@/context/ViewContext';
 
@@ -101,7 +101,7 @@ export default function TodoTaskCard({
   onClose,
   groupDnd,
 }: Props) {
-  // ★ 追加: ルーター & 現在のURL/クエリ、ビュー切替
+  // ルーター & 現在のURL/クエリ、ビュー切替
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -192,16 +192,15 @@ export default function TodoTaskCard({
   const [isInputOpen, setIsInputOpen] = useState(false);
   const inputWrapRef = useRef<HTMLDivElement | null>(null);
 
-  /* ▼▼▼ 追加: iOS検出とフォーカス用ダミー入力 ▼▼▼ */
+  /* iOS検出とフォーカス用ダミー入力 */
   const isIOS = useMemo(
     () => typeof navigator !== 'undefined' && /iP(hone|od|ad)/.test(navigator.userAgent),
     []
   );
   const dummyFocusRef = useRef<HTMLInputElement | null>(null);
-  /* ▲▲▲ 追加ここまで ▲▲▲ */
 
   const openAddInput = () => {
-    /* ▼ 変更: iOSでは「同期的にフォーカス」→ その後に入力表示＆本入力へ引き継ぎ */
+    /* iOSでは「同期的にフォーカス」→ その後に入力表示＆本入力へ引き継ぎ */
     if (isIOS) {
       // ダミーへ即フォーカス（ユーザー操作のコンテキスト内）
       dummyFocusRef.current?.focus();
