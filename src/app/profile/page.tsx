@@ -495,84 +495,89 @@ export default function ProfilePage() {
   };
 
   return (
-    // ★ 変更: min-h-screen w-screen -> min-h-[100dvh] w-full（vh問題/横はみ出し対策）
-    <div className="flex flex-col min-h-[100dvh] w-full bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
+    // 最上位は高さのみ（vh対策）
+    <div className="flex flex-col min-h-[100dvh] w/full bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Setting" />
-      {/* ★ 変更: 二重スクロール回避のため overflow-y-auto を削除（ClientLayout側に統一） */}
-      <main className="flex-1 px-4 py-6 space-y-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center w-full h-[60vh]">
-            <LoadingSpinner size={48} />
-          </div>
-        ) : (
-          <>
-            <ProfileCard
-              profileImage={profileImage}
-              setProfileImage={setProfileImage}
-              name={name}
-              setName={setName}
-              isGoogleUser={isGoogleUser}
-              onEditName={onEditNameHandler}
-              onEditEmail={onEditEmailHandler}
-              onEditPassword={onEditPasswordHandler}
-              email={email}
-              isLoading={isLoading}
-              nameUpdateStatus={nameUpdateStatus}
-            />
-            <PartnerSettings
-              isLoading={isLoading}
-              isPairLoading={isPairLoading}
-              pendingApproval={pendingApproval}
-              isPairConfirmed={isPairConfirmed}
-              partnerEmail={partnerEmail}
-              partnerImage={partnerImage ?? '/images/default.png'}
-              inviteCode={inviteCode}
-              pairDocId={pairDocId}
-              onApprovePair={handleApprovePair}
-              onRejectPair={handleRejectPair}
-              onCancelInvite={handleCancelInvite}
-              onSendInvite={handleSendInvite}
-              onRemovePair={handleRemovePair}
-              onChangePartnerEmail={setPartnerEmail}
-              isRemoving={isRemoving}
-            />
 
-            <section className="mt-6">
-              {/* ★ auth.currentUser 依存をやめ、uid 判定で確実に表示 */}
-              {uid && <PushToggle uid={uid} />}
-            </section>
-
-            {plan !== 'free' && (
-              <div className="flex flex-col items-center gap-2">
-                {/* ★ Stripe カスタマーポータルへ遷移 */}
-                <button
-                  onClick={handleOpenStripePortal}
-                  disabled={isPortalOpening}
-                  className="mt-4 text-indigo-600 py-2 px-4 rounded transition text-xs underline decoration-indigo-600 disabled:opacity-60"
-                >
-                  {isPortalOpening ? '開いています…' : 'サブスクリプションを管理（ポータル）'}
-                </button>
-
-                <button
-                  onClick={handleCancelPlan}
-                  className="text-gray-400 py-2 px-4 rounded transition text-[11px] underline decoration-gray-400"
-                >
-                  （開発用）強制的にFreeに戻す
-                </button>
-              </div>
-            )}
-
-            <div className="text-center mt-auto">
-              <Link
-                href="/delete-account"
-                className="text-xs text-gray-400 hover:underline underline decoration-gray-400"
-              >
-                アカウントを削除する
-              </Link>
+      {/* ★ 変更: Homeと同様の「専用スクロールコンテナ」。
+          ここに慣性スクロール指定を直付けして“実スクロール要素”を明確化 */}
+      <div className="flex-1 overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]">
+        {/* ★ mainはスクロールさせない（二重スクロール回避） */}
+        <main className="px-4 py-6 space-y-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center w-full h-[60vh]">
+              <LoadingSpinner size={48} />
             </div>
-          </>
-        )}
-      </main>
+          ) : (
+            <>
+              <ProfileCard
+                profileImage={profileImage}
+                setProfileImage={setProfileImage}
+                name={name}
+                setName={setName}
+                isGoogleUser={isGoogleUser}
+                onEditName={onEditNameHandler}
+                onEditEmail={onEditEmailHandler}
+                onEditPassword={onEditPasswordHandler}
+                email={email}
+                isLoading={isLoading}
+                nameUpdateStatus={nameUpdateStatus}
+              />
+              <PartnerSettings
+                isLoading={isLoading}
+                isPairLoading={isPairLoading}
+                pendingApproval={pendingApproval}
+                isPairConfirmed={isPairConfirmed}
+                partnerEmail={partnerEmail}
+                partnerImage={partnerImage ?? '/images/default.png'}
+                inviteCode={inviteCode}
+                pairDocId={pairDocId}
+                onApprovePair={handleApprovePair}
+                onRejectPair={handleRejectPair}
+                onCancelInvite={handleCancelInvite}
+                onSendInvite={handleSendInvite}
+                onRemovePair={handleRemovePair}
+                onChangePartnerEmail={setPartnerEmail}
+                isRemoving={isRemoving}
+              />
+
+              <section className="mt-6">
+                {/* ★ auth.currentUser 依存をやめ、uid 判定で確実に表示 */}
+                {uid && <PushToggle uid={uid} />}
+              </section>
+
+              {plan !== 'free' && (
+                <div className="flex flex-col items-center gap-2">
+                  {/* ★ Stripe カスタマーポータルへ遷移 */}
+                  <button
+                    onClick={handleOpenStripePortal}
+                    disabled={isPortalOpening}
+                    className="mt-4 text-indigo-600 py-2 px-4 rounded transition text-xs underline decoration-indigo-600 disabled:opacity-60"
+                  >
+                    {isPortalOpening ? '開いています…' : 'サブスクリプションを管理（ポータル）'}
+                  </button>
+
+                  <button
+                    onClick={handleCancelPlan}
+                    className="text-gray-400 py-2 px-4 rounded transition text-[11px] underline decoration-gray-400"
+                  >
+                    （開発用）強制的にFreeに戻す
+                  </button>
+                </div>
+              )}
+
+              <div className="text-center mt-auto">
+                <Link
+                  href="/delete-account"
+                  className="text-xs text-gray-400 hover:underline underline decoration-gray-400"
+                >
+                  アカウントを削除する
+                </Link>
+              </div>
+            </>
+          )}
+        </main>
+      </div>
 
       <EmailEditModal open={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} />
       <PasswordEditModal open={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} />
