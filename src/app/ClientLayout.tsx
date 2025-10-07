@@ -12,9 +12,10 @@ export const dynamic = 'force-dynamic';
   - /pricing でもタッチ許可（PreventBounce 無効化 & touch-pan-y 付与）
   - allowTouch 時は wrapper に overflow-y-auto を付与（縦スクロール明示）
   - （★今回）/main, /todo でもタッチ許可（モーダル内スクロール対策）
+  - （★今回）初回描画ガードを追加：スプラッシュより先にヘッダー/フッター等が見えないようにする
 */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Toaster } from 'sonner';
 import PairInit from '@/components/common/PairInit';
 import PreventBounce from '@/components/common/PreventBounce';
@@ -53,6 +54,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   /* PreventBounce の残留対策 */
   useUnlockBodyOnUnmount();
 
+  // ★ 追加: 初回描画ガード
+  // 初回は wrapper を不可視にし（visibility: hidden）、クライアント初期化直後に解除。
+  // これにより、スプラッシュが描画される前にヘッダー/フッター等がチラ見えするのを防止。
+  const [hideFirstPaint, setHideFirstPaint] = useState(true);
+  useEffect(() => {
+    // 次のフレームで可視化。必要に応じて requestAnimationFrame を使ってもOK。
+    const id = requestAnimationFrame(() => setHideFirstPaint(false));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   return (
     <>
       {/* SetViewportHeight は常時マウント（/landing でも適用） */}
@@ -71,6 +82,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             ? 'touch-pan-y overflow-y-auto [-webkit-overflow-scrolling:touch]'
             : 'overscroll-none'
         }`}
+        // ★ 追加: 初回だけ不可視に（スプラッシュが前面に出るまでのチラ見え防止）
+        style={hideFirstPaint ? { visibility: 'hidden' } : undefined}
       >
         <PairInit />
         <TaskSplitMonitor />
