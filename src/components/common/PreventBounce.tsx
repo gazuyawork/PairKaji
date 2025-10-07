@@ -1,39 +1,43 @@
-// src/components/common/PreventBounce.tsx
 'use client';
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * PreventBounce コンポーネント
+ *
+ * スマートフォンでのスクロール時に画面最上部・最下部で発生する
+ * 通称「バウンススクロール（ゴムのように伸びる挙動）」を抑制するための処理。
+ *
+ * - `.main-content` クラス内は通常のスクロールを許可
+ * - 2本指でのズーム操作は妨げない（アクセシビリティ配慮）
+ */
 
 import { useEffect } from 'react';
 
 export default function PreventBounce() {
   useEffect(() => {
     const preventBounce = (e: TouchEvent) => {
-      // すでに他で prevent 済みなら触らない（安全策）
-      if (e.defaultPrevented) return;
+      const target = e.target as HTMLElement;
 
-      // 2本指（ピンチ等）は許可
+      // ✅ main-contentクラスが親にある要素はスクロール許可
+      if (target.closest('.main-content')) return;
+
+      // ✅ 2本指操作（ピンチイン/アウトなど）は許可
       if (e.touches.length > 1) return;
 
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-
-      // ✅ スクロール許可ゾーン
-      // - 既存: .main-content
-      // - 追加: .touch-pan-y（Layout側と整合）
-      const allow = target.closest('.main-content, .touch-pan-y');
-      if (allow) return; // 許可ゾーン内は慣性スクロールを妨げない
-
-      // ❌ 許可ゾーン外はデフォルトのスクロールを抑制（バウンス防止）
+      // ❌ それ以外はデフォルトのスクロール挙動を抑制（バウンス防止）
       e.preventDefault();
     };
 
-    // bubble で十分。必要なら { capture: true } に変更可
+    // スクロール時のtouchmoveイベントでpreventBounceを適用
     document.addEventListener('touchmove', preventBounce, { passive: false });
 
+    // アンマウント時にイベントリスナーを削除
     return () => {
       document.removeEventListener('touchmove', preventBounce);
     };
   }, []);
 
+  // 見た目の描画は不要なためnullを返す
   return null;
 }
