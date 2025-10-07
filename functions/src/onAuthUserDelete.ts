@@ -17,7 +17,7 @@ import type { Firestore } from 'firebase-admin/firestore';
  */
 export const onAuthUserDelete = auth.user().onDelete(async (user) => {
   // 🔑 Admin SDK をここでのみ読み込む（トップレベル副作用なし）
-  const admin = await import('firebase-admin');
+  const admin = (await import('firebase-admin')).default as typeof import('firebase-admin');
 
   // 二重初期化防止
   if (admin.apps.length === 0) {
