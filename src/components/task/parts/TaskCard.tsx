@@ -361,51 +361,42 @@ export default function TaskCard({
               <span className="text-[#5E5E5E] font-bold font-sans truncate">{task.name}</span>
               {/* ★ 削除: 以前ここにあった備考Infoアイコンは右側（ポイント左）へ移動 */}
             </div>
-
-            {/* 2行目：日付 + 時刻 + 曜日 */}
+            {/* 2行目：日付・曜日・時間 */}
             <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
-              {(dateStr || timeStr) && (
-                <div className="flex items-center gap-2">
-                  {/* 日付の前にカレンダーアイコンを常に表示（dateStrがある時） */}
-                  {dateStr && (
-                    <span className="inline-flex items-center gap-1 leading-none">
-                      <Calendar size={12} className="text-gray-600" />
-                      <span className="leading-none">{dateStr}</span>
-                    </span>
-                  )}
-                  {/* 時間の前に時計アイコンを表示（timeStrがある時） */}
-                  {timeStr && (
-                    <span className="inline-flex items-center gap-1 leading-none">
-                      <Clock size={12} className="text-gray-600" />
-                      <span className="leading-none">{timeStr}</span>
-                    </span>
-                  )}
+              {/* 日付 */}
+              {dateStr && (
+                <span className="inline-flex items-center gap-1 leading-none">
+                  <Calendar size={12} className="text-gray-600" />
+                  <span className="leading-none">{dateStr}</span>
+                </span>
+              )}
+
+              {/* 曜日（ピル） */}
+              {sortedDays.length > 0 && (
+                <div className="flex items-center gap-[2px]">
+                  {sortedDays.map((d, i) => (
+                    <div
+                      key={i}
+                      className={clsx(
+                        'w-5 h-5 rounded-full text-white text-[10px] flex items-center justify-center border-2',
+                        'shrink-0 leading-none',
+                        dayBaseClass,
+                        dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
+                      )}
+                      title={`${d}曜`}
+                    >
+                      {d}
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {sortedDays.length > 0 && (
-                <div className="flex items-center gap-1">
-                  {/* 区切り点（日時がある時のみ） */}
-                  {(dateStr || timeStr) && <span className="text-gray-300">•</span>}
-
-                  {/* 曜日ピル（小さめ） */}
-                  <div className="flex items-center gap-[2px]">
-                    {sortedDays.map((d, i) => (
-                      <div
-                        key={i}
-                        className={clsx(
-                          'w-5 h-5 rounded-full text-white text-[10px] flex items-center justify-center border-2',
-                          'shrink-0 leading-none',
-                          dayBaseClass,
-                          dayBorderClassMap[dayKanjiToNumber[d]] ?? 'border-gray-500'
-                        )}
-                        title={`${d}曜`}
-                      >
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {/* 時間 */}
+              {timeStr && (
+                <span className="inline-flex items-center gap-1 leading-none">
+                  <Clock size={12} className="text-gray-600" />
+                  <span className="leading-none">{timeStr}</span>
+                </span>
               )}
             </div>
           </div>
