@@ -537,7 +537,20 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
 
       <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden">
         <div className="relative z-0" style={{ width: 144, height: 144 }}>
-          <StageImage stage={resolveStage(totalThisWeek)} sources={HEART_GARDEN_IMAGES as [string, string, string, string]} size={144} />
+          {/* ▼▼▼ 変更①：根本固定の“ゆらゆら”ラッパを追加 ▼▼▼ */}
+          <div
+            className={`garden-sway-container ${feedActive ? 'paused' : ''}`}
+            data-stage={resolveStage(totalThisWeek)}
+            aria-label="heart-garden-plant"
+          >
+            <StageImage
+              stage={resolveStage(totalThisWeek)}
+              sources={HEART_GARDEN_IMAGES as [string, string, string, string]}
+              size={144}
+            />
+          </div>
+          {/* ▲▲▲ 変更①ここまで ▲▲▲ */}
+
           {weekOffset === 0 && <HeartNutrientFlow count={feedCount} targetSize={144} active={feedActive} />}
         </div>
 
@@ -558,6 +571,37 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
           </span>
         </div>
       </div>
+
+      {/* ▼▼▼ 変更②：styled-jsx で“根本固定ゆらぎ”を追加 ▼▼▼ */}
+      <style jsx>{`
+        .garden-sway-container {
+          width: 144px;
+          height: 144px;
+          transform-origin: 50% 100%; /* 根本（下中央）を支点に回転 */
+          animation-name: garden-sway;
+          animation-duration: 5.8s;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+          animation-fill-mode: both;
+          will-change: transform;
+        }
+        .garden-sway-container.paused {
+          animation-play-state: paused;
+        }
+
+        /* 段階に応じて速度を微調整（お好みで調整可） */
+        .garden-sway-container[data-stage="0"] { animation-duration: 6.2s; }
+        .garden-sway-container[data-stage="1"] { animation-duration: 5.8s; }
+        .garden-sway-container[data-stage="2"] { animation-duration: 5.2s; }
+        .garden-sway-container[data-stage="3"] { animation-duration: 4.8s; }
+
+        @keyframes garden-sway {
+          0%   { transform: rotate(-1.1deg); }
+          50%  { transform: rotate( 1.1deg); }
+          100% { transform: rotate(-1.1deg); }
+        }
+      `}</style>
+      {/* ▲▲▲ 変更②ここまで ▲▲▲ */}
     </BaseModal>
   );
 }
