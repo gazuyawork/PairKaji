@@ -539,7 +539,7 @@ export default function EditTaskModal({
         {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
         {/* ★ 改行せず1行・溢れたら横スクロール＋ヒント */}
         <div className="flex items-center">
-          <label className="w-25 text-gray-600 shrink-0 flex items-center">
+          <label className="w-30 text-gray-600 shrink-0 flex items-center">
             <span className="inline-flex items-center gap-1 whitespace-nowrap">
               カテゴリ
               <HelpPopover
@@ -880,7 +880,7 @@ export default function EditTaskModal({
             )}
 
             <div className="flex items-center">
-              <label className="w-32 text-gray-600 shrink-0 flex items-center">
+              <label className="w-35 text-gray-600 shrink-0 flex items-center">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   プライベート
                   <HelpPopover
@@ -925,7 +925,7 @@ export default function EditTaskModal({
           const isVisible = toStrictBool((editedTask as unknown as { visible?: unknown }).visible);
           return (
             <div className="flex items-center">
-              <label className="w-32 text-gray-600 shrink-0 flex items-center">
+              <label className="w-35 text-gray-600 shrink-0 flex items-center">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   TODO表示
                   <HelpPopover
