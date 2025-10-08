@@ -1,4 +1,3 @@
-// src/components/home/parts/PartnerCompletedTasksCard.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +30,7 @@ type PartnerTask = {
   completedBy?: string | null;
 };
 
-type HeartStateMap = Record<string, boolean>; // key: taskId, value: liked?
+type HeartStateMap = Record<string, boolean>; // key: `${taskId}_${dateKey}`, value: liked?
 
 // Firestoreの tasks ドキュメントで本コンポーネントが参照する最小フィールド
 type FirestoreTask = {
@@ -51,6 +50,14 @@ function toBoolean(v: unknown, fallback = false): boolean {
 function toStringArray(v: unknown): string[] {
   return Array.isArray(v) ? (v.filter((x) => typeof x === 'string') as string[]) : [];
 }
+// 追加：完了日の日付キー（YYYYMMDD）を作る
+function toDateKey(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${y}${m}${day}`;
+}
 
 /**
  * 仕様（2025-09 反映）
@@ -60,8 +67,8 @@ function toStringArray(v: unknown): string[] {
  *    2) 「いいね済み」グループ（古い→新しいの昇順）
  * - 件数：制限なし（5件超もカードが縦に拡大して全件表示）
  * - 右端ハートで「いいね」トグル（自分→相手）
- * - taskLikes ドキュメントID：`${taskId}_${senderUid}` （重複登録防止）
- * - スキーマ：{ taskId, senderId, receiverId, participants:[sender, receiver]（昇順）, createdAt }
+ * - taskLikes ドキュメントID：`${taskId}_${YYYYMMDD}_${senderUid}` （完了インスタンス単位）
+ * - スキーマ：{ taskId, senderId, receiverId, participants:[sender, receiver]（昇順）, createdAt, dateKey, completedAt }
  */
 export default function PartnerCompletedTasksCard() {
   const COLLECTION = 'taskLikes' as const; // ← コレクション名を定数化
@@ -108,29 +115,30 @@ export default function PartnerCompletedTasksCard() {
     const unSub = onSnapshot(
       qTasks,
       (snap) => {
-        const list: PartnerTask[] = snap.docs.map((d: QueryDocumentSnapshot) => {
-          const data = d.data() as FirestoreTask;
+        const list: PartnerTask[] = snap.docs
+          .map((d: QueryDocumentSnapshot) => {
+            const data = d.data() as FirestoreTask;
 
-          const name = toStringOr(data.name, '(名称未設定)');
-          const completedBy = toStringOr(data.completedBy, null);
-          const completedAt = data.completedAt instanceof Timestamp ? data.completedAt.toDate() : null;
+            const name = toStringOr(data.name, '(名称未設定)');
+            const completedBy = toStringOr(data.completedBy, null);
+            const completedAt = data.completedAt instanceof Timestamp ? data.completedAt.toDate() : null;
 
-          // 一応のバリデーション（done=true, 自分が共有対象）
-          const okDone = toBoolean(data.done, true);
-          const okShared = toStringArray(data.userIds).includes(me.uid);
-          if (!okDone || !okShared) {
-            // 条件外は除外（map段階ではreturnしづらいので後続filterで落とす）
-          }
+            // 一応のバリデーション（done=true, 自分が共有対象）
+            const okDone = toBoolean(data.done, true);
+            const okShared = toStringArray(data.userIds).includes(me.uid);
+            if (!okDone || !okShared) {
+              // 条件外は除外（後続 filter で落とす）
+            }
 
-          return {
-            id: d.id,
-            name,
-            completedAt,
-            completedBy,
-          };
-        })
-        // 念のため completedAt が null のものは末尾へ
-        .sort((a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0));
+            return {
+              id: d.id,
+              name,
+              completedAt,
+              completedBy,
+            };
+          })
+          // 念のため completedAt が null のものは末尾へ
+          .sort((a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0));
 
         setRows(list);
         setLoading(false);
@@ -144,64 +152,77 @@ export default function PartnerCompletedTasksCard() {
     return () => unSub();
   }, [partnerUid, weekRange]);
 
-  // 既に自分がLikeしているタスクかをロード
+  // 既に自分がLikeしている「今週の完了インスタンス」かをロード
   useEffect(() => {
     const me = auth.currentUser;
     if (!me || rows.length === 0 || !partnerUid) return;
 
     (async () => {
-      const entries = await Promise.all(
+      const pairs = await Promise.all(
         rows.map(async (r) => {
-          const heartId = `${r.id}_${me.uid}`;
+          const dateKey = toDateKey(r.completedAt);
+          if (!dateKey) return null; // completedAt 無しは対象外
+          const likeKey = `${r.id}_${dateKey}`;
+          const heartId = `${likeKey}_${me.uid}`; // taskId_YYYYMMDD_meUid
           const ref = doc(db, COLLECTION, heartId);
           const snap = await getDoc(ref);
-          return [r.id, snap.exists()] as const;
+          return [likeKey, snap.exists()] as const;
         }),
       );
       const newMap: HeartStateMap = {};
-      for (const [taskId, liked] of entries) newMap[taskId] = liked;
+      for (const p of pairs) {
+        if (!p) continue;
+        const [likeKey, liked] = p;
+        newMap[likeKey] = liked;
+      }
       setLikedMap(newMap);
     })();
   }, [rows, partnerUid]);
 
+  // いいねトグル：完了インスタンス（日付）単位
   const toggleLike = useCallback(
-    async (taskId: string) => {
+    async (taskId: string, completedAt: Date | null | undefined) => {
       const me = auth.currentUser;
       if (!me || !partnerUid) return;
+      const dateKey = toDateKey(completedAt);
+      if (!dateKey) return; // completedAt 無しは対象外
 
-      const heartId = `${taskId}_${me.uid}`;
+      const likeKey = `${taskId}_${dateKey}`;
+      const heartId = `${likeKey}_${me.uid}`;
       const ref = doc(db, COLLECTION, heartId);
-      const isLiked = likedMap[taskId] === true;
+      const isLiked = likedMap[likeKey] === true;
 
       try {
         // 多重タップ防止
-        if (pendingMap[taskId]) return;
-        setPendingMap((p) => ({ ...p, [taskId]: true }));
+        if (pendingMap[likeKey]) return;
+        setPendingMap((p) => ({ ...p, [likeKey]: true }));
 
         if (isLiked) {
           // 楽観更新（取り消し）
-          setLikedMap((prev) => ({ ...prev, [taskId]: false }));
+          setLikedMap((prev) => ({ ...prev, [likeKey]: false }));
           await deleteDoc(ref);
         } else {
           // participants は並び順を固定（昇順）
           const participants = [me.uid, partnerUid].sort((a, b) => (a < b ? -1 : 1));
 
           // 楽観更新（付与）
-          setLikedMap((prev) => ({ ...prev, [taskId]: true }));
+          setLikedMap((prev) => ({ ...prev, [likeKey]: true }));
           await setDoc(ref, {
             taskId,
             senderId: me.uid,
             receiverId: partnerUid,
             participants,
             createdAt: serverTimestamp(), // サーバー時刻
+            dateKey,                      // 週集計や検索用
+            completedAt: completedAt ?? null, // 監査・デバッグ用
           });
         }
       } catch (e: unknown) {
         console.error('toggleLike error:', e);
         // ロールバック
-        setLikedMap((prev) => ({ ...prev, [taskId]: isLiked }));
+        setLikedMap((prev) => ({ ...prev, [likeKey]: isLiked }));
       } finally {
-        setPendingMap((p) => ({ ...p, [taskId]: false }));
+        setPendingMap((p) => ({ ...p, [likeKey]: false }));
       }
     },
     [likedMap, partnerUid, pendingMap],
@@ -234,8 +255,10 @@ export default function PartnerCompletedTasksCard() {
     if (rows.length === 0) return [];
     const arr = [...rows];
     arr.sort((a, b) => {
-      const aLiked = likedMap[a.id] === true ? 1 : 0;
-      const bLiked = likedMap[b.id] === true ? 1 : 0;
+      const aKey = toDateKey(a.completedAt);
+      const bKey = toDateKey(b.completedAt);
+      const aLiked = aKey ? (likedMap[`${a.id}_${aKey}`] === true ? 1 : 0) : 0;
+      const bLiked = bKey ? (likedMap[`${b.id}_${bKey}`] === true ? 1 : 0) : 0;
       if (aLiked !== bLiked) return aLiked - bLiked; // 未いいね(0)が先
       const aTime = a.completedAt?.getTime() ?? 0;
       const bTime = b.completedAt?.getTime() ?? 0;
@@ -259,8 +282,10 @@ export default function PartnerCompletedTasksCard() {
       ) : (
         <ul className="space-y-2">
           {displayRows.map((t) => {
-            const liked = likedMap[t.id] === true;
-            const disabled = pendingMap[t.id] === true;
+            const dateKey = toDateKey(t.completedAt);
+            const likeKey = dateKey ? `${t.id}_${dateKey}` : `${t.id}_nodate`;
+            const liked = likedMap[likeKey] === true;
+            const disabled = pendingMap[likeKey] === true || !dateKey; // 日付が無ければ無効化
             return (
               <li
                 key={t.id}
@@ -270,7 +295,11 @@ export default function PartnerCompletedTasksCard() {
                   <CheckCircle className="w-4 h-4 text-emerald-700" />
                   <span className="text-sm text-gray-800">{t.name}</span>
                 </div>
-                <HeartButton liked={liked} onClick={() => toggleLike(t.id)} disabled={disabled} />
+                <HeartButton
+                  liked={liked}
+                  onClick={() => toggleLike(t.id, t.completedAt ?? null)}
+                  disabled={disabled}
+                />
               </li>
             );
           })}
