@@ -520,14 +520,14 @@ export default function EditTaskModal({
                 const dup = shouldForkPrivate
                   ? false
                   : existingTasks.some(
-                      (t) =>
-                        t.name === newName &&
-                        t.id !== (task as unknown as { id?: string }).id &&
-                        Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
-                        ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
-                          editedUsersInner.includes(uid)
-                        )
-                    );
+                    (t) =>
+                      t.name === newName &&
+                      t.id !== (task as unknown as { id?: string }).id &&
+                      Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
+                      ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
+                        editedUsersInner.includes(uid)
+                      )
+                  );
                 setNameError(dup ? 'すでに登録済みです。' : null);
               }}
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
@@ -539,7 +539,25 @@ export default function EditTaskModal({
         {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
         {/* ★ 改行せず1行・溢れたら横スクロール＋ヒント */}
         <div className="flex items-center">
-          <label className="w-20 text-gray-600 shrink-0">カテゴリ：</label>
+          <label className="w-25 text-gray-600 shrink-0 flex items-center">
+            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+              カテゴリ
+              <HelpPopover
+                className="ml-1"
+                content={
+                  <div className="space-y-2">
+                    Todoがそれぞれのカテゴリに応じて変わります。
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>料理：レシピの管理におすすめです。</li>
+                      <li>買い物：買い物リストとしての利用に便利です。</li>
+                      <li>旅行：旅行の計画に役立ちます。</li>
+                    </ul>
+                  </div>
+                }
+              />
+              <span>：</span>
+            </span>
+          </label>
 
           <div className="relative flex-1">
             <div
@@ -600,7 +618,25 @@ export default function EditTaskModal({
 
         {/* 🗓 頻度選択 */}
         <div className="flex items-center">
-          <label className="w-20 text-gray-600 shrink-0">頻度：</label>
+          <label className="w-20 text-gray-600 shrink-0 flex items-center">
+            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+              頻度
+              <HelpPopover
+                className="ml-1"
+                content={
+                  <div className="space-y-2">
+                    タスクの頻度を設定します。
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>毎日：毎日おこなうタスクに使用します。</li>
+                      <li>週次：週間のタスクに使用します。</li>
+                      <li>不定期：日程の決まっているタスクに使用します。</li>
+                    </ul>
+                  </div>
+                }
+              />
+              <span>：</span>
+            </span>
+          </label>
           <select
             value={editedTask.period}
             onChange={(e) => {
@@ -639,11 +675,10 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-6 h-6 rounded-full text-xs font-bold ${
-                    editedTask.daysOfWeek.includes(day)
-                      ? 'bg-[#5E5E5E] text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
+                  className={`w-6 h-6 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
+                    ? 'bg-[#5E5E5E] text-white'
+                    : 'bg-gray-200 text-gray-600'
+                    }`}
                 >
                   {day}
                 </button>
@@ -655,7 +690,20 @@ export default function EditTaskModal({
         {/* ⏰ 時刻（週次/毎日） */}
         {(editedTask.period === '週次' || editedTask.period === '毎日') && (
           <div className="flex items-center">
-            <label className="w-20 text-gray-600 shrink-0">時間：</label>
+            <label className="w-20 text-gray-600 shrink-0 flex items-center">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                時間
+                <HelpPopover
+                  className="ml-1"
+                  content={
+                    <div className="space-y-2">
+                      設定すると、指定した時間の約30分前に通知が届きます。
+                    </div>
+                  }
+                />
+                <span>：</span>
+              </span>
+            </label>
             <div className="relative w-[40%]">
               {isIOS && (!editedTask.time || editedTask.time === '') && (
                 <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
@@ -734,7 +782,23 @@ export default function EditTaskModal({
         {/* ⭐ ポイント（共有のみ） */}
         {!isPrivate && (
           <div className="flex items-center">
-            <label className="w-20 text-gray-600 shrink-0">ポイント：</label>
+            <label className="w-25 text-gray-600 shrink-0 flex items-center">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                ポイント
+                <HelpPopover
+                  className="ml-1"
+                  content={
+                    <div className="space-y-2">
+                      ポイントを設定すると、完了時に担当者へポイントが付与されます。
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>0ptの場合はタスク一覧に表示されません。</li>
+                      </ul>
+                    </div>
+                  }
+                />
+                <span>：</span>
+              </span>
+            </label>
             <select
               value={(editedTask as unknown as { point?: number }).point ?? 0}
               onChange={(e) =>
@@ -766,7 +830,25 @@ export default function EditTaskModal({
           <>
             {!isPrivate && (
               <div className="flex items-center">
-                <label className="w-20 text-gray-600 shrink-0">担当者：</label>
+                <label className="w-26 text-gray-600 shrink-0 flex items-center">
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                    担当者
+                    <HelpPopover
+                      className="ml-1"
+                      content={
+                        <div className="space-y-2">
+                          <p>
+                            担当決めに使用します。
+                          </p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>選択していない場合は共通のアイコンが表示されます。</li>
+                          </ul>
+                        </div>
+                      }
+                    />
+                    <span>：</span>
+                  </span>
+                </label>
                 <div className="flex gap-2">
                   {users.map((user) => {
                     const isSelected = editedTask.users[0] === user.id;
@@ -776,9 +858,8 @@ export default function EditTaskModal({
                         key={user.id}
                         type="button"
                         onClick={() => toggleUser(user.id)}
-                        className={`w-12 h-12 rounded-full border overflow-hidden ${
-                          isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
-                        }`}
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                          }`}
                         title={`${user.name}`}
                       >
                         <Image
@@ -813,6 +894,7 @@ export default function EditTaskModal({
                         <li>パートナーの画面には表示されません。</li>
                         <li>ポイント付与や担当者の選択は無効化されます。</li>
                         <li>後から共有に戻すこともできます。</li>
+                        <li>パートナーが作成したタスクをプライベートにするときはコピーとして作成されます。</li>
                       </ul>
                     </div>
                   }
@@ -824,14 +906,12 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isPrivate}
                 onClick={() => setIsPrivate((v) => !v)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
-                }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isPrivate ? 'translate-x-6' : ''
-                  }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : ''
+                    }`}
                 />
               </button>
             </div>
@@ -843,7 +923,16 @@ export default function EditTaskModal({
           const isVisible = toStrictBool((editedTask as unknown as { visible?: unknown }).visible);
           return (
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-sm text-gray-600">TODO表示：</span>
+              <span className="text-sm text-gray-600">TODO表示
+                <HelpPopover
+                  className="ml-1"
+                  content={
+                    <div className="space-y-2">
+                      オンにすると、Todo画面で表示状態となります。
+                    </div>
+                  }
+                />
+                ：</span>
               <button
                 type="button"
                 role="switch"
@@ -854,14 +943,12 @@ export default function EditTaskModal({
                     (!isVisible) as unknown as TaskWithNote[keyof TaskWithNote]
                   )
                 }
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isVisible ? 'bg-yellow-500' : 'bg-gray-300'
-                }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isVisible ? 'bg-yellow-500' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isVisible ? 'translate-x-6' : ''
-                  }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isVisible ? 'translate-x-6' : ''
+                    }`}
                 />
               </button>
             </div>
@@ -925,7 +1012,7 @@ export default function EditTaskModal({
           )}
           {isIOS && showScrollUpHint && (
             <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
-            <ChevronUp size={16} className="text-white" />
+              <ChevronUp size={16} className="text-white" />
             </div>
           )}
         </div>
