@@ -280,30 +280,38 @@ export default function PartnerCompletedTasksCard() {
       ) : displayRows.length === 0 ? (
         <p className="text-sm text-gray-500">今週の完了タスクはまだありません。</p>
       ) : (
-        <ul className="space-y-2">
-          {displayRows.map((t) => {
+        <motion.ul layout className="space-y-2" layoutScroll>
+           {displayRows.map((t) => {
             const dateKey = toDateKey(t.completedAt);
             const likeKey = dateKey ? `${t.id}_${dateKey}` : `${t.id}_nodate`;
             const liked = likedMap[likeKey] === true;
             const disabled = pendingMap[likeKey] === true || !dateKey; // 日付が無ければ無効化
+
             return (
-              <li
-                key={t.id}
-                className="flex items-center justify-between border-b border-gray-200 px-3 pt-1"
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-700" />
-                  <span className="text-sm text-gray-800">{t.name}</span>
-                </div>
-                <HeartButton
-                  liked={liked}
-                  onClick={() => toggleLike(t.id, t.completedAt ?? null)}
-                  disabled={disabled}
-                />
-              </li>
-            );
-          })}
-        </ul>
+              <motion.li
+                 key={t.id}
+                layout
+                className="flex items-center justify-between border-b border-gray-200 px-3 pt-1 rounded-md"
+                initial={false}
+                animate={liked
+                  ? { backgroundColor: ['#ffffff', '#fff1f2', '#ffffff'] } // ほんのりピンク→白へ
+                  : { backgroundColor: '#ffffff' }
+                }
+                transition={{ duration: 0.6, type: 'tween' }}
+               >
+                 <div className="flex items-center gap-2">
+                   <CheckCircle className="w-4 h-4 text-emerald-700" />
+                   <span className="text-sm text-gray-800">{t.name}</span>
+                 </div>
+                 <HeartButton
+                   liked={liked}
+                   onClick={() => toggleLike(t.id, t.completedAt ?? null)}
+                   disabled={disabled}
+                 />
+              </motion.li>
+             );
+           })}
+        </motion.ul>
       )}
     </div>
   );
