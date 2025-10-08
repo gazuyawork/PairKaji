@@ -896,45 +896,57 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
 
   const src = snap.data() as TaskDocMinimal;
 
+  // ✅ 元タスク名に「_コピー」を付与（重複防止も含む）
+  const baseName =
+    typeof src.name === 'string'
+      ? src.name
+      : typeof src.title === 'string'
+      ? src.title
+      : '';
+  const copiedName = baseName.endsWith('_コピー') ? baseName : `${baseName}_コピー`;
+
   // 新しい自分専用タスクの作成データ
   const newTaskPayload = {
-    // 所有・共有
     userId: user.uid,
     userIds: [user.uid],
     private: true,
 
-    // 基本情報
-    name: typeof src.name === 'string' ? src.name : (typeof src.title === 'string' ? src.title : ''),
+    // ✅ 修正：名前に「_コピー」付き
+    name: copiedName,
     title: typeof src.title === 'string' ? src.title : '',
     period:
       src.period === '毎日' || src.period === '週次' || src.period === '不定期'
         ? src.period
         : '毎日',
-    point: typeof src.point === 'number' ? src.point : (src.point == null ? 0 : Number(src.point) || 0),
+    point:
+      typeof src.point === 'number'
+        ? src.point
+        : src.point == null
+        ? 0
+        : Number(src.point) || 0,
     daysOfWeek: Array.isArray(src.daysOfWeek) ? src.daysOfWeek : [],
     dates: Array.isArray(src.dates) ? src.dates : [],
     time: typeof src.time === 'string' ? src.time : '',
     isTodo: src.isTodo === true,
 
-    // 表示・分類
     visible: src.visible === true,
     category: src.category,
 
-    // メモ・TODO
-    note: typeof src.note === 'string' ? src.note : (src.note == null ? '' : String(src.note)),
+    note:
+      typeof src.note === 'string'
+        ? src.note
+        : src.note == null
+        ? ''
+        : String(src.note),
     users: Array.isArray(src.users) ? src.users : [],
     todos: isTodoArray(src.todos) ? src.todos : [],
 
-    // 履歴リセット
     done: false,
     skipped: false,
     completedAt: null,
     completedBy: '',
 
-    // 付帯情報
     groupId: null,
-
-    // 監査フィールド
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   } as Record<string, unknown>;
