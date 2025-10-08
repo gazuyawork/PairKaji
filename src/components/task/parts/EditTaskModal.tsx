@@ -879,28 +879,30 @@ export default function EditTaskModal({
               </div>
             )}
 
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-sm text-gray-600 flex items-center">
-                プライベート
-                <HelpPopover
-                  className="ml-1"
-                  content={
-                    <div className="space-y-2">
-                      <p>
-                        プライベートをオンにすると、このタスクは
-                        <span className="font-semibold">自分だけ</span>の管理対象になります。
-                      </p>
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li>パートナーの画面には表示されません。</li>
-                        <li>ポイント付与や担当者の選択は無効化されます。</li>
-                        <li>後から共有に戻すこともできます。</li>
-                        <li>パートナーが作成したタスクをプライベートにするときはコピーとして作成されます。</li>
-                      </ul>
-                    </div>
-                  }
-                />
-                ：
-              </span>
+            <div className="flex items-center">
+              <label className="w-32 text-gray-600 shrink-0 flex items-center">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  プライベート
+                  <HelpPopover
+                    className="ml-1"
+                    content={
+                      <div className="space-y-2">
+                        <p>
+                          プライベートをオンにすると、このタスクは
+                          <span className="font-semibold">自分だけ</span>の管理対象になります。
+                        </p>
+                        <ul className="list-disc pl-5 space-y-1">
+                          <li>パートナーの画面には表示されません。</li>
+                          <li>ポイント付与や担当者の選択は無効化されます。</li>
+                          <li>後から共有に戻すこともできます。</li>
+                          <li>パートナーが作成したタスクをプライベートにするときはコピーとして作成されます。</li>
+                        </ul>
+                      </div>
+                    }
+                  />
+                  <span>：</span>
+                </span>
+              </label>
               <button
                 type="button"
                 role="switch"
@@ -922,17 +924,21 @@ export default function EditTaskModal({
         {(() => {
           const isVisible = toStrictBool((editedTask as unknown as { visible?: unknown }).visible);
           return (
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-sm text-gray-600">TODO表示
-                <HelpPopover
-                  className="ml-1"
-                  content={
-                    <div className="space-y-2">
-                      オンにすると、Todo画面で表示状態となります。
-                    </div>
-                  }
-                />
-                ：</span>
+            <div className="flex items-center">
+              <label className="w-32 text-gray-600 shrink-0 flex items-center">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  TODO表示
+                  <HelpPopover
+                    className="ml-1"
+                    content={
+                      <div className="space-y-2">
+                        オンにすると、Todo画面で表示状態となります。
+                      </div>
+                    }
+                  />
+                  <span>：</span>
+                </span>
+              </label>
               <button
                 type="button"
                 role="switch"
