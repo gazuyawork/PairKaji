@@ -559,12 +559,16 @@ export default function EditTaskModal({
             </span>
           </label>
 
-          <div className="relative flex-1">
+          {/* ▼ 変更点①：flex子の幅制約（min-w-0 / basis-0）を追加 */}
+          <div className="relative flex-1 min-w-0 basis-0">
             <div
               ref={catScrollRef}
               onScroll={measureCatOverflow}
               className={[
+                // ▼ 変更点②：横幅制約 + iOS操作性向上クラスを追加
+                'w-full max-w-full',
                 'flex flex-nowrap gap-2 overflow-x-auto',
+                'touch-pan-x overscroll-x-contain',
                 '[-webkit-overflow-scrolling:touch]',
                 '[&::-webkit-scrollbar]:hidden',
                 'scrollbar-width-none',
@@ -592,7 +596,6 @@ export default function EditTaskModal({
                     ].join(' ')}
                     title={label}
                   >
-                    {/* className で色を指定（selected時は selectedIconColor か text-white） */}
                     <Icon
                       size={18}
                       className={selected ? (selectedIconColor ?? 'text-white') : iconColor}
@@ -615,6 +618,7 @@ export default function EditTaskModal({
             )}
           </div>
         </div>
+
 
         {/* 🗓 頻度選択 */}
         <div className="flex items-center">
