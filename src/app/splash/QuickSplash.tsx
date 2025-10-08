@@ -10,7 +10,7 @@ import { auth } from '@/lib/firebase';
 import Image from 'next/image';
 
 // 全体の演出時間（必要に応じて調整）
-const DURATION_MS = 560; // 回転→拡大→フェードアウトの総時間
+const DURATION_MS = 900; // 回転→拡大→フェードアウトの総時間
 
 export default function QuickSplash() {
   const router = useRouter();
@@ -60,17 +60,22 @@ export default function QuickSplash() {
         />
       </div>
 
-      {/* コンポーネントスコープのキーフレーム */}
-      <style jsx>{`
-        @keyframes pk-spin-zoom-fade {
-          /* 前半：素早く一周（くるっと） */
-          0%   { transform: rotate(0deg)   scale(1);    opacity: 1;   filter: blur(0px); }
-          70%  { transform: rotate(360deg) scale(1.25); opacity: 0.9; filter: blur(0.2px); }
+<style jsx>{`
+  @keyframes pk-spin-zoom-fade {
+    /* 前半：ゆっくり回転しながら少し拡大 */
+    0%   { transform: rotate(0deg)   scale(1);    opacity: 1;   filter: blur(0px); }
+    80%  { transform: rotate(360deg) scale(1.25); opacity: 0.98; filter: blur(0.2px); }
 
-          /* 後半：回転は止めて、滑らかに拡大しながらフェードアウト */
-          100% { transform: rotate(360deg) scale(1.8);  opacity: 0;   filter: blur(2px); }
-        }
-      `}</style>
+    /* 中盤：静止して一拍置く */
+    90%  { transform: rotate(360deg) scale(1.3);  opacity: 0.9;  filter: blur(0.4px); }
+
+    /* 後半：ゆっくりふわっと消えていく（余韻） */
+    100% { transform: rotate(360deg) scale(1.9);  opacity: 0;    filter: blur(3px); }
+  }
+`}</style>
+
+
+
     </div>
   );
 }
