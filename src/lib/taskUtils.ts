@@ -109,6 +109,24 @@ const getJstYmd = () =>
     day: '2-digit',
   }).format(new Date()); // → "YYYY-MM-DD"
 
+
+// undefined を再帰的に除去するユーティリティ（null/空文字は維持）
+const stripUndefinedDeep = <T>(input: T): T => {
+  if (Array.isArray(input)) {
+    return input.map((v) => stripUndefinedDeep(v)).filter((v) => v !== undefined) as unknown as T;
+  }
+  if (input && typeof input === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+      if (v === undefined) continue;
+      out[k] = stripUndefinedDeep(v as unknown);
+    }
+    return out as T;
+  }
+  return input;
+};
+
+
 /* =========================================================
  * 保存用正規化
  *  - Firestore は undefined を保存しないので削除
@@ -415,6 +433,7 @@ export const cleanObject = <T>(obj: T): T => {
 /* =========================================================
  * Firestore 保存（新規/更新）
  * =======================================================*/
+// 修正対象: saveTaskToFirestore（新規作成/更新ともに undefined を除去してから書き込み）
 export const saveTaskToFirestore = async (
   taskId: string | null,
   taskData: Record<string, unknown>
@@ -423,7 +442,6 @@ export const saveTaskToFirestore = async (
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');
 
-    // Record<string, unknown> → 部分的に絞ったビューで扱う
     const td = taskData as Partial<NormalizedTaskPayload> & {
       dates?: string[];
       time?: string;
@@ -439,8 +457,9 @@ export const saveTaskToFirestore = async (
       if (pairUserIds.length > 0) userIds = pairUserIds;
     }
 
-    // category を含めて正規化
+    // category を含めて正規化（この時点で undefined は極力出ない設計だが、保険で後段でも除去）
     const commonData = normalizeTaskPayload({ ...td, private: isPrivate }, uid, userIds);
+
     if (taskId) {
       const taskRef = doc(db, 'tasks', taskId);
 
@@ -497,30 +516,35 @@ export const saveTaskToFirestore = async (
 
       // ★ 修正：所有者（userId）は更新時に上書きしない（＝奪わない）
       const { userId: _ignoredUserId, ...commonDataWithoutOwner } = commonData;
-      // eslint対策：未使用変数を明示的に使用（副作用なし）
       void _ignoredUserId;
 
-      await updateDoc(taskRef, {
+      // ★ ここで undefined を除去してから updateDoc
+      const updatePayload = stripUndefinedDeep({
         ...commonDataWithoutOwner,
         dates: finalDates,
         time: finalTime,
         updatedAt: serverTimestamp(),
       });
 
+      await updateDoc(taskRef, updatePayload);
+
     } else {
-      // 新規作成
-      await addDoc(collection(db, 'tasks'), {
+      // ★ 新規作成も undefined を除去してから addDoc（category 未選択などの保険）
+      const createPayload = stripUndefinedDeep({
         ...commonData,
         userId: uid, // 新規作成は自分所有でOK
         done: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      await addDoc(collection(db, 'tasks'), createPayload);
     }
   } catch (err) {
     handleFirestoreError(err);
   }
 };
+
 
 /* =========================================================
  * タスク削除（notifyLogs からの削除含む）
@@ -885,6 +909,7 @@ export const updateTodoTextInTask = async (
  * 相手のタスクを「奪わずに」自分専用のプライベートタスクとして複製
  * （元タスクは共有のまま／userIdsを変更しない）
  * =======================================================*/
+// ★★★ 差し替え：相手のタスクを自分用に複製（undefined除去＆category正規化）
 export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<string> => {
   const user = auth.currentUser;
   if (!user) throw new Error('ログインしていません');
@@ -896,7 +921,7 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
 
   const src = snap.data() as TaskDocMinimal;
 
-  // ✅ 元タスク名に「_コピー」を付与（重複防止も含む）
+  // 元タスク名に「_コピー」を付与
   const baseName =
     typeof src.name === 'string'
       ? src.name
@@ -905,13 +930,18 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
       : '';
   const copiedName = baseName.endsWith('_コピー') ? baseName : `${baseName}_コピー`;
 
-  // 新しい自分専用タスクの作成データ
-  const newTaskPayload = {
+  // category を正規化（許可値のみ保持・それ以外は undefined）
+  const normalizedCategory: TaskCategory | undefined =
+    src.category === '料理' || src.category === '買い物' || src.category === '旅行'
+      ? (src.category as TaskCategory)
+      : undefined;
+
+  // 新しい自分専用タスクの作成データ（undefined は後で除去）
+  const newTaskPayload: Record<string, unknown> = {
     userId: user.uid,
     userIds: [user.uid],
     private: true,
 
-    // ✅ 修正：名前に「_コピー」付き
     name: copiedName,
     title: typeof src.title === 'string' ? src.title : '',
     period:
@@ -930,7 +960,7 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
     isTodo: src.isTodo === true,
 
     visible: src.visible === true,
-    category: src.category,
+    category: normalizedCategory, // ← undefined の場合は後で除去される
 
     note:
       typeof src.note === 'string'
@@ -941,19 +971,24 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
     users: Array.isArray(src.users) ? src.users : [],
     todos: isTodoArray(src.todos) ? src.todos : [],
 
+    // 履歴リセット
     done: false,
     skipped: false,
     completedAt: null,
     completedBy: '',
 
     groupId: null,
+
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  } as Record<string, unknown>;
+  };
+
+  // Firestore は undefined を拒否 → 保存前に除去
+  const sanitizedPayload = stripUndefinedDeep(newTaskPayload);
 
   // Firestore に追加（新しい自分用タスク）
-  const newDocRef = await addDoc(collection(db, 'tasks'), newTaskPayload);
+  const newDocRef = await addDoc(collection(db, 'tasks'), sanitizedPayload);
 
-  // 元タスクは一切変更しない（共有のまま残す）
+  // 元タスクは変更しない
   return newDocRef.id;
 };

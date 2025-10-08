@@ -31,7 +31,13 @@ const NOTE_MAX = 500;
 
 type TaskCategory = '料理' | '買い物' | '旅行';
 
-type CategoryOption = { key: TaskCategory; label: TaskCategory; Icon: LucideIcon; iconColor: string; selectedIconColor?: string; };
+type CategoryOption = {
+  key: TaskCategory;
+  label: TaskCategory;
+  Icon: LucideIcon;
+  iconColor: string;
+  selectedIconColor?: string;
+};
 const CATEGORY_OPTIONS: CategoryOption[] = [
   { key: '料理', label: '料理', Icon: Utensils, iconColor: 'text-emerald-500', selectedIconColor: 'text-white' },
   { key: '買い物', label: '買い物', Icon: ShoppingCart, iconColor: 'text-sky-500', selectedIconColor: 'text-white' },
@@ -82,8 +88,7 @@ const normalizeCategory = (v: unknown): TaskCategory | undefined => {
 };
 const eqCat = (a: unknown, b: TaskCategory) => normalizeCategory(a) === b;
 
-const toStrictBool = (v: unknown): boolean =>
-  v === true || v === 'true' || v === 1 || v === '1';
+const toStrictBool = (v: unknown): boolean => v === true || v === 'true' || v === 1 || v === '1';
 
 const resolveUserImageSrc = (user: UserInfo): string => {
   const candidates: Array<string | undefined> = [
@@ -318,7 +323,7 @@ export default function EditTaskModal({
   );
 
   // ★ 修正：プライベートONかつ元所有者≠自分 の場合は複製して保存
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!editedTask) return;
 
     const noteLen = (editedTask.note ?? '').length;
@@ -343,7 +348,14 @@ export default function EditTaskModal({
           editedUsers.includes(uid)
         )
     );
-    if (isDuplicate) {
+
+    const currentUid = auth.currentUser?.uid;
+    const originalOwner = (task as unknown as { userId?: string }).userId;
+    const shouldForkPrivate =
+      isPrivate && !!task.id && !!originalOwner && !!currentUid && originalOwner !== currentUid;
+
+    // ★ 複製モード時は、重複名チェックをスキップ
+    if (!shouldForkPrivate && isDuplicate) {
       setNameError('すでに登録済みです。');
       return;
     }
@@ -356,46 +368,40 @@ export default function EditTaskModal({
       userIds: [...editedUsers],
       daysOfWeek: editedTask.daysOfWeek.map((d) => toDayNumber(d)) as Task['daysOfWeek'],
       private: isPrivate,
+      // ★ UI整合のため、複製モード時は表示名にも「_コピー」を付与
+      name: shouldForkPrivate
+        ? (editedTask.name?.endsWith('_コピー') ? editedTask.name : `${editedTask.name}_コピー`)
+        : editedTask.name,
       category: normalizedCat,
     } as Task;
 
     setIsSaving(true);
 
-    // 相手作成タスクをプライベートONで保存 → 複製して新IDで保存
-    const currentUid = auth.currentUser?.uid;
-    const originalOwner = (task as unknown as { userId?: string }).userId;
-
-    const shouldForkPrivate =
-      isPrivate &&
-      !!task.id &&
-      !!originalOwner &&
-      !!currentUid &&
-      originalOwner !== currentUid;
-
     if (shouldForkPrivate) {
-      forkTaskAsPrivateForSelf(task.id!)
-        .then((newId) => {
-          onSave({ ...transformed, id: newId });
+      try {
+        const newId = await forkTaskAsPrivateForSelf(task.id!);
 
-          if (closeTimerRef.current) {
-            clearTimeout(closeTimerRef.current);
-            closeTimerRef.current = null;
-          }
-          setTimeout(() => {
-            setIsSaving(false);
-            setSaveComplete(true);
-            closeTimerRef.current = setTimeout(() => {
-              setSaveComplete(false);
-              setShouldClose(true);
-            }, 1500);
-          }, 300);
-        })
-        .catch((e) => {
-          console.error(e);
+        // 親が保存も担当する設計だと二重保存になり得ます。
+        // その場合はここで onSave を呼ばず、親に「新IDで再取得」させるコールバックに切り替えてください。
+        onSave({ ...transformed, id: newId });
+
+        if (closeTimerRef.current) {
+          clearTimeout(closeTimerRef.current);
+          closeTimerRef.current = null;
+        }
+        setTimeout(() => {
           setIsSaving(false);
-        });
-
-      return; // 既存タスクへの onSave はここでは行わない
+          setSaveComplete(true);
+          closeTimerRef.current = setTimeout(() => {
+            setSaveComplete(false);
+            setShouldClose(true);
+          }, 1500);
+        }, 300);
+      } catch (e) {
+        console.error(e);
+        setIsSaving(false);
+      }
+      return; // ここで終了
     }
 
     // 通常保存（自分作成 or 共有のまま）
@@ -505,15 +511,23 @@ export default function EditTaskModal({
                 update('name', newName as TaskWithNote['name']);
 
                 const editedUsersInner = Array.isArray(editedTask.users) ? editedTask.users : [];
-                const dup = existingTasks.some(
-                  (t) =>
-                    t.name === newName &&
-                    t.id !== (task as unknown as { id?: string }).id &&
-                    Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
-                    ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
-                      editedUsersInner.includes(uid)
-                    )
-                );
+                const currentUid = auth.currentUser?.uid;
+                const originalOwner = (task as unknown as { userId?: string }).userId;
+                const shouldForkPrivate =
+                  isPrivate && !!(task as { id?: string }).id && !!originalOwner && !!currentUid && originalOwner !== currentUid;
+
+                // ★ 即時チェックも、複製モード時はスキップ
+                const dup = shouldForkPrivate
+                  ? false
+                  : existingTasks.some(
+                      (t) =>
+                        t.name === newName &&
+                        t.id !== (task as unknown as { id?: string }).id &&
+                        Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
+                        ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
+                          editedUsersInner.includes(uid)
+                        )
+                    );
                 setNameError(dup ? 'すでに登録済みです。' : null);
               }}
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
@@ -523,7 +537,7 @@ export default function EditTaskModal({
         </div>
 
         {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
-        {/* ★ 差し替え: 改行せず1行・溢れたら横スクロール＋ヒント */}
+        {/* ★ 改行せず1行・溢れたら横スクロール＋ヒント */}
         <div className="flex items-center">
           <label className="w-20 text-gray-600 shrink-0">カテゴリ：</label>
 
@@ -898,9 +912,7 @@ export default function EditTaskModal({
           </div>
           <div className="mt-1 pr-1 flex justify-end">
             <span
-              className={`${
-                (editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'
-              } text-xs`}
+              className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'} text-xs`}
             >
               {(editedTask.note?.length ?? 0)}/{NOTE_MAX}
             </span>
@@ -913,7 +925,7 @@ export default function EditTaskModal({
           )}
           {isIOS && showScrollUpHint && (
             <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
-              <ChevronUp size={16} className="text-white" />
+            <ChevronUp size={16} className="text-white" />
             </div>
           )}
         </div>
