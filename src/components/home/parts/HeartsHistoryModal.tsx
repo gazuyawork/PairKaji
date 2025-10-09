@@ -143,24 +143,74 @@ function toDateFromLikeDate(val: unknown, keyLabel: string): Date | null {
   return null;
 }
 
-function FloatingHearts({ count, fadeInKey = 0 }: { count: number; fadeInKey?: number }) {
-  const MAX = 24;
-  const n = Math.min(Math.max(count, 0), MAX);
+/** 色の型 */
+type HeartColor = 'pink' | 'blue';
+
+function FloatingHearts({
+  pinkCount,
+  blueCount,
+  fadeInKey = 0,
+}: {
+  pinkCount: number;
+  blueCount: number;
+  fadeInKey?: number;
+}) {
+  const MAX_PER_COLOR = 24;
+  const nPink = Math.min(Math.max(pinkCount, 0), MAX_PER_COLOR);
+  const nBlue = Math.min(Math.max(blueCount, 0), MAX_PER_COLOR);
+  const total = nPink + nBlue;
 
   const seeds = React.useMemo(() => {
-    return Array.from({ length: n }).map((_, i) => {
-      const leftPct = 6 + Math.random() * 88;
-      const topPct = 8 + Math.random() * 84;
-      const dur = 10 + Math.random() * 8;
-      const delay = Math.random() * 2;
-      const blinkDur = 3.5 + Math.random() * 3.5;
-      const blinkDelay = Math.random() * 1.2;
-      const scale = 0.7 + Math.random() * 0.6;
-      return { id: `${fadeInKey}-${i}`, leftPct, topPct, dur, delay, blinkDur, blinkDelay, scale };
-    });
-  }, [n, fadeInKey]);
+    type Seed = {
+      id: string;
+      leftPct: number;
+      topPct: number;
+      dur: number;
+      delay: number;
+      blinkDur: number;
+      blinkDelay: number;
+      scale: number;
+      color: HeartColor;
+    };
 
-  if (n === 0) return null;
+    const makeOne = (i: number, color: HeartColor): Seed => {
+      // 色ごとに“わずかに”位置・タイミングのバイアスを変える（重なり軽減）
+      const biasX = color === 'pink' ? 0 : 3;   // 青は+3%側に寄せる
+      const biasY = color === 'pink' ? 0 : -2;  // 青は-2%側に寄せる
+
+      const leftPct = 6 + Math.random() * 88 + biasX;  // 6%〜94% (+bias)
+      const topPct = 8 + Math.random() * 84 + biasY;   // 8%〜92% (+bias)
+      const dur = 10 + Math.random() * 8;              // 10s〜18s
+      const delay = Math.random() * 2 + (color === 'blue' ? 0.3 : 0); // 青は0.3s遅らせがち
+      const blinkDur = 3.5 + Math.random() * 3.5;      // 3.5s〜7s
+      const blinkDelay = Math.random() * 1.2;
+      const scale = 0.7 + Math.random() * 0.6;         // 0.7〜1.3
+      return {
+        id: `${fadeInKey}-${color}-${i}`,
+        leftPct,
+        topPct,
+        dur,
+        delay,
+        blinkDur,
+        blinkDelay,
+        scale,
+        color,
+      };
+    };
+
+    const arr: Seed[] = [];
+    for (let i = 0; i < nPink; i += 1) arr.push(makeOne(i, 'pink'));
+    for (let i = 0; i < nBlue; i += 1) arr.push(makeOne(i, 'blue'));
+
+    // 両色を軽くシャッフルして、描画順で固まらないようにする
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [nPink, nBlue, fadeInKey]);
+
+  if (total === 0) return null;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
@@ -177,7 +227,13 @@ function FloatingHearts({ count, fadeInKey = 0 }: { count: number; fadeInKey?: n
             opacity: 0,
           }}
         >
-          <Heart className="w-4 h-4 text-rose-400/80" />
+          <Heart
+            className={
+              s.color === 'pink'
+                ? 'w-4 h-4 text-rose-400/80'
+                : 'w-4 h-4 text-sky-400/80'
+            }
+          />
         </span>
       ))}
 
@@ -491,7 +547,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     groupEnd();
   }, [isOpen, weekOffset, totalReceived, lastSeenKey]);
 
-  const showDrift = totalReceived > 0;
+  const showDrift = totalReceived > 0 || totalGiven > 0;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -537,7 +593,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
 
       <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden">
         <div className="relative z-0" style={{ width: 144, height: 144 }}>
-          {/* ▼▼▼ 変更①：根本固定の“ゆらゆら”ラッパを追加 ▼▼▼ */}
+          {/* ▼▼▼ 根本固定の“ゆらゆら”ラッパ */}
           <div
             className={`garden-sway-container ${feedActive ? 'paused' : ''}`}
             data-stage={resolveStage(totalThisWeek)}
@@ -549,14 +605,14 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
               size={144}
             />
           </div>
-          {/* ▲▲▲ 変更①ここまで ▲▲▲ */}
 
           {weekOffset === 0 && <HeartNutrientFlow count={feedCount} targetSize={144} active={feedActive} />}
         </div>
 
         {showDrift && (
           <div className="absolute inset-0 z-10">
-            <FloatingHearts count={totalReceived} fadeInKey={driftKey} />
+            {/* ★ ここでピンク＝受取数、青＝贈った数 を数量分飛ばす */}
+            <FloatingHearts pinkCount={totalReceived} blueCount={totalGiven} fadeInKey={driftKey} />
           </div>
         )}
 
@@ -572,7 +628,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
         </div>
       </div>
 
-      {/* ▼▼▼ 変更②：styled-jsx で“根本固定ゆらぎ”を追加 ▼▼▼ */}
+      {/* ▼▼▼ styled-jsx で“根本固定ゆらぎ” */}
       <style jsx>{`
         .garden-sway-container {
           width: 144px;
@@ -601,7 +657,6 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
           100% { transform: rotate(-1.1deg); }
         }
       `}</style>
-      {/* ▲▲▲ 変更②ここまで ▲▲▲ */}
     </BaseModal>
   );
 }
