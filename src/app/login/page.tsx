@@ -280,7 +280,7 @@ function LoginInner() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full px-4 py-3 text白 rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]
+            className="w-full px-4 py-3 text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]
                        disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
           >
             Googleでログイン
