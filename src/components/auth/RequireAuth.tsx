@@ -1,3 +1,5 @@
+// src/components/auth/RequireAuth.tsx
+
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +37,8 @@ export default function RequireAuth({ children }: Props) {
       if (!user) {
         if (!isPublic) {
           // 未ログインならログイン画面へ
-          window.location.replace(`/login?next=${encodeURIComponent(pathname || '/')}&reauth=1`);
+          // ★変更: reauth=1 を付けない
+          window.location.replace(`/login?next=${encodeURIComponent(pathname || '/')}`);
           return;
         }
         if (mountedRef.current) {
@@ -52,6 +55,6 @@ export default function RequireAuth({ children }: Props) {
     return () => unsubscribe();
   }, [pathname]);
 
-  // 🔸 スピナー表示を完全無効化（認証確認中でも即 children を描画）
+  // （従来通り）認証確認中でも children を描画
   return <>{children}</>;
 }

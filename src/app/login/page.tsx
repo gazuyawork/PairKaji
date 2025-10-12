@@ -37,7 +37,7 @@ export default function LoginPage() {
 
 /**
  * ここから内側: useSearchParams を利用
- * - reauth=1 なら必ず signOut
+ * - reauth=1 なら（明示ログアウト時のみ）signOut
  * - Google は prompt: 'select_account' で毎回アカウント選択
  * - 自動遷移なし。成功時のみ next へ遷移
  */
@@ -71,10 +71,18 @@ function LoginInner() {
     })();
   }, []);
 
-  // reauth=1 の時は必ず Firebase セッションをクリア（自動再ログイン防止）
+  // ★変更: reauth=1 の時でも「明示ログアウト時のみ」 Firebase セッションをクリア
   useEffect(() => {
     if (!reauth) return;
-    signOut(auth).catch(() => void 0);
+    try {
+      const manual = sessionStorage.getItem('manualSignOut');
+      if (manual === '1') {
+        sessionStorage.removeItem('manualSignOut'); // 実行後は必ず消す
+        signOut(auth).catch(() => void 0);
+      }
+    } catch {
+      // sessionStorage 不可環境は signOut しない（安全側）
+    }
   }, [reauth]);
 
   // Google リダイレクト戻り
@@ -129,10 +137,7 @@ function LoginInner() {
 
     setIsLoading(true);
     try {
-      // 【削除対象】念のため都度クリア（自動再ログイン抑止）
-      // await signOut(auth).catch(() => void 0);
-
-      // 【変更後】直接サインイン
+      // 【削除済み】ここでの signOut は不要
       await signInWithEmailAndPassword(auth, emailTrimmed, password);
       router.replace(next);
     } catch (error: unknown) {
@@ -150,9 +155,7 @@ function LoginInner() {
     setPasswordError('');
     setLoginError('');
     try {
-      // 【削除対象】念のため毎回クリア（自動再ログイン抑止）
-      // await signOut(auth).catch(() => void 0);
-
+      // 【削除済み】ここでの signOut は不要
       setIsLoading(true);
       // まずはポップアップ
       await signInWithPopup(auth, googleProvider);
@@ -277,7 +280,7 @@ function LoginInner() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full px-4 py-3 text-white rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]
+            className="w-full px-4 py-3 text白 rounded-[10px] bg-[#FF6B6B] border border-[#AAAAAA] font-sans text-[16px]
                        disabled:opacity-60 disabled:cursor-not-allowed active:translate-y-[1px]"
           >
             Googleでログイン
