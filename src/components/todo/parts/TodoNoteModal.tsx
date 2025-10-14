@@ -1,4 +1,3 @@
-// src/components/todo/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -308,7 +307,8 @@ export default function TodoNoteModal({
   // チェックリスト（新規追加）
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [checkIds, setCheckIds] = useState<string[]>([]);
-  const checkInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  // textarea参照に変更
+  const checkInputRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
 
   // ★ 追加: 個別保存中インジケータ（item.id → true/false）
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
@@ -592,7 +592,7 @@ export default function TodoNoteModal({
     });
   }, [checklist]);
 
-  // テキストエリアのリサイズ等
+  // テキストエリアのリサイズ等（備考）
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
     if (!el) return;
@@ -645,6 +645,25 @@ export default function TodoNoteModal({
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [resizeTextarea]);
+
+  // ★ 追加：チェックリストtextareaの自動リサイズ
+  const autoResizeChecklistTextarea = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.overflowY = 'hidden';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  // ★ 追加：現在表示中の全行を再計算
+  const resizeAllChecklistTextareas = () => {
+    checkInputRefs.current.forEach((el) => autoResizeChecklistTextarea(el));
+  };
+
+  // モーダル表示やリスト変動時に高さを再計算
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    requestAnimationFrame(resizeAllChecklistTextareas);
+  }, [isOpen, checklist, isPreview]);
 
   // 画像選択
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -988,7 +1007,7 @@ export default function TodoNoteModal({
         console.error('チェック更新の保存に失敗:', e);
         setChecklist(prevList);
       } finally {
-        // ★ ここを修正（未使用変数を作らない）
+        // ★ 個別インジケータ解除
         setSavingById((m) => {
           const next = { ...m };
           delete next[itemId];
@@ -1115,7 +1134,7 @@ export default function TodoNoteModal({
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">参考URL</h3>
             {!isPreview && (
-              <div className="flex items-center gap-2">
+              <div className="flex items中心 gap-2">
                 <button
                   type="button"
                   onClick={addUrl}
@@ -1224,7 +1243,11 @@ export default function TodoNoteModal({
                   setCheckIds((prev) => [...prev, id]);
                   setTimeout(() => {
                     const idx = checkIds.length; // 追加行のインデックス
-                    checkInputRefs.current[idx]?.focus();
+                    const target = checkInputRefs.current[idx];
+                    if (target) {
+                      autoResizeChecklistTextarea(target);
+                      target.focus();
+                    }
                   }, 0);
                 }}
                 className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
@@ -1283,18 +1306,21 @@ export default function TodoNoteModal({
                             />
                           </div>
 
-                          {/* 入力 */}
-                          <input
-                            ref={(el) => { checkInputRefs.current[idx] = el; }}
+                          {/* 入力（textareaに変更：Enterで改行／Ctrl(⌘)+Enterで下に追加） */}
+                          <textarea
+                            ref={(el) => { checkInputRefs.current[idx] = el; if (el) autoResizeChecklistTextarea(el); }}
                             value={item.text}
+                            rows={1}
                             onChange={(e) => {
                               const val = e.target.value;
                               setChecklist((prev) =>
                                 prev.map((c, i) => (i === idx ? { ...c, text: val } : c)),
                               );
+                              autoResizeChecklistTextarea(e.currentTarget);
                             }}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
+                              // Ctrl(Windows/Linux) or Meta(⌘ on macOS) + Enter で新規行を下に追加
+                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                                 e.preventDefault();
                                 const id = `cl_${Math.random().toString(16).slice(2)}`;
                                 setChecklist((prev) => {
@@ -1307,11 +1333,19 @@ export default function TodoNoteModal({
                                   arr.splice(idx + 1, 0, id);
                                   return arr;
                                 });
-                                setTimeout(() => checkInputRefs.current[idx + 1]?.focus(), 0);
+                                setTimeout(() => {
+                                  const nextEl = checkInputRefs.current[idx + 1];
+                                  if (nextEl) {
+                                    autoResizeChecklistTextarea(nextEl);
+                                    nextEl.focus();
+                                  }
+                                }, 0);
                               }
+                              // 通常のEnterは改行としてそのまま
                             }}
-                            placeholder="項目を入力（Enterで下に追加）"
-                            className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500"
+                            placeholder="項目を入力（Enterで改行／Ctrl(⌘)+Enterで下に追加）"
+                            className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500 resize-none leading-relaxed"
+                            style={{ whiteSpace: 'pre-wrap', overflow: 'hidden' }}
                           />
 
                           {/* 削除 */}
@@ -1342,7 +1376,7 @@ export default function TodoNoteModal({
               </SortableContext>
             </DndContext>
           ) : (
-            // ★ プレビュー（ここを「チェック可能 & 即DB保存」に改修）
+            // ★ プレビュー（ここを「チェック可能 & 即DB保存」に改修） + 改行保持
             <ul className="space-y-2">
               {checklist
                 .filter((c) => (c.text ?? '').trim() !== '')
@@ -1369,7 +1403,7 @@ export default function TodoNoteModal({
                         aria-disabled={isSaving}
                         title="クリックでチェックを切り替え"
                       >
-                        {c.text}
+                        <span className="whitespace-pre-wrap">{c.text}</span>
                       </button>
                     </li>
                   );
