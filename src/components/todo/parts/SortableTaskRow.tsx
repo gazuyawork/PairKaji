@@ -70,7 +70,7 @@ export default function SortableTaskRow({ task, onClickTitle, onHide }: Props) {
             className="text-left min-w-0"
             aria-label={`${task.name} を開く`}
           >
-            <div className="font-bold text-[#5E5E5E] truncate">{task.name}</div>
+            <div className="font-normal text-gray-800 truncate">{task.name}</div>
           </button>
         </div>
 
