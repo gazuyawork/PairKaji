@@ -1,3 +1,4 @@
+// src/components/todo/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,7 @@ import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceA
 import BaseModal from '../../common/modals/BaseModal';
 import NextImage from 'next/image';
 
-// ▼▼ dnd-kit（参考URLの並び替え用） ▼▼
+// ▼▼ dnd-kit（参考URL・チェックリストの並び替え用） ▼▼
 import {
   DndContext,
   closestCenter,
@@ -67,6 +68,9 @@ type Ingredient = {
   unit: string;
 };
 
+// 追加：チェックリスト項目
+type ChecklistItem = { id: string; text: string; done: boolean };
+
 type TaskDoc = {
   category?: Category;
   todos?: TodoDoc[];
@@ -87,6 +91,8 @@ type TodoDoc = {
   };
   timeStart?: string; // "HH:mm"
   timeEnd?: string;   // "HH:mm"
+  // 追加：チェックリスト
+  checklist?: ChecklistItem[];
 };
 
 function isString(v: unknown): v is string {
@@ -99,7 +105,7 @@ function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter(isString) : [];
 }
 function isTodoArray(v: unknown): v is TodoDoc[] {
-  return Array.isArray(v) && v.every((x) => x && typeof x.id === 'string');
+  return Array.isArray(v) && v.every((x) => x && typeof (x as TodoDoc).id === 'string');
 }
 
 /* ---------------- Constants ---------------- */
@@ -224,13 +230,13 @@ interface TodoNoteModalProps {
 type PendingUpload = { blob: Blob; mime: 'image/webp' | 'image/jpeg' };
 type TodoUpdates = Parameters<typeof updateTodoInTask>[2];
 
-// dnd のドラッグハンドル型（URL用）
+// dnd のドラッグハンドル型（URL/チェックリスト用）
 type DragHandleRenderProps = {
   attributes: DraggableAttributes;
   listeners: ReturnType<typeof useSortable>['listeners'];
 };
 
-// 参考URL用の Sortable 行
+// Sortable 行（URL/チェックリスト共通で使用）
 function SortableUrlRow({
   id,
   children,
@@ -299,6 +305,14 @@ export default function TodoNoteModal({
   const [urlIds, setUrlIds] = useState<string[]>([]);
   const urlRefs = useRef<Array<HTMLInputElement | null>>([]);
 
+  // チェックリスト（新規追加）
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [checkIds, setCheckIds] = useState<string[]>([]);
+  const checkInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  // ★ 追加: 個別保存中インジケータ（item.id → true/false）
+  const [savingById, setSavingById] = useState<Record<string, boolean>>({});
+
   // プレビュー用
   const [imgReady, setImgReady] = useState(false);
   const displaySrc = previewUrl ?? imageUrl;
@@ -334,7 +348,20 @@ export default function TodoNoteModal({
     [referenceUrls]
   );
 
-  const hasContent = hasMemo || hasImage || hasRecipe || hasShopping || hasReference || (!!timeStart && !!timeEnd);
+  const hasChecklist = useMemo(
+    () => checklist.some((c) => (c.text ?? '').trim() !== ''),
+    [checklist]
+  );
+
+  const hasContent =
+    hasMemo ||
+    hasImage ||
+    hasRecipe ||
+    hasShopping ||
+    hasReference ||
+    (!!timeStart && !!timeEnd) ||
+    hasChecklist;
+
   const showMemo = useMemo(() => !isPreview || hasMemo, [isPreview, hasMemo]);
 
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
@@ -463,14 +490,30 @@ export default function TodoNoteModal({
         // 参考URL（移植先）をロード
         const refs = asStringArray(todo.referenceUrls);
         setReferenceUrls(refs.length === 0 ? [''] : refs);
-        setUrlIds((prev) => {
-          const arr = [...prev];
-          arr.length = 0;
+        setUrlIds(() => {
+          const arr: string[] = [];
           for (let i = 0; i < (refs.length === 0 ? 1 : refs.length); i++) {
             arr.push(`url_${i}_${Math.random().toString(16).slice(2)}`);
           }
-          return [...arr];
+          return arr;
         });
+
+        // チェックリスト初期化（最低1行保証）
+        const existingChecklist = Array.isArray((todo as TodoDoc).checklist)
+          ? (todo as TodoDoc).checklist!.map((c, idx) => ({
+            id: typeof c?.id === 'string' ? c.id : `cl_${idx}`,
+            text: typeof c?.text === 'string' ? c.text : '',
+            done: typeof c?.done === 'boolean' ? c.done : false,
+          }))
+          : [];
+
+        const safeChecklist =
+          existingChecklist.length > 0
+            ? existingChecklist
+            : [{ id: `cl_${Math.random().toString(16).slice(2)}`, text: '', done: false }];
+
+        setChecklist(safeChecklist);
+        setCheckIds(safeChecklist.map((c) => c.id));
 
         // 旅行
         const loadedStart = isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '';
@@ -503,11 +546,51 @@ export default function TodoNoteModal({
     setUrlIds((prev) => {
       if (prev.length === referenceUrls.length) return prev;
       const next = [...prev];
-      while (next.length < referenceUrls.length) next.push(`url_${Math.random().toString(16).slice(2)}`);
-      while (next.length > referenceUrls.length) next.pop();
+      while (next.length < referenceUrls.length) {
+        next.push(`url_${Math.random().toString(16).slice(2)}`);
+      }
+      while (next.length > referenceUrls.length) {
+        next.pop();
+      }
       return next;
     });
   }, [referenceUrls]);
+
+  // ▼ 追加：チェックリスト（編集モードでは最低1行を常に保証）
+  useEffect(() => {
+    if (!isPreview && checklist.length === 0) {
+      const id = `cl_${Math.random().toString(16).slice(2)}`;
+      setChecklist([{ id, text: '', done: false }]);
+      setCheckIds([id]);
+    }
+  }, [isPreview, checklist.length]);
+
+  // ▼ 追加：checkIds の長さを checklist に同期（URL と同様）
+  useEffect(() => {
+    setCheckIds((prev) => {
+      if (prev.length === checklist.length) {
+        // 並べ替えでIDが入れ替わっている場合を同期
+        const aligned = prev.map((id, i) => (checklist[i]?.id ?? id));
+        return aligned;
+      }
+      const next = [...prev];
+      // 伸ばす
+      while (next.length < checklist.length) {
+        next.push(checklist[next.length]?.id ?? `cl_${Math.random().toString(16).slice(2)}`);
+      }
+      // 縮める
+      while (next.length > checklist.length) {
+        next.pop();
+      }
+      // インデックス対応のIDにそろえる
+      for (let i = 0; i < checklist.length; i++) {
+        if (checklist[i]?.id && next[i] !== checklist[i]!.id) {
+          next[i] = checklist[i]!.id;
+        }
+      }
+      return next;
+    });
+  }, [checklist]);
 
   // テキストエリアのリサイズ等
   const resizeTextarea = useCallback(() => {
@@ -611,12 +694,13 @@ export default function TodoNoteModal({
     setImageUrl(null);
   };
 
-  // --- 参考URL：操作系（材料と同じ“動き”） ----------------------
+  // --- dnd sensors（URL / チェックリスト共通） ----------------------
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
   );
 
+  // 参考URL：操作系（材料と同じ“動き”）
   const addUrlAt = useCallback((index: number) => {
     setReferenceUrls((prev) => {
       const arr = [...prev];
@@ -641,11 +725,11 @@ export default function TodoNoteModal({
   const removeUrl = (idx: number) => {
     setReferenceUrls((prev) => {
       if (prev.length <= 1) return ['']; // 最後の1件は空行に戻す
-      return prev.filter((_, i) => i !== idx);
+      return prev.filter((...args) => args[1] !== idx);
     });
     setUrlIds((prev) => {
       if (prev.length <= 1) return prev;
-      return prev.filter((_, i) => i !== idx);
+      return prev.filter((...args) => args[1] !== idx);
     });
   };
 
@@ -668,7 +752,6 @@ export default function TodoNoteModal({
     if (category === '料理') {
       const result = recipeEditorRef.current?.validateAndShowErrors();
       if (!result || result.hasErrors) {
-        // 任意: トーストなどで result.messages[0] を通知してもOK
         return; // ★ 保存中断
       }
     }
@@ -728,7 +811,7 @@ export default function TodoNoteModal({
         memo,
         price: Number.isFinite(appliedPrice) && appliedPrice! > 0 ? appliedPrice : null,
         quantity: validQuantity,
-        referenceUrls: referenceUrls.filter((u) => isString(u) && u.trim() !== ''), // ← TodoNoteModal の state を保存
+        referenceUrls: referenceUrls.filter((u) => isString(u) && u.trim() !== ''), // URLを保存
       };
 
       if (appliedUnit) (payload as { unit?: string }).unit = appliedUnit;
@@ -744,12 +827,12 @@ export default function TodoNoteModal({
         (payload as { recipe?: Recipe }).recipe = {
           ingredients: finalIngredients
             .filter((i) => i.name.trim() !== '')
-            .map((i) => ({
-              id: i.id,
-              name: i.name.trim(),
-              amount: typeof i.amount === 'number' ? i.amount : null,
-              unit: i.unit || '適量',
-            })),
+            .map((i) => ([
+              i.id,
+              i.name.trim(),
+              typeof i.amount === 'number' ? i.amount : null,
+              i.unit || '適量',
+            ])).map(([id, name, amount, unit]) => ({ id: id as string, name: name as string, amount: amount as number | null, unit: unit as string })),
           steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
         };
       }
@@ -758,6 +841,11 @@ export default function TodoNoteModal({
         (payload as { timeStart?: string | null }).timeStart = timeStart || null;
         (payload as { timeEnd?: string | null }).timeEnd = timeEnd || null;
       }
+
+      // ▼▼ チェックリストを保存（空行は除外） ▼▼
+      (payload as { checklist?: ChecklistItem[] }).checklist = checklist
+        .filter((c) => (c.text ?? '').trim() !== '')
+        .map((c) => ({ id: c.id, text: c.text.trim(), done: !!c.done }));
 
       await updateTodoInTask(taskId, todoId, payload);
 
@@ -856,6 +944,60 @@ export default function TodoNoteModal({
       img.onerror = null;
     };
   }, [displaySrc]);
+
+  /* =======================
+   *  チェックリスト保存系
+   * ======================= */
+
+  // 空行を除外しつつ整形
+  const normalizeChecklistForSave = useCallback((list: ChecklistItem[]): ChecklistItem[] => {
+    return list
+      .filter((c) => (c.text ?? '').trim() !== '')
+      .map((c) => ({ id: c.id, text: c.text.trim(), done: !!c.done }));
+  }, []);
+
+  // Firestoreへ保存（共通）
+  const saveChecklistToFirestore = useCallback(
+    async (listForState: ChecklistItem[]) => {
+      try {
+        const payload: TodoUpdates = {
+          checklist: normalizeChecklistForSave(listForState),
+        } as { checklist: ChecklistItem[] };
+        await updateTodoInTask(taskId, todoId, payload);
+      } catch (e) {
+        throw e;
+      }
+    },
+    [normalizeChecklistForSave, taskId, todoId]
+  );
+
+  // プレビューでのトグル（楽観的更新 → 保存 → 失敗時ロールバック）
+  const handlePreviewToggleChecklist = useCallback(
+    async (itemId: string, nextDone: boolean) => {
+      const idx = checklist.findIndex((c) => c.id === itemId);
+      if (idx < 0) return;
+
+      const prevList = checklist;
+      const nextList = prevList.map((c, i) => (i === idx ? { ...c, done: nextDone } : c));
+      setChecklist(nextList);
+      setSavingById((m) => ({ ...m, [itemId]: true }));
+
+      try {
+        await saveChecklistToFirestore(nextList);
+      } catch (e) {
+        console.error('チェック更新の保存に失敗:', e);
+        setChecklist(prevList);
+      } finally {
+        // ★ ここを修正（未使用変数を作らない）
+        setSavingById((m) => {
+          const next = { ...m };
+          delete next[itemId];
+          return next;
+        });
+      }
+    },
+    [checklist, saveChecklistToFirestore]
+  );
 
   if (!mounted || initialLoad) return null;
 
@@ -1067,6 +1209,176 @@ export default function TodoNoteModal({
         </div>
       )}
       {/* ▲▲ 参考URLここまで ▲▲ */}
+
+      {/* ▼▼ チェックリスト ▼▼ */}
+      {(!isPreview || hasChecklist) && (
+        <div className="px-2 pt-2 pb-3 mt-2">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium">チェックリスト</h3>
+            {!isPreview && (
+              <button
+                type="button"
+                onClick={() => {
+                  const id = `cl_${Math.random().toString(16).slice(2)}`;
+                  setChecklist((prev) => [...prev, { id, text: '', done: false }]);
+                  setCheckIds((prev) => [...prev, id]);
+                  setTimeout(() => {
+                    const idx = checkIds.length; // 追加行のインデックス
+                    checkInputRefs.current[idx]?.focus();
+                  }, 0);
+                }}
+                className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+              >
+                <Plus size={16} />
+                追加
+              </button>
+            )}
+          </div>
+
+          {!isPreview ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+              onDragEnd={(e: DragEndEvent) => {
+                const { active, over } = e;
+                if (!over || active.id === over.id) return;
+                const oldIndex = checkIds.findIndex((id) => id === active.id);
+                const newIndex = checkIds.findIndex((id) => id === over.id);
+                if (oldIndex < 0 || newIndex < 0) return;
+                setCheckIds((prev) => arrayMove(prev, oldIndex, newIndex));
+                setChecklist((prev) => arrayMove(prev, oldIndex, newIndex));
+              }}
+            >
+              <SortableContext items={checkIds} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {checklist.map((item, idx) => (
+                    <SortableUrlRow key={checkIds[idx] ?? item.id} id={checkIds[idx] ?? item.id}>
+                      {({ attributes, listeners }) => (
+                        <>
+                          {/* 並べ替えハンドル */}
+                          <button
+                            type="button"
+                            className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
+                            aria-label="行を並び替え"
+                            {...attributes}
+                            {...listeners}
+                          >
+                            <GripVertical size={16} />
+                          </button>
+
+                          {/* チェックボックス */}
+                          <div className="col-span-1 flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={!!item.done}
+                              onChange={(e) => {
+                                const val = e.currentTarget.checked;
+                                setChecklist((prev) =>
+                                  prev.map((c, i) => (i === idx ? { ...c, done: val } : c)),
+                                );
+                              }}
+                              aria-label="完了"
+                              className="w-4 h-4"
+                            />
+                          </div>
+
+                          {/* 入力 */}
+                          <input
+                            ref={(el) => { checkInputRefs.current[idx] = el; }}
+                            value={item.text}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setChecklist((prev) =>
+                                prev.map((c, i) => (i === idx ? { ...c, text: val } : c)),
+                              );
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                const id = `cl_${Math.random().toString(16).slice(2)}`;
+                                setChecklist((prev) => {
+                                  const arr = [...prev];
+                                  arr.splice(idx + 1, 0, { id, text: '', done: false });
+                                  return arr;
+                                });
+                                setCheckIds((prev) => {
+                                  const arr = [...prev];
+                                  arr.splice(idx + 1, 0, id);
+                                  return arr;
+                                });
+                                setTimeout(() => checkInputRefs.current[idx + 1]?.focus(), 0);
+                              }
+                            }}
+                            placeholder="項目を入力（Enterで下に追加）"
+                            className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500"
+                          />
+
+                          {/* 削除 */}
+                          {checklist.length >= 2 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setChecklist((prev) => {
+                                  if (prev.length <= 1) return [{ ...prev[0], text: '', done: false }];
+                                  return prev.filter((_unused, i) => i !== idx);
+                                });
+                                setCheckIds((prev) => {
+                                  if (prev.length <= 1) return prev;
+                                  return prev.filter((_unused, i) => i !== idx);
+                                });
+                              }}
+                              aria-label="項目を削除"
+                              className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
+                            >
+                              <span aria-hidden className="text-lg leading-none">×</span>
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </SortableUrlRow>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            // ★ プレビュー（ここを「チェック可能 & 即DB保存」に改修）
+            <ul className="space-y-2">
+              {checklist
+                .filter((c) => (c.text ?? '').trim() !== '')
+                .map((c) => {
+                  const isSaving = !!savingById[c.id];
+                  return (
+                    <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={!!c.done}
+                        disabled={isSaving}
+                        onChange={(e) => {
+                          const next = e.currentTarget.checked;
+                          void handlePreviewToggleChecklist(c.id, next);
+                        }}
+                        aria-label={`${c.text} を${c.done ? '未完了にする' : '完了にする'}`}
+                      />
+                      <button
+                        type="button"
+                        className={`text-left break-words ${c.done ? 'line-through text-gray-400' : 'text-gray-800'} ${isSaving ? 'opacity-60' : 'hover:opacity-80'} transition`}
+                        onClick={() => void handlePreviewToggleChecklist(c.id, !c.done)}
+                        disabled={isSaving}
+                        aria-disabled={isSaving}
+                        title="クリックでチェックを切り替え"
+                      >
+                        {c.text}
+                      </button>
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
+        </div>
+      )}
+      {/* ▲▲ チェックリストここまで ▲▲ */}
 
       {/* 旅行カテゴリ */}
       {category === '旅行' && (

@@ -56,6 +56,9 @@ type TaskDocMinimal = {
   category?: TaskCategory;
 };
 
+// ▼ 追加：チェックリスト型
+type ChecklistItem = { id: string; text: string; done: boolean };
+
 type TodoDoc = {
   id: string;
   text?: string;
@@ -73,6 +76,9 @@ type TodoDoc = {
   /** 旅行時の時間帯（"HH:mm"）。存在しない場合は未定義 */
   timeStart?: string;
   timeEnd?: string;
+
+  // ▼ 追加：チェックリスト
+  checklist?: ChecklistItem[];
 };
 
 function isString(x: unknown): x is string {
@@ -595,6 +601,7 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
 
 /* =========================================================
  * ToDo 部分更新（旅行の時間帯保存に対応）
+ *  + チェックリスト保存を追加
  * =======================================================*/
 export const updateTodoInTask = async (
   taskId: string,
@@ -610,6 +617,9 @@ export const updateTodoInTask = async (
     /** 旅行時の時間帯。null指定でフィールド削除 */
     timeStart?: string | null;
     timeEnd?: string | null;
+
+    // ▼ 追加：チェックリスト（空配列可・全置換）
+    checklist?: ChecklistItem[];
   }
 ) => {
   const taskRef = doc(db, 'tasks', taskId);
@@ -673,6 +683,19 @@ export const updateTodoInTask = async (
     next = rest as TodoDoc;
   } else if (typeof updates.recipe !== 'undefined') {
     next = { ...next, recipe: updates.recipe };
+  }
+
+  // --- checklist の扱い（配列置換） ---
+  if (typeof updates.checklist !== 'undefined') {
+    const normalized: ChecklistItem[] = Array.isArray(updates.checklist)
+      ? updates.checklist.map((c, idx) => ({
+          id: typeof c?.id === 'string' ? c.id : `cl_${idx}`,
+          text: typeof c?.text === 'string' ? c.text : '',
+          done: !!c?.done,
+        }))
+      : [];
+    // コンポーネント側で空行は除外済み想定。念のため文字列化・trimは実施済み。
+    next = { ...next, checklist: normalized };
   }
 
   // --- 旅行の時間帯 timeStart/timeEnd の扱い ---
