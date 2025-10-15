@@ -16,6 +16,7 @@ import {
   getDoc,
   arrayRemove,
   writeBatch,
+  deleteField,
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask, TaskCategory } from '@/types/Task';
@@ -142,7 +143,7 @@ type NormalizedTaskPayload = {
   userId: string;
   userIds: string[];
   users: string[];
-  category?: TaskCategory;
+  category?: TaskCategory | ''; // ★ 追加
   name: string;
   period: '毎日' | '週次' | '不定期';
   point: number | null;
@@ -175,8 +176,12 @@ const normalizeTaskPayload = (
 
   // category
   const rawCat = isString(r.category) ? r.category.trim() : undefined;
-  const category: TaskCategory | undefined =
-    rawCat === '料理' || rawCat === '買い物' || rawCat === '旅行' ? (rawCat as TaskCategory) : undefined;
+  const category: TaskCategory | '' | undefined =
+    rawCat === ''
+      ? '' // ★ 空文字を維持（後段で deleteField に変換）
+      : rawCat === '料理' || rawCat === '買い物' || rawCat === '旅行'
+        ? (rawCat as TaskCategory)
+        : undefined;
 
   const payload: NormalizedTaskPayload = {
     userId: uid,
@@ -525,25 +530,39 @@ export const saveTaskToFirestore = async (
       const { userId: _ignoredUserId, ...commonDataWithoutOwner } = commonData;
       void _ignoredUserId;
 
-      // ★ ここで undefined を除去してから updateDoc
-      const updatePayload = stripUndefinedDeep({
+      // ★ ここで category:'' を deleteField に変換
+      const updatePayloadBase: Record<string, unknown> = {
         ...commonDataWithoutOwner,
         dates: finalDates,
         time: finalTime,
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      if (updatePayloadBase.category === '') {
+        updatePayloadBase.category = deleteField(); // ← 未選択はフィールド削除
+      }
+
+      // ★ ここで undefined を除去してから updateDoc
+      const updatePayload = stripUndefinedDeep(updatePayloadBase);
 
       await updateDoc(taskRef, updatePayload);
 
     } else {
-      // ★ 新規作成も undefined を除去してから addDoc（category 未選択などの保険）
-      const createPayload = stripUndefinedDeep({
+      // ★ 新規作成：category:'' は書かない（フィールドを作らない）
+      const createPayloadBase: Record<string, unknown> = {
         ...commonData,
         userId: uid, // 新規作成は自分所有でOK
         done: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      if (createPayloadBase.category === '') {
+        delete createPayloadBase.category; // ← 新規時は単に省く
+      }
+
+      // ★ 新規作成も undefined を除去してから addDoc（category 未選択などの保険）
+      const createPayload = stripUndefinedDeep(createPayloadBase);
 
       await addDoc(collection(db, 'tasks'), createPayload);
     }

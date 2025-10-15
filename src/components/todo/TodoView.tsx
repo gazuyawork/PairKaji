@@ -78,8 +78,17 @@ const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown 
 /* =========================
    カテゴリメタ（GroupSelectorと同等）
    ========================= */
-function getCategoryMeta(raw?: string | null) {
-  const category = (raw ?? '').trim() || '未分類';
+function getCategoryMeta(raw?: unknown) {
+  // 非文字列でも安全に扱えるよう常に文字列化 → 正規化 → trim
+  const normalized = String(raw ?? '').normalize('NFKC').trim();
+
+  // 空や想定外は「未分類」にフォールバック
+  const category =
+    normalized === '' ||
+      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
+      ? '未分類'
+      : normalized;
+
   switch (category) {
     case '買い物':
       return {
@@ -126,12 +135,13 @@ function getCategoryMeta(raw?: string | null) {
       return {
         Icon: Tag,
         colorClass: 'text-gray-400',
-        label: category,
+        label: '未分類',
         chipActiveClass: 'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
         activeBg: 'from-gray-500 to-gray-600',
       };
   }
 }
+
 
 /* =========================================================
    特定カテゴリを末尾へ送るための優先度マップ
@@ -419,7 +429,11 @@ export default function TodoView() {
 
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'ja'));
+      .sort((a, b) => {
+        const labelA = String(a.label ?? '');
+        const labelB = String(b.label ?? '');
+        return labelA.localeCompare(labelB, 'ja');
+      });
   }, [tasks, uid]);
 
   /* ===========================================
@@ -494,7 +508,11 @@ export default function TodoView() {
 
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'ja'));
+      .sort((a, b) => {
+        const labelA = String(a.label ?? '');
+        const labelB = String(b.label ?? '');
+        return labelA.localeCompare(labelB, 'ja');
+      });
   }, [tasks, uid]);
 
   return (
@@ -641,25 +659,24 @@ export default function TodoView() {
 
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {/* 動的カテゴリ（アイコンのみ・横並び） */}
-              {availableCategories.map((c) => {
+              {availableCategories.map((c, idx) => {
                 const isActive = selectedCategoryId === c.id;
-                const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
+                const { Icon, colorClass } = getCategoryMeta(c.label);
+
+                // 安定キー: id が string/number ならそれを使用、そうでなければ label+idx へフォールバック
+                const key =
+                  typeof c?.id === 'string' || typeof c?.id === 'number'
+                    ? String(c.id)
+                    : `${c.label}-${idx}`;
+
                 return (
                   <button
-                    key={c.id}
+                    key={key}
                     type="button"
                     onClick={() =>
                       setSelectedCategoryId((prev) => (prev === c.id ? null : c.id))
                     }
-                    className={[
-                      'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                      'shrink-0',
-                      isActive
-                        ? `bg-gradient-to-b ${activeBg} text-white border-[2px] border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
-                        : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D]/10 hover:border-[#FFCB7D]',
-                    ].join(' ')}
-
-
+                    className={[/* ... */].join(' ')}
                     aria-pressed={isActive}
                     aria-label={c.label}
                     title={c.label}
@@ -668,6 +685,7 @@ export default function TodoView() {
                   </button>
                 );
               })}
+
 
               {/* 仕切り（縦線）: カテゴリが1件以上ある場合のみ表示 */}
               {availableCategories.length > 0 && (
@@ -818,19 +836,22 @@ export default function TodoView() {
                         </button>
 
                         {/* 動的カテゴリ */}
-                        {addAvailableCategories.map((c) => {
+                        {addAvailableCategories.map((c, idx) => {
                           const active = addSelectedCategoryId === c.id;
                           const { Icon, colorClass, chipActiveClass } = getCategoryMeta(c.label);
+
+                          const key =
+                            typeof c?.id === 'string' || typeof c?.id === 'number'
+                              ? String(c.id)
+                              : `${c.label}-${idx}`;
+
                           return (
                             <button
-                              key={c.id}
+                              key={key}
                               type="button"
                               onClick={() => setAddSelectedCategoryId(c.id)}
                               className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1
-                                ${active
-                                  ? `${chipActiveClass} shadow-[0_2px_2px_rgba(0,0,0,0.1)]`
-                                  : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white'}
-                                active:translate-y-[1px]`}
+        ${active ? `${chipActiveClass} ...` : '...'} active:translate-y-[1px]`}
                               aria-pressed={active}
                               title={c.label}
                             >
@@ -839,6 +860,7 @@ export default function TodoView() {
                             </button>
                           );
                         })}
+
                       </div>
                     </div>
                   </div>

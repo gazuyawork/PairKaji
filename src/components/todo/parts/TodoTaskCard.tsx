@@ -115,9 +115,34 @@ export default function TodoTaskCard({
   const [, setHasUserOrder] = useState<boolean>(false);
 
   // カテゴリ
-  const category: string | null = (task as unknown as { category?: string }).category ?? null;
-  const { CatIcon, catColor } = useCategoryIcon(category);
-  const categoryLabel = (category ?? '').trim() || '未分類';
+  const rawCategory = (task as { category?: unknown }).category;
+  const normalizedCategory = String(rawCategory ?? '').normalize('NFKC').trim();
+  const categoryLabel =
+    normalizedCategory === '' ||
+      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalizedCategory)
+      ? '未分類'
+      : normalizedCategory;
+
+  // 正規化後のラベルを渡す（フック側が string | null でも '未分類' を渡せばOK）
+  const { CatIcon, catColor } = useCategoryIcon(categoryLabel);
+
+  // ★ ここで実際に使うカテゴリ値を作成（未分類フォールバック）
+  type Category = '買い物' | '料理' | '旅行' | '仕事' | '家事' | '未分類';
+  const category: Category =
+    (['買い物', '料理', '旅行', '仕事', '家事', '未分類'] as const).includes(categoryLabel as Category)
+      ? (categoryLabel as Category)
+      : '未分類';
+
+  const [searchQuery, setSearchQuery] = useState('');
+  // 表示（保存順＝表示順にするため preferTimeSort は false）
+  const { canAdd, isCookingCategory, undoneCount, doneCount, finalFilteredTodos, doneMatchesCount } =
+    useTodoSearchAndSort({
+      todos,
+      tab,
+      category,             // ← 未定義を解消
+      searchQuery,
+      preferTimeSort: false,
+    });
 
   // 追加用入力
   const [isComposingAdd, setIsComposingAdd] = useState(false);
@@ -129,17 +154,6 @@ export default function TodoTaskCard({
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
 
   // 検索
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // 表示（保存順＝表示順にするため preferTimeSort は false）
-  const { canAdd, isCookingCategory, undoneCount, doneCount, finalFilteredTodos, doneMatchesCount } =
-    useTodoSearchAndSort({
-      todos,
-      tab,
-      category,
-      searchQuery,
-      preferTimeSort: false,
-    });
 
   // スクロールメーター
   const { scrollRef, scrollRatio, isScrollable, showScrollDownHint, showScrollUpHint } = useScrollMeter(
@@ -717,9 +731,11 @@ export default function TodoTaskCard({
                       Array.isArray(todo.referenceUrls) &&
                       todo.referenceUrls.some((u) => typeof u === 'string' && u.trim() !== '');
 
+                    // 変更後（任意の安全化）
                     const hasTravelTime =
                       category === '旅行' &&
-                      ((todo.timeStart ?? '').trim() !== '' || (todo.timeEnd ?? '').trim() !== '');
+                      (String(todo.timeStart ?? '').trim() !== '' || String(todo.timeEnd ?? '').trim() !== '');
+
 
                     const hasContentForIcon =
                       hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls || hasTravelTime;

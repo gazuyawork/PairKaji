@@ -52,6 +52,12 @@ const nextConfig = {
         hostname: 'lh3.googleusercontent.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.google.com',
+        // /s2/favicons?... を含むパスを包括
+        pathname: '/s2/**',
+      },
     ],
   },
 

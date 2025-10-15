@@ -1,4 +1,4 @@
-// src/components/todo/TodoNoteModal.tsx
+// src/components/todo/parts/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -56,7 +56,6 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 // ▲▲ dnd-kit ▲▲
-import Image from 'next/image';
 
 /* ---------------- Types & guards ---------------- */
 
@@ -206,7 +205,7 @@ async function compressImage(
     return {
       blob: file,
       mime: file.type === 'image/webp' ? 'image/webp' : 'image/jpeg',
-    };
+    } as { blob: Blob; mime: 'image/webp' | 'image/jpeg' };
   }
 
   const bitmapOrImg: ImageBitmap | HTMLImageElement = await (async () => {
@@ -251,7 +250,7 @@ async function compressImage(
     toBlob('image/jpeg', quality),
   ]);
 
-  if (!webpBlob && !jpegBlob) return { blob: file, mime: 'image/jpeg' };
+  if (!webpBlob && !jpegBlob) return { blob: file, mime: 'image/jpeg' } as { blob: Blob; mime: 'image/webp' | 'image/jpeg' };
   if (webpBlob && jpegBlob) {
     return webpBlob.size <= jpegBlob.size
       ? { blob: webpBlob, mime: 'image/webp' }
@@ -356,9 +355,6 @@ export default function TodoNoteModal({
   const urlRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [pendingUrlFocusIndex, setPendingUrlFocusIndex] = useState<number | null>(null);
 
-  // ラベルのインライン編集 index
-  // const [editingLabelIndex, setEditingLabelIndex] = useState<number | null>(null);
-
   // チェックリスト（input）
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [checkIds, setCheckIds] = useState<string[]>([]);
@@ -408,6 +404,11 @@ export default function TodoNoteModal({
     [checklist]
   );
 
+  const isUncategorized = useMemo(() => {
+    const v = typeof category === 'string' ? category.normalize('NFKC').trim() : '';
+    return category == null || v === '' || v === '未分類';
+  }, [category]);
+
   const hasContent =
     hasMemo ||
     hasImage ||
@@ -415,7 +416,7 @@ export default function TodoNoteModal({
     hasShopping ||
     hasReference ||
     (!!timeStart && !!timeEnd) ||
-    hasChecklist;
+    (isUncategorized && hasChecklist);
 
   const showMemo = useMemo(() => !isPreview || hasMemo, [isPreview, hasMemo]);
 
@@ -489,7 +490,7 @@ export default function TodoNoteModal({
     setSaveLabel(!Number.isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
   }, [comparePrice]);
 
-  // --- 初期データの取得（省略：元実装と同一。中略せず完全コード化のため残しています） ---
+  // --- 初期データの取得 ---
   useEffect(() => {
     const fetchTodoData = async () => {
       if (!taskId || !todoId) return;
@@ -563,10 +564,10 @@ export default function TodoNoteModal({
         // チェックリスト（必須ではないが、編集モードで最低1行は表示）
         const existingChecklist = Array.isArray((todo as TodoDoc).checklist)
           ? (todo as TodoDoc).checklist!.map((c, idx) => ({
-              id: typeof c?.id === 'string' ? c.id : `cl_${idx}`,
-              text: typeof c?.text === 'string' ? c.text : '',
-              done: typeof c?.done === 'boolean' ? c.done : false,
-            }))
+            id: typeof c?.id === 'string' ? c.id : `cl_${idx}`,
+            text: typeof c?.text === 'string' ? c.text : '',
+            done: typeof c?.done === 'boolean' ? c.done : false,
+          }))
           : [];
         const safeChecklist =
           existingChecklist.length > 0
@@ -755,7 +756,9 @@ export default function TodoNoteModal({
       try {
         if (fileInputRef.current) fileInputRef.current.value = '';
         else inputEl.value = '';
-      } catch { }
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -1086,14 +1089,10 @@ export default function TodoNoteModal({
 
   const saveChecklistToFirestore = useCallback(
     async (listForState: ChecklistItem[]) => {
-      try {
-        const payload: TodoUpdates = {
-          checklist: normalizeChecklistForSave(listForState),
-        } as { checklist: ChecklistItem[] };
-        await updateTodoInTask(taskId, todoId, payload);
-      } catch (e) {
-        throw e;
-      }
+      const payload: TodoUpdates = {
+        checklist: normalizeChecklistForSave(listForState),
+      } as { checklist: ChecklistItem[] };
+      await updateTodoInTask(taskId, todoId, payload);
     },
     [normalizeChecklistForSave, taskId, todoId]
   );
@@ -1115,16 +1114,35 @@ export default function TodoNoteModal({
         setChecklist(prevList);
       } finally {
         setSavingById((m) => {
-          const next = { ...m };
-          delete next[itemId];
-          return next;
+          const n = { ...m };
+          delete n[itemId];
+          return n;
         });
       }
     },
     [checklist, saveChecklistToFirestore]
   );
 
-  if (!mounted || initialLoad) return null;
+  // --- 描画（SSR ガード & ローディング表示） ---
+  if (!mounted) return null;
+
+  if (initialLoad) {
+    return (
+      <BaseModal
+        isOpen={isOpen}
+        onClose={onClose}
+        isSaving={false}
+        saveComplete={false}
+        onSaveClick={() => { }}
+        saveLabel="保存"
+        hideActions
+      >
+        <div className="flex items-center justify-center py-10 text-gray-500 text-sm">
+          読み込み中です…
+        </div>
+      </BaseModal>
+    );
+  }
 
   const showPreviewToggle = hasContent;
 
@@ -1295,9 +1313,11 @@ export default function TodoNoteModal({
                             {/* 入力（URL）+ ラベルUI */}
                             <div className="col-span-9 flex items-center gap-2 min-w-0">
                               {u.trim() !== '' && (
-                                <Image
+                                <NextImage
                                   src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(extractHostname(u))}&sz=32`}
                                   alt=""
+                                  width={16}
+                                  height={16}
                                   className="w-4 h-4 shrink-0 opacity-80"
                                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
                                 />
@@ -1362,7 +1382,7 @@ export default function TodoNoteModal({
       {/* ▲▲ 参考URLここまで ▲▲ */}
 
       {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
-      {category === null && (!isPreview || hasChecklist) && (
+      {isUncategorized && (!isPreview || hasChecklist) && (
         <div className="pt-2 pb-3 mt-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">チェックリスト</h3>
@@ -1663,7 +1683,7 @@ export default function TodoNoteModal({
           value={recipe}
           onChange={handleRecipeChange}
           isPreview={isPreview}
-          // showErrors={errorsShown}
+        // showErrors={errorsShown} // RecipeEditor 側に未定義なら渡さない
         />
       )}
     </BaseModal>

@@ -25,11 +25,11 @@ import { useUserUid } from '@/hooks/useUserUid';
    ========================= */
 type TaskCategoryShape =
   | {
-      categoryId?: string | null;
-      categoryName?: string | null;
-      categoryLabel?: string | null;
-      category?: string | null;
-    }
+    categoryId?: string | null;
+    categoryName?: string | null;
+    categoryLabel?: string | null;
+    category?: string | null;
+  }
   | undefined;
 
 /** カテゴリID（比較用） */
@@ -170,7 +170,11 @@ const GroupSelector = forwardRef<GroupSelectorHandle, Props>(
       }
       return Array.from(map.entries())
         .map(([id, label]) => ({ id, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'ja'));
+        .sort((a, b) => {
+          const labelA = String(a.label ?? '');
+          const labelB = String(b.label ?? '');
+          return labelA.localeCompare(labelB, 'ja');
+        });
     }, [baseFilteredTasks]);
 
     // キーワード & カテゴリを反映した絞り込み
@@ -358,11 +362,10 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                             type="button"
                             onClick={() => setSelectedCategoryId(null)}
                             className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-  ${
-    selectedCategoryId === null
-      ? 'bg-gray-900 text-white border-gray-900 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
-      : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-gray-50 hover:to-white hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
-  }
+  ${selectedCategoryId === null
+                                ? 'bg-gray-900 text-white border-gray-900 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                                : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-gray-50 hover:to-white hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                              }
   active:translate-y-[1px]`}
                             aria-pressed={selectedCategoryId === null}
                           >
@@ -379,11 +382,10 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                                 type="button"
                                 onClick={() => setSelectedCategoryId(c.id)}
                                 className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1
-  ${
-    active
-      ? `${chipActiveClass} shadow-[0_2px_2px_rgba(0,0,0,0.1)]`
-      : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
-  }
+  ${active
+                                    ? `${chipActiveClass} shadow-[0_2px_2px_rgba(0,0,0,0.1)]`
+                                    : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-[#fff5eb] hover:to-white hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                                  }
   active:translate-y-[1px]`}
                                 aria-pressed={active}
                                 title={c.label}
@@ -421,11 +423,10 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                                 key={task.id}
                                 onClick={() => handleSelectAndClose(task.id ?? null)}
                                 className={`w-full px-3 py-3 rounded-xl border text-sm font-semibold transition-all text-left
-  ${
-    isActive
-      ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
-      : 'bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:border-[#FFCB7D]'
-  }
+  ${isActive
+                                    ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[#f0a93a] shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
+                                    : 'bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:border-[#FFCB7D]'
+                                  }
   active:translate-y-[1px]`}
                                 title={task.name ?? ''}
                                 type="button"

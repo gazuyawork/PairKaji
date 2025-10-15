@@ -362,17 +362,23 @@ export default function EditTaskModal({
     setNameError(null);
 
     const normalizedCat = normalizeCategory(editedTask.category);
+    /**
+     * ポイント：
+     * - 未選択（= normalizeCategory が undefined）なら空文字 '' を入れる。
+     *   → 親の "undefined は送らない" 実装でも空文字は送られるため、上書きが発生する。
+     * - Firestore 側では '' を受け取ったら deleteField() に変換して物理削除推奨（後述）。
+     */
     const transformed: Task = {
       ...editedTask,
       users: [...editedUsers],
       userIds: [...editedUsers],
       daysOfWeek: editedTask.daysOfWeek.map((d) => toDayNumber(d)) as Task['daysOfWeek'],
       private: isPrivate,
-      // ★ UI整合のため、複製モード時は表示名にも「_コピー」を付与
       name: shouldForkPrivate
         ? (editedTask.name?.endsWith('_コピー') ? editedTask.name : `${editedTask.name}_コピー`)
         : editedTask.name,
-      category: normalizedCat,
+      // ★ ここを変更
+      category: (normalizedCat ?? ('' as unknown as Task['category'])),
     } as Task;
 
     setIsSaving(true);
