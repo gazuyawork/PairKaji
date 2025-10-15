@@ -69,6 +69,7 @@ type TodoDoc = {
   unit?: string;
   imageUrl?: string | null;
   referenceUrls?: string[];
+  referenceUrlLabels?: string[];
   recipe?: {
     ingredients?: unknown[];
     steps?: string[];
@@ -614,6 +615,7 @@ export const updateTodoInTask = async (
     imageUrl?: string | null;
     recipe?: { ingredients: unknown[]; steps: string[] } | null;
     referenceUrls?: string[];
+    referenceUrlLabels?: string[];
     /** 旅行時の時間帯。null指定でフィールド削除 */
     timeStart?: string | null;
     timeEnd?: string | null;
@@ -662,6 +664,24 @@ export const updateTodoInTask = async (
       ? updates.referenceUrls.filter((u): u is string => typeof u === 'string' && u.trim() !== '')
       : [];
     next = { ...next, referenceUrls: urls };
+  }
+
+  // --- referenceUrlLabels（配列を整える） ← 追加 ---
+  if (typeof updates.referenceUrlLabels !== 'undefined') {
+    const labels = Array.isArray(updates.referenceUrlLabels)
+      ? updates.referenceUrlLabels.map((s) =>
+          typeof s === 'string' ? s.trim() : ''
+        )
+      : [];
+
+    // もし URL 数とラベル数がズレていれば、URL数に合わせて切り詰め/穴埋め
+    const urlCount = Array.isArray(next.referenceUrls) ? next.referenceUrls.length : 0;
+    const normalized =
+      urlCount > 0
+        ? Array.from({ length: urlCount }, (_ , i) => labels[i] ?? '')
+        : [];
+
+    next = { ...next, referenceUrlLabels: normalized };
   }
 
   // --- imageUrl の扱い ---
