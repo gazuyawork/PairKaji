@@ -358,7 +358,7 @@ export default function TaskCard({
             {/* 1行目：タスク名 + フラグ */}
             <div className="flex items-center gap-1 min-w-0">
               {task.flagged && <Flag className="text-red-500 w-4 h-4 shrink-0" />}
-              <span className="text-gray-800 font-normal font-sans truncate">{task.name}</span>
+              <span className="text-[#5E5E5E] font-bold font-sans truncate">{task.name}</span>
               {/* ★ 削除: 以前ここにあった備考Infoアイコンは右側（ポイント左）へ移動 */}
             </div>
             {/* 2行目：日付・曜日・時間 */}
