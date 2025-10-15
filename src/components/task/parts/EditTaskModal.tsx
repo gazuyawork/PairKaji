@@ -35,13 +35,35 @@ type CategoryOption = {
   key: TaskCategory;
   label: TaskCategory;
   Icon: LucideIcon;
-  iconColor: string;
-  selectedIconColor?: string;
+  iconColor: string;          // 非選択時のアイコン色
+  selectedIconColor?: string; // 選択時のアイコン色
+  selectedBg: string;         // ★選択時のボタン背景（Tailwindクラス）
 };
 const CATEGORY_OPTIONS: CategoryOption[] = [
-  { key: '料理', label: '料理', Icon: Utensils, iconColor: 'text-emerald-500', selectedIconColor: 'text-white' },
-  { key: '買い物', label: '買い物', Icon: ShoppingCart, iconColor: 'text-sky-500', selectedIconColor: 'text-white' },
-  { key: '旅行', label: '旅行', Icon: Plane, iconColor: 'text-orange-500', selectedIconColor: 'text-white' },
+  {
+    key: '料理',
+    label: '料理',
+    Icon: Utensils,
+    iconColor: 'text-emerald-500',
+    selectedIconColor: 'text-white',
+    selectedBg: 'from-emerald-500 to-emerald-600', // ★
+  },
+  {
+    key: '買い物',
+    label: '買い物',
+    Icon: ShoppingCart,
+    iconColor: 'text-sky-500',
+    selectedIconColor: 'text-white',
+    selectedBg: 'from-sky-500 to-sky-600', // ★
+  },
+  {
+    key: '旅行',
+    label: '旅行',
+    Icon: Plane,
+    iconColor: 'text-orange-500',
+    selectedIconColor: 'text-white',
+    selectedBg: 'from-orange-500 to-orange-600', // ★
+  },
 ];
 
 type TaskWithNote = Task & { note?: string; category?: TaskCategory };
@@ -584,7 +606,7 @@ export default function EditTaskModal({
               style={{ scrollbarWidth: 'none' }}
               aria-label="カテゴリ一覧（横スクロール）"
             >
-              {CATEGORY_OPTIONS.map(({ key, label, Icon, iconColor, selectedIconColor }) => {
+              {CATEGORY_OPTIONS.map(({ key, label, Icon, iconColor, selectedIconColor, selectedBg }) => {
                 const selected = eqCat(editedTask.category, key);
                 return (
                   <button
@@ -597,8 +619,8 @@ export default function EditTaskModal({
                       'inline-flex items-center gap-2 px-3 py-2 rounded-full border transition',
                       'shrink-0 snap-start',
                       selected
-                        ? 'border-[#FFCB7D] bg-yellow-500 text-white'
-                        : 'border-gray-300 text-gray-600 opacity-80',
+                        ? `bg-gradient-to-b ${selectedBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]` // ★カテゴリ色で発光
+                        : 'bg-white border-gray-300 text-gray-700 opacity-90 hover:opacity-100',
                     ].join(' ')}
                     title={label}
                   >
