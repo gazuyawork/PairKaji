@@ -65,7 +65,7 @@ const isPositiveNumber = (s: string) => /^\d+(\.\d+)?$/.test(s);
 const genId = () => {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch {}
+  } catch { }
   return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 };
 
@@ -118,8 +118,7 @@ function useStableArray<T>(value: T[], equal: (a: T[], b: T[]) => boolean) {
 }
 
 /**
- * useSortable の戻り値から listeners 型を推論し、
- * 外部に公開されていない SyntheticListenerMap へ依存しない。
+ * useSortable の戻り値から listeners 型を推論し、外部に公開されていない SyntheticListenerMap へ依存しない。
  */
 type DragHandleRenderProps = {
   attributes: DraggableAttributes;
@@ -238,63 +237,67 @@ function SortableStepRow({
 }
 
 /* =========
-  バリデーション共通計算（nameText のオーバーレイを考慮可能）
+  バリデーション（行ごとに複数エラーを安定表示）
   ========= */
+function computeRowErrors(
+  ing: Ingredient,
+  idx: number,
+  amountText: Record<string, string>,
+  nameOverlay?: Record<string, string>
+): string[] {
+  const errs: string[] = [];
+  const rawAmount =
+    amountText[ing.id] !== undefined ? amountText[ing.id] : (ing.amount != null ? String(ing.amount) : '');
+  const normalizedAmt = toHalfWidth((rawAmount ?? '')).replace(',', '.').trim();
+  const effectiveName = (nameOverlay?.[ing.id] ?? ing.name ?? '').trim();
+
+  // 空行（完全未入力）はスキップ
+  const isBlank =
+    effectiveName === '' &&
+    (ing.unit === '適量') &&
+    (normalizedAmt === '' || normalizedAmt === '-') &&
+    ing.amount == null;
+  if (isBlank) return errs;
+
+  // 名前必須：数量入力あり or 単位が「適量」以外
+  if (effectiveName === '' && (normalizedAmt !== '' || ing.unit !== '適量')) {
+    errs.push('材料名を入力してください。');
+  }
+
+  if (ing.unit !== '適量') {
+    if (normalizedAmt === '' && ing.amount == null) {
+      errs.push('数量を入力してください。');
+    } else if (normalizedAmt !== '' && !isPositiveNumber(normalizedAmt)) {
+      errs.push('数量は正の数で入力してください。');
+    }
+  } else {
+    // 適量のとき数量は不要
+    if (normalizedAmt !== '' || ing.amount != null) {
+      errs.push('単位が「適量」のときは数量は空にしてください。');
+    }
+  }
+
+  return errs;
+}
+
 function computeIngredientValidation(
   ingredients: Ingredient[],
   amountText: Record<string, string>,
   nameOverlay?: Record<string, string>
 ) {
-  const invalidName = new Set<string>();
-  const invalidAmount = new Set<string>();
-  const msgs: string[] = [];
-
-  ingredients.forEach((ing, idx) => {
-    const rawText =
-      amountText[ing.id] !== undefined
-        ? amountText[ing.id]
-        : (ing.amount != null ? String(ing.amount) : '');
-    const normalized = toHalfWidth((rawText ?? '')).replace(',', '.').trim();
-
-    // name は未確定バッファを優先（保存時など）
-    const effectiveName = (nameOverlay?.[ing.id] ?? ing.name).trim();
-
-    const isBlankRow =
-      effectiveName === '' &&
-      ing.unit === '適量' &&
-      (normalized === '' || normalized === '-') &&
-      ( ing.amount == null );
-
-    if (isBlankRow) return;
-
-    // 材料名必須（数量あり or 単位が適量以外）
-    if (effectiveName === '' && (normalized !== '' || ing.unit !== '適量')) {
-      invalidName.add(ing.id);
-      msgs.push(`${indexToLetters(idx)} の材料名を入力してください。`);
-    }
-
-    if (ing.unit !== '適量') {
-      if (normalized === '') {
-        invalidAmount.add(ing.id);
-        if (effectiveName !== '') {
-          msgs.push(`${indexToLetters(idx)} の数量を入力してください（単位が「${ing.unit}」のため必須です）。`);
-        } else {
-          msgs.push(`${indexToLetters(idx)} の数量を入力してください。`);
-        }
-      } else if (!isPositiveNumber(normalized)) {
-        invalidAmount.add(ing.id);
-        msgs.push(`${indexToLetters(idx)} の数量は数字で入力してください（正の整数/小数）。`);
-      }
-    } else {
-      // 単位が適量なのに数量が入っている（UI保険）
-      if (normalized !== '' && normalized !== '-') {
-        invalidAmount.add(ing.id);
-        msgs.push(`${indexToLetters(idx)} は単位が「適量」のため数量は入力しないでください。`);
-      }
-    }
+  const errorsPerRow: string[][] = ingredients.map((ing, idx) =>
+    computeRowErrors(ing, idx, amountText, nameOverlay)
+  );
+  const invalidNameIds = new Set<string>();
+  const invalidAmountIds = new Set<string>();
+  errorsPerRow.forEach((errs, i) => {
+    if (errs.some((e) => e.includes('材料名'))) invalidNameIds.add(ingredients[i].id);
+    if (errs.some((e) => e.includes('数量'))) invalidAmountIds.add(ingredients[i].id);
   });
-
-  return { invalidNameIds: invalidName, invalidAmountIds: invalidAmount, errorMessages: msgs };
+  const errorMessages = errorsPerRow.flatMap((arr, i) =>
+    arr.map((m) => `${indexToLetters(i)} ${m}`)
+  );
+  return { errorsPerRow, invalidNameIds, invalidAmountIds, errorMessages };
 }
 
 /** RecipeEditor 本体（forwardRef + 命令的ハンドルを公開） */
@@ -315,7 +318,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   // 数量：入力中の表示専用テキスト（id -> text）
   const [amountText, setAmountText] = useState<Record<string, string>>({});
 
-  // ★ 材料名：入力中の表示専用テキスト（id -> text）
+  // 材料名：入力中の表示専用テキスト（id -> text）
   const [nameText, setNameText] = useState<Record<string, string>>({});
 
   // 材料：編集中
@@ -330,7 +333,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     () => value.steps.map(() => `step_${genId()}`)
   );
 
-  // 保存押下でエラー表示を有効化（親の保存ボタンで validateAndShowErrors() を呼ぶ）
+  // 保存押下でエラー表示を有効化
   const [showErrors, setShowErrors] = useState(false);
 
   // フォーカス管理
@@ -390,7 +393,6 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
       const next: Record<string, string> = { ...prev };
       const currentIds = new Set(ingredients.map((i) => i.id));
 
-      // 追加分を補完
       for (const ing of ingredients) {
         const desired = ing.amount != null ? String(ing.amount) : '';
         if (next[ing.id] === undefined) {
@@ -398,33 +400,29 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
           changed = true;
         }
       }
-      // 削除分を掃除
       for (const id of Object.keys(next)) {
         if (!currentIds.has(id)) {
           delete next[id];
           changed = true;
         }
       }
-
       return changed ? next : prev;
     });
   }, [ingredients]);
 
-  // ★ 材料名テキストの初期化・同期（差分更新）
+  // 材料名テキストの初期化・同期（差分更新）
   useEffect(() => {
     setNameText((prev) => {
       let changed = false;
       const next: Record<string, string> = { ...prev };
       const currentIds = new Set(ingredients.map((i) => i.id));
 
-      // 追加分：未編集の行は既存 name を初期表示
       for (const ing of ingredients) {
         if (next[ing.id] === undefined) {
           next[ing.id] = ing.name ?? '';
           changed = true;
         }
       }
-      // 削除分を掃除
       for (const id of Object.keys(next)) {
         if (!currentIds.has(id)) {
           delete next[id];
@@ -435,17 +433,17 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     });
   }, [ingredients]);
 
-  // 材料の必須/数量バリデーション（保存時に表示）
-  // 「空行」は: name='', unit=適量, 数量空 -> 対象外
-  const { invalidNameIds, invalidAmountIds, errorMessages } = useMemo(
-    () => computeIngredientValidation(ingredients, amountText),
-    [ingredients, amountText]
-  );
+  // 材料のバリデーション（行ごと）
+  const { errorsPerRow, errorMessages } = useMemo(() => {
+    const result = computeIngredientValidation(ingredients, amountText, nameText);
+    // 未使用フィールドはここでは返さない（validateAndShowErrors 内で都度利用）
+    return { errorsPerRow: result.errorsPerRow, errorMessages: result.errorMessages };
+  }, [ingredients, amountText, nameText]);
 
   // showErrors 中は、親へ「いまエラーがあるか」を通知（保存ボタンの活性制御に使用）
   useEffect(() => {
-    onValidityChange?.(errorMessages.length > 0);
-  }, [errorMessages, onValidityChange]);
+    onValidityChange?.(showErrors ? errorMessages.length > 0 : false);
+  }, [errorMessages, onValidityChange, showErrors]);
 
   // プレビュー時に空行を非表示にするためのフィルタ
   const visibleIngredients = useMemo(
@@ -505,7 +503,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     });
   };
 
-  // ★ 材料名の確定（ローカルバッファ -> ingredients へ反映）
+  // 材料名の確定（ローカルバッファ -> ingredients へ反映）
   const commitIngredientName = (id: string) => {
     const text = (nameText[id] ?? '').toString();
     setIngredients((prev) => prev.map((i) => (i.id === id ? { ...i, name: text } : i)));
@@ -535,22 +533,18 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     }));
   };
 
-  // 単位変更時の数量フォーカス自動移動を削除
+  // 単位変更（自動フォーカス移動なし）
   const changeIngredientUnit = (id: string, unit: string) => {
     setIngredients((prev) => {
       const next = prev.map((i) =>
         i.id === id ? { ...i, unit, amount: unit === '適量' ? null : i.amount } : i
       );
-      // ★ 削除: ここにあった数量入力へ focus()/select() する処理を削除しました
       return next;
     });
 
     // 適量に戻した場合は表示テキストも空に
     if (unit === '適量') {
-      setAmountText((m) => {
-        if (m[id] === '') return m;
-        return { ...m, [id]: '' };
-      });
+      setAmountText((m) => (m[id] === '' ? m : { ...m, [id]: '' }));
     }
   };
 
@@ -595,7 +589,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
   const changeStep = (idx: number, val: string) =>
     setSteps((prev) => prev.map((s, i) => (i === idx ? val : s)));
 
-  // Enterで連続追加（材料名）: 先に確定してから行追加
+  // Enterで連続追加（材料名）
   const onIngredientNameKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     idx: number,
@@ -608,7 +602,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
     addIngredientAt(idx);
   };
 
-  // Enterで連続追加（数量：確定→次の材料行追加）
+  // Enterで連続追加（数量）
   const onAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, id: string, idx: number) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
     if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return;
@@ -650,13 +644,13 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
       commitAllAmounts: commitAllAmountsSync,
       getValue: () => ({ ingredients, steps, referenceUrls: value.referenceUrls ?? [] }),
       validateAndShowErrors: () => {
-        // nameText を加味した直近のバリデーション結果を算出
+        // nameText を加味して判定
         const computed = computeIngredientValidation(ingredients, amountText, nameText);
 
-        // エラー表示ON
+        // エラー表示ON（固定化してチカチカ防止）
         setShowErrors(true);
 
-        // nameText を ingredients にコミットしておく（UIと実データの同期）
+        // nameText を ingredients にコミット（UIと実データの同期）
         setIngredients((prev) =>
           prev.map((i) => (nameText[i.id] !== undefined ? { ...i, name: nameText[i.id] } : i))
         );
@@ -771,51 +765,54 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                                 setEditingId((curr) => (curr === ing.id ? null : curr));
                               }}
                               placeholder="材料名（例：玉ねぎ）"
-                              className="col-span-5 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
+                              className="col-span-6 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500"
                               readOnly={isPreview}
                               aria-readonly={isPreview}
-                              aria-invalid={showErrors && (invalidNameIds.has(ing.id))}
+                              aria-invalid={showErrors && errorsPerRow[idx].some((m) => m.includes('材料名'))}
                             />
 
-                            {/* 数量（右寄せ・約6ch幅） */}
-                            <input
-                              ref={(el) => { amountRefs.current[ing.id] = el; }}
-                              inputMode="decimal"
-                              value={
-                                ing.unit === '適量'
-                                  ? '-'
-                                  : (
-                                    (amountText[ing.id] !== undefined)
-                                      ? amountText[ing.id]
-                                      : (ing.amount != null ? String(ing.amount) : '')
-                                  )
-                              }
-                              onChange={(e) => onAmountInputChange(ing.id, e.target.value)}
-                              onBlur={() => commitAmount(ing.id)}
-                              onKeyDown={(e) => onAmountKeyDown(e, ing.id, idx)}
-                              placeholder="数量"
-                              className="col-span-2 border-0 border-b border-gray-300 bg-transparent pr-2 py-2 text-sm text-right focus:outline-none focus:ring-0 focus:border-blue-500 disabled:text-gray-400"
-                              style={{ width: '6ch' }}
-                              readOnly={isPreview}
-                              aria-readonly={isPreview}
-                              disabled={ing.unit === '適量' || isPreview}
-                              aria-invalid={showErrors && (ing.unit !== '適量' && invalidAmountIds.has(ing.id))}
-                            />
+                            {/* 数量＋単位（隙間なし・幅を逆転） */}
+                            <div className="col-span-3 flex items-end">
+                              {/* 数量（やや狭め・固定幅） */}
+                              <input
+                                ref={(el) => { amountRefs.current[ing.id] = el; }}
+                                inputMode="decimal"
+                                value={
+                                  ing.unit === '適量'
+                                    ? '-'
+                                    : (
+                                      (amountText[ing.id] !== undefined)
+                                        ? amountText[ing.id]
+                                        : (ing.amount != null ? String(ing.amount) : '')
+                                    )
+                                }
+                                onChange={(e) => onAmountInputChange(ing.id, e.target.value)}
+                                onBlur={() => commitAmount(ing.id)}
+                                onKeyDown={(e) => onAmountKeyDown(e, ing.id, idx)}
+                                placeholder="数量"
+                                className="flex-[1] border-0 border-b border-gray-300 bg-transparent pr-0 py-2 text-sm text-right focus:outline-none focus:ring-0 focus:border-blue-500 disabled:text-gray-400"
+                                style={{ width: '4ch' }} // ← 数量を狭め
+                                readOnly={isPreview}
+                                aria-readonly={isPreview}
+                                disabled={ing.unit === '適量' || isPreview}
+                                aria-invalid={showErrors && errorsPerRow[idx].some((m) => m.includes('数量'))}
+                              />
 
-                            {/* 単位 */}
-                            <select
-                              value={ing.unit}
-                              onChange={(e) => changeIngredientUnit(ing.id, e.target.value)}
-                              className="col-span-2 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 text-center ml-1"
-                              disabled={isPreview}
-                              aria-disabled={isPreview}
-                            >
-                              {UNIT_OPTIONS.map((u) => (
-                                <option key={u} value={u}>
-                                  {u}
-                                </option>
-                              ))}
-                            </select>
+                              {/* 単位（やや広め） */}
+                              <select
+                                value={ing.unit}
+                                onChange={(e) => changeIngredientUnit(ing.id, e.target.value)}
+                                className="flex-[2] border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm appearance-none focus:outline-none focus:ring-0 focus:border-blue-500 text-center"
+                                disabled={isPreview}
+                                aria-disabled={isPreview}
+                              >
+                                {UNIT_OPTIONS.map((u) => (
+                                  <option key={u} value={u}>
+                                    {u}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
 
                             {/* 削除（×）：2件以上のとき表示 */}
                             {!isPreview && ingredients.length >= 2 && (
@@ -828,22 +825,25 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                                 <span aria-hidden className="text-lg leading-none">×</span>
                               </button>
                             )}
+
+                            {/* ▼ 行のエラー（対象箇所直下に固定表示） */}
+                            {showErrors && errorsPerRow[idx].length > 0 && (
+                              <div className="col-span-10 col-start-3">
+                                <ul className="text-xs text-red-500 list-disc list-inside">
+                                  {errorsPerRow[idx].map((msg, i) => (
+                                    <li key={`ingerr-${ing.id}-${i}`}>{msg}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </>
                         )}
                       </SortableIngredientRow>
                     ))}
                   </div>
+
                 </SortableContext>
               </DndContext>
-
-              {/* 保存押下後のみ、材料エラー詳細を表示 */}
-              {showErrors && errorMessages.length > 0 && (
-                <div className="mt-3 text-sm text-red-600">
-                  {errorMessages.map((msg, i) => (
-                    <div key={i}>{msg}</div>
-                  ))}
-                </div>
-              )}
             </>
           ) : (
             // プレビュー
@@ -981,7 +981,7 @@ const RecipeEditor = forwardRef<RecipeEditorHandle, Props>(function RecipeEditor
                   </div>
                   <AutoResizeTextarea
                     value={s}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     placeholder="手順を入力"
                     className="col-span-11 w-full border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:ring-0"
                     readOnly

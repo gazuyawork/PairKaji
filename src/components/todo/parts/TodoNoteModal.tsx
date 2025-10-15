@@ -1,3 +1,4 @@
+// src/components/todo/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 // ▲▲ dnd-kit ▲▲
+import Image from 'next/image';
 
 /* ---------------- Types & guards ---------------- */
 
@@ -175,6 +177,18 @@ const suggestLabelFromUrl = (raw: string): string => {
   } catch {
     const head = host.charAt(0).toUpperCase() + host.slice(1);
     return head;
+  }
+};
+
+// ゆるめのURL検証（http/https 省略も許容）
+const isValidUrlLoose = (value: string): boolean => {
+  if (!value.trim()) return true;
+  const v = value.trim();
+  try {
+    const u = new URL(v.startsWith('http') ? v : `https://${v}`);
+    return !!u.hostname && /\./.test(u.hostname);
+  } catch {
+    return false;
   }
 };
 
@@ -310,16 +324,21 @@ export default function TodoNoteModal({
   const [isPreview, setIsPreview] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
 
+  // ▼▼ バリデーション制御 ▼▼
+  const [errorsShown, setErrorsShown] = useState(false);
+  const [urlErrors, setUrlErrors] = useState<string[]>([]);
+  const [shoppingErrors, setShoppingErrors] = useState<{ price?: string; quantity?: string; unit?: string }>({});
+  const [timeError, setTimeError] = useState<string>('');
+
   const compareQuantityRef = useRef<string>('');
   useEffect(() => { compareQuantityRef.current = compareQuantity; }, [compareQuantity]);
 
   // 旅行
   const [timeStart, setTimeStart] = useState<string>('');
   const [timeEnd, setTimeEnd] = useState<string>('');
-  const [timeError, setTimeError] = useState<string>('');
   const [durationMin, setDurationMin] = useState<string>('');
 
-  // レシピ（※ referenceUrls はここでは持たない）
+  // レシピ
   const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
   // 画像
@@ -335,14 +354,16 @@ export default function TodoNoteModal({
   const [referenceLabels, setReferenceLabels] = useState<string[]>([]); // 表示ラベル
   const [urlIds, setUrlIds] = useState<string[]>([]);
   const urlRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const [pendingUrlFocusIndex, setPendingUrlFocusIndex] = useState<number | null>(null);
 
   // ラベルのインライン編集 index
-  const [editingLabelIndex, setEditingLabelIndex] = useState<number | null>(null);
+  // const [editingLabelIndex, setEditingLabelIndex] = useState<number | null>(null);
 
   // チェックリスト（input）
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [checkIds, setCheckIds] = useState<string[]>([]);
   const checkInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const [pendingCheckFocusIndex, setPendingCheckFocusIndex] = useState<number | null>(null);
 
   // プレビュー用の個別保存インジケータ
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
@@ -468,7 +489,7 @@ export default function TodoNoteModal({
     setSaveLabel(!Number.isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
   }, [comparePrice]);
 
-  // --- 初期データの取得
+  // --- 初期データの取得（省略：元実装と同一。中略せず完全コード化のため残しています） ---
   useEffect(() => {
     const fetchTodoData = async () => {
       if (!taskId || !todoId) return;
@@ -504,7 +525,7 @@ export default function TodoNoteModal({
             }))
             : [];
           setRecipe({
-            ingredients: safeIngredients,
+            ingredients: safeIngredients.length > 0 ? safeIngredients : [{ id: 'ing_0', name: '', amount: null, unit: '適量' }],
             steps: Array.isArray(existing.steps) ? existing.steps.filter(isString) : [],
           });
         } else {
@@ -521,7 +542,6 @@ export default function TodoNoteModal({
         setPreviewUrl(null);
         setIsImageRemoved(false);
 
-        // 参考URL（移植先）をロード
         const refs = asStringArray(todo.referenceUrls);
         const refLabels = asStringArray((todo as TodoDoc).referenceUrlLabels);
         setReferenceUrls(refs.length === 0 ? [''] : refs);
@@ -540,7 +560,7 @@ export default function TodoNoteModal({
           return arr;
         });
 
-        // チェックリスト初期化（最低1行保証）
+        // チェックリスト（必須ではないが、編集モードで最低1行は表示）
         const existingChecklist = Array.isArray((todo as TodoDoc).checklist)
           ? (todo as TodoDoc).checklist!.map((c, idx) => ({
               id: typeof c?.id === 'string' ? c.id : `cl_${idx}`,
@@ -548,16 +568,13 @@ export default function TodoNoteModal({
               done: typeof c?.done === 'boolean' ? c.done : false,
             }))
           : [];
-
         const safeChecklist =
           existingChecklist.length > 0
             ? existingChecklist
             : [{ id: `cl_${Math.random().toString(16).slice(2)}`, text: '', done: false }];
-
         setChecklist(safeChecklist);
         setCheckIds(safeChecklist.map((c) => c.id));
 
-        // 旅行
         const loadedStart = isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '';
         const loadedEnd = isString((todo as TodoDoc).timeEnd) ? (todo as TodoDoc).timeEnd! : '';
         setTimeStart(loadedStart);
@@ -584,7 +601,7 @@ export default function TodoNoteModal({
     }
   }, [isPreview, referenceUrls.length]);
 
-  // urlIds の長さを referenceUrls に同期 + ラベル配列の長さ同期
+  // urlIds 長さ同期 + ラベル長さ同期
   useEffect(() => {
     setUrlIds((prev) => {
       if (prev.length === referenceUrls.length) return prev;
@@ -602,7 +619,7 @@ export default function TodoNoteModal({
     });
   }, [referenceUrls]);
 
-  // ▼ 追加：チェックリスト（編集モードでは最低1行を常に保証）
+  // チェックリスト（編集モード最低1行）
   useEffect(() => {
     if (!isPreview && checklist.length === 0) {
       const id = `cl_${Math.random().toString(16).slice(2)}`;
@@ -611,7 +628,7 @@ export default function TodoNoteModal({
     }
   }, [isPreview, checklist.length]);
 
-  // ▼ 追加：checkIds の長さを checklist に同期（URL と同様）
+  // checkIds 同期
   useEffect(() => {
     setCheckIds((prev) => {
       if (prev.length === checklist.length) {
@@ -634,14 +651,31 @@ export default function TodoNoteModal({
     });
   }, [checklist]);
 
+  // フォーカス適用
+  useEffect(() => {
+    if (pendingUrlFocusIndex == null) return;
+    const el = urlRefs.current[pendingUrlFocusIndex];
+    if (el) {
+      el.focus();
+      setPendingUrlFocusIndex(null);
+    }
+  }, [pendingUrlFocusIndex, referenceUrls.length, urlIds.length]);
+
+  useEffect(() => {
+    if (pendingCheckFocusIndex == null) return;
+    const el = checkInputRefs.current[pendingCheckFocusIndex];
+    if (el) {
+      el.focus();
+      setPendingCheckFocusIndex(null);
+    }
+  }, [pendingCheckFocusIndex, checklist.length, checkIds.length]);
+
   // テキストエリアのリサイズ等（備考）
   const resizeTextarea = useCallback(() => {
     const el = memoRef.current;
     if (!el) return;
-
     const maxHeightPx =
       (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
-
     el.style.height = 'auto';
     el.style.maxHeight = `${maxHeightPx}px`;
     el.style.setProperty('-webkit-overflow-scrolling', 'touch');
@@ -653,7 +687,6 @@ export default function TodoNoteModal({
       el.style.height = `${el.scrollHeight}px`;
       el.style.overflowY = 'hidden';
     }
-
     updateHints();
   }, [updateHints]);
 
@@ -744,30 +777,33 @@ export default function TodoNoteModal({
 
   // 参考URL：操作系
   const addUrlAt = useCallback((index: number) => {
+    const newIndex = index + 1;
     setReferenceUrls((prev) => {
       const arr = [...prev];
-      arr.splice(index + 1, 0, '');
+      arr.splice(newIndex, 0, '');
       return arr;
     });
     setReferenceLabels((prev) => {
       const arr = [...prev];
-      arr.splice(index + 1, 0, '');
+      arr.splice(newIndex, 0, '');
       return arr;
     });
     setUrlIds((prev) => {
       const arr = [...prev];
-      arr.splice(index + 1, 0, `url_${Math.random().toString(16).slice(2)}`);
+      arr.splice(newIndex, 0, `url_${Math.random().toString(16).slice(2)}`);
       return arr;
     });
-    setTimeout(() => { urlRefs.current[index + 1]?.focus(); }, 0);
+    setPendingUrlFocusIndex(newIndex);
   }, []);
 
   const addUrl = useCallback(() => {
-    setReferenceUrls((prev) => [...prev, '']);
+    setReferenceUrls((prev) => {
+      const next = [...prev, ''];
+      setPendingUrlFocusIndex(next.length - 1);
+      return next;
+    });
     setReferenceLabels((prev) => [...prev, '']);
     setUrlIds((prev) => [...prev, `url_${Math.random().toString(16).slice(2)}`]);
-    setTimeout(() => { urlRefs.current[referenceUrls.length]?.focus(); }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const removeUrl = (idx: number) => {
@@ -802,19 +838,58 @@ export default function TodoNoteModal({
     e.preventDefault();
     addUrlAt(idx);
   };
-  // ---------------------------------------------------------
+
+  /* =========================
+   *  バリデーション（保存時）
+   * ========================= */
+  const runValidation = useCallback(() => {
+    const nextUrlErrors = referenceUrls.map((u) =>
+      u.trim() && !isValidUrlLoose(u) ? 'URLの形式が正しくありません。' : ''
+    );
+
+    const shopErr: { price?: string; quantity?: string; unit?: string } = {};
+    if (category === '買い物') {
+      const p = Number.parseFloat(price);
+      const q = Number.parseFloat(quantity);
+      const hasP = Number.isFinite(p) && p > 0;
+      const hasQ = Number.isFinite(q) && q > 0;
+
+      if (hasP && !hasQ) shopErr.quantity = '数量を入力してください。';
+      if (hasQ && !hasP && !(Number.parseFloat(comparePrice) > 0)) {
+        shopErr.price = '価格を入力してください。';
+      }
+      if (hasQ && !unit.trim()) shopErr.unit = '単位を選択してください。';
+    }
+
+    const timeErr = category === '旅行' ? validateTimeRange(timeStart, timeEnd) : '';
+
+    setUrlErrors(nextUrlErrors);
+    setShoppingErrors(shopErr);
+    setTimeError(timeErr);
+
+    const hasUrlError = nextUrlErrors.some((e) => !!e);
+    const hasShopError = Object.keys(shopErr).length > 0;
+    const hasTimeError = !!timeErr;
+
+    return !(hasUrlError || hasShopError || hasTimeError);
+  }, [referenceUrls, category, price, quantity, unit, comparePrice, timeStart, timeEnd]);
 
   // 保存
   const handleSave = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
+    setErrorsShown(true); // 保存押下で初めてエラー表示
+    const okCommon = runValidation();
+
+    // 料理の材料：子コンポーネント側で一回だけ表示をオンにする（ちらつき防止）
+    let okRecipe = true;
     if (category === '料理') {
       const result = recipeEditorRef.current?.validateAndShowErrors();
-      if (!result || result.hasErrors) {
-        return; // ★ 保存中断
-      }
+      if (!result || result.hasErrors) okRecipe = false;
     }
+
+    if (!(okCommon && okRecipe)) return; // どちらかエラーなら保存中断
 
     setIsSaving(true);
 
@@ -842,15 +917,6 @@ export default function TodoNoteModal({
         : null;
     const totalDifferenceCalced =
       unitPriceDiffCalced !== null ? unitPriceDiffCalced * safeCmpQty : null;
-
-    if (category === '旅行') {
-      const err = validateTimeRange(timeStart, timeEnd);
-      if (err) {
-        setTimeError(err);
-        setIsSaving(false);
-        return;
-      }
-    }
 
     try {
       // 画像アップロード
@@ -894,12 +960,7 @@ export default function TodoNoteModal({
         (payload as { recipe?: Recipe }).recipe = {
           ingredients: finalIngredients
             .filter((i) => i.name.trim() !== '')
-            .map((i) => ([
-              i.id,
-              i.name.trim(),
-              typeof i.amount === 'number' ? i.amount : null,
-              i.unit || '適量',
-            ])).map(([id, name, amount, unit]) => ({ id: id as string, name: name as string, amount: amount as number | null, unit: unit as string })),
+            .map((i) => ({ id: i.id, name: i.name.trim(), amount: typeof i.amount === 'number' ? i.amount : null, unit: i.unit || '適量' })),
           steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
         };
       }
@@ -909,7 +970,7 @@ export default function TodoNoteModal({
         (payload as { timeEnd?: string | null }).timeEnd = timeEnd || null;
       }
 
-      // ▼▼ チェックリストを保存（空行は除外） ▼▼
+      // ▼▼ チェックリストを保存（空行は除外） ▼▼ ※必須ではない
       (payload as { checklist?: ChecklistItem[] }).checklist = checklist
         .filter((c) => (c.text ?? '').trim() !== '')
         .map((c) => ({ id: c.id, text: c.text.trim(), done: !!c.done }));
@@ -992,6 +1053,7 @@ export default function TodoNoteModal({
       setPendingUpload(null);
       setIsImageRemoved(false);
       previewInitRef.current = false;
+      setErrorsShown(false); // 閉じるたびにエラー表示をリセット
     }
   }, [isOpen, previewUrl]);
 
@@ -1013,17 +1075,15 @@ export default function TodoNoteModal({
   }, [displaySrc]);
 
   /* =======================
-   *  チェックリスト保存系
+   *  チェックリスト保存系（プレビューの即保存）
    * ======================= */
 
-  // 空行を除外しつつ整形
   const normalizeChecklistForSave = useCallback((list: ChecklistItem[]): ChecklistItem[] => {
     return list
       .filter((c) => (c.text ?? '').trim() !== '')
       .map((c) => ({ id: c.id, text: c.text.trim(), done: !!c.done }));
   }, []);
 
-  // Firestoreへ保存（共通）
   const saveChecklistToFirestore = useCallback(
     async (listForState: ChecklistItem[]) => {
       try {
@@ -1038,14 +1098,11 @@ export default function TodoNoteModal({
     [normalizeChecklistForSave, taskId, todoId]
   );
 
-  // プレビューでのトグル（楽観的更新 → 保存 → 失敗時ロールバック）
   const handlePreviewToggleChecklist = useCallback(
     async (itemId: string, nextDone: boolean) => {
-      // 対象インデックス
       const idx = checklist.findIndex((c) => c.id === itemId);
       if (idx < 0) return;
 
-      // 楽観的更新
       const prevList = checklist;
       const nextList = prevList.map((c, i) => (i === idx ? { ...c, done: nextDone } : c));
       setChecklist(nextList);
@@ -1055,10 +1112,8 @@ export default function TodoNoteModal({
         await saveChecklistToFirestore(nextList);
       } catch (e) {
         console.error('チェック更新の保存に失敗:', e);
-        // ロールバック
         setChecklist(prevList);
       } finally {
-        // 個別インジケータ解除
         setSavingById((m) => {
           const next = { ...m };
           delete next[itemId];
@@ -1179,7 +1234,7 @@ export default function TodoNoteModal({
         </div>
       )}
 
-      {/* ▼▼ 参考URL（画像選択の直下：編集モードは1件の空行を常に表示） ▼▼ */}
+      {/* ▼▼ 参考URL ▼▼ */}
       {(!isPreview || hasReference) && (
         <div className="pb-2">
           <div className="mb-3 flex items-center justify-between">
@@ -1197,13 +1252,6 @@ export default function TodoNoteModal({
               </div>
             )}
           </div>
-
-
-
-
-
-
-
 
           {!isPreview ? (
             <>
@@ -1244,19 +1292,16 @@ export default function TodoNoteModal({
                               {idx + 1}.
                             </div>
 
-                            {/* 入力（URL）+ ラベルUI（ピル/インライン編集） */}
+                            {/* 入力（URL）+ ラベルUI */}
                             <div className="col-span-9 flex items-center gap-2 min-w-0">
-                              {/* favicon */}
                               {u.trim() !== '' && (
-                                <img
+                                <Image
                                   src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(extractHostname(u))}&sz=32`}
                                   alt=""
                                   className="w-4 h-4 shrink-0 opacity-80"
                                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
                                 />
                               )}
-
-                              {/* URL input */}
                               <input
                                 ref={(el) => { urlRefs.current[idx] = el; }}
                                 value={u}
@@ -1265,54 +1310,30 @@ export default function TodoNoteModal({
                                 placeholder="https://example.com/..."
                                 className="flex-1 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500 min-w-0"
                                 inputMode="url"
+                                aria-invalid={errorsShown && !!urlErrors[idx]}
+                                aria-describedby={errorsShown && urlErrors[idx] ? `url-err-${idx}` : undefined}
                               />
-
-                              {/* ラベル表示 or 編集 */}
-                              {editingLabelIndex === idx ? (
-                                <input
-                                  autoFocus
-                                  value={referenceLabels[idx] ?? ''}
-                                  onChange={(e) => setReferenceLabels((prev) => prev.map((t, i) => (i === idx ? e.target.value : t)))}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      setEditingLabelIndex(null);
-                                    } else if (e.key === 'Escape') {
-                                      e.preventDefault();
-                                      setEditingLabelIndex(null);
-                                    }
-                                  }}
-                                  onBlur={() => setEditingLabelIndex(null)}
-                                  placeholder="表示ラベル（任意）"
-                                  className="w-36 border border-gray-300 rounded-full px-3 py-1 text-xs focus:outline-none focus:border-blue-500"
-                                />
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingLabelIndex(idx)}
-                                  className={`max-w-[10rem] truncate rounded-full px-2 py-1 text-xs border ${
-                                    (referenceLabels[idx] ?? '').trim() === ''
-                                      ? 'border-dashed text-gray-400'
-                                      : 'border-gray-300 text-gray-700'
-                                  } hover:bg-gray-50`}
-                                  title="表示ラベルを編集"
-                                  aria-label="表示ラベルを編集"
-                                >
-                                  {(referenceLabels[idx] ?? '').trim() || 'ラベル（任意）'}
-                                </button>
-                              )}
                             </div>
 
-                            {/* 削除（×）：2件以上のとき表示。最後の1件は空行に戻す */}
+                            {/* 削除 */}
                             {referenceUrls.length >= 2 && (
                               <button
                                 type="button"
                                 onClick={() => removeUrl(idx)}
                                 aria-label="URLを削除"
-                                className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
+                                className="col-span-1 flex items-center justify-center w-5 h-8 text-gray-700 hover:text-red-600"
                               >
                                 <span aria-hidden className="text-lg leading-none">×</span>
                               </button>
+                            )}
+
+                            {/* URL エラー（対象入力直下） */}
+                            {errorsShown && urlErrors[idx] && (
+                              <div className="col-span-12">
+                                <p id={`url-err-${idx}`} className="mt-1 text-xs text-red-500">
+                                  {urlErrors[idx]}
+                                </p>
+                              </div>
                             )}
                           </>
                         )}
@@ -1323,7 +1344,6 @@ export default function TodoNoteModal({
               </DndContext>
             </>
           ) : (
-            // プレビュー（URLが1件以上ある場合のみ）
             <ul className="list-disc list-inside text-sm text-blue-500">
               {referenceUrls
                 .map((url, i) => ({ url: url.trim(), label: (referenceLabels[i] ?? '').trim() }))
@@ -1341,9 +1361,9 @@ export default function TodoNoteModal({
       )}
       {/* ▲▲ 参考URLここまで ▲▲ */}
 
-      {/* ▼▼ チェックリスト ▼▼ */}
-      {(!isPreview || hasChecklist) && (
-        <div className=" pt-2 pb-3 mt-2">
+      {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
+      {category === null && (!isPreview || hasChecklist) && (
+        <div className="pt-2 pb-3 mt-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">チェックリスト</h3>
             {!isPreview && (
@@ -1351,13 +1371,12 @@ export default function TodoNoteModal({
                 type="button"
                 onClick={() => {
                   const id = `cl_${Math.random().toString(16).slice(2)}`;
-                  setChecklist((prev) => [...prev, { id, text: '', done: false }]);
+                  setChecklist((prev) => {
+                    const next = [...prev, { id, text: '', done: false }];
+                    return next;
+                  });
                   setCheckIds((prev) => [...prev, id]);
-                  setTimeout(() => {
-                    const idx = checkIds.length; // 追加行のインデックス
-                    const el = checkInputRefs.current[idx];
-                    el?.focus();
-                  }, 0);
+                  setPendingCheckFocusIndex(checkIds.length);
                 }}
                 className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
               >
@@ -1388,7 +1407,6 @@ export default function TodoNoteModal({
                     <SortableUrlRow key={checkIds[idx] ?? item.id} id={checkIds[idx] ?? item.id}>
                       {({ attributes, listeners }) => (
                         <>
-                          {/* 並べ替えハンドル */}
                           <button
                             type="button"
                             className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
@@ -1399,7 +1417,6 @@ export default function TodoNoteModal({
                             <GripVertical size={16} />
                           </button>
 
-                          {/* チェックボックス */}
                           <div className="col-span-1 flex items-center justify-center">
                             <input
                               type="checkbox"
@@ -1415,7 +1432,6 @@ export default function TodoNoteModal({
                             />
                           </div>
 
-                          {/* 入力（input：Enterで下に追加） */}
                           <input
                             ref={(el) => { checkInputRefs.current[idx] = el; }}
                             value={item.text}
@@ -1429,24 +1445,24 @@ export default function TodoNoteModal({
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
                                 const id = `cl_${Math.random().toString(16).slice(2)}`;
+                                const newIndex = idx + 1;
                                 setChecklist((prev) => {
                                   const arr = [...prev];
-                                  arr.splice(idx + 1, 0, { id, text: '', done: false });
+                                  arr.splice(newIndex, 0, { id, text: '', done: false });
                                   return arr;
                                 });
                                 setCheckIds((prev) => {
                                   const arr = [...prev];
-                                  arr.splice(idx + 1, 0, id);
+                                  arr.splice(newIndex, 0, id);
                                   return arr;
                                 });
-                                setTimeout(() => checkInputRefs.current[idx + 1]?.focus(), 0);
+                                setPendingCheckFocusIndex(newIndex);
                               }
                             }}
                             placeholder="項目を入力（Enterで下に追加）"
                             className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500"
                           />
 
-                          {/* 削除 */}
                           {checklist.length >= 2 && (
                             <button
                               type="button"
@@ -1474,7 +1490,6 @@ export default function TodoNoteModal({
               </SortableContext>
             </DndContext>
           ) : (
-            // プレビュー（チェック可能 & 即DB保存）
             <ul className="space-y-2">
               {checklist
                 .filter((c) => (c.text ?? '').trim() !== '')
@@ -1517,7 +1532,6 @@ export default function TodoNoteModal({
         <div className="mt-4 ml-2">
           <h3 className="font-medium">時間帯</h3>
           <div className="flex items-center gap-2 mt-1">
-            {/* 開始 */}
             <div className="relative">
               {isPreview ? (
                 <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
@@ -1534,7 +1548,8 @@ export default function TodoNoteModal({
                     if (Number.isFinite(n) && n > 0) {
                       const autoEnd = addMinutesToHHmm(v, n);
                       setTimeEnd(autoEnd);
-                      setTimeError(validateTimeRange(v, autoEnd));
+                      const err = validateTimeRange(v, autoEnd);
+                      setTimeError(err);
                     } else {
                       setTimeError(validateTimeRange(v, timeEnd));
                     }
@@ -1549,14 +1564,13 @@ export default function TodoNoteModal({
 
             <span className="text-gray-500">~</span>
 
-            {/* 終了 */}
             <div className="relative">
               {isPreview ? (
                 <>
                   <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
                     {timeEnd || '— —'}
                   </span>
-                  {previewDurationMin !== null && !timeError && (
+                  {previewDurationMin !== null && !(errorsShown && timeError) && (
                     <span className="ml-2 text-gray-700">（所要時間：{previewDurationMin}分）</span>
                   )}
                 </>
@@ -1577,7 +1591,6 @@ export default function TodoNoteModal({
               )}
             </div>
 
-            {/* 所要（分） */}
             {!isPreview && (
               <div className="flex items-center gap-1 ml-2">
                 <span className="text-gray-500 text-sm">所要</span>
@@ -1607,33 +1620,42 @@ export default function TodoNoteModal({
               </div>
             )}
           </div>
-          {timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
+          {errorsShown && timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
         </div>
       )}
 
       {/* 買い物カテゴリ */}
       {category === '買い物' && (
-        <ShoppingDetailsEditor
-          price={price}
-          quantity={quantity}
-          unit={unit}
-          compareMode={compareMode}
-          comparePrice={comparePrice}
-          compareQuantity={compareQuantity}
-          onChangePrice={setPrice}
-          onChangeQuantity={setQuantity}
-          onChangeUnit={setUnit}
-          onToggleCompareMode={(next) => setCompareMode(next)}
-          onChangeComparePrice={setComparePrice}
-          onChangeCompareQuantity={setCompareQuantity}
-          animatedDifference={animatedDifference}
-          animationComplete={diffAnimationComplete}
-          isPreview={isPreview}
-          onRequestEditMode={() => setIsPreview(false)}
-        />
+        <>
+          <ShoppingDetailsEditor
+            price={price}
+            quantity={quantity}
+            unit={unit}
+            compareMode={compareMode}
+            comparePrice={comparePrice}
+            compareQuantity={compareQuantity}
+            onChangePrice={setPrice}
+            onChangeQuantity={setQuantity}
+            onChangeUnit={setUnit}
+            onToggleCompareMode={(next) => setCompareMode(next)}
+            onChangeComparePrice={setComparePrice}
+            onChangeCompareQuantity={setCompareQuantity}
+            animatedDifference={animatedDifference}
+            animationComplete={diffAnimationComplete}
+            isPreview={isPreview}
+            onRequestEditMode={() => setIsPreview(false)}
+          />
+          {errorsShown && (shoppingErrors.price || shoppingErrors.quantity || shoppingErrors.unit) && (
+            <ul className="mt-2 text-xs text-red-500 list-disc list-inside">
+              {shoppingErrors.price && <li>{shoppingErrors.price}</li>}
+              {shoppingErrors.quantity && <li>{shoppingErrors.quantity}</li>}
+              {shoppingErrors.unit && <li>{shoppingErrors.unit}</li>}
+            </ul>
+          )}
+        </>
       )}
 
-      {/* 料理カテゴリ */}
+      {/* 料理カテゴリ（保存押下時にエラー表示を固定） */}
       {category === '料理' && (
         <RecipeEditor
           ref={recipeEditorRef}
@@ -1641,6 +1663,7 @@ export default function TodoNoteModal({
           value={recipe}
           onChange={handleRecipeChange}
           isPreview={isPreview}
+          // showErrors={errorsShown}
         />
       )}
     </BaseModal>
