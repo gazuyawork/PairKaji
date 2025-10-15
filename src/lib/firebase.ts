@@ -2,7 +2,7 @@
 
 'use client';
 
-export const dynamic = 'force-dynamic';
+// ※ lib ファイルでは page/route 専用の `export const dynamic = 'force-dynamic'` は不要です。
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
@@ -109,19 +109,51 @@ async function nukeCorruptedFirebaseIndexedDB(projectId?: string) {
 
 /* ------------------------------ Auth 永続化 ------------------------------ */
 const auth = getAuth(app);
+
+/** 永続化状態を外部参照＆同期ポイントとして公開 */
+export type AuthPersistenceState = 'indexedDB' | 'localStorage' | 'inMemory' | 'unknown';
+let __authPersistenceState: AuthPersistenceState = 'unknown';
+
+/** 現在の永続化状態を返す（UIで警告表示などに利用） */
+export function getAuthPersistenceState(): AuthPersistenceState {
+  return __authPersistenceState;
+}
+
+// 永続化の最終状態が決まるのを通知する Promise（画面側で await 可能）
+let __authPersistenceReadyResolve: (() => void) | null = null;
+/** 永続化の確定を待つための同期ポイント */
+export const authPersistenceReady: Promise<void> = new Promise<void>((resolve) => {
+  __authPersistenceReadyResolve = resolve;
+});
+
 if (typeof window !== 'undefined') {
-  // browserLocalPersistence を最優先にして、IndexedDB 依存を回避
-  setPersistence(auth, browserLocalPersistence)
+  // ✅ 優先度: IndexedDB → localStorage → inMemory
+  setPersistence(auth, indexedDBLocalPersistence)
+    .then(() => {
+      __authPersistenceState = 'indexedDB';
+    })
     .catch((e1) => {
-      console.warn('[Auth] browserLocalPersistence failed. Fallback to indexedDBLocalPersistence.', e1);
-      return setPersistence(auth, indexedDBLocalPersistence);
+      console.warn('[Auth] indexedDBLocalPersistence failed. Fallback to browserLocalPersistence.', e1);
+      return setPersistence(auth, browserLocalPersistence).then(() => {
+        __authPersistenceState = 'localStorage';
+      });
     })
     .catch((e2) => {
-      console.warn('[Auth] indexedDBLocalPersistence failed. Fallback to inMemoryPersistence.', e2);
-      return setPersistence(auth, inMemoryPersistence);
+      console.warn('[Auth] browserLocalPersistence failed. Fallback to inMemoryPersistence.', e2);
+      return setPersistence(auth, inMemoryPersistence).then(() => {
+        __authPersistenceState = 'inMemory';
+      });
     })
     .catch((e3) => {
       console.warn('[Auth] inMemoryPersistence also failed (rare).', e3);
+      __authPersistenceState = 'unknown';
+    })
+    .finally(() => {
+      try {
+        __authPersistenceReadyResolve?.();
+      } catch {
+        // noop
+      }
     });
 }
 
@@ -159,4 +191,5 @@ try {
 
 const storage = getStorage(app);
 
+/** ここからエクスポート（ユーティリティは“宣言時 export 済み”のため重複させない） */
 export { auth, db, storage, app };

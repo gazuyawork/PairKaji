@@ -8,6 +8,8 @@ import type { Metadata, Viewport } from 'next';
 // ▼ 追加：起動直後にキャッシュ値でバッジ反映する初期化コンポーネント
 import AppBadgeInitializer from '@/components/system/AppBadgeInitializer';
 
+import { AuthProvider } from '@/context/AuthContext';
+
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
   weight: ['400'],
@@ -57,6 +59,7 @@ export const viewport: Viewport = {
   maximumScale: 1, // ← user-scalable=no 相当
 };
 
+// 変更箇所のみ抜粋（前後文脈つき）
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -75,8 +78,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT}`}
         />
-        <ClientLayout>{children}</ClientLayout>
+        {/* ▼▼▼ 追加：アプリ全体を AuthProvider でラップ ▼▼▼ */}
+        <AuthProvider>
+          <ClientLayout>{children}</ClientLayout>
+        </AuthProvider>
+        {/* ▲▲▲ 追加ここまで ▲▲▲ */}
       </body>
     </html>
   );
 }
+
