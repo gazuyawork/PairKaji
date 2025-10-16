@@ -30,7 +30,7 @@ import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
-import { getCategoryIconInfo } from '@/components/todo/parts/utils/categoryIcon';
+// import { getCategoryIconInfo } from '@/components/todo/parts/utils/categoryIcon';
 import SortableTaskRow from '@/components/todo/parts/SortableTaskRow';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 // 同じIDのtext置換保存
@@ -574,7 +574,8 @@ export default function TodoView() {
                 <SortableContext items={allVisibleIds} strategy={verticalListSortingStrategy}>
                   <div className="mx-auto w-full max-w-xl space-y-6">
                     {categorized.map(({ category, items }) => {
-                      const { Icon: CatIcon, colorClass, label } = getCategoryIconInfo(category);
+                      // const { Icon: CatIcon, colorClass, label } = getCategoryIconInfo(category);
+                      const { Icon: CatIcon, colorClass, label } = getCategoryMeta(category);
 
                       return (
                         <section key={category} className="space-y-2">
