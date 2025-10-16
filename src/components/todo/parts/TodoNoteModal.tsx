@@ -1312,16 +1312,9 @@ export default function TodoNoteModal({
 
                             {/* 入力（URL）+ ラベルUI */}
                             <div className="col-span-9 flex items-center gap-2 min-w-0">
-                              {u.trim() !== '' && (
-                                <NextImage
-                                  src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(extractHostname(u))}&sz=32`}
-                                  alt=""
-                                  width={16}
-                                  height={16}
-                                  className="w-4 h-4 shrink-0 opacity-80"
-                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
-                                />
-                              )}
+                              {/* ★ ここから削除：ファビコン表示（NextImage） */}
+                              {/* ★ 削除済み */}
+                              {/* 入力欄 */}
                               <input
                                 ref={(el) => { urlRefs.current[idx] = el; }}
                                 value={u}
@@ -1384,7 +1377,7 @@ export default function TodoNoteModal({
       {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
       {isUncategorized && (!isPreview || hasChecklist) && (
         <div className="pt-2 pb-3 mt-2">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items中心 justify-between">
             <h3 className="font-medium">チェックリスト</h3>
             {!isPreview && (
               <button
@@ -1576,7 +1569,7 @@ export default function TodoNoteModal({
                     const diff2 = minutesBetweenHHmm(v, timeEnd);
                     if (diff2 != null) setDurationMin(String(diff2));
                   }}
-                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg透明 pb-1 tabular-nums text-center"
                   aria-label="開始時刻"
                 />
               )}
