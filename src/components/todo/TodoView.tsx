@@ -3,12 +3,12 @@
 
 export const dynamic = 'force-dynamic';
 
+import { Fragment } from 'react';
 import {
   useState,
   useRef,
   useEffect,
   useMemo,
-  // useCallback,
 } from 'react';
 import {
   collection,
@@ -30,18 +30,12 @@ import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
-// import { getCategoryIconInfo } from '@/components/todo/parts/utils/categoryIcon';
 import SortableTaskRow from '@/components/todo/parts/SortableTaskRow';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
-// 同じIDのtext置換保存
 import { updateTodoTextInTask } from '@/lib/taskUtils';
-// Portal
 import { createPortal } from 'react-dom';
-// UI
 import { motion, AnimatePresence } from 'framer-motion';
-// カテゴリアイコンを追加（絞り込みボタンで使用）
 import { Eye, X, Search, ShoppingCart, Utensils, Briefcase, Home, Tag, Plane } from 'lucide-react';
-// dnd-kit
 import {
   DndContext,
   PointerSensor,
@@ -55,7 +49,6 @@ import {
   verticalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import type React from 'react';
 
 // 配列移動
 const moveItem = <T,>(arr: T[], from: number, to: number) => {
@@ -75,15 +68,25 @@ const getOrderOrInf = (t: { order?: number } | TodoOnlyTask) =>
 const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown } =>
   typeof e === 'object' && e !== null && ('code' in e || 'message' in e);
 
+// 表示用に安全な文字列へ
+const safeText = (v: unknown): string => {
+  if (typeof v === 'string' || typeof v === 'number') return String(v);
+  if (v === null || v === undefined) return '';
+  return '[invalid]';
+};
+
+// 取得時に name を正規化（描画までにオブジェクトを除去）
+const normalizeName = (v: unknown): string => {
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return ''; // FieldValue や配列/オブジェクトは空文字へ
+};
+
 /* =========================
-   カテゴリメタ（GroupSelectorと同等）
-   ※「覚えた色・アイコン」を反映
+   カテゴリメタ
    ========================= */
 function getCategoryMeta(raw?: unknown) {
-  // 非文字列でも安全に扱えるよう常に文字列化 → 正規化 → trim
   const normalized = String(raw ?? '').normalize('NFKC').trim();
-
-  // 空や想定外は「未分類」にフォールバック
   const category =
     normalized === '' ||
     !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
@@ -94,7 +97,6 @@ function getCategoryMeta(raw?: unknown) {
     case '料理':
       return {
         Icon: Utensils,
-        // 記憶：料理 = アイコン text-emerald-500、選択時ボタン背景 from-emerald-500 to-emerald-600
         colorClass: 'text-emerald-500',
         label: '料理',
         chipActiveClass:
@@ -104,7 +106,6 @@ function getCategoryMeta(raw?: unknown) {
     case '買い物':
       return {
         Icon: ShoppingCart,
-        // 記憶：買い物 = アイコン text-sky-500、選択時ボタン背景 from-sky-500 to-sky-600
         colorClass: 'text-sky-500',
         label: '買い物',
         chipActiveClass:
@@ -114,7 +115,6 @@ function getCategoryMeta(raw?: unknown) {
     case '旅行':
       return {
         Icon: Plane,
-        // 記憶：旅行 = アイコン text-orange-500、選択時ボタン背景 from-orange-500 to-orange-600
         colorClass: 'text-orange-500',
         label: '旅行',
         chipActiveClass:
@@ -152,16 +152,8 @@ function getCategoryMeta(raw?: unknown) {
   }
 }
 
-/* =========================================================
-   特定カテゴリを末尾へ送るための優先度マップ
-   値が大きいほど後ろに並ぶ。未指定は 0（通常の五十音順）
-   今回は「未分類」を末尾へ。
-   複数末尾送りしたい場合は同様に 1 を指定可。
-   例) { '未分類': 1, '買い物': 1 }
-   ========================================================= */
-const CATEGORY_ORDER: Record<string, number> = {
-  '未分類': 1,
-};
+/* ========================================================= */
+const CATEGORY_ORDER: Record<string, number> = { '未分類': 1 };
 
 export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName, index } = useView();
@@ -178,71 +170,51 @@ export default function TodoView() {
   const uid = useUserUid();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [addQuery, setAddQuery] = useState('');
-  // 再表示シート用 カテゴリ選択（null = すべて）
   const [addSelectedCategoryId, setAddSelectedCategoryId] = useState<string | null>(null);
-
-  // 検索ボックスの表示切替（左下パネルの虫眼鏡でトグル）
   const [showSearch, setShowSearch] = useState(false);
 
-  // 追加するstate（※ 既存のuseState群の近くに追記してください）
   const [confirmHide, setConfirmHide] = useState<{ open: boolean; taskId: string | null; source: 'list' | 'detail' | null }>({
-    open: false,
-    taskId: null,
-    source: null,
+    open: false, taskId: null, source: null,
   });
   const [isConfirmProcessing, setIsConfirmProcessing] = useState(false);
 
-  // メモモーダル開閉ハンドラ
+  // メモモーダル
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
     setNoteModalTask(task);
     setNoteModalTodo(todo);
     setNoteModalOpen(true);
   };
-
   const closeNoteModal = () => {
     setNoteModalOpen(false);
     setNoteModalTask(null);
     setNoteModalTodo(null);
   };
 
-  // 背景スクロール制御（追加シート or 詳細オーバーレイ）
+  // 背景スクロール制御
   useEffect(() => {
     if (!mounted) return;
     const prev = document.body.style.overflow;
-    if (isAddSheetOpen || selectedTaskId) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = prev || '';
-    }
-    return () => {
-      document.body.style.overflow = prev || '';
-    };
+    if (isAddSheetOpen || selectedTaskId) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = prev || '';
+    return () => { document.body.style.overflow = prev || ''; };
   }, [isAddSheetOpen, selectedTaskId, mounted]);
 
-  // Escで閉じる（追加シート）
+  // Escで閉じる
   useEffect(() => {
     if (!isAddSheetOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsAddSheetOpen(false);
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsAddSheetOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isAddSheetOpen]);
 
-  // Firestore購読
+  // Firestore購読（★ name を正規化）
   useEffect(() => {
-    if (!uid) {
-      setTasks([]);
-      setIsLoading(false);
-      return;
-    }
+    if (!uid) { setTasks([]); setIsLoading(false); return; }
     setIsLoading(true);
 
     let unsubscribe: (() => void) | null = null;
@@ -260,9 +232,7 @@ export default function TodoView() {
       const userIds = new Set<string>([uid]);
       pairsSnap.forEach((docSnap) => {
         const data = docSnap.data();
-        if (Array.isArray(data.userIds)) {
-          (data.userIds as string[]).forEach((id: string) => userIds.add(id));
-        }
+        if (Array.isArray(data.userIds)) (data.userIds as string[]).forEach((id) => userIds.add(id));
       });
 
       const ids = Array.from(userIds).slice(0, 10);
@@ -276,6 +246,8 @@ export default function TodoView() {
             return {
               id: d.id,
               ...data,
+              // ★ ここで name を安全化
+              name: normalizeName((data as any).name),
               todos: Array.isArray(data.todos) ? data.todos : [],
             };
           });
@@ -296,50 +268,31 @@ export default function TodoView() {
       );
     })().catch(() => setIsLoading(false));
 
-    return () => {
-      isMounted = false;
-      if (unsubscribe) unsubscribe();
-    };
+    return () => { isMounted = false; if (unsubscribe) unsubscribe(); };
   }, [uid]);
 
   // フォーカス復帰
   useEffect(() => {
     if (focusedTodoId && todoRefs.current[focusedTodoId]) {
-      requestAnimationFrame(() => {
-        todoRefs.current[focusedTodoId]?.focus();
-      });
+      requestAnimationFrame(() => { todoRefs.current[focusedTodoId]?.focus(); });
       setFocusedTodoId(null);
     }
   }, [focusedTodoId]);
 
-  /* -------------------------------------------------
-     外部からのselectedTaskName
-     変更後：ID優先で詳細を開く／フィルタ解除
-     ------------------------------------------------- */
+  // 外部からのselectedTaskName
   useEffect(() => {
     if (!selectedTaskName) return;
-
-    // 1) まずはID一致
     let matched = tasks.find((t) => t.id === selectedTaskName);
-
-    // 2) なければ名前一致（後方互換）
-    if (!matched) {
-      matched = tasks.find((t) => t.name === selectedTaskName);
-    }
-
+    if (!matched) matched = tasks.find((t) => t.name === selectedTaskName);
     if (matched) {
-      // 詳細オーバーレイを開く
       setSelectedTaskId(matched.id);
       setFilterText('');
-      setSelectedCategoryId(null); // カテゴリも解除
+      setSelectedCategoryId(null);
     } else {
-      // フォールバック：テキストフィルタにかける
       setFilterText(selectedTaskName);
-      setSelectedCategoryId(null); // 一貫性重視：テキスト検索に絞るためカテゴリは解除
+      setSelectedCategoryId(null);
       setShowSearch(true);
     }
-
-    // 消費
     setSelectedTaskName('');
   }, [selectedTaskName, setSelectedTaskName, tasks]);
 
@@ -373,19 +326,14 @@ export default function TodoView() {
     });
 
     const idToTask = tasks.reduce<Record<string, TodoOnlyTask>>((acc, t) => {
-      acc[t.id] = t;
-      return acc;
+      acc[t.id] = t; return acc;
     }, {});
-    const newTasks = newAllOrder
-      .map((id) => idToTask[id])
-      .filter((t): t is TodoOnlyTask => Boolean(t));
+    const newTasks = newAllOrder.map((id) => idToTask[id]).filter((t): t is TodoOnlyTask => Boolean(t));
     setTasks(newTasks);
 
     try {
       const batch = writeBatch(db);
-      newAllOrder.forEach((id, idx) => {
-        batch.update(doc(db, 'tasks', id), { order: idx });
-      });
+      newAllOrder.forEach((id, idx) => { batch.update(doc(db, 'tasks', id), { order: idx }); });
       await batch.commit();
     } catch (err) {
       console.error('Failed to update task order:', err);
@@ -399,14 +347,10 @@ export default function TodoView() {
     [selectedTaskId, tasks]
   );
 
-  /* =========================
-     一覧側カテゴリ選択 state
-     ========================= */
+  // 一覧側カテゴリ選択
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  /* ===========================================
-     表示用カテゴリ一覧（重複排除＋昇順）
-     =========================================== */
+  // 表示用カテゴリ一覧
   const availableCategories = useMemo(() => {
     type TaskCategoryShape = {
       categoryId?: string | null;
@@ -429,26 +373,17 @@ export default function TodoView() {
 
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => {
-        const labelA = String(a.label ?? '');
-        const labelB = String(b.label ?? '');
-        return labelA.localeCompare(labelB, 'ja');
-      });
+      .sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? ''), 'ja'));
   }, [tasks, uid]);
 
-  /* ===========================================
-     ★ カテゴリ・テキスト・Group選択を反映した一覧
-     カテゴリ見出しのソートを「優先度→五十音順」に変更
-     =========================================== */
+  // カテゴリ・テキスト反映済みのグループ
   const categorized = useMemo(() => {
     const filtered = tasks.filter((task) => {
       const visibleOk = task.visible;
       const ownerOk = task.userId === uid || task.private !== true;
-      // テキストマッチ
       const text = filterText.trim();
       const textOk = text === '' ? true : (task.name ?? '').includes(text);
 
-      // カテゴリマッチ
       type WithCategory = { categoryId?: string | null; category?: string | null };
       const c = task as WithCategory;
       const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
@@ -467,10 +402,8 @@ export default function TodoView() {
       map.set(key, arr);
     }
 
-    // 優先度（CATEGORY_ORDER）→ 同一優先度内は五十音
     const entries = Array.from(map.entries()).sort((a, b) => {
-      const aKey = a[0];
-      const bKey = b[0];
+      const aKey = a[0]; const bKey = b[0];
       const aPrio = CATEGORY_ORDER[aKey] ?? 0;
       const bPrio = CATEGORY_ORDER[bKey] ?? 0;
       if (aPrio !== bPrio) return aPrio - bPrio;
@@ -480,12 +413,10 @@ export default function TodoView() {
     return entries.map(([cat, arr]) => ({ category: cat, items: arr }));
   }, [tasks, filterText, selectedCategoryId, uid]);
 
-  // 一覧で使う全表示ID（DnD用）
+  // DnD 用の全表示ID
   const allVisibleIds = useMemo(() => categorized.flatMap((g) => g.items.map((t) => t.id)), [categorized]);
 
-  /* ===========================================
-     再表示シート用の「非表示タスク」カテゴリ一覧
-     =========================================== */
+  // 再表示シート用の「非表示タスク」カテゴリ一覧
   const addAvailableCategories = useMemo(() => {
     type TaskCategoryShape = {
       categoryId?: string | null;
@@ -496,7 +427,7 @@ export default function TodoView() {
 
     const map = new Map<string, string>();
     for (const t of tasks) {
-      if (t.visible) continue; // 非表示のみ
+      if (t.visible) continue;
       if (!(t.userId === uid || t.private !== true)) continue;
 
       const c = t as TaskCategoryShape;
@@ -508,11 +439,7 @@ export default function TodoView() {
 
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => {
-        const labelA = String(a.label ?? '');
-        const labelB = String(b.label ?? '');
-        return labelA.localeCompare(labelB, 'ja');
-      });
+      .sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? ''), 'ja'));
   }, [tasks, uid]);
 
   return (
@@ -530,7 +457,7 @@ export default function TodoView() {
             />
           )}
 
-          {/* Sticky 検索のみ（カテゴリは左下固定に移動） */}
+          {/* Sticky 検索 */}
           {showSearch && (
             <div className="sticky top-0 z-[999] w-full bg-transparent">
               <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg px-2 pt-2 pb-3">
@@ -563,7 +490,7 @@ export default function TodoView() {
             </div>
           )}
 
-          {/* ▼ 一覧：カテゴリ見出しでグループ分け（カードにカテゴリアイコン＆名も表示） */}
+          {/* 一覧 */}
           {(() => {
             if (allVisibleIds.length === 0) {
               return <p className="text-center text-gray-500 mt-4">TODOはありません。</p>;
@@ -574,31 +501,24 @@ export default function TodoView() {
                 <SortableContext items={allVisibleIds} strategy={verticalListSortingStrategy}>
                   <div className="mx-auto w-full max-w-xl space-y-6">
                     {categorized.map(({ category, items }) => {
-                      // const { Icon: CatIcon, colorClass, label } = getCategoryIconInfo(category);
                       const { Icon: CatIcon, colorClass, label } = getCategoryMeta(category);
 
                       return (
                         <section key={category} className="space-y-2">
-                          {/* 見出し（カテゴリアイコン＋カテゴリ名） */}
                           <header className="flex items-center gap-2 px-1">
                             <CatIcon size={16} className={`shrink-0 ${colorClass}`} aria-label={`${label} カテゴリ`} />
                             <h3 className="text-sm font-semibold text-[#5E5E5E]">{label}</h3>
                           </header>
 
-                          {/* タイトルカード群 */}
                           <div className="space-y-2">
                             {items.map((task) => (
-                              <SortableTaskRow
-                                key={task.id}
-                                task={task}
-                                onClickTitle={(taskId) => {
-                                  setSelectedTaskId(taskId);
-                                }}
-                                onHide={(taskId) => {
-                                  setConfirmHide({ open: true, taskId, source: 'list' });
-                                }}
-
-                              />
+                              <Fragment key={task.id}>
+                                <SortableTaskRow
+                                  task={task}
+                                  onClickTitle={(taskId) => setSelectedTaskId(taskId)}
+                                  onHide={(taskId) => setConfirmHide({ open: true, taskId, source: 'list' })}
+                                />
+                              </Fragment>
                             ))}
                           </div>
                         </section>
@@ -610,12 +530,11 @@ export default function TodoView() {
             );
           })()}
 
-          {/* 広告 */}
           {!isLoading && !isChecking && plan === 'free' && <AdCard />}
         </main>
       </div>
 
-      {/* 右下＋（非表示ToDoの再表示シートを開く） */}
+      {/* 右下＋ */}
       {mounted &&
         index === 2 &&
         createPortal(
@@ -641,28 +560,25 @@ export default function TodoView() {
           document.body
         )}
 
-      {/* ★ 左下固定のカテゴリフィルタ（アイコン丸ボタン）＋ 検索トグル */}
+      {/* 左下フィルタ＋検索トグル */}
       {mounted &&
         index === 2 &&
         createPortal(
           <div
             className="
-    fixed
-    bottom-[calc(env(safe-area-inset-bottom)+5.5rem)]
-    left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
-    z-[1100]
-    rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200
-    shadow-[0_8px_24px_rgba(0,0,0,0.16)]
-    px-2 py-2
-  "
+              fixed
+              bottom-[calc(env(safe-area-inset-bottom)+5.5rem)]
+              left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
+              z-[1100]
+              rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200
+              shadow-[0_8px_24px_rgba(0,0,0,0.16)]
+              px-2 py-2
+            "
           >
-
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-              {/* 動的カテゴリ（アイコンのみ・横並び） */}
               {availableCategories.map((c, idx) => {
                 const isActive = selectedCategoryId === c.id;
                 const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
-
                 const key =
                   typeof c?.id === 'string' || typeof c?.id === 'number'
                     ? String(c.id)
@@ -672,9 +588,7 @@ export default function TodoView() {
                   <button
                     key={key}
                     type="button"
-                    onClick={() =>
-                      setSelectedCategoryId((prev) => (prev === c.id ? null : c.id))
-                    }
+                    onClick={() => setSelectedCategoryId((prev) => (prev === c.id ? null : c.id))}
                     className={[
                       'shrink-0 w-10 h-10 rounded-full border relative overflow-hidden p-0',
                       'flex items-center justify-center transition-all duration-300',
@@ -684,30 +598,23 @@ export default function TodoView() {
                       'active:translate-y-[1px]',
                     ].join(' ')}
                     aria-pressed={isActive}
-                    aria-label={c.label}
-                    title={c.label}
+                    aria-label={safeText(c.label)}      
+                    title={safeText(c.label)}           
                   >
                     <Icon className={`w-6 h-6 ${isActive ? 'text-white' : colorClass}`} />
-                    <span className="sr-only">{c.label}</span>
+                    <span className="sr-only">{safeText(c.label)}</span>
                   </button>
                 );
               })}
 
-              {/* 仕切り（縦線）: カテゴリが1件以上ある場合のみ表示 */}
-              {availableCategories.length > 0 && (
-                <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
-              )}
+              {availableCategories.length > 0 && <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />}
 
-              {/* 検索表示トグル（虫眼鏡） */}
               <button
                 type="button"
                 onClick={() =>
                   setShowSearch((prev) => {
                     const next = !prev;
-                    if (!next) {
-                      // 検索OFFにする瞬間にテキストもクリア
-                      setFilterText('');
-                    }
+                    if (!next) setFilterText('');
                     return next;
                   })
                 }
@@ -724,7 +631,6 @@ export default function TodoView() {
               >
                 <Search className={`w-6 h-6 ${showSearch ? 'text-white' : 'text-gray-600'}`} />
               </button>
-
             </div>
           </div>,
           document.body
@@ -762,38 +668,24 @@ export default function TodoView() {
                 >
                   <div className="mx-auto mt-2 mb-1 h-1.5 w-12 rounded-full bg-gray-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" />
                   <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-2 flex items-center gap-2 shadow-[0_6px_12px_rgba(0,0,0,0.06)]">
-                    <button
-                      className="p-2 rounded-full hover:bg-gray-100"
-                      onClick={() => setIsAddSheetOpen(false)}
-                      aria-label="閉じる"
-                    >
+                    <button className="p-2 rounded-full hover:bg-gray-100" onClick={() => setIsAddSheetOpen(false)} aria-label="閉じる">
                       <X className="w-5 h-5 text-red-600" />
                     </button>
                     <h2 className="text-base font-semibold text-[#5E5E5E]">非表示のTodoを再表示</h2>
                     <span className="ml-auto text-xs text-gray-500">
-                      {/* キーワード＆カテゴリでフィルタ後の件数を表示 */}
                       {(() => {
                         const q = addQuery.trim().toLowerCase();
-                        // 非表示の中からカテゴリでフィルタ
-                        const hidden = tasks.filter(
-                          (t) => !t.visible && (t.userId === uid || t.private !== true)
-                        );
-
+                        const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
                         type WithCategory = { categoryId?: string | null; category?: string | null };
                         const filteredByCategory = hidden.filter((t) => {
                           const c = t as WithCategory;
                           const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
                           return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
                         });
-
-                        // キーワード（name に対して）
                         const filtered = filteredByCategory.filter((t) =>
                           q ? (t.name ?? '').toLowerCase().includes(q) : true
                         );
-
-                        return q || addSelectedCategoryId !== null
-                          ? `一致: ${filtered.length}件`
-                          : `候補: ${hidden.length}件`;
+                        return q || addSelectedCategoryId !== null ? `一致: ${filtered.length}件` : `候補: ${hidden.length}件`;
                       })()}
                     </span>
                   </div>
@@ -815,10 +707,7 @@ export default function TodoView() {
                         autoFocus
                       />
                       {addQuery && (
-                        <button
-                          className="text-sm text-gray-600 hover:text-gray-800"
-                          onClick={() => setAddQuery('')}
-                        >
+                        <button className="text-sm text-gray-600 hover:text-gray-800" onClick={() => setAddQuery('')}>
                           クリア
                         </button>
                       )}
@@ -827,26 +716,23 @@ export default function TodoView() {
                     {/* カテゴリチップ（再表示シート） */}
                     <div className="mt-3">
                       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
-                        {/* すべて */}
                         <button
                           type="button"
                           onClick={() => setAddSelectedCategoryId(null)}
                           className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-    ${addSelectedCategoryId === null
-      ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-      : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
-    active:translate-y-[1px]`}
+                            ${addSelectedCategoryId === null
+                              ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                              : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
+                            active:translate-y-[1px]`}
                           aria-pressed={addSelectedCategoryId === null}
                           title="すべて"
                         >
                           すべて
                         </button>
 
-                        {/* 動的カテゴリ */}
                         {addAvailableCategories.map((c, idx) => {
                           const active = addSelectedCategoryId === c.id;
                           const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
-
                           const key =
                             typeof c?.id === 'string' || typeof c?.id === 'number'
                               ? String(c.id)
@@ -865,10 +751,10 @@ export default function TodoView() {
                                 'active:translate-y-[1px]',
                               ].join(' ')}
                               aria-pressed={active}
-                              title={c.label}
+                              title={safeText(c.label)}   /* ★ 安全化 */
                             >
                               <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
-                              <span>{c.label}</span>
+                              <span>{safeText(c.label)}</span>   {/* ★ 安全化 */}
                             </button>
                           );
                         })}
@@ -879,48 +765,25 @@ export default function TodoView() {
                   <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
                     {(() => {
                       const q = addQuery.trim().toLowerCase();
+                      const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
 
-                      // 1) 非表示タスクのみ抽出
-                      const hidden = tasks.filter(
-                        (t) => !t.visible && (t.userId === uid || t.private !== true)
-                      );
-
-                      // 2) カテゴリでフィルタ
                       const byCategory = hidden.filter((t) => {
-                        type WithCategory = {
-                          categoryId?: string | null;
-                          category?: string | null;
-                          categoryName?: string | null;
-                          categoryLabel?: string | null;
-                        };
+                        type WithCategory = { categoryId?: string | null; category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
                         const c = t as WithCategory;
                         const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
                         return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
                       });
 
-                      // 3) キーワード（name）でフィルタ
-                      const byKeyword = byCategory.filter((t) =>
-                        q ? (t.name ?? '').toLowerCase().includes(q) : true
-                      );
+                      const byKeyword = byCategory.filter((t) => q ? (t.name ?? '').toLowerCase().includes(q) : true);
 
                       if (byKeyword.length === 0) {
-                        return (
-                          <div className="text-center text-sm text-gray-500 py-10">
-                            一致するToDoが見つかりませんでした。
-                          </div>
-                        );
+                        return <div className="text-center text-sm text-gray-500 py-10">一致するToDoが見つかりませんでした。</div>;
                       }
 
-                      // 4) 表示（カテゴリメタも表示）
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {byKeyword.map((t) => {
-                            // カテゴリメタ
-                            type WithCategory = {
-                              category?: string | null;
-                              categoryName?: string | null;
-                              categoryLabel?: string | null;
-                            };
+                            type WithCategory = { category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
                             const catLabel =
                               ((t as WithCategory).categoryName ??
                                 (t as WithCategory).categoryLabel ??
@@ -937,11 +800,9 @@ export default function TodoView() {
                                     updatedAt: serverTimestamp(),
                                   });
                                   toast.success('非表示のタスクを再表示しました。');
-
-                                  // ▼ 一覧は絞り込まずに、詳細オーバーレイを開く
                                   setFilterText('');
-                                  setSelectedCategoryId(null);      // 一覧側カテゴリ解除
-                                  setAddSelectedCategoryId(null);   // 再表示シート側カテゴリも解除
+                                  setSelectedCategoryId(null);
+                                  setAddSelectedCategoryId(null);
                                   setSelectedTaskId(t.id);
                                   setAddQuery('');
                                   setIsAddSheetOpen(false);
@@ -951,10 +812,9 @@ export default function TodoView() {
                                            shadow-[0_2px_1px_rgba(0,0,0,0.1)]
                                            hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
                                            hover:border-[#FFCB7D] active:translate-y-[1px]"
-                                title={t.name ?? ''}
+                                title={safeText(t.name)}   /* ★ 安全化 */
                               >
-                                <span className="line-clamp-2">{t.name}</span>
-                                {/* カテゴリ名の前にアイコン＋色 */}
+                                <span className="line-clamp-2">{safeText(t.name)}</span> {/* ★ 安全化 */}
                                 <span className="mt-1 block text-[11px] text-gray-500">
                                   <span className="inline-flex items-center gap-1">
                                     <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
@@ -983,7 +843,7 @@ export default function TodoView() {
           <AnimatePresence>
             <motion.div
               key={selectedTask.id}
-              className="fixed inset-0 z-[1300] flex flex-col bg-white"
+              className="fixed inset-0 z-[1300] flex flex-col bg-white"  /* ★ タイポ修正 */
               role="dialog"
               aria-modal="true"
               initial={{ opacity: 0, y: 24 }}
@@ -991,22 +851,6 @@ export default function TodoView() {
               exit={{ opacity: 0, y: 24 }}
               transition={{ type: 'spring', stiffness: 280, damping: 26 }}
             >
-              {/* <div className="h-14 bg-white">
-                <div className="mx-auto w-full max-w-xl h-full flex items-center justify-between px-3">
-                  <div className="font-bold pl-4 truncate text-[#5E5E5E]">
-                    {selectedTask.name}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="閉じる"
-                    onClick={handleCloseDetail}
-                    className="p-2 rounded-full hover:bg-gray-100"
-                  >
-                    <X />
-                  </button>
-                </div>
-              </div> */}
-
               <div className="flex-1 overflow-y-auto">
                 <div className="mx-auto w-full max-w-xl">
                   <TodoTaskCard
@@ -1056,8 +900,7 @@ export default function TodoView() {
                           const code = typeof e.code === 'string' ? e.code : undefined;
                           const message = typeof e.message === 'string' ? e.message : undefined;
                           if (code === 'DUPLICATE_TODO' || message === 'DUPLICATE_TODO') {
-                            toast.error('既に登録されています。');
-                            return;
+                            toast.error('既に登録されています。'); return;
                           }
                         }
                         toast.error('保存に失敗しました');
@@ -1071,42 +914,25 @@ export default function TodoView() {
                         updatedAt: serverTimestamp(),
                       });
                     }}
-                    // onDeleteTask={async () => {
-                    //   setConfirmHide({ open: true, taskId: selectedTask.id, source: 'detail' });
-                    // }}
                     todoRefs={todoRefs}
                     focusedTodoId={focusedTodoId}
                     onReorderTodos={async (orderedIds) => {
-                      const idToTodo = selectedTask.todos.reduce<
-                        Record<string, (typeof selectedTask.todos)[number]>
-                      >((acc, td) => {
-                        acc[td.id] = td;
-                        return acc;
+                      const idToTodo = selectedTask.todos.reduce<Record<string, (typeof selectedTask.todos)[number]>>((acc, td) => {
+                        acc[td.id] = td; return acc;
                       }, {});
-                      const newTodos = orderedIds
-                        .map((id) => idToTodo[id])
-                        .filter((v): v is (typeof selectedTask.todos)[number] => Boolean(v));
-
+                      const newTodos = orderedIds.map((id) => idToTodo[id]).filter((v): v is (typeof selectedTask.todos)[number] => Boolean(v));
                       setTasks((prev) => prev.map((t) => (t.id === selectedTask.id ? { ...t, todos: newTodos } : t)));
 
                       try {
                         await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                          todos: newTodos,
-                          updatedAt: serverTimestamp(),
+                          todos: newTodos, updatedAt: serverTimestamp(),
                         });
                       } catch (e) {
                         console.error('reorder update error:', e);
                         toast.error('並び替えの保存に失敗しました');
                       }
                     }}
-                    onClose={() => {
-                      // ★ これで × ボタンでモーダルが閉じます
-                      setSelectedTaskId(null);
-
-                      // もし閉じるときに検索やカテゴリもリセットしたいなら以下も
-                      // setFilterText('');
-                      // setSelectedCategoryId(null);
-                    }}
+                    onClose={() => setSelectedTaskId(null)}
                   />
                 </div>
               </div>
@@ -1115,7 +941,7 @@ export default function TodoView() {
           document.body
         )}
 
-      {/* === ConfirmModal（画面末尾に1つだけ） === */}
+      {/* ConfirmModal */}
       {mounted && index === 2 && createPortal(
         <ConfirmModal
           isOpen={confirmHide.open}
@@ -1138,18 +964,12 @@ export default function TodoView() {
             if (!taskId) return;
             try {
               setIsConfirmProcessing(true);
-
               const payload =
                 confirmHide.source === 'detail'
                   ? { visible: false, groupId: null, updatedAt: serverTimestamp() }
                   : { visible: false, updatedAt: serverTimestamp() };
-
               await updateDoc(doc(db, 'tasks', taskId), payload);
-
-              if (confirmHide.source === 'detail') {
-                setSelectedTaskId(null);
-              }
-
+              if (confirmHide.source === 'detail') setSelectedTaskId(null);
               toast.success('カードを非表示にしました。');
             } catch (err) {
               console.error(err);
@@ -1162,7 +982,6 @@ export default function TodoView() {
         />,
         document.body
       )}
-
     </>
   );
 }
