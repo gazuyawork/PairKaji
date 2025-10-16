@@ -40,7 +40,7 @@ import { createPortal } from 'react-dom';
 // UI
 import { motion, AnimatePresence } from 'framer-motion';
 // カテゴリアイコンを追加（絞り込みボタンで使用）
-import { Eye, X, Search, ShoppingCart, Utensils, MapPin, Briefcase, Home, Tag } from 'lucide-react';
+import { Eye, X, Search, ShoppingCart, Utensils, Briefcase, Home, Tag, Plane } from 'lucide-react';
 // dnd-kit
 import {
   DndContext,
@@ -77,6 +77,7 @@ const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown 
 
 /* =========================
    カテゴリメタ（GroupSelectorと同等）
+   ※「覚えた色・アイコン」を反映
    ========================= */
 function getCategoryMeta(raw?: unknown) {
   // 非文字列でも安全に扱えるよう常に文字列化 → 正規化 → trim
@@ -85,41 +86,48 @@ function getCategoryMeta(raw?: unknown) {
   // 空や想定外は「未分類」にフォールバック
   const category =
     normalized === '' ||
-      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
+    !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
       ? '未分類'
       : normalized;
 
   switch (category) {
-    case '買い物':
-      return {
-        Icon: ShoppingCart,
-        colorClass: 'text-emerald-500',
-        label: '買い物',
-        chipActiveClass: 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
-        activeBg: 'from-emerald-500 to-emerald-600',
-      };
     case '料理':
       return {
         Icon: Utensils,
-        colorClass: 'text-orange-500',
+        // 記憶：料理 = アイコン text-emerald-500、選択時ボタン背景 from-emerald-500 to-emerald-600
+        colorClass: 'text-emerald-500',
         label: '料理',
-        chipActiveClass: 'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
-        activeBg: 'from-orange-500 to-orange-600',
+        chipActiveClass:
+          'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
+        activeBg: 'from-emerald-500 to-emerald-600',
+      };
+    case '買い物':
+      return {
+        Icon: ShoppingCart,
+        // 記憶：買い物 = アイコン text-sky-500、選択時ボタン背景 from-sky-500 to-sky-600
+        colorClass: 'text-sky-500',
+        label: '買い物',
+        chipActiveClass:
+          'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
+        activeBg: 'from-sky-500 to-sky-600',
       };
     case '旅行':
       return {
-        Icon: MapPin,
-        colorClass: 'text-sky-500',
+        Icon: Plane,
+        // 記憶：旅行 = アイコン text-orange-500、選択時ボタン背景 from-orange-500 to-orange-600
+        colorClass: 'text-orange-500',
         label: '旅行',
-        chipActiveClass: 'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
-        activeBg: 'from-sky-500 to-sky-600',
+        chipActiveClass:
+          'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
+        activeBg: 'from-orange-500 to-orange-600',
       };
     case '仕事':
       return {
         Icon: Briefcase,
         colorClass: 'text-indigo-500',
         label: '仕事',
-        chipActiveClass: 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-indigo-600',
+        chipActiveClass:
+          'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-indigo-600',
         activeBg: 'from-indigo-500 to-indigo-600',
       };
     case '家事':
@@ -127,7 +135,8 @@ function getCategoryMeta(raw?: unknown) {
         Icon: Home,
         colorClass: 'text-rose-500',
         label: '家事',
-        chipActiveClass: 'bg-gradient-to-b from-rose-500 to-rose-600 text-white border-rose-600',
+        chipActiveClass:
+          'bg-gradient-to-b from-rose-500 to-rose-600 text-white border-rose-600',
         activeBg: 'from-rose-500 to-rose-600',
       };
     case '未分類':
@@ -136,12 +145,12 @@ function getCategoryMeta(raw?: unknown) {
         Icon: Tag,
         colorClass: 'text-gray-400',
         label: '未分類',
-        chipActiveClass: 'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
+        chipActiveClass:
+          'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
         activeBg: 'from-gray-500 to-gray-600',
       };
   }
 }
-
 
 /* =========================================================
    特定カテゴリを末尾へ送るための優先度マップ
@@ -189,7 +198,6 @@ export default function TodoView() {
     source: null,
   });
   const [isConfirmProcessing, setIsConfirmProcessing] = useState(false);
-
 
   // メモモーダル開閉ハンドラ
   const openNoteModal = (task: TodoOnlyTask, todo: { id: string; text: string }) => {
@@ -390,14 +398,6 @@ export default function TodoView() {
     () => (selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null),
     [selectedTaskId, tasks]
   );
-
-  //  詳細を閉じたらフィルタも解除（カテゴリ含む）
-  // const handleCloseDetail = useCallback(() => {
-  //   setSelectedTaskId(null);
-  //   setFilterText('');
-  //   setSelectedCategoryId(null);
-  //   // 必要ならタブも初期化: setActiveTabs({})
-  // }, []);
 
   /* =========================
      一覧側カテゴリ選択 state
@@ -640,8 +640,7 @@ export default function TodoView() {
           document.body
         )}
 
-
-      {/* ★ 修正：左下固定のカテゴリフィルタ（横並び・アイコンのみ・真円）＋ 検索トグル */}
+      {/* ★ 左下固定のカテゴリフィルタ（アイコン丸ボタン）＋ 検索トグル */}
       {mounted &&
         index === 2 &&
         createPortal(
@@ -661,9 +660,8 @@ export default function TodoView() {
               {/* 動的カテゴリ（アイコンのみ・横並び） */}
               {availableCategories.map((c, idx) => {
                 const isActive = selectedCategoryId === c.id;
-                const { Icon, colorClass } = getCategoryMeta(c.label);
+                const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
 
-                // 安定キー: id が string/number ならそれを使用、そうでなければ label+idx へフォールバック
                 const key =
                   typeof c?.id === 'string' || typeof c?.id === 'number'
                     ? String(c.id)
@@ -676,16 +674,23 @@ export default function TodoView() {
                     onClick={() =>
                       setSelectedCategoryId((prev) => (prev === c.id ? null : c.id))
                     }
-                    className={[/* ... */].join(' ')}
+                    className={[
+                      'shrink-0 w-10 h-10 rounded-full border relative overflow-hidden p-0',
+                      'flex items-center justify-center transition-all duration-300',
+                      isActive
+                        ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
+                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]',
+                      'active:translate-y-[1px]',
+                    ].join(' ')}
                     aria-pressed={isActive}
                     aria-label={c.label}
                     title={c.label}
                   >
                     <Icon className={`w-6 h-6 ${isActive ? 'text-white' : colorClass}`} />
+                    <span className="sr-only">{c.label}</span>
                   </button>
                 );
               })}
-
 
               {/* 仕切り（縦線）: カテゴリが1件以上ある場合のみ表示 */}
               {availableCategories.length > 0 && (
@@ -710,7 +715,7 @@ export default function TodoView() {
                   'shrink-0',
                   showSearch
                     ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-[2px] border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-                    : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
+                    : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50',
                 ].join(' ')}
                 aria-pressed={showSearch}
                 aria-label={showSearch ? '検索を隠す' : '検索を表示'}
@@ -826,11 +831,12 @@ export default function TodoView() {
                           type="button"
                           onClick={() => setAddSelectedCategoryId(null)}
                           className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-                            ${addSelectedCategoryId === null
-                              ? 'bg-gray-900 text-white border-gray-900 shadow-[0_2px_2px_rgba(0,0,0,0.1)]'
-                              : 'bg-gradient-to-b from-white to-gray-50 text-gray-700 border-gray-300 shadow-[0_2px_2px_rgba(0,0,0,0.1)] hover:from-gray-50 hover:to-white'}
-                            active:translate-y-[1px]`}
+    ${addSelectedCategoryId === null
+      ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+      : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
+    active:translate-y-[1px]`}
                           aria-pressed={addSelectedCategoryId === null}
+                          title="すべて"
                         >
                           すべて
                         </button>
@@ -838,7 +844,7 @@ export default function TodoView() {
                         {/* 動的カテゴリ */}
                         {addAvailableCategories.map((c, idx) => {
                           const active = addSelectedCategoryId === c.id;
-                          const { Icon, colorClass, chipActiveClass } = getCategoryMeta(c.label);
+                          const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
 
                           const key =
                             typeof c?.id === 'string' || typeof c?.id === 'number'
@@ -850,8 +856,13 @@ export default function TodoView() {
                               key={key}
                               type="button"
                               onClick={() => setAddSelectedCategoryId(c.id)}
-                              className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1
-        ${active ? `${chipActiveClass} ...` : '...'} active:translate-y-[1px]`}
+                              className={[
+                                'shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1',
+                                active
+                                  ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
+                                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50',
+                                'active:translate-y-[1px]',
+                              ].join(' ')}
                               aria-pressed={active}
                               title={c.label}
                             >
@@ -860,7 +871,6 @@ export default function TodoView() {
                             </button>
                           );
                         })}
-
                       </div>
                     </div>
                   </div>
@@ -875,13 +885,13 @@ export default function TodoView() {
                       );
 
                       // 2) カテゴリでフィルタ
-                      type WithCategory = {
-                        categoryId?: string | null;
-                        category?: string | null;
-                        categoryName?: string | null;
-                        categoryLabel?: string | null;
-                      };
                       const byCategory = hidden.filter((t) => {
+                        type WithCategory = {
+                          categoryId?: string | null;
+                          category?: string | null;
+                          categoryName?: string | null;
+                          categoryLabel?: string | null;
+                        };
                         const c = t as WithCategory;
                         const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
                         return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
@@ -905,6 +915,11 @@ export default function TodoView() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {byKeyword.map((t) => {
                             // カテゴリメタ
+                            type WithCategory = {
+                              category?: string | null;
+                              categoryName?: string | null;
+                              categoryLabel?: string | null;
+                            };
                             const catLabel =
                               ((t as WithCategory).categoryName ??
                                 (t as WithCategory).categoryLabel ??
@@ -1013,9 +1028,9 @@ export default function TodoView() {
                         prev.map((t) =>
                           t.id === selectedTask.id
                             ? {
-                              ...t,
-                              todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
-                            }
+                                ...t,
+                                todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
+                              }
                             : t
                         )
                       );

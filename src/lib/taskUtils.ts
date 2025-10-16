@@ -16,7 +16,6 @@ import {
   getDoc,
   arrayRemove,
   writeBatch,
-  deleteField,
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask, TaskCategory } from '@/types/Task';
@@ -117,7 +116,6 @@ const getJstYmd = () =>
     day: '2-digit',
   }).format(new Date()); // → "YYYY-MM-DD"
 
-
 // undefined を再帰的に除去するユーティリティ（null/空文字は維持）
 const stripUndefinedDeep = <T>(input: T): T => {
   if (Array.isArray(input)) {
@@ -134,16 +132,16 @@ const stripUndefinedDeep = <T>(input: T): T => {
   return input;
 };
 
-
 /* =========================================================
  * 保存用正規化
  *  - Firestore は undefined を保存しないので削除
+ *  - category は必ず '未設定' | '料理' | '買い物' | '旅行' のいずれかに統一
  * =======================================================*/
 type NormalizedTaskPayload = {
   userId: string;
   userIds: string[];
   users: string[];
-  category?: TaskCategory | ''; // ★ 追加
+  category: TaskCategory; // ★ 必須・'未設定' を含む TaskCategory
   name: string;
   period: '毎日' | '週次' | '不定期';
   point: number | null;
@@ -153,6 +151,18 @@ type NormalizedTaskPayload = {
   time: string;
   note: string;
   private: boolean;
+};
+
+// ★ 保存用カテゴリ正規化：''/null/undefined/未設定系 → '未設定'
+const normalizeCategoryForSave = (v: unknown): TaskCategory => {
+  const s = typeof v === 'string' ? v.normalize('NFKC').trim().toLowerCase() : '';
+  if (s === '' || s === '未設定' || s === 'みせってい' || s === 'unset' || s === 'unselected') {
+    return '未設定';
+  }
+  if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
+  if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
+  if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
+  return '未設定';
 };
 
 const normalizeTaskPayload = (
@@ -174,20 +184,11 @@ const normalizeTaskPayload = (
     ? Array.from(new Set(usersRaw.map((v) => v.trim()).filter((v) => v.length > 0)))
     : [];
 
-  // category
-  const rawCat = isString(r.category) ? r.category.trim() : undefined;
-  const category: TaskCategory | '' | undefined =
-    rawCat === ''
-      ? '' // ★ 空文字を維持（後段で deleteField に変換）
-      : rawCat === '料理' || rawCat === '買い物' || rawCat === '旅行'
-        ? (rawCat as TaskCategory)
-        : undefined;
-
   const payload: NormalizedTaskPayload = {
     userId: uid,
     userIds: Array.isArray(userIds) && userIds.length ? userIds : [uid],
     users,
-    category,
+    category: normalizeCategoryForSave(r.category),
     name: isString(r.name) ? r.name.trim() : '',
     period:
       r.period == null || (isString(r.period) && ['毎日', '週次', '不定期'].includes(r.period))
@@ -260,18 +261,17 @@ export const buildFirestoreTaskData = (
     task.period === '週次'
       ? (task.daysOfWeek ?? []).map((d) => toDayIndex(d))
       : [];
+
   const t = task as unknown as TaskDocMinimal;
 
-  const category: TaskCategory | undefined =
-    t.category === '料理' || t.category === '買い物' || t.category === '旅行'
-      ? (t.category as TaskCategory)
-      : undefined;
+  // ★ 保存用カテゴリ（null/不明/未設定表記 → '未設定'）
+  const toSaveCategory = (v: unknown): TaskCategory => normalizeCategoryForSave(v);
 
   return {
     userId: uid,
     userIds,
     users: t.users ?? [],
-    category,
+    category: toSaveCategory(t.category),
     name: task.name ?? '',
     title: task.title ?? '',
     period: task.period ?? '毎日',
@@ -298,7 +298,7 @@ export const saveAllTasks = async (tasks: TaskManageTask[], uid: string, userIds
   for (const task of tasks) {
     const taskData = buildFirestoreTaskData(task, userIds, uid);
     try {
-      await saveTaskToFirestore(task.isNew ? null : task.id, taskData);
+      await saveTaskToFirestore(task.isNew ? null : task.id, taskData as unknown as Record<string, unknown>);
     } catch (e) {
       console.error('タスク保存失敗:', e);
       toast.error('タスクの保存に失敗しました');
@@ -445,7 +445,7 @@ export const cleanObject = <T>(obj: T): T => {
 /* =========================================================
  * Firestore 保存（新規/更新）
  * =======================================================*/
-// 修正対象: saveTaskToFirestore（新規作成/更新ともに undefined を除去してから書き込み）
+// 修正後: category は '未設定' を含む有効値として保存（deleteField で消さない）
 export const saveTaskToFirestore = async (
   taskId: string | null,
   taskData: Record<string, unknown>
@@ -469,7 +469,7 @@ export const saveTaskToFirestore = async (
       if (pairUserIds.length > 0) userIds = pairUserIds;
     }
 
-    // category を含めて正規化（この時点で undefined は極力出ない設計だが、保険で後段でも除去）
+    // category を含めて正規化
     const commonData = normalizeTaskPayload({ ...td, private: isPrivate }, uid, userIds);
 
     if (taskId) {
@@ -530,7 +530,7 @@ export const saveTaskToFirestore = async (
       const { userId: _ignoredUserId, ...commonDataWithoutOwner } = commonData;
       void _ignoredUserId;
 
-      // ★ ここで category:'' を deleteField に変換
+      // ★ '未設定' もフィールドとして保存（削除しない）
       const updatePayloadBase: Record<string, unknown> = {
         ...commonDataWithoutOwner,
         dates: finalDates,
@@ -538,17 +538,12 @@ export const saveTaskToFirestore = async (
         updatedAt: serverTimestamp(),
       };
 
-      if (updatePayloadBase.category === '') {
-        updatePayloadBase.category = deleteField(); // ← 未選択はフィールド削除
-      }
-
       // ★ ここで undefined を除去してから updateDoc
       const updatePayload = stripUndefinedDeep(updatePayloadBase);
 
       await updateDoc(taskRef, updatePayload);
-
     } else {
-      // ★ 新規作成：category:'' は書かない（フィールドを作らない）
+      // ★ 新規作成：'未設定' もそのまま保存
       const createPayloadBase: Record<string, unknown> = {
         ...commonData,
         userId: uid, // 新規作成は自分所有でOK
@@ -557,11 +552,7 @@ export const saveTaskToFirestore = async (
         updatedAt: serverTimestamp(),
       };
 
-      if (createPayloadBase.category === '') {
-        delete createPayloadBase.category; // ← 新規時は単に省く
-      }
-
-      // ★ 新規作成も undefined を除去してから addDoc（category 未選択などの保険）
+      // ★ 新規作成も undefined を除去してから addDoc
       const createPayload = stripUndefinedDeep(createPayloadBase);
 
       await addDoc(collection(db, 'tasks'), createPayload);
@@ -570,7 +561,6 @@ export const saveTaskToFirestore = async (
     handleFirestoreError(err);
   }
 };
-
 
 /* =========================================================
  * タスク削除（notifyLogs からの削除含む）
@@ -672,8 +662,6 @@ export const updateTodoInTask = async (
     next = { ...next, quantity: updates.quantity ?? null };
   }
   if ('unit' in updates) {
-    // 数量が無いなら unit は残しても良い/消す、どちらでも運用次第。
-    // ここでは指定時のみ上書き（未指定なら現状維持）
     next = { ...next, unit: updates.unit };
   }
 
@@ -685,7 +673,7 @@ export const updateTodoInTask = async (
     next = { ...next, referenceUrls: urls };
   }
 
-  // --- referenceUrlLabels（配列を整える） ← 追加 ---
+  // --- referenceUrlLabels（配列を整える） ---
   if (typeof updates.referenceUrlLabels !== 'undefined') {
     const labels = Array.isArray(updates.referenceUrlLabels)
       ? updates.referenceUrlLabels.map((s) =>
@@ -705,14 +693,13 @@ export const updateTodoInTask = async (
 
   // --- imageUrl の扱い ---
   if (updates.imageUrl === null) {
-    // プロパティごと除去した新オブジェクトを作る
+    // プロパティごと除去
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { imageUrl: _omit, ...rest } = next;
     next = rest as TodoDoc;
   } else if (typeof updates.imageUrl === 'string') {
     next = { ...next, imageUrl: updates.imageUrl };
   }
-  // undefined の場合は変更なし
 
   // --- recipe の扱い ---
   if (updates.recipe === null) {
@@ -733,7 +720,6 @@ export const updateTodoInTask = async (
           done: !!c?.done,
         }))
       : [];
-    // コンポーネント側で空行は除外済み想定。念のため文字列化・trimは実施済み。
     next = { ...next, checklist: normalized };
   }
 
@@ -992,11 +978,11 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
       : '';
   const copiedName = baseName.endsWith('_コピー') ? baseName : `${baseName}_コピー`;
 
-  // category を正規化（許可値のみ保持・それ以外は undefined）
-  const normalizedCategory: TaskCategory | undefined =
-    src.category === '料理' || src.category === '買い物' || src.category === '旅行'
+  // ★ カテゴリを '未設定' 含む正規化に
+  const normalizedCategory: TaskCategory =
+    src.category === '料理' || src.category === '買い物' || src.category === '旅行' || src.category === '未設定'
       ? (src.category as TaskCategory)
-      : undefined;
+      : '未設定';
 
   // 新しい自分専用タスクの作成データ（undefined は後で除去）
   const newTaskPayload: Record<string, unknown> = {
@@ -1022,7 +1008,7 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
     isTodo: src.isTodo === true,
 
     visible: src.visible === true,
-    category: normalizedCategory, // ← undefined の場合は後で除去される
+    category: normalizedCategory,
 
     note:
       typeof src.note === 'string'

@@ -1,4 +1,3 @@
-// src/components/task/parts/EditTaskModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +16,7 @@ import {
   ShoppingCart,
   Plane,
   type LucideIcon,
-  ChevronRight, // 横スクロールヒント用
+  ChevronRight,
 } from 'lucide-react';
 import UrlAwareTextarea from '@/components/common/UrlAwareTextarea';
 import HelpPopover from '@/components/common/HelpPopover';
@@ -37,7 +36,7 @@ type CategoryOption = {
   Icon: LucideIcon;
   iconColor: string;          // 非選択時のアイコン色
   selectedIconColor?: string; // 選択時のアイコン色
-  selectedBg: string;         // ★選択時のボタン背景（Tailwindクラス）
+  selectedBg: string;         // 選択時のボタン背景（Tailwindクラス）
 };
 const CATEGORY_OPTIONS: CategoryOption[] = [
   {
@@ -46,7 +45,7 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
     Icon: Utensils,
     iconColor: 'text-emerald-500',
     selectedIconColor: 'text-white',
-    selectedBg: 'from-emerald-500 to-emerald-600', // ★
+    selectedBg: 'from-emerald-500 to-emerald-600',
   },
   {
     key: '買い物',
@@ -54,7 +53,7 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
     Icon: ShoppingCart,
     iconColor: 'text-sky-500',
     selectedIconColor: 'text-white',
-    selectedBg: 'from-sky-500 to-sky-600', // ★
+    selectedBg: 'from-sky-500 to-sky-600',
   },
   {
     key: '旅行',
@@ -62,11 +61,12 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
     Icon: Plane,
     iconColor: 'text-orange-500',
     selectedIconColor: 'text-white',
-    selectedBg: 'from-orange-500 to-orange-600', // ★
+    selectedBg: 'from-orange-500 to-orange-600',
   },
 ];
 
-type TaskWithNote = Task & { note?: string; category?: TaskCategory };
+// ★ ここを null 許容に（未選択は null で統一）
+type TaskWithNote = Task & { note?: string; category: TaskCategory | null };
 
 type UserInfo = {
   id: string;
@@ -100,16 +100,36 @@ type Props = {
   existingTasks: Task[];
 };
 
-const normalizeCategory = (v: unknown): TaskCategory | undefined => {
-  if (typeof v !== 'string') return undefined;
+/* =========================================================
+ * カテゴリ正規化（UI表示用 / 保存用）
+ * =======================================================*/
+// ✅ UI表示用: Firestore等の値をUIの「未選択(null) or 実カテゴリ」に正規化
+const parseCategoryForUI = (v: unknown): TaskCategory | null => {
+  if (typeof v !== 'string') return null;
   const s = v.normalize('NFKC').trim().toLowerCase();
+  // 「未設定」はUIでは未選択扱いにする
+  if (s === '未設定' || s === 'みせってい' || s === 'unset' || s === 'unselected' || s === '') {
+    return null;
+  }
   if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
   if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
   if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
-  return undefined;
+  return null;
 };
-const eqCat = (a: unknown, b: TaskCategory) => normalizeCategory(a) === b;
 
+// ✅ 保存用: UIの値(null=未選択)を保存値に正規化（必ず「未設定」or 実カテゴリで返す）
+const formatCategoryForSave = (v: TaskCategory | null): TaskCategory | '未設定' => {
+  if (v == null) return '未設定';
+  const parsed = parseCategoryForUI(v);
+  return parsed ?? '未設定';
+};
+
+// ✅ 比較用（UI内の選択判定）
+const eqCat = (a: unknown, b: TaskCategory) => parseCategoryForUI(a) === b;
+
+/* =========================================================
+ * 便利関数
+ * =======================================================*/
 const toStrictBool = (v: unknown): boolean => v === true || v === 'true' || v === 1 || v === '1';
 
 const resolveUserImageSrc = (user: UserInfo): string => {
@@ -178,8 +198,8 @@ export default function EditTaskModal({
   const caretRef = useRef<{ start: number; end: number } | null>(null);
 
   // カテゴリ行の横スクロール関連
-  const catScrollRef = useRef<HTMLDivElement | null>(null); // 横スクロールDOM参照
-  const [catOverflow, setCatOverflow] = useState(false); // 溢れているかどうか
+  const catScrollRef = useRef<HTMLDivElement | null>(null);
+  const [catOverflow, setCatOverflow] = useState(false);
 
   // 端末判定（iOS Mobile Safari）
   useEffect(() => {
@@ -213,7 +233,8 @@ export default function EditTaskModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    const normalizedCategory = normalizeCategory(
+    // ★ 読み込み時も UI用に正規化（'未設定' 等は null として未選択扱い）
+    const normalizedCategory = parseCategoryForUI(
       (task as unknown as { category?: unknown })?.category
     );
 
@@ -233,7 +254,7 @@ export default function EditTaskModal({
       period: task.period,
       note: (task as unknown as { note?: string }).note ?? '',
       visible: Boolean((task as unknown as { visible?: unknown }).visible),
-      category: normalizedCategory,
+      category: normalizedCategory, // ★ null or 実カテゴリ（UI用）
     });
 
     setIsPrivate(Boolean((task as unknown as { private?: unknown }).private) || !isPairConfirmed);
@@ -334,17 +355,18 @@ export default function EditTaskModal({
     [editedTask, update]
   );
 
+  // ★ 同じボタンを押したら「外す」＝ null をセット
   const toggleCategory = useCallback(
     (cat: TaskCategory) => {
       if (!editedTask) return;
       const before = editedTask.category;
-      const next = eqCat(before, cat) ? undefined : cat;
-      update('category', next as TaskWithNote['category']);
+      const next = eqCat(before, cat) ? null : cat;
+      update('category', next);
     },
     [editedTask, update]
   );
 
-  // ★ 修正：プライベートONかつ元所有者≠自分 の場合は複製して保存
+  // 保存
   const handleSave = useCallback(async () => {
     if (!editedTask) return;
 
@@ -376,20 +398,15 @@ export default function EditTaskModal({
     const shouldForkPrivate =
       isPrivate && !!task.id && !!originalOwner && !!currentUid && originalOwner !== currentUid;
 
-    // ★ 複製モード時は、重複名チェックをスキップ
     if (!shouldForkPrivate && isDuplicate) {
       setNameError('すでに登録済みです。');
       return;
     }
     setNameError(null);
 
-    const normalizedCat = normalizeCategory(editedTask.category);
-    /**
-     * ポイント：
-     * - 未選択（= normalizeCategory が undefined）なら空文字 '' を入れる。
-     *   → 親の "undefined は送らない" 実装でも空文字は送られるため、上書きが発生する。
-     * - Firestore 側では '' を受け取ったら deleteField() に変換して物理削除推奨（後述）。
-     */
+    // ★ 保存値は未選択→'未設定' で統一、選択時はそのまま実カテゴリ
+    const categoryForSave = formatCategoryForSave(editedTask.category);
+
     const transformed: Task = {
       ...editedTask,
       users: [...editedUsers],
@@ -399,8 +416,8 @@ export default function EditTaskModal({
       name: shouldForkPrivate
         ? (editedTask.name?.endsWith('_コピー') ? editedTask.name : `${editedTask.name}_コピー`)
         : editedTask.name,
-      // ★ ここを変更
-      category: (normalizedCat ?? ('' as unknown as Task['category'])),
+      // ★ 保存時は '未設定' または 実カテゴリ('料理' | '買い物' | '旅行')
+      category: categoryForSave as unknown as Task['category'],
     } as Task;
 
     setIsSaving(true);
@@ -408,9 +425,6 @@ export default function EditTaskModal({
     if (shouldForkPrivate) {
       try {
         const newId = await forkTaskAsPrivateForSelf(task.id!);
-
-        // 親が保存も担当する設計だと二重保存になり得ます。
-        // その場合はここで onSave を呼ばず、親に「新IDで再取得」させるコールバックに切り替えてください。
         onSave({ ...transformed, id: newId });
 
         if (closeTimerRef.current) {
@@ -429,10 +443,10 @@ export default function EditTaskModal({
         console.error(e);
         setIsSaving(false);
       }
-      return; // ここで終了
+      return;
     }
 
-    // 通常保存（自分作成 or 共有のまま）
+    // 通常保存
     onSave(transformed);
 
     if (closeTimerRef.current) {
@@ -458,7 +472,7 @@ export default function EditTaskModal({
     setCatOverflow(hasOverflow);
   }, []);
 
-  // モーダルオープン時にオーバーフロー測定 & “揺らぎ”でスクロールを示唆
+  // モーダルオープン時にオーバーフロー測定 & 揺らぎでスクロールを示唆
   useEffect(() => {
     if (!isOpen) return;
     requestAnimationFrame(() => {
@@ -494,10 +508,10 @@ export default function EditTaskModal({
     try {
       el.setSelectionRange(s, e);
     } catch {
-      // iOS等のフォールバック：末尾へ
+      // iOS 等のフォールバック：末尾へ
       el.setSelectionRange(len, len);
     } finally {
-      caretRef.current = null; // 復元したらクリア
+      caretRef.current = null;
     }
   }, [editedTask?.note]);
 
@@ -542,20 +556,24 @@ export default function EditTaskModal({
                 const currentUid = auth.currentUser?.uid;
                 const originalOwner = (task as unknown as { userId?: string }).userId;
                 const shouldForkPrivate =
-                  isPrivate && !!(task as { id?: string }).id && !!originalOwner && !!currentUid && originalOwner !== currentUid;
+                  isPrivate &&
+                  !!(task as { id?: string }).id &&
+                  !!originalOwner &&
+                  !!currentUid &&
+                  originalOwner !== currentUid;
 
-                // ★ 即時チェックも、複製モード時はスキップ
+                // 即時チェックも、複製モード時はスキップ
                 const dup = shouldForkPrivate
                   ? false
                   : existingTasks.some(
-                    (t) =>
-                      t.name === newName &&
-                      t.id !== (task as unknown as { id?: string }).id &&
-                      Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
-                      ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
-                        editedUsersInner.includes(uid)
-                      )
-                  );
+                      (t) =>
+                        t.name === newName &&
+                        t.id !== (task as unknown as { id?: string }).id &&
+                        Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
+                        ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
+                          editedUsersInner.includes(uid)
+                        )
+                    );
                 setNameError(dup ? 'すでに登録済みです。' : null);
               }}
               className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
@@ -565,7 +583,6 @@ export default function EditTaskModal({
         </div>
 
         {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
-        {/* ★ 改行せず1行・溢れたら横スクロール＋ヒント */}
         <div className="flex items-center">
           <label className="w-28 text-gray-600 shrink-0 flex items-center">
             <span className="inline-flex items-center gap-1 whitespace-nowrap">
@@ -587,13 +604,11 @@ export default function EditTaskModal({
             </span>
           </label>
 
-          {/* ▼ 変更点①：flex子の幅制約（min-w-0 / basis-0）を追加 */}
           <div className="relative flex-1 min-w-0 basis-0">
             <div
               ref={catScrollRef}
               onScroll={measureCatOverflow}
               className={[
-                // ▼ 変更点②：横幅制約 + iOS操作性向上クラスを追加
                 'w-full max-w-full',
                 'flex flex-nowrap gap-2 overflow-x-auto',
                 'touch-pan-x overscroll-x-contain',
@@ -619,7 +634,7 @@ export default function EditTaskModal({
                       'inline-flex items-center gap-2 px-3 py-2 rounded-full border transition',
                       'shrink-0 snap-start',
                       selected
-                        ? `bg-gradient-to-b ${selectedBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]` // ★カテゴリ色で発光
+                        ? `bg-gradient-to-b ${selectedBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
                         : 'bg-white border-gray-300 text-gray-700 opacity-90 hover:opacity-100',
                     ].join(' ')}
                     title={label}
@@ -646,7 +661,6 @@ export default function EditTaskModal({
             )}
           </div>
         </div>
-
 
         {/* 🗓 頻度選択 */}
         <div className="flex items-center">
@@ -707,10 +721,11 @@ export default function EditTaskModal({
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-6 h-6 rounded-full text-xs font-bold ${editedTask.daysOfWeek.includes(day)
-                    ? 'bg-[#5E5E5E] text-white'
-                    : 'bg-gray-200 text-gray-600'
-                    }`}
+                  className={`w-6 h-6 rounded-full text-xs font-bold ${
+                    editedTask.daysOfWeek.includes(day)
+                      ? 'bg-[#5E5E5E] text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}
                 >
                   {day}
                 </button>
@@ -727,11 +742,7 @@ export default function EditTaskModal({
                 時間
                 <HelpPopover
                   className="ml-1"
-                  content={
-                    <div className="space-y-2">
-                      設定すると、指定した時間の約30分前に通知が届きます。
-                    </div>
-                  }
+                  content={<div className="space-y-2">設定すると、指定した時間の約30分前に通知が届きます。</div>}
                 />
                 <span>：</span>
               </span>
@@ -848,11 +859,8 @@ export default function EditTaskModal({
               ))}
             </select>
 
-            {/* 0pt 選択時の補足表示 */}
             {(((editedTask as unknown as { point?: number }).point ?? 0) === 0) && (
-              <span className="ml-2 text-xs text-gray-500 whitespace-nowrap">
-                （ポイントを使用しない）
-              </span>
+              <span className="ml-2 text-xs text-gray-500 whitespace-nowrap">（ポイントを使用しない）</span>
             )}
           </div>
         )}
@@ -869,9 +877,7 @@ export default function EditTaskModal({
                       className="ml-1"
                       content={
                         <div className="space-y-2">
-                          <p>
-                            担当決めに使用します。
-                          </p>
+                          <p>担当決めに使用します。</p>
                           <ul className="list-disc pl-5 space-y-1">
                             <li>選択していない場合は共通のアイコンが表示されます。</li>
                           </ul>
@@ -890,8 +896,9 @@ export default function EditTaskModal({
                         key={user.id}
                         type="button"
                         onClick={() => toggleUser(user.id)}
-                        className={`w-12 h-12 rounded-full border overflow-hidden ${isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
-                          }`}
+                        className={`w-12 h-12 rounded-full border overflow-hidden ${
+                          isSelected ? 'border-[#FFCB7D] opacity-100' : 'border-gray-300 opacity-30'
+                        }`}
                         title={`${user.name}`}
                       >
                         <Image
@@ -940,12 +947,14 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isPrivate}
                 onClick={() => setIsPrivate((v) => !v)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
-                  }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                  isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
+                }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : ''
-                    }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                    isPrivate ? 'translate-x-6' : ''
+                  }`}
                 />
               </button>
             </div>
@@ -960,14 +969,7 @@ export default function EditTaskModal({
               <label className="w-35 text-gray-600 shrink-0 flex items-center">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   TODO表示
-                  <HelpPopover
-                    className="ml-1"
-                    content={
-                      <div className="space-y-2">
-                        オンにすると、Todo画面で表示状態となります。
-                      </div>
-                    }
-                  />
+                  <HelpPopover className="ml-1" content={<div className="space-y-2">オンにすると、Todo画面で表示状態となります。</div>} />
                   <span>：</span>
                 </span>
               </label>
@@ -976,17 +978,16 @@ export default function EditTaskModal({
                 role="switch"
                 aria-checked={isVisible}
                 onClick={() =>
-                  update(
-                    'visible' as keyof TaskWithNote,
-                    (!isVisible) as unknown as TaskWithNote[keyof TaskWithNote]
-                  )
+                  update('visible' as keyof TaskWithNote, (!isVisible) as unknown as TaskWithNote[keyof TaskWithNote])
                 }
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isVisible ? 'bg-yellow-500' : 'bg-gray-300'
-                  }`}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                  isVisible ? 'bg-yellow-500' : 'bg-gray-300'
+                }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isVisible ? 'translate-x-6' : ''
-                    }`}
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                    isVisible ? 'translate-x-6' : ''
+                  }`}
                 />
               </button>
             </div>
@@ -1006,18 +1007,15 @@ export default function EditTaskModal({
               rows={1}
               placeholder="備考を入力"
               onChange={(e) => {
-                const el = e.currentTarget; // HTMLTextAreaElement
+                const el = e.currentTarget;
                 const native = e.nativeEvent as unknown as { inputType?: string; isComposing?: boolean };
 
                 let start = el.selectionStart ?? el.value.length;
                 let end = el.selectionEnd ?? el.value.length;
 
-                // Enter による改行（insertLineBreak）が原因の 1文字前ズレを補正
-                //   - IME変換中は補正しない（isComposing）
                 const isLineBreak =
                   native?.inputType === 'insertLineBreak' && native?.isComposing !== true;
 
-                // 選択が collapse（単一点）で Enter のときだけ +1 補正
                 if (isLineBreak && start === end) {
                   start += 1;
                   end = start;
@@ -1036,9 +1034,7 @@ export default function EditTaskModal({
             />
           </div>
           <div className="mt-1 pr-1 flex justify-end">
-            <span
-              className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'} text-xs`}
-            >
+            <span className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'} text-xs`}>
               {(editedTask.note?.length ?? 0)}/{NOTE_MAX}
             </span>
           </div>
