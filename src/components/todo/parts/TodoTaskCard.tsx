@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import clsx from 'clsx';
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Search, X, Tag } from 'lucide-react';
 import { motion, type Variants, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -124,7 +124,8 @@ export default function TodoTaskCard({
       : normalizedCategory;
 
   // 正規化後のラベルを渡す（フック側が string | null でも '未分類' を渡せばOK）
-  const { CatIcon, catColor } = useCategoryIcon(categoryLabel);
+  const { CatIcon: MaybeIcon, catColor } = useCategoryIcon(categoryLabel);
+  const CatIcon = MaybeIcon ?? Tag; // ← 必ず描画できるコンポーネントに
 
   // ★ ここで実際に使うカテゴリ値を作成（未分類フォールバック）
   type Category = '買い物' | '料理' | '旅行' | '仕事' | '家事' | '未分類';
@@ -164,7 +165,10 @@ export default function TodoTaskCard({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 12 } }));
 
   // 表示対象ID（フィルタ後）
-  const visibleIds = useMemo(() => finalFilteredTodos.map((t) => t.id), [finalFilteredTodos]);
+  const visibleIds = useMemo(
+    () => finalFilteredTodos.map((t) => t.id).filter((id): id is string => typeof id === 'string' && id.length > 0),
+    [finalFilteredTodos]
+  );
 
   function arrayMove<T>(arr: T[], from: number, to: number): T[] {
     const copy = arr.slice();
