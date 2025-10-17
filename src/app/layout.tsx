@@ -10,6 +10,10 @@ import AppBadgeInitializer from '@/components/system/AppBadgeInitializer';
 
 import { AuthProvider } from '@/context/AuthContext';
 
+// [追加] すべての「？」(HelpPopover) をグローバルにON/OFFするためのProviderとトグル
+import { HelpHintsProvider } from '@/context/HelpHintsContext'; // [追加]
+import HelpHintsToggle from '@/components/common/HelpHintsToggle'; // [追加]
+
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
   weight: ['400'],
@@ -60,6 +64,7 @@ export const viewport: Viewport = {
 };
 
 // 変更箇所のみ抜粋（前後文脈つき）
+// [変更] HelpHintsProvider で全体をラップし、右上に固定トグルを配置
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -78,13 +83,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT}`}
         />
-        {/* ▼▼▼ 追加：アプリ全体を AuthProvider でラップ ▼▼▼ */}
-        <AuthProvider>
-          <ClientLayout>{children}</ClientLayout>
-        </AuthProvider>
+
+        {/* ▼▼▼ 追加：全画面のHelpPopover表示ON/OFFのグローバルProviderでラップ ▼▼▼ */}
+        <HelpHintsProvider> {/* [追加] */}
+          {/* 右上固定ON/OFFスイッチ（全画面共通）。OFF時は全ての「？」が非表示になります */}
+          <HelpHintsToggle /> {/* [追加] */}
+
+          {/* ▼ 既存：アプリの認証プロバイダ＆クライアントレイアウト */}
+          <AuthProvider>
+            <ClientLayout>{children}</ClientLayout>
+          </AuthProvider>
+        </HelpHintsProvider>
         {/* ▲▲▲ 追加ここまで ▲▲▲ */}
       </body>
     </html>
   );
 }
-

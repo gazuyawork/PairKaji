@@ -1,9 +1,12 @@
+// src/components/common/HelpPopover.tsx
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { HelpCircle, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
+// [追加] グローバルON/OFF状態を参照（※Provider必須）
+import { useHelpHints } from '@/context/HelpHintsContext';
 
 type HelpPopoverProps = {
   /** ポップアップ内に表示する説明内容（任意のJSX可） */
@@ -35,6 +38,9 @@ export default function HelpPopover({
   preferredSide = 'bottom',
   ariaLabel = '項目の説明を表示',
 }: HelpPopoverProps) {
+  // ★ Hooksは無条件で呼び出す（lint/rules-of-hooks対応）
+  const { enabled: helpEnabled } = useHelpHints();
+
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [pos, setPos] = useState<Pos>({ top: 0, left: 0, side: preferredSide, containerH: 0 });
@@ -121,6 +127,11 @@ export default function HelpPopover({
       document.removeEventListener('touchstart', onDocPointer);
     };
   }, [open]);
+
+  // グローバルOFF時は「？」自体を描画しない（DOM/スペースごと消える）
+  if (!helpEnabled) {
+    return null;
+  }
 
   return (
     <>
