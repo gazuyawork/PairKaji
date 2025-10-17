@@ -1,7 +1,7 @@
-// src/components/common/HelpHintsToggle.tsx
 'use client';
 
 import { useHelpHints } from '@/context/HelpHintsContext';
+import { HelpCircle } from 'lucide-react';
 
 type Props = {
   className?: string;
@@ -18,15 +18,18 @@ export default function HelpHintsToggle({ className = '' }: Props) {
       onClick={toggle}
       className={[
         'fixed right-4 top-19 z-[1000]',
-        'rounded-full border px-3 py-1 text-xs font-semibold shadow-sm transition',
+        'rounded-full border p-2 shadow-md transition-all backdrop-blur',
+        'hover:scale-105 active:scale-95',
         enabled
           ? 'bg-white/90 border-gray-300 text-gray-600 hover:bg-gray-50'
-          : 'bg-gray-400 border-gray-500 text-white hover:bg-yellow-400',
-        'backdrop-blur',
+          : 'bg-gray-500/90 border-gray-600 text-white hover:bg-yellow-400',
         className,
       ].join(' ')}
     >
-      {enabled ? 'ヘルプ ON' : 'ヘルプ OFF'}
+      <HelpCircle
+        size={18}
+        className={enabled ? 'text-gray-600' : 'text-white'}
+      />
     </button>
   );
 }
