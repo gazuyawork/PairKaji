@@ -12,6 +12,7 @@ import { handleSavePoints } from '@/utils/handleSavePoints';
 import { auth, db } from '@/lib/firebase';
 import { getConfirmedPartnerUid } from '@/lib/pairs';
 import { doc, getDoc } from 'firebase/firestore';
+import { useProfileImages } from '@/hooks/useProfileImages';
 
 type UserInfo = {
   id: string;
@@ -74,6 +75,19 @@ export default function EditPointModal({
   // ===== users フォールバック（空でもログイン中なら自分1人で表示可能にする） =====
   const meUid = auth.currentUser?.uid ?? null;
 
+  // 他画面（TaskView）と同様に、設定済みプロフィール画像を取得
+  const { profileImage, partnerImage } = useProfileImages();
+
+  // 画像URLの簡易正規化（gs:// や空文字は既定画像に）
+  const normalizeImage = (url?: string) => {
+    if (!url || url.trim() === '') return '/images/default.png';
+    if (url.startsWith('gs://') || (!url.startsWith('http') && !url.startsWith('/'))) {
+      console.warn('Storageパス検出: 事前に getDownloadURL での変換を推奨します ->', url);
+      return '/images/default.png';
+    }
+    return url;
+  };
+
   // ペアプロフィール（親が1名だけ渡してくるケースで合成するための情報）
   const [partnerUser, setPartnerUser] = useState<PartnerProfile>(null);
 
@@ -112,7 +126,8 @@ export default function EditPointModal({
         setPartnerUser({
           id: partnerUid,
           name: (data?.displayName || data?.name || 'パートナー') as string,
-          imageUrl: (data?.photoURL || data?.imageUrl || '/images/default.png') as string,
+          // 表示は partnerImage を最優先（未設定時のみ Firestore 値を利用）
+          imageUrl: (partnerImage || data?.photoURL || data?.imageUrl || '/images/default.png') as string,
         });
       } catch {
         // 取得できなくても行だけは合成して表示できるようにする
@@ -125,7 +140,7 @@ export default function EditPointModal({
     };
 
     run();
-  }, [users, meUid]);
+  }, [users, meUid, partnerImage]);
 
   // safeUsers 構築（親が2名以上 → そのまま / それ以外 → 自分 + 合成パートナー）
   const safeUsers = useMemo<UserInfo[]>(() => {
@@ -137,7 +152,8 @@ export default function EditPointModal({
           {
             id: meUid,
             name: auth.currentUser?.displayName || 'あなた',
-            imageUrl: auth.currentUser?.photoURL || '/images/default.png',
+            // Googleアイコン(photoURL)ではなく「設定したプロフィール画像」に差し替え
+            imageUrl: normalizeImage(profileImage),
           },
         ]
       : [];
@@ -147,7 +163,7 @@ export default function EditPointModal({
       base.push({
         id: partnerUser.id,
         name: partnerUser.name,
-        imageUrl: partnerUser.imageUrl,
+        imageUrl: normalizeImage(partnerImage || partnerUser.imageUrl),
       });
     }
 
@@ -159,13 +175,13 @@ export default function EditPointModal({
     }
 
     return base;
-  }, [users, meUid, partnerUser]);
+  }, [users, meUid, partnerUser, profileImage, partnerImage]);
 
   // 自分のID（safeUsers から算出）
   const selfId: string | null =
     safeUsers.find((u) => u.id === meUid)?.id ?? safeUsers[0]?.id ?? null;
 
-  // ===== ユーザー別割当（内訳） =====
+  // ===== ユーザー別割当（内訳）=====
   const [alloc, setAlloc] = useState<Record<string, number>>({});
 
   // 合計（UI確認用。ペア自動モード時は PointAllocInputs 内で自動表示されるが、汎用チェック用に維持）

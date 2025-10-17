@@ -69,6 +69,13 @@ function toMillis(v: unknown): number | null {
   return null;
 }
 
+/** バッジ永続化用キー（ユーザー＋該当週で一意） */
+function getBadgeStorageKey(uid: string, start: Date, end: Date) {
+  const s = format(start, 'yyyy-MM-dd');
+  const e = format(end, 'yyyy-MM-dd');
+  return `pointsMiniCard:updateBadge:${uid}:${s}_${e}`;
+}
+
 /**
  * ミニカード：提供いただいた棒グラフスタイルをそのまま採用
  * - 合計: 「今週の合計ポイント（M/D〜M/D）」の見出し
@@ -76,6 +83,12 @@ function toMillis(v: unknown): number | null {
  * - 凡例: 色とラベル（あなた/パートナー）で意味を明示
  * - クリックで EditPointModal を開き、目標値等を編集
  * - パーセンテージは表示しない（数値のみ）
+ *
+ * 追加仕様：
+ * - tasks コレクションで「追加/削除」を検知したら左上に赤い「Update」バッジを表示
+ * - 初回スナップショットは既存状態としてバッジは出さない
+ * - ★ 保存成功までバッジは消さない（モーダルを開いても維持）
+ * - ★ バッジ状態は localStorage に保存してリロード後も維持
  */
 export default function PointsMiniCard() {
   const uid = useUserUid();
@@ -92,11 +105,25 @@ export default function PointsMiniCard() {
 
   // 集計対象UID（自分 or 自分+パートナー）をリアルタイム維持
   const [targetIds, setTargetIds] = useState<string[]>([]);
+  // タスク更新促し用バッジフラグ（localStorage で永続化）
+  const [needsRefresh, setNeedsRefresh] = useState(false);
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
+
+  // 初期表示：localStorage からバッジ状態を復元
+  useEffect(() => {
+    if (!uid) return;
+    try {
+      const key = getBadgeStorageKey(uid, weekStart, weekEnd);
+      const v = localStorage.getItem(key);
+      setNeedsRefresh(v === '1');
+    } catch {
+      /* noop */
+    }
+  }, [uid, weekStart, weekEnd]);
 
   // pairs を購読して targetIds / hasPartner をリアルタイム更新
   useEffect(() => {
@@ -112,8 +139,8 @@ export default function PointsMiniCard() {
         return;
       }
       const data = snap.docs[0].data() as PairDoc;
-      const arr = Array.isArray(data.userIds)
-        ? (data.userIds as unknown[]).filter((x): x is string => typeof x === 'string')
+      const arr = Array.isArray((data as any).userIds)
+        ? ((data as any).userIds as unknown[]).filter((x): x is string => typeof x === 'string')
         : [uid];
 
       const unique = Array.from(new Set(arr));
@@ -185,8 +212,8 @@ export default function PointsMiniCard() {
           typeof data.userId === 'string'
             ? data.userId
             : Array.isArray(data.userIds) && data.userIds.length === 1
-            ? data.userIds[0]
-            : undefined;
+              ? data.userIds[0]
+              : undefined;
 
         if (!ownerId) return;
 
@@ -241,6 +268,37 @@ export default function PointsMiniCard() {
     };
   }, [uid, targetIds, weekStart, weekEnd]);
 
+  // tasks の追加/削除を監視して「要更新」バッジをON（localStorage にも保存）
+  useEffect(() => {
+    if (!uid || targetIds.length === 0) return;
+    if (targetIds.length > 10) return; // Firestore 制限（array-contains-any は最大10）
+
+    const colRef = collection(db, 'tasks');
+    const qTasks = query(colRef, where('userIds', 'array-contains-any', targetIds));
+
+    let initialized = false; // 初回は既存読み込みなのでバッジ出さない
+    const unsub = onSnapshot(qTasks, (snap) => {
+      if (!initialized) {
+        initialized = true;
+        return;
+      }
+      const hasAddOrRemove = snap.docChanges().some(
+        (ch) => ch.type === 'added' || ch.type === 'removed'
+      );
+      if (hasAddOrRemove) {
+        setNeedsRefresh(true);
+        try {
+          const key = getBadgeStorageKey(uid, weekStart, weekEnd);
+          localStorage.setItem(key, '1'); // ON を永続化
+        } catch {
+          /* noop */
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [uid, targetIds, weekStart, weekEnd]);
+
   // 目標（合計/各自）をリアルタイムで購読（あなた＋パートナー）
   useEffect(() => {
     if (!uid || targetIds.length === 0) return;
@@ -279,7 +337,8 @@ export default function PointsMiniCard() {
 
   const total = selfPoints + partnerPoints;
   const selfWidthPct = maxPoints > 0 ? Math.min(100, (selfPoints / maxPoints) * 100) : 0;
-  const partnerWidthPct = maxPoints > 0 ? Math.min(100 - selfWidthPct, (partnerPoints / maxPoints) * 100) : 0;
+  const partnerWidthPct =
+    maxPoints > 0 ? Math.min(100 - selfWidthPct, (partnerPoints / maxPoints) * 100) : 0;
 
   const handleSave = async (newPoint: number, newSelfPoint: number) => {
     if (!uid) return;
@@ -298,20 +357,43 @@ export default function PointsMiniCard() {
       },
       { merge: true }
     );
+
+    // ★ 保存成功後は既読扱い（バッジ消去＆永続化OFF）
+    setNeedsRefresh(false);
+    try {
+      const key = getBadgeStorageKey(uid, weekStart, weekEnd);
+      localStorage.removeItem(key);
+    } catch {
+      /* noop */
+    }
   };
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setIsModalOpen(true)}
-        className="group flex w-full flex-col items-center justify-center rounded-xl p-3 text-center transition
+        onClick={() => {
+          setIsModalOpen(true);
+          // ★ モーダルを開いてもバッジは維持するため、ここでは setNeedsRefresh(false) しない
+        }}
+        className="group relative flex w-full flex-col items-center justify-center rounded-xl p-3 text-center transition
                    ring-1 ring-gray-200/60 hover:ring-gray-300 bg-yellow-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
         aria-label={`今週の合計ポイント${weekLabel}：${total} / ${maxPoints}ポイント。クリックで編集`}
         title={`今週の合計ポイント ${weekLabel}`}
       >
+        {/* 左上：更新促しバッジ（角：左上＋右下のみ丸） */}
+        {needsRefresh && (
+          <span
+            className="absolute -top-0.5 -left-0.5 inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 h-6 shadow-md ring-2 ring-white rounded-br-xl rounded-tl-xl"
+            aria-label="新しい変更があります。保存して反映してください。"
+            title="新しい変更があります。保存して反映してください。"
+          >
+            Update
+          </span>
+        )}
+
         {/* 見出し */}
-        <div className="flex items中心 gap-2 text-gray-700">
+        <div className="flex items-center gap-2 text-gray-700">
           {/* <span className="rounded-md border border-gray-300 bg-white p-1 group-hover:shadow-sm">
             <Star className="w-4 h-4" />
           </span> */}

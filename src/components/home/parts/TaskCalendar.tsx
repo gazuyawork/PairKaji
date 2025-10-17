@@ -88,7 +88,7 @@ export default function TaskCalendar({ tasks }: Props) {
   };
 
   return (
-    <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center mb-3 shadow-md border border-[#e5e5e5]">
+    <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center shadow-md border border-[#e5e5e5]">
       <h2 className="text-base font-bold text-[#5E5E5E] mb-4">スケジュール {weekLabel}</h2>
 
       <div
