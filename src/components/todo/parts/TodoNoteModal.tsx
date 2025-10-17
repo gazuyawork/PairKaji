@@ -405,8 +405,9 @@ export default function TodoNoteModal({
   );
 
   const isUncategorized = useMemo(() => {
-    const v = typeof category === 'string' ? category.normalize('NFKC').trim() : '';
-    return category == null || v === '' || v === '未分類';
+    if (category == null) return true;
+    const v = String(category).normalize('NFKC').trim();
+    return v === '' || v === '未設定' || v === '未分類' || v === '未選択';
   }, [category]);
 
   const hasContent =
