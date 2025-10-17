@@ -567,7 +567,7 @@ export default function TodoView() {
           <div
             className="
               fixed
-              bottom-[calc(env(safe-area-inset-bottom)+5.5rem)]
+              bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]
               left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
               z-[1100]
               rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200
@@ -619,7 +619,7 @@ export default function TodoView() {
                   })
                 }
                 className={[
-                  'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                  'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                   'shrink-0',
                   showSearch
                     ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-[2px] border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'

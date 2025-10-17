@@ -1,3 +1,4 @@
+// src/components/task/TaskView.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -38,6 +39,7 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
+  Copy,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
@@ -193,12 +195,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const keyboardSummonerRef = useRef<HTMLInputElement>(null);
   const { profileImage, partnerImage } = useProfileImages();
   const { plan, isChecking } = useUserPlan();
-  const params = useSearchParams(); // ReadonlyURLSearchParams | null を想定して安全に扱う
+  const params = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(INITIAL_TASK_GROUPS);
-  // const [periodFilter, setPeriodFilter] = useState<Period | null>(null);
-  // const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
   const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
   const [partnerUserId, setPartnerUserId] = useState<string | null>(null);
@@ -231,12 +231,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const urlFocusSearch = params?.get('focus') === 'search';
 
   useEffect(() => {
-    // クエリに search があるときは、表示時点で検索欄を出し、語句を投入
     if (urlSearch !== '') {
       setSearchTerm(urlSearch);
       setShowSearchBox(true);
     }
-    // focus=search のときは入力にフォーカス（2段階で安定化）
     if (urlFocusSearch) {
       requestAnimationFrame(() => {
         const el = searchInputRef.current;
@@ -614,13 +612,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   // 虫眼鏡ボタンで検索UIをトグル（閉じる時は検索語をクリア）
   const handleToggleSearch = useCallback(() => {
     if (isSearchVisible) {
-      // すでに表示中 → 非表示にして検索語をクリア
       setShowSearchBox(false);
       setSearchTerm('');
       try { searchInputRef.current?.blur(); } catch { }
       try { keyboardSummonerRef.current?.blur(); } catch { }
     } else {
-      // 非表示 → 表示＆フォーカス
       keyboardSummonerRef.current?.focus();
       setShowSearchBox(true);
       requestAnimationFrame(() => {
@@ -655,6 +651,57 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       return next;
     });
   }, []);
+
+  // 一括コピー（選択したタスクを複製して新規作成）
+  const handleBulkCopy = useCallback(async () => {
+    if (!uid) {
+      toast.error('ログインしていません');
+      return;
+    }
+    if (selectedIds.size === 0) return;
+
+    try {
+      const selectedIdSet = new Set(selectedIds);
+      const allTasks = periods.flatMap((p) => tasksState[p] ?? []);
+      const targets = allTasks.filter((t) => selectedIdSet.has(t.id));
+
+      const batch = writeBatch(db);
+      targets.forEach((original) => {
+        const newRef = doc(collection(db, 'tasks'));
+        const copiedName = original.name ? `${original.name} (コピー)` : '無題 (コピー)';
+
+        // 【修正①】original から createdAt / updatedAt / id を除去（未使用変数を持たない）
+        const rest: Record<string, unknown> = { ...(original as unknown as Record<string, unknown>) };
+        delete rest.id;
+        delete (rest as Record<string, unknown>).createdAt;
+        delete (rest as Record<string, unknown>).updatedAt;
+
+        // Firestore 書き込み用のプレーンなペイロードとして組み立て（型は Record で受ける）
+        const newTask: Record<string, unknown> = {
+          ...rest,
+          id: newRef.id,
+          name: copiedName,
+          // 【修正②】any を排除
+          title: (original as { title?: string }).title ?? copiedName,
+          done: false,
+          skipped: false,
+          completedAt: null,
+          completedBy: '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+
+        batch.set(newRef, newTask);
+      });
+
+      await batch.commit();
+      toast.success(`${selectedIds.size}件のタスクをコピーしました`);
+      setSelectedIds(new Set());
+    } catch (e) {
+      console.error('[BulkCopy] 失敗:', e);
+      toast.error('タスクのコピーに失敗しました');
+    }
+  }, [uid, selectedIds, tasksState]);
 
   // 一括削除
   const handleBulkDelete = useCallback(async () => {
@@ -777,8 +824,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   (task) =>
                     uid &&
                     task.userIds?.includes(uid) &&
-                    // (!periodFilter || periodFilter === task.period) &&
-                    // (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
                     (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
@@ -795,8 +840,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   (task) =>
                     uid &&
                     task.userIds?.includes(uid) &&
-                    // (!periodFilter || periodFilter === period) &&
-                    // (!personFilter || task.users.includes(personFilter)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
                     (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
@@ -892,7 +935,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                                 ? (selectedIds.has(task.id) ? 'filter-none' : 'filter grayscale brightness-[.90]')
                                 : '',
                             ].join(' ')}
-                            aria-selected={selectionMode ? selectedIds.has(task.id) : undefined}
                           >
                             {/* 選択モード中：カードどこをタップしても選択トグル可能にする透明オーバーレイ */}
                             {selectionMode && (
@@ -968,7 +1010,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               <div
                 className="
           fixed
-          bottom-[calc(env(safe-area-inset-bottom)+5.5rem)]
+          bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]  /* 新規＋と重ならない高さ（下げた位置） */
           left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
           z-[1100]
           pointer-events-auto
@@ -976,7 +1018,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               >
                 {/* ガラス風コンテナ */}
                 <div className="rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-2 py-2">
-                  {/* 横スクロール行（狭い幅で横に流れる） */}
+                  {/* 横スクロール行 */}
                   <div
                     className="flex items-center gap-2 overflow-x-auto no-scrollbar pr-1 pl-1 whitespace-nowrap"
                     style={{ WebkitOverflowScrolling: 'touch' }}
@@ -987,7 +1029,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       aria-pressed={selectionMode}
                       title="選択モード"
                       className={[
-                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                         'shrink-0',
                         selectionMode
                           ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-[2px] border-emerald-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
@@ -997,13 +1039,31 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       {selectionMode ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
                     </button>
 
+                    {/* 一括コピー（選択中のみ表示） */}
+                    {selectionMode && (
+                      <button
+                        onClick={handleBulkCopy}
+                        disabled={selectedIds.size === 0}
+                        className={[
+                          'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                          'shrink-0',
+                          selectedIds.size === 0
+                            ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
+                            : 'bg-gradient-to-b from-sky-400 to-sky-600 text-white border-[2px] border-sky-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)] hover:brightness-105',
+                        ].join(' ')}
+                        title="選択したタスクをコピーして新規作成"
+                      >
+                        <Copy className="w-6 h-6" />
+                      </button>
+                    )}
+
                     {/* 一括削除（選択中のみ表示） */}
                     {selectionMode && (
                       <button
                         onClick={handleBulkDelete}
                         disabled={selectedIds.size === 0}
                         className={[
-                          'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                          'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                           'shrink-0',
                           selectedIds.size === 0
                             ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
@@ -1015,72 +1075,77 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       </button>
                     )}
 
-                    {/* 仕切り */}
-                    <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+                    {/* ===== フィルタ群は複数選択モード中は非表示 ===== */}
+                    {!selectionMode && (
+                      <>
+                        {/* 仕切り */}
+                        <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
 
-                    {/* 📅 本日フィルター */}
-                    <button
-                      onClick={() => setTodayFilter((prev) => !prev)}
-                      aria-pressed={todayFilter}
-                      aria-label="本日のタスクに絞り込む"
-                      title="本日のタスクに絞り込む"
-                      className={[
-                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                        'shrink-0',
-                        todayFilter
-                          ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[2px] border-[#f0a93a] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                          : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
-                      ].join(' ')}
-                    >
-                      <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-[#f5b94f]'}`} />
-                      <span
-                        className={[
-                          'absolute text-[12px] font-bold top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
-                          todayFilter ? 'text-white' : 'text-[#f5b94f] pb-1',
-                        ].join(' ')}
-                      >
-                        {todayDate}
-                      </span>
-                    </button>
+                        {/* 📅 本日フィルター */}
+                        <button
+                          onClick={() => setTodayFilter((prev) => !prev)}
+                          aria-pressed={todayFilter}
+                          aria-label="本日のタスクに絞り込む"
+                          title="本日のタスクに絞り込む"
+                          className={[
+                            'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                            'shrink-0',
+                            todayFilter
+                              ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[2px] border-[#f0a93a] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                              : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
+                          ].join(' ')}
+                        >
+                          <Calendar className={`w-7 h-7 ${todayFilter ? 'text-white' : 'text-[#f5b94f]'}`} />
+                          <span
+                            className={[
+                              'absolute text-[12px] font-bold top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
+                              todayFilter ? 'text-white' : 'text-[#f5b94f] pb-1',
+                            ].join(' ')}
+                          >
+                            {todayDate}
+                          </span>
+                        </button>
 
-                    {/* 🔒 プライベート（ペア確定時のみ） */}
-                    {pairStatus === 'confirmed' && (
-                      <button
-                        onClick={() => setPrivateFilter((prev) => !prev)}
-                        aria-pressed={privateFilter}
-                        aria-label="プライベートタスクのみ表示"
-                        title="プライベートタスク"
-                        className={[
-                          'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                          'shrink-0',
-                          privateFilter
-                            ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[2px] border-[#059669] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                            : 'bg-white text-[#059669] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#059669] hover:text-white hover:border-[#059669]',
-                        ].join(' ')}
-                      >
-                        <SquareUser className="w-7 h-7" />
-                      </button>
+                        {/* 🔒 プライベート（ペア確定時のみ） */}
+                        {pairStatus === 'confirmed' && (
+                          <button
+                            onClick={() => setPrivateFilter((prev) => !prev)}
+                            aria-pressed={privateFilter}
+                            aria-label="プライベートタスクのみ表示"
+                            title="プライベートタスク"
+                            className={[
+                              'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                              'shrink-0',
+                              privateFilter
+                                ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[2px] border-[#059669] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                                : 'bg-white text-[#059669] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#059669] hover:text-white hover:border-[#059669]',
+                            ].join(' ')}
+                          >
+                            <SquareUser className="w-7 h-7" />
+                          </button>
+                        )}
+
+                        {/* 🚩 フラグ */}
+                        <button
+                          onClick={() => setFlaggedFilter((prev) => !prev)}
+                          aria-pressed={flaggedFilter}
+                          aria-label="フラグ付きタスクのみ表示"
+                          title="フラグ付きタスク"
+                          className={[
+                            'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                            'shrink-0',
+                            flaggedFilter
+                              ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] text-white border-[2px] border-[#f43f5e] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                              : 'bg-white text-[#fb7185] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]',
+                          ].join(' ')}
+                        >
+                          <Flag className="w-6 h-6" />
+                        </button>
+
+                        {/* 仕切り */}
+                        <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+                      </>
                     )}
-
-                    {/* 🚩 フラグ */}
-                    <button
-                      onClick={() => setFlaggedFilter((prev) => !prev)}
-                      aria-pressed={flaggedFilter}
-                      aria-label="フラグ付きタスクのみ表示"
-                      title="フラグ付きタスク"
-                      className={[
-                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                        'shrink-0',
-                        flaggedFilter
-                          ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] text-white border-[2px] border-[#f43f5e] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                          : 'bg-white text-[#fb7185] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]',
-                      ].join(' ')}
-                    >
-                      <Flag className="w-6 h-6" />
-                    </button>
-
-                    {/* 仕切り */}
-                    <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
 
                     {/* 🔎 検索（虫眼鏡） */}
                     <button
@@ -1089,12 +1154,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       aria-label="検索ボックスを表示/非表示"
                       title="検索"
                       className={[
-                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                         'shrink-0',
                         isSearchVisible
                           ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-[2px] border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
                           : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
-
                       ].join(' ')}
                     >
                       <Search className={`w-6 h-6 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
