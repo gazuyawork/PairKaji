@@ -1,4 +1,3 @@
-// src/components/views/TaskView.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -19,16 +18,27 @@ import {
   getDoc,
   DocumentData,
   QueryDocumentSnapshot,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-// import { resetCompletedTasks } from '@/lib/scheduler/resetTasks';
 import { isToday, parseISO } from 'date-fns';
 import { toggleTaskDoneStatus, saveSingleTask, removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import { motion } from 'framer-motion';
-import { Lightbulb, LightbulbOff, SquareUser, Calendar, Flag, Search } from 'lucide-react';
+import {
+  Lightbulb,
+  LightbulbOff,
+  SquareUser,
+  Calendar,
+  Flag,
+  Search,
+  CheckCircle,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+} from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import AdCard from '@/components/home/parts/AdCard';
@@ -212,6 +222,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const { index } = useView();
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
 
+  // 選択モードと選択ID
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   /* URLクエリから検索語とフォーカス指示を取得して反映 */
   const urlSearch = (params?.get('search') ?? '').trim();
   const urlFocusSearch = params?.get('focus') === 'search';
@@ -256,7 +270,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       setFlaggedFilter(true);
     }
   }, [params]);
-
 
   // 「パートナー解除後の孤児データ削除」案内の判定
   useEffect(() => {
@@ -459,28 +472,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   };
 
-  // 日次の自動リセット
-  // useEffect(() => {
-  //   let mounted = true;
-
-  //   (async () => {
-  //     try {
-  //       const count = await resetCompletedTasks();
-  //       if (!mounted) return;
-
-  //       if (count > 0) {
-  //         toast.success('タスクのリセットが完了しました。今日も1日がんばりましょう！');
-  //       }
-  //     } catch (e) {
-  //       console.error('resetCompletedTasks 実行時にエラー', e);
-  //     }
-  //   })();
-
-  //   return () => {
-  //     mounted = false;
-  //   };
-  // }, []);
-
   // タスク購読
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -648,9 +639,45 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   }, [isSearchVisible]);
 
+  // 選択モード関連ハンドラ
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode((prev) => {
+      if (prev) setSelectedIds(new Set()); // OFF時は選択クリア
+      return !prev;
+    });
+  }, []);
+
+  const toggleSelect = useCallback((taskId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }, []);
+
+  // 一括削除
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    const proceed = window.confirm(`${selectedIds.size}件のタスクを削除します。よろしいですか？`);
+    if (!proceed) return;
+
+    try {
+      const batch = writeBatch(db);
+      for (const id of selectedIds) {
+        batch.delete(doc(db, 'tasks', id));
+      }
+      await batch.commit();
+      toast.success('選択したタスクを削除しました');
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+    } catch (e) {
+      console.error('[BulkDelete] 失敗:', e);
+      toast.error('一括削除に失敗しました');
+    }
+  }, [selectedIds]);
 
   return (
-    // <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pb-20 select-none overflow-hidden">
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] overflow-hidden">
       <main className="overflow-y-auto px-4 pt-5 pb-20">
         {/* キーボード喚起用のダミー input */}
@@ -721,12 +748,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           confirmLabel="OK"
         />
 
-        {/* <main
-          className={
-            "main-content flex-1 px-4 py-3 space-y-6 overflow-y-auto pb-57 " +
-            "[-webkit-overflow-scrolling:touch] [touch-action:pan-y] overscroll-contain"
-          }
-        > */}
         {isLoading ? (
           <div className="flex items-center justify-center text-gray-400 text-sm h-200">
             <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -797,7 +818,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
                 return (
                   <div key={period} className="mx-auto w-full max-w-xl">
-                    {/* <div className="flex items-center justify-between mt-4 mb-2 px-2"> */}
                     <div className={`flex items-center justify-between ${i === 0 ? 'mt-0' : 'mt-4'} mb-2 px-2`}>
                       <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
                         <span
@@ -864,30 +884,72 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         })
                         .filter((t) => showCompletedMap[period] || !t.done || searchActive)
                         .map((task, idx) => (
-                          <TaskCard
+                          <li
                             key={task.id}
-                            task={task}
-                            period={period}
-                            index={idx}
-                            onToggleDone={toggleDone}
-                            onDelete={deleteTask}
-                            onEdit={() =>
-                              setEditTargetTask({
-                                ...task,
-                                period: task.period,
-                                daysOfWeek: task.daysOfWeek ?? [],
-                                dates: task.dates ?? [],
-                                isTodo: getOpt(task, 'isTodo') ?? false,
-                              })
-                            }
-                            userList={userList}
-                            isPairConfirmed={pairStatus === 'confirmed'}
-                            isPrivate={getOpt(task, 'private') === true}
-                            onLongPress={(x, y) => setLongPressPosition({ x, y })}
-                            deletingTaskId={deletingTaskId}
-                            onSwipeLeft={(taskId) => setDeletingTaskId(taskId)}
-                            onSkip={handleSkip}
-                          />
+                            className={[
+                              'relative transition-all duration-200',
+                              selectionMode
+                                ? (selectedIds.has(task.id) ? 'filter-none' : 'filter grayscale brightness-[.90]')
+                                : '',
+                            ].join(' ')}
+                            aria-selected={selectionMode ? selectedIds.has(task.id) : undefined}
+                          >
+                            {/* 選択モード中：カードどこをタップしても選択トグル可能にする透明オーバーレイ */}
+                            {selectionMode && (
+                              <button
+                                type="button"
+                                onClick={() => toggleSelect(task.id)}
+                                className="absolute inset-0 z-[5]"
+                                aria-pressed={selectedIds.has(task.id)}
+                                aria-label={selectedIds.has(task.id) ? '選択解除' : '選択'}
+                                style={{ background: 'transparent' }}
+                              />
+                            )}
+
+                            {/* 選択バッジ（左上のチェック丸） */}
+                            {selectionMode && (
+                              <button
+                                type="button"
+                                onClick={() => toggleSelect(task.id)}
+                                className={[
+                                  'absolute -top-1.5 -left-1.5 z-10',
+                                  'inline-flex items-center justify-center',
+                                  'w-7 h-7 rounded-full',
+                                  selectedIds.has(task.id)
+                                    ? 'bg-emerald-500 text-white ring-2 ring-white shadow-md'
+                                    : 'bg-white text-gray-400 border border-gray-300 shadow-sm',
+                                ].join(' ')}
+                                aria-pressed={selectedIds.has(task.id)}
+                                title={selectedIds.has(task.id) ? '選択中' : '選択'}
+                              >
+                                <CheckCircle className="w-5 h-5" />
+                              </button>
+                            )}
+
+                            <TaskCard
+                              task={task}
+                              period={period}
+                              index={idx}
+                              onToggleDone={toggleDone}
+                              onDelete={deleteTask}
+                              onEdit={() =>
+                                setEditTargetTask({
+                                  ...task,
+                                  period: task.period,
+                                  daysOfWeek: task.daysOfWeek ?? [],
+                                  dates: task.dates ?? [],
+                                  isTodo: getOpt(task, 'isTodo') ?? false,
+                                })
+                              }
+                              userList={userList}
+                              isPairConfirmed={pairStatus === 'confirmed'}
+                              isPrivate={getOpt(task, 'private') === true}
+                              onLongPress={(x, y) => setLongPressPosition({ x, y })}
+                              deletingTaskId={deletingTaskId}
+                              onSwipeLeft={(taskId) => setDeletingTaskId(taskId)}
+                              onSkip={handleSkip}
+                            />
+                          </li>
                         ))}
                     </ul>
                   </div>
@@ -897,7 +959,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           </motion.div>
         )}
         {!isLoading && !isChecking && plan === 'free' && <AdCard />}
-        {/* </main> */}
 
         {/* 左下のフローティング列（虫眼鏡は右端） */}
         {!editTargetTask && index === 1 &&
@@ -913,13 +974,50 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           pointer-events-auto
         "
               >
-                {/* ▼ Todoの左下フィルタと同じガラス風コンテナ */}
+                {/* ガラス風コンテナ */}
                 <div className="rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-2 py-2">
-                  {/* 横スクロール行 */}
+                  {/* 横スクロール行（狭い幅で横に流れる） */}
                   <div
-                    className="flex items-center gap-2 overflow-x-auto no-scrollbar pr-1 pl-1"
+                    className="flex items-center gap-2 overflow-x-auto no-scrollbar pr-1 pl-1 whitespace-nowrap"
                     style={{ WebkitOverflowScrolling: 'touch' }}
                   >
+                    {/* ==== 選択モードトグル ==== */}
+                    <button
+                      onClick={toggleSelectionMode}
+                      aria-pressed={selectionMode}
+                      title="選択モード"
+                      className={[
+                        'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'shrink-0',
+                        selectionMode
+                          ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-[2px] border-emerald-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                          : 'bg-white text-emerald-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-emerald-500 hover:text-white hover:border-emerald-500',
+                      ].join(' ')}
+                    >
+                      {selectionMode ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                    </button>
+
+                    {/* 一括削除（選択中のみ表示） */}
+                    {selectionMode && (
+                      <button
+                        onClick={handleBulkDelete}
+                        disabled={selectedIds.size === 0}
+                        className={[
+                          'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                          'shrink-0',
+                          selectedIds.size === 0
+                            ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
+                            : 'bg-gradient-to-b from-rose-400 to-rose-600 text-white border-[2px] border-rose-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)] hover:brightness-105',
+                        ].join(' ')}
+                        title="選択したタスクを削除"
+                      >
+                        <Trash2 className="w-6 h-6" />
+                      </button>
+                    )}
+
+                    {/* 仕切り */}
+                    <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+
                     {/* 📅 本日フィルター */}
                     <button
                       onClick={() => setTodayFilter((prev) => !prev)}
@@ -928,7 +1026,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       title="本日のタスクに絞り込む"
                       className={[
                         'w-12 h-12 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                        'shrink-0', // ← active:translate-y を削除
+                        'shrink-0',
                         todayFilter
                           ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[2px] border-[#f0a93a] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
                           : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
@@ -944,9 +1042,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         {todayDate}
                       </span>
                     </button>
-
-                    {/* 仕切り */}
-                    {/* {pairStatus === 'confirmed' && <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />} */}
 
                     {/* 🔒 プライベート（ペア確定時のみ） */}
                     {pairStatus === 'confirmed' && (
@@ -966,9 +1061,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         <SquareUser className="w-7 h-7" />
                       </button>
                     )}
-
-                    {/* 仕切り */}
-                    {/* <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" /> */}
 
                     {/* 🚩 フラグ */}
                     <button
@@ -1007,29 +1099,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     >
                       <Search className={`w-6 h-6 ${isSearchVisible ? 'text-white' : 'text-gray-600'}`} />
                     </button>
-
-
-                    {/* ❌ クリア（いずれかフィルタが有効時） */}
-                    {/* {(periodFilter || personFilter || todayFilter || privateFilter || isSearchVisible || flaggedFilter || searchTerm) && (
-                      <motion.button
-                        onClick={() => {
-                          setPeriodFilter(null);
-                          setPersonFilter(null);
-                          setSearchTerm('');
-                          setTodayFilter(false);
-                          setPrivateFilter(false);
-                          setShowSearchBox(false);
-                          setFlaggedFilter(false);
-                        }}
-                        whileTap={{ scale: 1.2 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                        className="w-12 h-12 rounded-full border-[2px] text-white flex items-center justify-center bg-gradient-to-b from-[#fca5a5] to-[#ef4444] border-[#dc2626] shadow-[0_6px_14px_rgba(0,0,0,0.18)]"
-                        title="すべてのフィルターを解除"
-                        aria-label="すべてのフィルターを解除"
-                      >
-                        <X className="w-5 h-5" />
-                      </motion.button>
-                    )} */}
                   </div>
                 </div>
               </div>
