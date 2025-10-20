@@ -315,9 +315,9 @@ function LoginInner() {
         </form>
       </motion.div>
 
-      <Link href="/landing" className="mt-6">
+      {/* <Link href="/landing" className="mt-6">
         <p className="text-xs text-center text-[#5E5E5E] underline font-sans">PairKajiとは？</p>
-      </Link>
+      </Link> */}
 
       {isLoading && (
         <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-50">

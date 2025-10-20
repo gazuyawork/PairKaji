@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 import {
-  MoreVertical, User, Mail, LogOut, Loader2, CheckCircle, ArrowLeft, Info,
+  MoreVertical, User, Mail, LogOut, Loader2, CheckCircle, ArrowLeft,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from 'firebase/auth';
@@ -86,7 +86,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
                   <Mail size={16} />
                   お問い合わせ
                 </li>
-                <li
+                {/* <li
                   className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
                   onClick={() => {
                     setShowMenu(false);
@@ -95,7 +95,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
                 >
                   <Info size={16} />
                   PairKahi とは？
-                </li>
+                </li> */}
                 <li
                   className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
                   onClick={async () => {
