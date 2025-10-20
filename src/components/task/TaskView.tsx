@@ -183,6 +183,19 @@ const getComparableDateTimeMs = (
   return { hasDate: false, hasTimeOnly: false, ms: null };
 };
 
+/* =========================================================
+ * コピー名の一意化ヘルパ
+ * =======================================================*/
+function generateCopyName(base: string, existingNames: Set<string>) {
+  const baseTrimmed = (base ?? '').trim();
+  const stem = baseTrimmed === '' ? '無題' : baseTrimmed;
+  const first = `${stem} (コピー)`;
+  if (!existingNames.has(first)) return first;
+  let i = 2;
+  while (existingNames.has(`${stem} (コピー ${i})`)) i++;
+  return `${stem} (コピー ${i})`;
+}
+
 type Props = {
   initialSearch?: string;
   onModalOpenChange?: (isOpen: boolean) => void;
@@ -323,6 +336,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       todos: [],
+      category: '未設定',
     } as unknown as Task;
   }, [uid]);
 
@@ -652,6 +666,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     });
   }, []);
 
+  // /src/components/task/TaskView.tsx
+
+  // （略）handleBulkCopy 定義の前半は変更なし
+
   // 一括コピー（選択したタスクを複製して新規作成）
   const handleBulkCopy = useCallback(async () => {
     if (!uid) {
@@ -665,23 +683,36 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       const allTasks = periods.flatMap((p) => tasksState[p] ?? []);
       const targets = allTasks.filter((t) => selectedIdSet.has(t.id));
 
+      // 既存名の集合（重複防止）
+      const existingNames = new Set<string>(
+        periods.flatMap((p) => (tasksState[p] ?? []).map((t) => t.name ?? ''))
+      );
+
+      // 1) タスク本体をまとめて作成（従来どおり）
       const batch = writeBatch(db);
+      const idMap: Array<{ origId: string; newId: string }> = [];
+
       targets.forEach((original) => {
         const newRef = doc(collection(db, 'tasks'));
-        const copiedName = original.name ? `${original.name} (コピー)` : '無題 (コピー)';
+        const copiedName = generateCopyName(original.name ?? '無題', existingNames);
+        existingNames.add(copiedName);
 
-        // 【修正①】original から createdAt / updatedAt / id を除去（未使用変数を持たない）
         const rest: Record<string, unknown> = { ...(original as unknown as Record<string, unknown>) };
         delete rest.id;
         delete (rest as Record<string, unknown>).createdAt;
         delete (rest as Record<string, unknown>).updatedAt;
 
-        // Firestore 書き込み用のプレーンなペイロードとして組み立て（型は Record で受ける）
+        const originalCategory =
+          (original as unknown as { category?: unknown })?.category;
+        const normalizedCategory =
+          typeof originalCategory === 'string' && originalCategory.trim() !== ''
+            ? originalCategory
+            : '未設定';
+
         const newTask: Record<string, unknown> = {
           ...rest,
           id: newRef.id,
           name: copiedName,
-          // 【修正②】any を排除
           title: (original as { title?: string }).title ?? copiedName,
           done: false,
           skipped: false,
@@ -689,19 +720,108 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           completedBy: '',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          // 【追加】カテゴリは必ず '未設定'（未指定/空文字/不正時も強制）
+          category: normalizedCategory,
         };
 
         batch.set(newRef, newTask);
+        idMap.push({ origId: original.id, newId: newRef.id });
       });
 
       await batch.commit();
-      toast.success(`${selectedIds.size}件のタスクをコピーしました`);
+
+      // 2) 各タスクの todos サブコレクションを複製 + 「旧→新 todoId マップ」を作成
+      for (const { origId, newId } of idMap) {
+        const todosSnap = await getDocs(collection(db, 'tasks', origId, 'todos'));
+
+        // 旧→新 ID 対応表
+        const todoIdMap = new Map<string, string>();
+
+        if (!todosSnap.empty) {
+          let subBatch = writeBatch(db);
+          let ops = 0;
+          const COMMIT_THRESHOLD = 400;
+
+          for (const todoDoc of todosSnap.docs) {
+            const data = todoDoc.data() as Record<string, unknown>;
+            const newTodoRef = doc(collection(db, 'tasks', newId, 'todos'));
+
+            const payload: Record<string, unknown> = {
+              ...data,
+              id: newTodoRef.id,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            };
+
+            // 旧ID -> 新ID を記録
+            todoIdMap.set(todoDoc.id, newTodoRef.id);
+
+            // 元の子Docに taskId があれば新タスクIDへ差し替え
+            if ('taskId' in data) {
+              (payload as Record<string, unknown>)['taskId'] = newId;
+            }
+
+            subBatch.set(newTodoRef, payload);
+            ops++;
+
+            if (ops >= COMMIT_THRESHOLD) {
+              await subBatch.commit();
+              subBatch = writeBatch(db);
+              ops = 0;
+            }
+          }
+
+          if (ops > 0) {
+            await subBatch.commit();
+          }
+        }
+
+        // 3) タスク本体の `todos` 配列フィールドも旧ID→新ID で張り替えて保存
+        //    - 元タスクドキュメントを直接 read して、配列の実体を取得
+        //    - 配列要素がオブジェクトで id を持つ場合にのみ差し替え
+        const origTaskRef = doc(db, 'tasks', origId);
+        const newTaskRef = doc(db, 'tasks', newId);
+
+        const origSnap = await getDoc(origTaskRef);
+        const origData = origSnap.exists() ? (origSnap.data() as Record<string, unknown>) : null;
+        const origTodos = Array.isArray(origData?.todos) ? (origData!.todos as unknown[]) : null;
+
+        if (origTodos) {
+          const remapped = origTodos.map((item) => {
+            // 文字列や数値などはそのまま
+            if (item === null || typeof item !== 'object') return item;
+
+            // オブジェクトの場合のみ shallow copy して id 差し替えを試みる
+            const cloned: Record<string, unknown> = { ...(item as Record<string, unknown>) };
+
+            const oldId = typeof cloned.id === 'string' ? (cloned.id as string) : null;
+            if (oldId && todoIdMap.has(oldId)) {
+              cloned.id = todoIdMap.get(oldId);
+            }
+
+            // 子要素内の createdAt/updatedAt があるなら新規として無効化/削除したい場合はここで調整
+            // delete cloned.createdAt;
+            // delete cloned.updatedAt;
+
+            return cloned;
+          });
+
+          await updateDoc(newTaskRef, {
+            todos: remapped,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      toast.success(`${selectedIds.size}件のタスクをコピーしました（サブタスクと配列todosを含む）`);
       setSelectedIds(new Set());
+      setSelectionMode(false);
     } catch (e) {
       console.error('[BulkCopy] 失敗:', e);
       toast.error('タスクのコピーに失敗しました');
     }
   }, [uid, selectedIds, tasksState]);
+
 
   // 一括削除
   const handleBulkDelete = useCallback(async () => {
@@ -932,7 +1052,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             className={[
                               'relative transition-all duration-200',
                               selectionMode
-                                ? (selectedIds.has(task.id) ? 'filter-none' : 'filter grayscale brightness-[.90]')
+                                ? (selectedIds.has(task.id) ? 'filter-none' : 'filter saturate-50 brightness-97 opacity-90')
                                 : '',
                             ].join(' ')}
                           >
