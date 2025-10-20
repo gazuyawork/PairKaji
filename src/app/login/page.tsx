@@ -7,13 +7,13 @@ import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } fr
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   signInWithEmailAndPassword,
-  setPersistence,
-  browserLocalPersistence,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   signOut, // reauth=1 用に使用継続
+  onAuthStateChanged,
+  type User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
@@ -24,10 +24,10 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 /**
  * ラッパー: Suspense で useSearchParams を含む内側を包む
+ * （Next.js App Router の要件）
  */
 export default function LoginPage() {
-  // Next.js の要件: useSearchParams を使うページは Suspense 境界が必要
-  // ただし起動時の二重表示を防ぐため fallback は null にする
+  // 起動時の二重表示を防ぐため fallback は null にする
   return (
     <Suspense fallback={null}>
       <LoginInner />
@@ -39,7 +39,7 @@ export default function LoginPage() {
  * ここから内側: useSearchParams を利用
  * - reauth=1 なら（明示ログアウト時のみ）signOut
  * - Google は prompt: 'select_account' で毎回アカウント選択
- * - 自動遷移なし。成功時のみ next へ遷移
+ * - 既ログイン（セッション復元済み）なら onAuthStateChanged で自動遷移
  */
 function LoginInner() {
   const router = useRouter();
@@ -60,16 +60,22 @@ function LoginInner() {
   const [passwordError, setPasswordError] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // 永続化（必要に応じて）
+  // ★追加: 認証状態の「復元待ち」フラグと現在ユーザー
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+
+  // ★追加: 起動時に onAuthStateChanged で復元完了を待ち、既ログインなら自動で next へ遷移
   useEffect(() => {
-    (async () => {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-      } catch {
-        // firebase.ts 側のフォールバックに任せる
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setAuthUser(u);
+      setIsAuthResolved(true);
+      if (u) {
+        // 既にログイン済みなら即座に next へ
+        router.replace(next);
       }
-    })();
-  }, []);
+    });
+    return () => unsub();
+  }, [router, next]);
 
   // ★変更: reauth=1 の時でも「明示ログアウト時のみ」 Firebase セッションをクリア
   useEffect(() => {
@@ -137,7 +143,6 @@ function LoginInner() {
 
     setIsLoading(true);
     try {
-      // 【削除済み】ここでの signOut は不要
       await signInWithEmailAndPassword(auth, emailTrimmed, password);
       router.replace(next);
     } catch (error: unknown) {
@@ -155,7 +160,6 @@ function LoginInner() {
     setPasswordError('');
     setLoginError('');
     try {
-      // 【削除済み】ここでの signOut は不要
       setIsLoading(true);
       // まずはポップアップ
       await signInWithPopup(auth, googleProvider);
@@ -190,6 +194,18 @@ function LoginInner() {
       setLoginError('ログインに失敗しました：' + fe?.message);
     }
   }, [googleProvider, next, router]);
+
+  // ★追加: 認証復元が未確定の間はローディングのみ表示（チラつき/誤判定防止）
+  if (!isAuthResolved) {
+    return (
+      <div className="relative min-h-screen flex items-center justify-center bg-white">
+        <LoadingSpinner size={48} />
+      </div>
+    );
+  }
+
+  // ★追加: 既ログイン（replace 中）なら何も描画しない
+  if (authUser) return null;
 
   // UI
   return (
