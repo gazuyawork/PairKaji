@@ -40,7 +40,7 @@ export default function HelpHintsToggle({ className = '' }: Props) {
       aria-pressed={enabled}
       onClick={toggle}
       className={[
-        'fixed right-4 top-19 z-[1000]',
+        'fixed right-14 top-3 z-[1000]',
         'rounded-full border p-2 shadow-sm transition-all backdrop-blur-md',
         'hover:scale-105 active:scale-95',
         enabled

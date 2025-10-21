@@ -1363,7 +1363,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                 <div className="rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-2 py-2">
                   {/* 横スクロール行 */}
                   <div
-                    className="flex items-center gap-2 overflow-x-auto no-scrollbar pr-1 pl-1 whitespace-nowrap"
+                    className="flex items-center gap-1 overflow-x-auto no-scrollbar pr-1 pl-1 whitespace-nowrap"
                     style={{ WebkitOverflowScrolling: 'touch' }}
                   >
                     {/* ==== 選択モードトグル ==== */}
@@ -1372,7 +1372,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       aria-pressed={selectionMode}
                       title="選択モード"
                       className={[
-                        'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                         'shrink-0',
                         selectionMode
                           ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-[2px] border-emerald-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
@@ -1388,7 +1388,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         onClick={handleBulkCopy}
                         disabled={selectedIds.size === 0}
                         className={[
-                          'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                          'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                           'shrink-0',
                           selectedIds.size === 0
                             ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
@@ -1406,7 +1406,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         onClick={handleBulkDelete}
                         disabled={selectedIds.size === 0}
                         className={[
-                          'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                          'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                           'shrink-0',
                           selectedIds.size === 0
                             ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
@@ -1431,7 +1431,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           aria-label="本日のタスクに絞り込む"
                           title="本日のタスクに絞り込む"
                           className={[
-                            'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                            'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                             'shrink-0',
                             todayFilter
                               ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[2px] border-[#f0a93a] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
@@ -1457,7 +1457,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             aria-label="プライベートタスクのみ表示"
                             title="プライベートタスク"
                             className={[
-                              'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                              'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                               'shrink-0',
                               privateFilter
                                 ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[2px] border-[#059669] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
@@ -1475,7 +1475,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           aria-label="フラグ付きタスクのみ表示"
                           title="フラグ付きタスク"
                           className={[
-                            'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                            'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                             'shrink-0',
                             flaggedFilter
                               ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] text-white border-[2px] border-[#f43f5e] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
@@ -1497,7 +1497,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       aria-label="検索ボックスを表示/非表示"
                       title="検索"
                       className={[
-                        'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                        'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                         'shrink-0',
                         isSearchVisible
                           ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-[2px] border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
