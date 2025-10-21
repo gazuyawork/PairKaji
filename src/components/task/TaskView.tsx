@@ -248,19 +248,25 @@ function SelectModeRow({
     <li
       ref={setNodeRef}
       style={style}
-      className={[
-        'relative transition-all duration-200 rounded-xl border bg-white',
-        selected ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200',
-        isDragging ? 'shadow-lg' : '',
-      ].join(' ')}
+    className={[
+      'relative transition-all duration-200 rounded-xl border',
+      // 色味を白基調で統一（グラデは任意）
+      'bg-white shadow-sm',
+      // ★ 最低高さを指定（例：72px）
+      'min-h-[58px]',
+      // 中の余白も合わせておくと見た目が安定
+      'px-2 py-2',
+      selected ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200',
+      isDragging ? 'shadow-lg' : '',
+    ].join(' ')}
     >
-      <div className="flex items-center gap-3 px-3 py-2">
+      <div className="flex items-center gap-3 px-2 py-1">
         {/* チェック */}
         <button
           type="button"
           onClick={() => onToggleSelect(task.id)}
           className={[
-            'inline-flex items-center justify-center',
+            'inline-flex items-center justify-center ',
             'w-7 h-7 rounded-full',
             selected
               ? 'bg-emerald-500 text-white ring-2 ring-white shadow-md'
@@ -276,7 +282,7 @@ function SelectModeRow({
         <button
           type="button"
           onClick={() => onToggleSelect(task.id)}
-          className="flex-1 text-left text-[15px] font-medium text-gray-800 py-1"
+          className="flex-1 text-left text-[#5E5E5E] font-bold py-1 font-sans truncate"
           title={task.name}
         >
           {task.name || '(無題)'}

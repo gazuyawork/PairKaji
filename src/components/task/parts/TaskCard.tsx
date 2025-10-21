@@ -299,7 +299,7 @@ export default function TaskCard({
         }}
         className={clsx(
           // 新しいベースクラス
-          'w-full relative flex justify-between items-center px-2.5 py-2 overflow-hidden [touch-action:pan-y] cursor-pointer',
+          'w-full relative flex justify-between items-center px-2.5 py-2 overflow-hidden [touch-action:pan-y] cursor-pointer min-h-[58px]',
 
           // 両方のデザイン統合
           'group text-[#5E5E5E]',
