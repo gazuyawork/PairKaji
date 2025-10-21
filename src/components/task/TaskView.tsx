@@ -248,17 +248,17 @@ function SelectModeRow({
     <li
       ref={setNodeRef}
       style={style}
-    className={[
-      'relative transition-all duration-200 rounded-xl border',
-      // 色味を白基調で統一（グラデは任意）
-      'bg-white shadow-sm',
-      // ★ 最低高さを指定（例：72px）
-      'min-h-[58px]',
-      // 中の余白も合わせておくと見た目が安定
-      'px-2 py-2',
-      selected ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200',
-      isDragging ? 'shadow-lg' : '',
-    ].join(' ')}
+      className={[
+        'relative transition-all duration-200 rounded-xl border',
+        // 色味を白基調で統一（グラデは任意）
+        'bg-white shadow-sm',
+        // ★ 最低高さを指定（例：72px）
+        'min-h-[58px]',
+        // 中の余白も合わせておくと見た目が安定
+        'px-2 py-2',
+        selected ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200',
+        isDragging ? 'shadow-lg' : '',
+      ].join(' ')}
     >
       <div className="flex items-center gap-3 px-2 py-1">
         {/* チェック */}
@@ -981,9 +981,15 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [uid, selectedIds, tasksState]);
 
   // 一括削除
+  // ✅ TaskCard と同じ ConfirmModal 方式に統一
   const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
-    const proceed = window.confirm(`${selectedIds.size}件のタスクを削除します。よろしいですか？`);
+
+    const proceed = await new Promise<boolean>((resolve) => {
+      pendingConfirmResolver.current = resolve;
+      setConfirmOpen(true);
+    });
+
     if (!proceed) return;
 
     try {
@@ -1000,6 +1006,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       toast.error('一括削除に失敗しました');
     }
   }, [selectedIds]);
+
 
   /* =========================================================
    * 並び替え（複数選択モード時のみ）
@@ -1513,6 +1520,26 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             document.body
           )}
       </main>
+
+      {/* 一括削除確認モーダル */}
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title=""
+        message={<div className="text-xl font-semibold">{`${selectedIds.size}件のタスクを削除しますか？`}</div>}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          pendingConfirmResolver.current?.(true);
+          pendingConfirmResolver.current = null;
+        }}
+        onCancel={() => {
+          setConfirmOpen(false);
+          pendingConfirmResolver.current?.(false);
+          pendingConfirmResolver.current = null;
+        }}
+        confirmLabel="削除する"
+        cancelLabel="キャンセル"
+      />
+
     </div>
   );
 }
