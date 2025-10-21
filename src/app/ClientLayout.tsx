@@ -22,6 +22,7 @@ import PreventBounce from '@/components/common/PreventBounce';
 import SetViewportHeight from '@/components/common/SetViewportHeight';
 import TaskSplitMonitor from '@/components/common/TaskSplitMonitor';
 import { usePathname } from 'next/navigation'
+import ServiceWorkerInit from '@/components/common/ServiceWorkerInit';
 
 /* ★ 追加: body ロック解除のクリーンアップ */
 function useUnlockBodyOnUnmount() {
@@ -73,14 +74,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <div
         key={allowTouch ? 'allow-touch' : 'default'}
         // ★ 強化: allowTouch 時は縦スクロール & 慣性スクロールを明示
-        className={`flex flex-col min-h-[100dvh] ${
-          allowTouch
-            ? 'touch-pan-y overflow-y-auto [-webkit-overflow-scrolling:touch]'
-            : 'overscroll-none'
-        }`}
+        className={`flex flex-col min-h-[100dvh] ${allowTouch
+          ? 'touch-pan-y overflow-y-auto [-webkit-overflow-scrolling:touch]'
+          : 'overscroll-none'
+          }`}
       >
         <PairInit />
         <TaskSplitMonitor />
+        <ServiceWorkerInit />
         {children}
         <Toaster position="top-center" richColors />
       </div>
