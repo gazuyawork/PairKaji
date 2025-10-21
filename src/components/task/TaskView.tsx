@@ -23,7 +23,11 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { isToday, parseISO } from 'date-fns';
-import { toggleTaskDoneStatus, saveSingleTask, removeOrphanSharedTasksIfPairMissing } from '@/lib/firebaseUtils';
+import {
+  toggleTaskDoneStatus,
+  saveSingleTask,
+  removeOrphanSharedTasksIfPairMissing,
+} from '@/lib/firebaseUtils';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
 import { useProfileImages } from '@/hooks/useProfileImages';
@@ -40,6 +44,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Copy,
+  GripVertical,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
@@ -50,6 +55,24 @@ import { useUserUid } from '@/hooks/useUserUid';
 import { createPortal } from 'react-dom';
 import { useView } from '@/context/ViewContext';
 import { skipTaskWithoutPoints } from '@/lib/taskUtils';
+
+/* ========= dnd-kit（タッチ対応のドラッグ＆ドロップ） ========= */
+import {
+  DndContext,
+  DragEndEvent,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 
 /* =========================================================
  * 任意プロパティを型安全に読むための補助
@@ -68,12 +91,10 @@ type TaskOptionalFields = {
   time?: string;
   scheduledTime?: string;
   timeString?: string;
+  order?: number; // 並び順
 };
 
-function getOpt<T extends keyof TaskOptionalFields>(
-  t: Task,
-  k: T
-): TaskOptionalFields[T] {
+function getOpt<T extends keyof TaskOptionalFields>(t: Task, k: T): TaskOptionalFields[T] {
   return (t as unknown as TaskOptionalFields)[k];
 }
 
@@ -202,6 +223,81 @@ type Props = {
   onLongPress?: (x: number, y: number) => void;
 };
 
+/* =========================================================
+ * 選択モード用・最小行（ドラッグ可能）
+ * =======================================================*/
+function SelectModeRow({
+  task,
+  selected,
+  onToggleSelect,
+}: {
+  task: Task;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={[
+        'relative transition-all duration-200 rounded-xl border bg-white',
+        selected ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200',
+        isDragging ? 'shadow-lg' : '',
+      ].join(' ')}
+    >
+      <div className="flex items-center gap-3 px-3 py-2">
+        {/* チェック */}
+        <button
+          type="button"
+          onClick={() => onToggleSelect(task.id)}
+          className={[
+            'inline-flex items-center justify-center',
+            'w-7 h-7 rounded-full',
+            selected
+              ? 'bg-emerald-500 text-white ring-2 ring-white shadow-md'
+              : 'bg-white text-gray-400 border border-gray-300 shadow-sm',
+          ].join(' ')}
+          aria-pressed={selected}
+          title={selected ? '選択中' : '選択'}
+        >
+          <CheckCircle className="w-5 h-5" />
+        </button>
+
+        {/* タスク名（タップで選択） */}
+        <button
+          type="button"
+          onClick={() => onToggleSelect(task.id)}
+          className="flex-1 text-left text-[15px] font-medium text-gray-800 py-1"
+          title={task.name}
+        >
+          {task.name || '(無題)'}
+        </button>
+
+        {/* ドラッグハンドル */}
+        <button
+          type="button"
+          className="px-1 py-1 cursor-grab active:cursor-grabbing select-none touch-none"
+          aria-label="ドラッグして並び替え"
+          title="ドラッグして並び替え"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
   const uid = useUserUid();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -238,6 +334,18 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   // 選択モードと選択ID
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // 並び替え（ドラッグ＆ドロップ）用：表示順のローカルオーバーライド（task.id -> order）
+  const [localOrderMap, setLocalOrderMap] = useState<Record<string, number>>({});
+
+  // === [Fix]（前回の修正） onSnapshot巻き戻し対策用フラグ
+  const pendingOrderPeriods = useRef<Set<Period>>(new Set());
+
+  // === [Fix2] コミット直後の短時間ガードを延長するためのタイマー保持
+  const pendingTimers = useRef<Partial<Record<Period, number>>>({});
+
+  // dnd-kit センサー（タッチ/マウス対応）
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   /* URLクエリから検索語とフォーカス指示を取得して反映 */
   const urlSearch = (params?.get('search') ?? '').trim();
@@ -389,7 +497,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
     const dayNumberToKanji: Record<number, string> = {
-      0: '日', 1: '月', 2: '火', 3: '水', 4: '木', 5: '金', 6: '土',
+      0: '日',
+      1: '月',
+      2: '火',
+      3: '水',
+      4: '木',
+      5: '金',
+      6: '土',
     };
     const todayDayKanji = dayNumberToKanji[today.getDay()];
 
@@ -484,6 +598,49 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   };
 
+  // === [Fix] 並び順の一元化関数（常に同じ基準でソートを生成）
+  const sortByDisplayOrder = useCallback(
+    (list: Task[]): Task[] => {
+      const manualOrderingEnabled = list.some((t) => typeof getOpt(t, 'order') === 'number');
+      return list
+        .slice()
+        .sort((a, b) => {
+          const la = localOrderMap[a.id];
+          const lb = localOrderMap[b.id];
+          if (typeof la === 'number' && typeof lb === 'number') return la - lb;
+          if (typeof la === 'number') return -1;
+          if (typeof lb === 'number') return 1;
+
+          if (manualOrderingEnabled) {
+            const oa = getOpt(a, 'order');
+            const ob = getOpt(b, 'order');
+            if (typeof oa === 'number' && typeof ob === 'number') return oa - ob;
+            if (typeof oa === 'number') return -1;
+            if (typeof ob === 'number') return 1;
+          }
+
+          const aFlag = getOpt(a, 'flagged') === true;
+          const bFlag = getOpt(b, 'flagged') === true;
+          if (aFlag && !bFlag) return -1;
+          if (!aFlag && bFlag) return 1;
+
+          if (a.done !== b.done) return a.done ? 1 : -1;
+
+          const aKey = getComparableDateTimeMs(a);
+          const bKey = getComparableDateTimeMs(b);
+
+          if (aKey.hasDate && bKey.hasDate) return (aKey.ms ?? 0) - (bKey.ms ?? 0);
+          if (aKey.hasDate !== bKey.hasDate) return aKey.hasDate ? -1 : 1;
+
+          if (aKey.hasTimeOnly && bKey.hasTimeOnly) return (aKey.ms ?? 0) - (bKey.ms ?? 0);
+          if (aKey.hasTimeOnly !== bKey.hasTimeOnly) return aKey.hasTimeOnly ? -1 : 1;
+
+          return a.name.localeCompare(b.name);
+        });
+    },
+    [localOrderMap]
+  );
+
   // タスク購読
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -496,11 +653,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       }
 
       const pairsSnap = await getDocs(
-        query(
-          collection(db, 'pairs'),
-          where('userIds', 'array-contains', uid),
-          where('status', '==', 'confirmed')
-        )
+        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
       );
 
       const partnerUids = new Set<string>([uid]);
@@ -521,9 +674,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       const qTasks = query(collection(db, 'tasks'), where('userIds', 'array-contains-any', ids));
 
       unsubscribe = onSnapshot(qTasks, async (snapshot) => {
-        const rawTasks = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) =>
-          mapFirestoreDocToTask(d)
-        );
+        const rawTasks = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => mapFirestoreDocToTask(d));
 
         // completedAt の日付越え戻し（不定期以外）
         const updates: Promise<void>[] = [];
@@ -585,6 +736,25 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         }
 
         setTasksState(grouped);
+
+        // === [Fix] Firestoreの order をローカル初期値に反映。
+        // 保存直後は pending を尊重して巻き戻しを防ぐ。
+        setLocalOrderMap((prev) => {
+          const next: Record<string, number> = { ...prev };
+          for (const p of periods) {
+            const list = grouped[p];
+            const isPending = pendingOrderPeriods.current.has(p);
+            list.forEach((t, idx) => {
+              if (isPending && typeof prev[t.id] === 'number') {
+                return; // pending 中は prev を維持
+              }
+              const ord = getOpt(t, 'order');
+              next[t.id] = typeof ord === 'number' ? ord : idx;
+            });
+          }
+          return next;
+        });
+
         setIsLoading(false);
       });
     })().catch(console.error);
@@ -628,8 +798,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     if (isSearchVisible) {
       setShowSearchBox(false);
       setSearchTerm('');
-      try { searchInputRef.current?.blur(); } catch { }
-      try { keyboardSummonerRef.current?.blur(); } catch { }
+      try {
+        searchInputRef.current?.blur();
+      } catch { }
+      try {
+        keyboardSummonerRef.current?.blur();
+      } catch { }
     } else {
       keyboardSummonerRef.current?.focus();
       setShowSearchBox(true);
@@ -666,10 +840,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     });
   }, []);
 
-  // /src/components/task/TaskView.tsx
-
-  // （略）handleBulkCopy 定義の前半は変更なし
-
   // 一括コピー（選択したタスクを複製して新規作成）
   const handleBulkCopy = useCallback(async () => {
     if (!uid) {
@@ -683,12 +853,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       const allTasks = periods.flatMap((p) => tasksState[p] ?? []);
       const targets = allTasks.filter((t) => selectedIdSet.has(t.id));
 
-      // 既存名の集合（重複防止）
       const existingNames = new Set<string>(
         periods.flatMap((p) => (tasksState[p] ?? []).map((t) => t.name ?? ''))
       );
 
-      // 1) タスク本体をまとめて作成（従来どおり）
       const batch = writeBatch(db);
       const idMap: Array<{ origId: string; newId: string }> = [];
 
@@ -702,8 +870,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         delete (rest as Record<string, unknown>).createdAt;
         delete (rest as Record<string, unknown>).updatedAt;
 
-        const originalCategory =
-          (original as unknown as { category?: unknown })?.category;
+        const originalCategory = (original as unknown as { category?: unknown })?.category;
         const normalizedCategory =
           typeof originalCategory === 'string' && originalCategory.trim() !== ''
             ? originalCategory
@@ -720,7 +887,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           completedBy: '',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          // 【追加】カテゴリは必ず '未設定'（未指定/空文字/不正時も強制）
           category: normalizedCategory,
         };
 
@@ -730,11 +896,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
       await batch.commit();
 
-      // 2) 各タスクの todos サブコレクションを複製 + 「旧→新 todoId マップ」を作成
+      // サブコレクション複製・todos 配列差し替え
       for (const { origId, newId } of idMap) {
         const todosSnap = await getDocs(collection(db, 'tasks', origId, 'todos'));
 
-        // 旧→新 ID 対応表
         const todoIdMap = new Map<string, string>();
 
         if (!todosSnap.empty) {
@@ -753,10 +918,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               updatedAt: serverTimestamp(),
             };
 
-            // 旧ID -> 新ID を記録
             todoIdMap.set(todoDoc.id, newTodoRef.id);
 
-            // 元の子Docに taskId があれば新タスクIDへ差し替え
             if ('taskId' in data) {
               (payload as Record<string, unknown>)['taskId'] = newId;
             }
@@ -776,9 +939,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           }
         }
 
-        // 3) タスク本体の `todos` 配列フィールドも旧ID→新ID で張り替えて保存
-        //    - 元タスクドキュメントを直接 read して、配列の実体を取得
-        //    - 配列要素がオブジェクトで id を持つ場合にのみ差し替え
         const origTaskRef = doc(db, 'tasks', origId);
         const newTaskRef = doc(db, 'tasks', newId);
 
@@ -788,21 +948,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
         if (origTodos) {
           const remapped = origTodos.map((item) => {
-            // 文字列や数値などはそのまま
             if (item === null || typeof item !== 'object') return item;
 
-            // オブジェクトの場合のみ shallow copy して id 差し替えを試みる
             const cloned: Record<string, unknown> = { ...(item as Record<string, unknown>) };
-
             const oldId = typeof cloned.id === 'string' ? (cloned.id as string) : null;
             if (oldId && todoIdMap.has(oldId)) {
               cloned.id = todoIdMap.get(oldId);
             }
-
-            // 子要素内の createdAt/updatedAt があるなら新規として無効化/削除したい場合はここで調整
-            // delete cloned.createdAt;
-            // delete cloned.updatedAt;
-
             return cloned;
           });
 
@@ -821,7 +973,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       toast.error('タスクのコピーに失敗しました');
     }
   }, [uid, selectedIds, tasksState]);
-
 
   // 一括削除
   const handleBulkDelete = useCallback(async () => {
@@ -843,6 +994,99 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       toast.error('一括削除に失敗しました');
     }
   }, [selectedIds]);
+
+  /* =========================================================
+   * 並び替え（複数選択モード時のみ）
+   * =======================================================*/
+
+  // 指定 period の表示順を Firestore に保存（period 全体の ID 順）
+  const persistOrderForPeriod = useCallback(async (period: Period, orderedIds: string[]) => {
+    try {
+      const batch = writeBatch(db);
+      orderedIds.forEach((id, idx) => {
+        const ref = doc(db, 'tasks', id);
+        batch.update(ref, { order: idx, updatedAt: serverTimestamp() });
+      });
+      await batch.commit();
+      toast.success('並び順を保存しました');
+    } catch (e) {
+      console.error('[persistOrderForPeriod] 失敗:', e);
+      toast.error('並び順の保存に失敗しました');
+    }
+  }, []);
+
+  // === [Fix2] 可視リストの移動を period 全体の順序へ合成するユーティリティ
+  const mergeVisibleReorderIntoFull = useCallback(
+    (fullOrderedIds: string[], visibleOldIds: string[], visibleNewIds: string[]) => {
+      // full から可視IDの位置（index群）を抽出して昇順に
+      const slots = fullOrderedIds
+        .map((id, idx) => ({ id, idx }))
+        .filter((x) => visibleOldIds.includes(x.id))
+        .map((x) => x.idx)
+        .sort((a, b) => a - b);
+
+      // 一旦、可視IDを抜いた full の骨格を作る
+      const skeleton = fullOrderedIds.filter((id) => !visibleOldIds.includes(id));
+
+      // 抜いた位置に、新しい可視順を同じスロットに差し戻す
+      const result = skeleton.slice();
+      visibleNewIds.forEach((id, i) => {
+        const pos = slots[i];
+        result.splice(pos, 0, id);
+      });
+      return result;
+    },
+    []
+  );
+
+  // dnd-kit: ドラッグ終了（period 全体順で処理）
+  // === [Fix2] 第3引数: period 全体（未フィルタ）／ 第4引数: 可視（表示中）ID の配列
+  const handleDragEnd = useCallback(
+    async (period: Period, event: DragEndEvent, periodAll: Task[], visibleIds: string[]) => {
+      const { active, over } = event;
+      if (!active?.id || !over?.id || active.id === over.id) return;
+
+      // 1) period 全体の現在順序（localOrderMap/order）で ID 配列を作成（完全リスト）
+      const fullOrderedIds = sortByDisplayOrder(periodAll).map((t) => t.id);
+
+      // 2) 可視（表示中）ID の現在順序と、新しい順序を作る
+      const visibleOldIds = fullOrderedIds.filter((id) => visibleIds.includes(id));
+      const oldIndex = visibleOldIds.indexOf(String(active.id));
+      const newIndex = visibleOldIds.indexOf(String(over.id));
+      if (oldIndex < 0 || newIndex < 0) return;
+
+      const visibleNewIds = arrayMove(visibleOldIds, oldIndex, newIndex);
+
+      // 3) 可視の並び替えを period 全体の順序へ合成
+      const nextFullIds = mergeVisibleReorderIntoFull(fullOrderedIds, visibleOldIds, visibleNewIds);
+
+      // 4) ローカル order 更新（period 全体）＋ 楽観的保護
+      setLocalOrderMap((prev) => {
+        const next = { ...prev };
+        nextFullIds.forEach((id, idx) => {
+          next[id] = idx;
+        });
+        return next;
+      });
+
+      pendingOrderPeriods.current.add(period);
+
+      // 5) Firestore に period 全体の順序を保存
+      await persistOrderForPeriod(period, nextFullIds);
+
+      // 6) 保存直後のスナップショット遅延に備えて、短時間 pending を維持（巻き戻し防止）
+      //    既存のタイマーがあればクリアしてから、再度 1200ms 保持
+      const t = pendingTimers.current[period];
+      if (typeof t === 'number') {
+        window.clearTimeout(t);
+      }
+      pendingTimers.current[period] = window.setTimeout(() => {
+        pendingOrderPeriods.current.delete(period);
+        delete pendingTimers.current[period];
+      }, 1200);
+    },
+    [persistOrderForPeriod, sortByDisplayOrder, mergeVisibleReorderIntoFull]
+  );
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] overflow-hidden">
@@ -955,8 +1199,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               }
 
               return periods.map((period, i) => {
-                const rawTasks = tasksState[period] ?? [];
-                const list = rawTasks.filter(
+                const periodAll = tasksState[period] ?? []; // === [Fix2] 未フィルタの period 全体
+                const baseList = periodAll.filter(
                   (task) =>
                     uid &&
                     task.userIds?.includes(uid) &&
@@ -965,7 +1209,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     (!privateFilter || getOpt(task, 'private') === true) &&
                     (!flaggedFilter || getOpt(task, 'flagged') === true)
                 );
-                const remaining = list.filter((t) => !t.done).length;
+                const remaining = baseList.filter((t) => !t.done).length;
 
                 if (!uid) {
                   return (
@@ -975,9 +1219,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   );
                 }
 
-                if (list.length === 0) {
+                if (baseList.length === 0) {
                   return <div key={period} />;
                 }
+
+                const orderedAllForPeriod = sortByDisplayOrder(baseList);
 
                 return (
                   <div key={period} className="mx-auto w-full max-w-xl">
@@ -987,7 +1233,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           className={`inline-block rounded-full px-3 py-1 text-sm text-white 
       ${remaining === 0
                               ? 'bg-gradient-to-b from-[#b0b0b0] to-[#8c8c8c] shadow-md shadow-black/20'
-                              : 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] shadow-md shadow-black/20'} 
+                              : 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] shadow-md shadow-black/20'
+                            } 
       shadow-inner`}
                         >
                           {period}
@@ -997,7 +1244,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         </span>
                       </h2>
 
-                      {list.some((t) => t.done) && (
+                      {baseList.some((t) => t.done) && (
                         <button
                           onClick={() => setShowCompletedMap((prev) => ({ ...prev, [period]: !prev[period] }))}
                           title={
@@ -1020,74 +1267,42 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                       )}
                     </div>
 
+                    {/* ====== リスト表示 ====== */}
                     <ul className="space-y-1.5 [touch-action:pan-y]">
-                      {list
-                        .slice()
-                        .sort((a, b) => {
-                          // ① フラグ付きタスクを優先
-                          const aFlag = getOpt(a, 'flagged') === true;
-                          const bFlag = getOpt(b, 'flagged') === true;
-                          if (aFlag && !bFlag) return -1;
-                          if (!aFlag && bFlag) return 1;
+                      {(() => {
+                        const visibleList = orderedAllForPeriod.filter(
+                          (t) => showCompletedMap[period] || !t.done || searchActive
+                        );
 
-                          // ② 未完了タスクを優先
-                          if (a.done !== b.done) return a.done ? 1 : -1;
+                        if (selectionMode) {
+                          // === 選択モード：dnd-kit で並び替え（表示中アイテムのみドラッグ可能）
+                          const sortedIds = orderedAllForPeriod.map((t) => t.id);
+                          const visibleIds = visibleList.map((t) => t.id); // === [Fix2] 可視IDを handleDragEnd へ
 
-                          // ③ 日時/時間による優先ソート
-                          const aKey = getComparableDateTimeMs(a);
-                          const bKey = getComparableDateTimeMs(b);
+                          return (
+                            <DndContext
+                              sensors={sensors}
+                              collisionDetection={closestCenter}
+                              modifiers={[restrictToVerticalAxis]}
+                              onDragEnd={(e) => handleDragEnd(period, e, periodAll, visibleIds)}
+                            >
+                              <SortableContext items={sortedIds} strategy={verticalListSortingStrategy}>
+                                {visibleList.map((task) => (
+                                  <SelectModeRow
+                                    key={task.id}
+                                    task={task}
+                                    selected={selectedIds.has(task.id)}
+                                    onToggleSelect={toggleSelect}
+                                  />
+                                ))}
+                              </SortableContext>
+                            </DndContext>
+                          );
+                        }
 
-                          if (aKey.hasDate && bKey.hasDate) return (aKey.ms! - bKey.ms!);
-                          if (aKey.hasDate !== bKey.hasDate) return aKey.hasDate ? -1 : 1;
-
-                          if (aKey.hasTimeOnly && bKey.hasTimeOnly) return (aKey.ms! - bKey.ms!);
-                          if (aKey.hasTimeOnly !== bKey.hasTimeOnly) return aKey.hasTimeOnly ? -1 : 1;
-
-                          return a.name.localeCompare(b.name);
-                        })
-                        .filter((t) => showCompletedMap[period] || !t.done || searchActive)
-                        .map((task, idx) => (
-                          <li
-                            key={task.id}
-                            className={[
-                              'relative transition-all duration-200',
-                              selectionMode
-                                ? (selectedIds.has(task.id) ? 'filter-none' : 'filter saturate-50 brightness-97 opacity-90')
-                                : '',
-                            ].join(' ')}
-                          >
-                            {/* 選択モード中：カードどこをタップしても選択トグル可能にする透明オーバーレイ */}
-                            {selectionMode && (
-                              <button
-                                type="button"
-                                onClick={() => toggleSelect(task.id)}
-                                className="absolute inset-0 z-[5]"
-                                aria-pressed={selectedIds.has(task.id)}
-                                aria-label={selectedIds.has(task.id) ? '選択解除' : '選択'}
-                                style={{ background: 'transparent' }}
-                              />
-                            )}
-
-                            {/* 選択バッジ（左上のチェック丸） */}
-                            {selectionMode && (
-                              <button
-                                type="button"
-                                onClick={() => toggleSelect(task.id)}
-                                className={[
-                                  'absolute -top-1.5 -left-1.5 z-10',
-                                  'inline-flex items-center justify-center',
-                                  'w-7 h-7 rounded-full',
-                                  selectedIds.has(task.id)
-                                    ? 'bg-emerald-500 text-white ring-2 ring-white shadow-md'
-                                    : 'bg-white text-gray-400 border border-gray-300 shadow-sm',
-                                ].join(' ')}
-                                aria-pressed={selectedIds.has(task.id)}
-                                title={selectedIds.has(task.id) ? '選択中' : '選択'}
-                              >
-                                <CheckCircle className="w-5 h-5" />
-                              </button>
-                            )}
-
+                        // === 通常モード（TaskCard 表示） ===
+                        return visibleList.map((task, idx) => (
+                          <li key={task.id} className="relative transition-all duration-200">
                             <TaskCard
                               task={task}
                               period={period}
@@ -1112,7 +1327,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                               onSkip={handleSkip}
                             />
                           </li>
-                        ))}
+                        ));
+                      })()}
                     </ul>
                   </div>
                 );
@@ -1123,14 +1339,15 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         {!isLoading && !isChecking && plan === 'free' && <AdCard />}
 
         {/* 左下のフローティング列（虫眼鏡は右端） */}
-        {!editTargetTask && index === 1 &&
+        {!editTargetTask &&
+          index === 1 &&
           typeof window !== 'undefined' &&
           createPortal(
             <div className="w-full pointer-events-none">
               <div
                 className="
           fixed
-          bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]  /* 新規＋と重ならない高さ（下げた位置） */
+          bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]  /* 新規＋と重ならない高さ */
           left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
           z-[1100]
           pointer-events-auto
@@ -1238,7 +1455,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                               'shrink-0',
                               privateFilter
                                 ? 'bg-gradient-to-b from-[#6ee7b7] to-[#059669] text-white border-[2px] border-[#059669] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                                : 'bg-white text-[#059669] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#059669] hover:text-white hover:border-[#059669]',
+                                : 'bg-white text-[#059669] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#059669] hover:text白 hover:border-[#059669]',
                             ].join(' ')}
                           >
                             <SquareUser className="w-7 h-7" />
@@ -1256,7 +1473,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             'shrink-0',
                             flaggedFilter
                               ? 'bg-gradient-to-b from-[#fda4af] to-[#fb7185] text-white border-[2px] border-[#f43f5e] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                              : 'bg-white text-[#fb7185] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover:border-[#fb7185]',
+                              : 'bg-white text-[#fb7185] border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#fb7185] hover:text-white hover;border-[#fb7185]',
                           ].join(' ')}
                         >
                           <Flag className="w-6 h-6" />
@@ -1288,8 +1505,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
               </div>
             </div>,
             document.body
-          )
-        }
+          )}
       </main>
     </div>
   );
