@@ -1,30 +1,23 @@
 // src/components/common/ServiceWorkerInit.tsx
 'use client';
-
 import { useEffect } from 'react';
 
 export default function ServiceWorkerInit() {
   useEffect(() => {
     (async () => {
-      // 本番(HTTPS) or localhost のみ
+      console.log('[sw:init] mount'); // ⬅️【追加】起動ログ
       const isSecure =
         location.protocol === 'https:' ||
         location.hostname === 'localhost' ||
         location.hostname === '127.0.0.1';
-      if (!isSecure) return;
-      if (!('serviceWorker' in navigator)) return;
+      if (!isSecure || !('serviceWorker' in navigator)) return;
 
       try {
-        // ルート直下の sw.js を scope:'/' で登録
         const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-
-        // 有効化完了を待機（すぐに制御を握れない場合もある）
         await navigator.serviceWorker.ready;
-
-        // デバッグ用ログ（不要なら削除可）
-        console.log('[sw] registered:', reg.scope);
+        console.log('[sw:init] registered:', reg.scope); // ⬅️【追加】登録ログ
       } catch (e) {
-        console.error('[sw] register error', e);
+        console.error('[sw:init] REGISTER FAILED:', e);  // ⬅️【追加】失敗ログ
       }
     })();
   }, []);
