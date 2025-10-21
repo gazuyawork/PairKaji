@@ -575,7 +575,7 @@ export default function TodoView() {
               px-2 py-2
             "
           >
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
               {availableCategories.map((c, idx) => {
                 const isActive = selectedCategoryId === c.id;
                 const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);

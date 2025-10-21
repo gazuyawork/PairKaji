@@ -454,8 +454,8 @@ export default function TaskCard({
                 <Image
                   src={profileImage || '/images/default.png'}
                   alt={`${profileName}のアイコン`}
-                  width={38}
-                  height={38}
+                  width={35}
+                  height={35}
                   className="rounded-full border border-gray-300 object-cover aspect-square select-none"
                   draggable={false}
                 />
