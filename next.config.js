@@ -23,7 +23,8 @@ const pwaOptions = {
   buildExcludes: [
     /middleware-manifest\.json$/,
     /app-build-manifest\.json$/, // dev では存在しないことがあるので除外
-    /(^|\/)sw\.js$/, // swSrc として手動で提供するため除外
+    /_next\/dynamic-css-manifest\.json$/, // ★追加: 本番で 404 になり得る → precache から除外
+    /(^|\/)sw\.js$/,                       // ★再掲: SW 本体は precache しない
   ],
 
   // ⚠️ InjectManifest では runtimeCaching は使用不可（未指定）
