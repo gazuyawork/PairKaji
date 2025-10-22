@@ -1,5 +1,9 @@
-// 【変更目的】起動直後に SW を確実に登録し、ready を全体で await できるように共有
-// 【追加点】window.__swReadyPromise の設定、既存登録の確認、/sw.js 手動登録のフォールバック
+// src/components/common/ServiceWorkerInit.tsx
+// 【変更点サマリ】
+// - ★変更: 既存 registration（installing/waiting）でも activated まで待機
+// - ★変更: ready を直接共有せず、タイムアウト＋statechange二重待機の Promise を共有
+// - ★追加: reg.update() を明示的に実行して更新検知を促す
+// - 型安全に addEventListener/removeEventListener を利用（any回避）
 
 'use client';
 
@@ -23,29 +27,88 @@ export default function ServiceWorkerInit() {
 
         // 既存登録の確認（scope は '/' を想定）
         let reg = await navigator.serviceWorker.getRegistration('/');
-        // まだなら明示登録（next-pwa の register:true があっても冪等に動きます）
+
+        // まだなら明示登録（next-pwa の register:true があっても冪等に動く）
         if (!reg) {
           reg = await navigator.serviceWorker.register('/sw.js', {
             scope: '/',
             updateViaCache: 'none',
           });
-          // 初回は controller が null のことがあるので state 遷移を待つ
-          const sw = reg.active || reg.waiting || reg.installing;
-          if (sw && sw.state !== 'activated') {
-            await new Promise<void>((resolve) => {
+        }
+
+        // ★変更: 既存登録でも installing/waiting → activated を待機（+ 明示 update）
+        if (reg) {
+          try {
+            reg.update();
+          } catch {
+            /* noop */
+          }
+          const sw: ServiceWorker | null = reg.active ?? reg.waiting ?? reg.installing ?? null;
+          if (!sw || sw.state !== 'activated') {
+            await new Promise<void>((resolve, reject) => {
+              const timer = setTimeout(
+                () => reject(new Error('SW activate wait timeout')),
+                15_000
+              );
+              const target = sw ?? reg.installing ?? reg.waiting ?? reg.active ?? null;
+              if (!target) {
+                clearTimeout(timer);
+                resolve();
+                return;
+              }
               const onChange = () => {
-                if (sw.state === 'activated') {
-                  (sw as any).removeEventListener?.('statechange', onChange);
+                if (target.state === 'activated') {
+                  target.removeEventListener('statechange', onChange);
+                  clearTimeout(timer);
                   resolve();
                 }
               };
-              (sw as any).addEventListener?.('statechange', onChange);
+              target.addEventListener('statechange', onChange);
+              try {
+                reg.update();
+              } catch {
+                /* noop */
+              }
             });
           }
         }
 
-        // ★ ここが肝：以降はどこからでも await できる共有 Promise
-        window.__swReadyPromise = navigator.serviceWorker.ready;
+        // ★変更: ready を直接晒さず、タイムアウト + 二重チェックの Promise を共有
+        window.__swReadyPromise = (async () => {
+          const readyPromise = navigator.serviceWorker.ready;
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('SW ready timeout')), 15_000)
+          );
+          const regReady = await Promise.race([readyPromise, timeout]) as ServiceWorkerRegistration;
+
+          if (!regReady.active || regReady.active.state !== 'activated') {
+            await new Promise<void>((resolve, reject) => {
+              const sw = regReady.active ?? regReady.waiting ?? regReady.installing ?? null;
+              if (!sw) {
+                resolve();
+                return;
+              }
+              const t = setTimeout(
+                () => reject(new Error('SW activate wait timeout (post-ready)')),
+                10_000
+              );
+              const onChange = () => {
+                if (sw.state === 'activated') {
+                  sw.removeEventListener('statechange', onChange);
+                  clearTimeout(t);
+                  resolve();
+                }
+              };
+              sw.addEventListener('statechange', onChange);
+              try {
+                regReady.update();
+              } catch {
+                /* noop */
+              }
+            });
+          }
+          return regReady;
+        })();
 
         // （任意）デバッグログ
         window.__swReadyPromise.then((r) => {
@@ -57,7 +120,7 @@ export default function ServiceWorkerInit() {
       }
     };
 
-    init();
+    void init();
   }, []);
 
   return null;

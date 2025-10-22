@@ -1,4 +1,10 @@
 // src/components/settings/PushToggle.tsx
+// 【変更点サマリ】
+// - ★変更: navigator.serviceWorker.register に updateViaCache:'none' を付与
+// - ★変更: waitForSWReady を強化（ready タイムアウト時のフォールバック、activated/ controller の三段待機）
+// - ★変更: subscribe() 内のフォールバックも強化（active/waiting/installing 直接拾い・短期待機）
+// - その他ロジックは現状踏襲（UI・APIコール含む）
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -10,13 +16,13 @@ type Props = {
 };
 
 type ErrorInfo = {
-  context: string;           // どの処理で発生したか（例: 'SUBSCRIBE', 'UNSUBSCRIBE', 'TEST_SEND', 'ENSURE_REG', 'REFRESH'）
-  message: string;           // 人間が読む用の主メッセージ
-  name?: string;             // Error.name
-  code?: string | number;    // エラーコード（TIMEOUT, HTTP_400, NoSW など）
-  stack?: string;            // スタック
-  extra?: unknown;           // レスポンス本文など
-  time: string;              // ISO時刻
+  context: string;
+  message: string;
+  name?: string;
+  code?: string | number;
+  stack?: string;
+  extra?: unknown;
+  time: string;
 };
 
 export default function PushToggle({ uid }: Props) {
@@ -40,7 +46,7 @@ export default function PushToggle({ uid }: Props) {
   const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
   const withCode = <T extends Error>(err: T, code: string | number) => {
-    (err as any).code = code;
+    (err as Error & { code?: string | number }).code = code;
     return err;
   };
 
@@ -65,14 +71,19 @@ export default function PushToggle({ uid }: Props) {
     });
 
   const isTimeoutError = (e: unknown) =>
-    typeof (e as any)?.message === 'string' && String((e as any).message).startsWith('timeout:');
+    typeof (e as { message?: string })?.message === 'string' &&
+    String((e as { message?: string }).message).startsWith('timeout:');
 
   const toErrorInfo = (context: string, e: unknown, extra?: unknown): ErrorInfo => {
-    const anyE = e as any;
-    const name = anyE?.name ?? 'Error';
-    const code = anyE?.code ?? anyE?.status ?? undefined;
+    const anyE = e as Record<string, unknown> | string;
+    const name = (anyE as Record<string, unknown>)?.['name'] as string | undefined ?? 'Error';
+    const code =
+      (anyE as Record<string, unknown>)?.['code'] ??
+      (anyE as Record<string, unknown>)?.['status'] ??
+      undefined;
     const msgParts: string[] = [];
-    if (anyE?.message) msgParts.push(String(anyE.message));
+    const maybeMsg = (anyE as Record<string, unknown>)?.['message'];
+    if (typeof maybeMsg === 'string') msgParts.push(maybeMsg);
     if (typeof anyE === 'string') msgParts.push(anyE);
     if (extra && typeof extra === 'string') msgParts.push(extra.slice(0, 300));
     const message = msgParts.join(' | ') || 'Unknown error';
@@ -80,8 +91,8 @@ export default function PushToggle({ uid }: Props) {
       context,
       message,
       name,
-      code,
-      stack: anyE?.stack,
+      code: code as string | number | undefined,
+      stack: (anyE as Record<string, unknown>)?.['stack'] as string | undefined,
       extra,
       time: new Date().toISOString(),
     };
@@ -100,8 +111,8 @@ export default function PushToggle({ uid }: Props) {
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         const err = withCode(new Error(`HTTP ${res.status}`), `HTTP_${res.status}`);
-        (err as any).status = res.status;
-        (err as any).body = text;
+        (err as Error & { status?: number; body?: string }).status = res.status;
+        (err as Error & { status?: number; body?: string }).body = text;
         throw err;
       }
       return res;
@@ -112,7 +123,7 @@ export default function PushToggle({ uid }: Props) {
 
   /** basePath を推定（ENV > __NEXT_DATA__.assetPrefix > <base>） */
   const getBasePath = (): string => {
-    if (ENV_BASE) return ENV_BASE; // 例: "/app"
+    if (ENV_BASE) return ENV_BASE;
     const anyWin = window as unknown as { __NEXT_DATA__?: { assetPrefix?: string } };
     const ap = anyWin.__NEXT_DATA__?.assetPrefix || '';
     if (ap && ap.startsWith('/')) return ap.replace(/\/+$/g, '');
@@ -133,7 +144,7 @@ export default function PushToggle({ uid }: Props) {
     const base = getBasePath();
     const list: Array<{ url: string; scope: string }> = [];
     if (base) list.push({ url: `${base}/sw.js`, scope: `${base}/` });
-    list.push({ url: `/sw.js`, scope: `/` }); // 最後にルート直下
+    list.push({ url: `/sw.js`, scope: `/` });
     return list;
   };
 
@@ -168,12 +179,16 @@ export default function PushToggle({ uid }: Props) {
     try {
       const def = await navigator.serviceWorker.getRegistration();
       if (def) regs.push(def);
-    } catch {}
+    } catch {
+      /* noop */
+    }
     for (const c of getSWCandidates()) {
       try {
         const r = await navigator.serviceWorker.getRegistration(c.scope);
         if (r && !regs.includes(r)) regs.push(r);
-      } catch {}
+      } catch {
+        /* noop */
+      }
     }
     return regs;
   };
@@ -195,16 +210,23 @@ export default function PushToggle({ uid }: Props) {
         if (await isReachable(c.url)) reachable.push(c);
       }
       if (reachable.length === 0) {
-        reportError('ENSURE_REG', new Error('No reachable sw.js'), {
-          candidates: candidates.map((c) => c.url),
-        }, 'Service Worker が準備できていません（sw.js の配置や scope を確認）');
+        reportError(
+          'ENSURE_REG',
+          new Error('No reachable sw.js'),
+          { candidates: candidates.map((c) => c.url) },
+          'Service Worker が準備できていません（sw.js の配置や scope を確認）'
+        );
         toast.error('Service Worker が準備できていません（sw.js の配置や scope を確認）');
         return null;
       }
       let lastErr: unknown = null;
       for (const c of reachable) {
         try {
-          reg = await navigator.serviceWorker.register(c.url, { scope: c.scope });
+          // ★変更: updateViaCache を明示（更新遅延回避）
+          reg = await navigator.serviceWorker.register(c.url, {
+            scope: c.scope,
+            updateViaCache: 'none',
+          });
           break;
         } catch (e) {
           lastErr = e;
@@ -235,7 +257,7 @@ export default function PushToggle({ uid }: Props) {
             sw.addEventListener('statechange', onState);
           });
         })(),
-        budgetA,
+        budgetA
       );
     } catch {
       /* timeout → 次へ */
@@ -251,7 +273,7 @@ export default function PushToggle({ uid }: Props) {
             const onCtrl = () => resolve();
             navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
           }),
-          budgetB,
+          budgetB
         );
       } catch {
         /* timeout → 最終チェックへ */
@@ -260,6 +282,82 @@ export default function PushToggle({ uid }: Props) {
 
     const finalReg = await getRegImmediate();
     return finalReg ?? reg;
+  };
+
+  // ================================
+  // ★変更: SW の ready を厳密に待つヘルパー（三段待機＋フォールバック強化）
+  // ================================
+  const waitForSWReady = async (timeoutMs = 15000): Promise<ServiceWorkerRegistration> => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      throw new Error('Service Worker not supported');
+    }
+    const base = (window as unknown as { __swReadyPromise?: Promise<ServiceWorkerRegistration> })
+      .__swReadyPromise;
+    const readyPromise = base ?? navigator.serviceWorker.ready;
+
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Service Worker not ready (timeout)')), timeoutMs)
+    );
+
+    // ① まずは ready を待つ（タイムアウト付き）
+    let reg: ServiceWorkerRegistration | null = null;
+    try {
+      reg = (await Promise.race([readyPromise, timeout])) as ServiceWorkerRegistration;
+    } catch {
+      // ② ready が間に合わない → 既存 registration 群から直接拾う（active → waiting → installing）
+      const regs = await getAllRegistrations();
+      for (const r of regs) {
+        try {
+          r.update();
+        } catch {
+          /* noop */
+        }
+      }
+      reg =
+        regs.find((r) => r.active) ||
+        regs.find((r) => r.waiting) ||
+        regs.find((r) => r.installing) ||
+        null;
+      if (!reg) throw new Error('No Service Worker registration');
+    }
+
+    // ③ Worker の activated まで待機（直接 statechange 監視）
+    const sw = reg.active || reg.waiting || reg.installing || null;
+    if (sw && sw.state !== 'activated') {
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(
+          () => reject(new Error('Service Worker not ready (statechange timeout)')),
+          10_000
+        );
+        const onChange = () => {
+          if (sw.state === 'activated') {
+            sw.removeEventListener('statechange', onChange);
+            clearTimeout(t);
+            resolve();
+          }
+        };
+        sw.addEventListener('statechange', onChange);
+        try {
+          reg!.update();
+        } catch {
+          /* noop */
+        }
+      });
+    }
+
+    // ④ ページが SW に制御される（controller 付与）まで待機
+    if (!navigator.serviceWorker.controller) {
+      await Promise.race<void>([
+        new Promise<void>((resolve) => {
+          if (navigator.serviceWorker.controller) return resolve();
+          const onCtrl = () => resolve();
+          navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
+        }),
+        delay(4000),
+      ]);
+    }
+
+    return reg;
   };
 
   /** 状態再取得（待ちすぎず UI を必ず更新） */
@@ -298,10 +396,10 @@ export default function PushToggle({ uid }: Props) {
 
       // 最後の保険：ready を 2s で打ち切り
       if (regs.length === 0) {
-        const readyReg = await Promise.race<ServiceWorkerRegistration | null>([
+        const readyReg = (await Promise.race([
           navigator.serviceWorker.ready,
           delay(2000).then(() => null),
-        ]);
+        ])) as ServiceWorkerRegistration | null;
         if (readyReg) regs = [readyReg];
       }
 
@@ -318,7 +416,9 @@ export default function PushToggle({ uid }: Props) {
             setIsSubscribed(true);
             return;
           }
-        } catch {}
+        } catch {
+          /* noop */
+        }
       }
       setIsSubscribed(false);
     } catch (e) {
@@ -326,44 +426,6 @@ export default function PushToggle({ uid }: Props) {
       reportError('REFRESH', e);
       setIsSubscribed(false);
     }
-  };
-
-  // ================================
-  // ★追加: SW の ready を厳密に待つヘルパー
-  // ================================
-  const waitForSWReady = async (timeoutMs = 15000): Promise<ServiceWorkerRegistration> => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-      throw new Error('Service Worker not supported');
-    }
-    const base = (window as any).__swReadyPromise as Promise<ServiceWorkerRegistration> | undefined;
-    const readyPromise = base ?? navigator.serviceWorker.ready;
-
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Service Worker not ready (timeout)')), timeoutMs)
-    );
-
-    const reg = (await Promise.race([readyPromise, timeout])) as ServiceWorkerRegistration;
-
-    const sw = reg.active || reg.waiting || reg.installing || null;
-    if (!sw) return reg;
-    if (sw.state === 'activated') return reg;
-
-    await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(
-        () => reject(new Error('Service Worker not ready (statechange timeout)')),
-        7000
-      );
-      const onChange = () => {
-        if (sw.state === 'activated') {
-          clearTimeout(t);
-          (sw as any).removeEventListener?.('statechange', onChange);
-          resolve();
-        }
-      };
-      (sw as any).addEventListener?.('statechange', onChange);
-    });
-
-    return reg;
   };
 
   // 初期化
@@ -430,18 +492,31 @@ export default function PushToggle({ uid }: Props) {
       // 無ければ登録→待機まで（最大 6s）
       let reg: ServiceWorkerRegistration | null = await ensureRegistration(6000);
 
-      // ================================
       // ★変更: ここで必ず ready を厳密に待つ
-      // ================================
       try {
-        reg = await waitForSWReady(15000);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (e) {
-        // ready 待機に失敗した場合でも最後の保険として ready 2s レースを残す
-        reg = await Promise.race<ServiceWorkerRegistration | null>([
+        reg = await waitForSWReady(15_000);
+      } catch {
+        // ① ready が間に合わない → 2s レース
+        reg = (await Promise.race([
           navigator.serviceWorker.ready,
           delay(2000).then(() => null),
-        ]);
+        ])) as ServiceWorkerRegistration | null;
+        // ② まだ null → 既存 registration から active/waiting/installing を直接拾う
+        if (!reg) {
+          const regs = await getAllRegistrations();
+          for (const r of regs) {
+            try {
+              r.update();
+            } catch {
+              /* noop */
+            }
+          }
+          reg =
+            regs.find((r) => r.active) ||
+            regs.find((r) => r.waiting) ||
+            regs.find((r) => r.installing) ||
+            null;
+        }
       }
 
       if (!reg) {
@@ -456,6 +531,23 @@ export default function PushToggle({ uid }: Props) {
         return;
       }
 
+      // ★変更: 念のため active の state を二重チェック（activated まで短期待機）
+      const w = reg.active || reg.waiting || reg.installing || null;
+      if (w && w.state !== 'activated') {
+        await Promise.race<void>([
+          new Promise<void>((resolve) => {
+            const onChange = () => {
+              if (w.state === 'activated') {
+                w.removeEventListener('statechange', onChange);
+                resolve();
+              }
+            };
+            w.addEventListener('statechange', onChange, { once: true });
+          }),
+          delay(2000),
+        ]);
+      }
+
       // 既存購読は全 registration をチェック（使い回せるならそれを利用）
       let existing: PushSubscription | null = null;
       for (const r of await getAllRegistrations()) {
@@ -465,7 +557,9 @@ export default function PushToggle({ uid }: Props) {
             existing = s;
             break;
           }
-        } catch {}
+        } catch {
+          /* noop */
+        }
       }
 
       // 新規 subscribe は最大 6s で打ち切り
@@ -477,7 +571,7 @@ export default function PushToggle({ uid }: Props) {
             applicationServerKey: b64ToU8(vapidKey),
           }),
           6000,
-          () => console.warn('[push] subscribe timeout'),
+          () => console.warn('[push] subscribe timeout')
         ));
 
       await fetchWithDiagnostics(
@@ -496,9 +590,10 @@ export default function PushToggle({ uid }: Props) {
     } catch (e) {
       let msg = '通知の許可に失敗しました';
       if (isTimeoutError(e)) msg = '通信がタイムアウトしました';
-      if ((e as any)?.code?.toString?.().startsWith('HTTP_')) {
-        const status = (e as any)?.status;
-        const body = (e as any)?.body;
+      const maybe = e as { code?: unknown; status?: number; body?: string };
+      if (typeof maybe?.code === 'string' && maybe.code.startsWith('HTTP_')) {
+        const status = maybe.status;
+        const body = maybe.body;
         msg = `サーバー応答エラー（${status}）`;
         reportError('SUBSCRIBE_API', e, body, msg);
       } else {
@@ -522,7 +617,9 @@ export default function PushToggle({ uid }: Props) {
             await pTimeout<boolean>(sub.unsubscribe(), 4000);
             any = true;
           }
-        } catch {}
+        } catch {
+          /* noop */
+        }
       }
       if (!any) console.warn('[push] no subscription found on any registration');
 
@@ -561,9 +658,10 @@ export default function PushToggle({ uid }: Props) {
     } catch (e) {
       let msg = 'テスト通知の送信に失敗しました';
       if (isTimeoutError(e)) msg = '通信がタイムアウトしました';
-      if ((e as any)?.code?.toString?.().startsWith('HTTP_')) {
-        const status = (e as any)?.status;
-        const body = (e as any)?.body;
+      const maybe = e as { code?: unknown; status?: number; body?: string };
+      if (typeof maybe?.code === 'string' && maybe.code.startsWith('HTTP_')) {
+        const status = maybe.status;
+        const body = maybe.body;
         msg = `テスト送信のサーバー応答エラー（${status}）`;
         reportError('TEST_SEND_API', e, body, msg);
       } else {
@@ -581,8 +679,8 @@ export default function PushToggle({ uid }: Props) {
       isSubscribed === null
         ? '状態を確認中…'
         : isSubscribed
-          ? '通知は有効です'
-          : '通知は無効です';
+        ? '通知は有効です'
+        : '通知は無効です';
     switch (phase) {
       case 'sending':
         return base + '（処理中…）';
@@ -609,8 +707,14 @@ export default function PushToggle({ uid }: Props) {
         <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-700">
           <div className="font-semibold mb-1">エラー詳細</div>
           <div className="space-y-0.5">
-            <div>発生箇所: <span className="font-mono">{lastError.context}</span></div>
-            {lastError.code && <div>コード: <span className="font-mono">{String(lastError.code)}</span></div>}
+            <div>
+              発生箇所: <span className="font-mono">{lastError.context}</span>
+            </div>
+            {lastError.code && (
+              <div>
+                コード: <span className="font-mono">{String(lastError.code)}</span>
+              </div>
+            )}
             <div>内容: {lastError.message}</div>
             <div>時刻: {new Date(lastError.time).toLocaleString()}</div>
           </div>
