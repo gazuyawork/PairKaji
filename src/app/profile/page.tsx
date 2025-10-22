@@ -464,7 +464,7 @@ export default function ProfilePage() {
   return (
     <div className="flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Setting" />
-      <main className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
+      <main className="flex-1 px-4 py-6 space-y-3 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center w-full h-[60vh]">
             <LoadingSpinner size={48} />
@@ -502,7 +502,7 @@ export default function ProfilePage() {
               isRemoving={isRemoving}
             />
 
-            <section className="mt-6">
+            <section className="">
               {/* ★ auth.currentUser 依存をやめ、uid 判定で確実に表示 */}
               {uid && <PushToggle uid={uid} />}
             </section>

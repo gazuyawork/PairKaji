@@ -51,7 +51,7 @@ export default function ProfileCard({
 
   return (
     <motion.div
-      className="relative min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-6 mx-auto w-full max-w-xl"
+      className="relative min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-4 mx-auto w-full max-w-xl"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
