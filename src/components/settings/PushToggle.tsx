@@ -321,31 +321,37 @@ export default function PushToggle({ uid }: Props) {
       if (!reg) throw new Error('No Service Worker registration');
     }
 
-    // ③ Worker の activated まで待機（直接 statechange 監視）
-    const sw = reg.active || reg.waiting || reg.installing || null;
-    if (sw && sw.state !== 'activated') {
-      await new Promise<void>((resolve, reject) => {
-        const t = setTimeout(
-          () => reject(new Error('Service Worker not ready (statechange timeout)')),
-          10_000
-        );
-        const onChange = () => {
-          if (sw.state === 'activated') {
-            sw.removeEventListener('statechange', onChange);
-            clearTimeout(t);
-            resolve();
-          }
-        };
-        sw.addEventListener('statechange', onChange);
-        try {
-          reg!.update();
-        } catch {
-          /* noop */
-        }
-      });
-    }
 
-    // ④ ページが SW に制御される（controller 付与）まで待機
+    // ③ registration 全体を監視（active/ controller / updatefound）＋ポーリング
+    await new Promise<void>((resolve, reject) => {
+      const deadline = setTimeout(
+        () => reject(new Error('Service Worker not ready (statechange timeout)')),
+        10_000
+      );
+      const cleanups: Array<() => void> = [];
+      const done = () => { cleanups.forEach(fn => fn()); clearTimeout(deadline); resolve(); };
+      const check = () => {
+        if (reg.active?.state === 'activated' || navigator.serviceWorker.controller) done();
+      };
+      const watch = (w?: ServiceWorker | null) => {
+        if (!w) return;
+        const on = () => { if (w.state === 'activated') check(); };
+        w.addEventListener('statechange', on);
+        cleanups.push(() => w.removeEventListener('statechange', on));
+      };
+      watch(reg.active); watch(reg.waiting); watch(reg.installing);
+      const onUpdateFound = () => { watch(reg.installing); };
+      reg.addEventListener('updatefound', onUpdateFound);
+      cleanups.push(() => reg.removeEventListener('updatefound', onUpdateFound));
+      const onCtrl = () => check();
+      navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
+      cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
+      const iv = setInterval(() => { try { reg.update(); } catch {} ; check(); }, 250);
+      cleanups.push(() => clearInterval(iv));
+      check();
+    });
+
+    // ④ ここまで来れば controller もほぼ付与済み。取りこぼし用に 4s レースだけ残す
     if (!navigator.serviceWorker.controller) {
       await Promise.race<void>([
         new Promise<void>((resolve) => {

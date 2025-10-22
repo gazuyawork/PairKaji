@@ -36,42 +36,40 @@ export default function ServiceWorkerInit() {
           });
         }
 
-        // ★変更: 既存登録でも installing/waiting → activated を待機（+ 明示 update）
         if (reg) {
-          try {
-            reg.update();
-          } catch {
-            /* noop */
-          }
-          const sw: ServiceWorker | null = reg.active ?? reg.waiting ?? reg.installing ?? null;
-          if (!sw || sw.state !== 'activated') {
-            await new Promise<void>((resolve, reject) => {
-              const timer = setTimeout(
-                () => reject(new Error('SW activate wait timeout')),
-                15_000
-              );
-              const target = sw ?? reg.installing ?? reg.waiting ?? reg.active ?? null;
-              if (!target) {
-                clearTimeout(timer);
-                resolve();
-                return;
-              }
-              const onChange = () => {
-                if (target.state === 'activated') {
-                  target.removeEventListener('statechange', onChange);
-                  clearTimeout(timer);
-                  resolve();
-                }
-              };
-              target.addEventListener('statechange', onChange);
-              try {
-                reg.update();
-              } catch {
-                /* noop */
-              }
-            });
-          }
+          try { reg.update(); } catch { }
+          // ★強化: registration 全体を監視（active/ controller / updatefound）＋ポーリング
+          await new Promise<void>((resolve, reject) => {
+            const deadline = setTimeout(() => reject(new Error('SW activate wait timeout')), 15_000);
+            const cleanups: Array<() => void> = [];
+            const done = () => { cleanups.forEach(fn => fn()); clearTimeout(deadline); resolve(); };
+            const check = () => {
+              if (reg.active?.state === 'activated' || navigator.serviceWorker.controller) done();
+            };
+            // 現状の worker 群に statechange を貼る
+            const watch = (w?: ServiceWorker | null) => {
+              if (!w) return;
+              const on = () => { if (w.state === 'activated') check(); };
+              w.addEventListener('statechange', on);
+              cleanups.push(() => w.removeEventListener('statechange', on));
+            };
+            watch(reg.active); watch(reg.waiting); watch(reg.installing);
+            // 新しく見つかった installing にも追従
+            const onUpdateFound = () => { watch(reg.installing); };
+            reg.addEventListener('updatefound', onUpdateFound);
+            cleanups.push(() => reg.removeEventListener('updatefound', onUpdateFound));
+            // controller 付与を待つ
+            const onCtrl = () => check();
+            navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
+            cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
+            // ポーリングで取りこぼし防止
+            const iv = setInterval(() => { try { reg.update(); } catch { }; check(); }, 250);
+            cleanups.push(() => clearInterval(iv));
+            // 初回判定
+            check();
+          });
         }
+
 
         // ★変更: ready を直接晒さず、タイムアウト + 二重チェックの Promise を共有
         window.__swReadyPromise = (async () => {
@@ -81,40 +79,31 @@ export default function ServiceWorkerInit() {
           );
           const regReady = await Promise.race([readyPromise, timeout]) as ServiceWorkerRegistration;
 
-          if (!regReady.active || regReady.active.state !== 'activated') {
-            await new Promise<void>((resolve, reject) => {
-              const sw = regReady.active ?? regReady.waiting ?? regReady.installing ?? null;
-              if (!sw) {
-                resolve();
-                return;
-              }
-              const t = setTimeout(
-                () => reject(new Error('SW activate wait timeout (post-ready)')),
-                10_000
-              );
-              const onChange = () => {
-                if (sw.state === 'activated') {
-                  sw.removeEventListener('statechange', onChange);
-                  clearTimeout(t);
-                  resolve();
-                }
-              };
-              sw.addEventListener('statechange', onChange);
-              try {
-                regReady.update();
-              } catch {
-                /* noop */
-              }
-            });
-          }
-          // ★追加: ページが SW に制御される（controller 付与）まで必ず待つ
-          if (!navigator.serviceWorker.controller) {
-            await new Promise<void>((resolve) => {
-              if (navigator.serviceWorker.controller) return resolve();
-              const onCtrl = () => resolve();
-              navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
-            });
-          }
+          // ★強化: regReady でも同じく registration 全体で待つ（10s）
+          await new Promise<void>((resolve, reject) => {
+            const deadline = setTimeout(() => reject(new Error('SW activate wait timeout (post-ready)')), 10_000);
+            const cleanups: Array<() => void> = [];
+            const done = () => { cleanups.forEach(fn => fn()); clearTimeout(deadline); resolve(); };
+            const check = () => {
+              if (regReady.active?.state === 'activated' || navigator.serviceWorker.controller) done();
+            };
+            const watch = (w?: ServiceWorker | null) => {
+              if (!w) return;
+              const on = () => { if (w.state === 'activated') check(); };
+              w.addEventListener('statechange', on);
+              cleanups.push(() => w.removeEventListener('statechange', on));
+            };
+            watch(regReady.active); watch(regReady.waiting); watch(regReady.installing);
+            const onUpdateFound = () => { watch(regReady.installing); };
+            regReady.addEventListener('updatefound', onUpdateFound);
+            cleanups.push(() => regReady.removeEventListener('updatefound', onUpdateFound));
+            const onCtrl = () => check();
+            navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
+            cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
+            const iv = setInterval(() => { try { regReady.update(); } catch { }; check(); }, 250);
+            cleanups.push(() => clearInterval(iv));
+            check();
+          });
           return regReady;
         })();
 
