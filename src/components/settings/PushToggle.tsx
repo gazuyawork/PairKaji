@@ -3,6 +3,8 @@
 // - ★変更: navigator.serviceWorker.register に updateViaCache:'none' を付与
 // - ★変更: waitForSWReady を強化（ready タイムアウト時のフォールバック、activated/ controller の三段待機）
 // - ★変更: subscribe() 内のフォールバックも強化（active/waiting/installing 直接拾い・短期待機）
+// - ★追加: 開発者/一般ユーザーのエラー表示切り分け（gazuya@gmail.com を開発者として判定）
+// - ★追加: toFriendlyMessage / notifyError を導入し、catch/早期 return のエラー表示を集約
 // - その他ロジックは現状踏襲（UI・APIコール含む）
 
 'use client';
@@ -10,6 +12,8 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 type Props = {
   uid: string;
@@ -29,6 +33,16 @@ export default function PushToggle({ uid }: Props) {
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [phase, setPhase] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [lastError, setLastError] = useState<ErrorInfo | null>(null);
+  const [isDev, setIsDev] = useState(false); // ★追加: 開発者フラグ
+
+  // ★追加: 開発者判定（メールが gazuya@gmail.com なら DEV 扱い）
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u: User | null) => {
+      const email = (u?.email ?? '').toLowerCase();
+      setIsDev(email === 'gazuya@gmail.com');
+    });
+    return () => unsub();
+  }, []);
 
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
   const ENV_BASE = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/+$/g, '');
@@ -70,9 +84,42 @@ export default function PushToggle({ uid }: Props) {
       });
     });
 
-  const isTimeoutError = (e: unknown) =>
-    typeof (e as { message?: string })?.message === 'string' &&
-    String((e as { message?: string }).message).startsWith('timeout:');
+  // ★追加: 一般ユーザー向けのやさしい文言
+  function toFriendlyMessage(err: ErrorInfo): string {
+    switch (err.code) {
+      case 'NoSW':
+        return 'アプリの更新を反映中です。数秒後にもう一度お試しください。';
+      case 'NOT_SUPPORTED':
+        return 'お使いの端末・ブラウザでは通知がご利用いただけません。';
+      case 'NOT_SECURE':
+        return 'HTTPS でのアクセスが必要です。アプリを最新版から開いてください。';
+      case 'PERMISSION_BLOCKED':
+        return '通知がブロックされています。端末の「設定」から通知を許可してください。';
+      case 'PERMISSION_NOT_GRANTED':
+        return '通知の許可が必要です。設定から許可してください。';
+      case 'VAPID_MISSING':
+        return '通知の設定に失敗しました。時間をおいてお試しください。';
+      case 'NETWORK':
+        return '通信状況が不安定です。ネットワークをご確認ください。';
+      case 'TIMEOUT':
+        return '処理がタイムアウトしました。再度お試しください。';
+      case 'HTTP_400':
+      case 'HTTP_401':
+      case 'HTTP_403':
+      case 'HTTP_404':
+        return '設定に失敗しました。しばらくしてから再度お試しください。';
+      case 'SERVER_5XX':
+        return 'サーバーが混み合っています。時間をおいてお試しください。';
+      default: {
+        if (err.context === 'SUBSCRIBE') return '通知の有効化に失敗しました。もう一度お試しください。';
+        if (err.context === 'UNSUBSCRIBE') return '通知の無効化に失敗しました。もう一度お試しください。';
+        if (err.context === 'TEST_SEND') return 'テスト通知の送信に失敗しました。しばらくしてお試しください。';
+        if (err.context === 'ENSURE_REG') return '起動準備中にエラーが発生しました。再度お試しください。';
+        if (err.context === 'REFRESH') return '通知設定の更新に失敗しました。再度お試しください。';
+        return 'エラーが発生しました。もう一度お試しください。';
+      }
+    }
+  }
 
   const toErrorInfo = (context: string, e: unknown, extra?: unknown): ErrorInfo => {
     const anyE = e as Record<string, unknown> | string;
@@ -98,11 +145,31 @@ export default function PushToggle({ uid }: Props) {
     };
   };
 
-  const reportError = (context: string, e: unknown, extra?: unknown, toastMsg?: string) => {
+  // ★追加: 表示切り分け（DEV には詳細、一般には要約）
+  function notifyError(err: ErrorInfo) {
+    setLastError(err);
+    if (isDev) {
+      // 開発者向け：詳細ログ＋詳細トースト
+      console.error('[DEV][PushToggle]', {
+        context: err.context,
+        code: err.code,
+        message: err.message,
+        name: err.name,
+        extra: err.extra,
+        time: err.time,
+        stack: err.stack,
+      });
+      toast.error(`[DEV] ${err.context} / ${err.code ?? 'NO_CODE'}: ${err.message}`);
+    } else {
+      // 一般ユーザー向け：やさしい文言のみ
+      toast.error(toFriendlyMessage(err));
+    }
+  }
+
+  // 既存の reportError を notifyError 経由に
+  const reportError = (context: string, e: unknown, extra?: unknown) => {
     const info = toErrorInfo(context, e, extra);
-    setLastError(info);
-    console.error(`[push][${context}]`, e, extra ?? '');
-    if (toastMsg) toast.error(toastMsg);
+    notifyError(info);
   };
 
   const fetchWithDiagnostics = async (url: string, init: RequestInit, timeoutMs = 8000) => {
@@ -212,11 +279,9 @@ export default function PushToggle({ uid }: Props) {
       if (reachable.length === 0) {
         reportError(
           'ENSURE_REG',
-          new Error('No reachable sw.js'),
-          { candidates: candidates.map((c) => c.url) },
-          'Service Worker が準備できていません（sw.js の配置や scope を確認）'
+          withCode(new Error('No reachable sw.js'), 'NoSW'),
+          { candidates: candidates.map((c) => c.url) }
         );
-        toast.error('Service Worker が準備できていません（sw.js の配置や scope を確認）');
         return null;
       }
       let lastErr: unknown = null;
@@ -289,7 +354,8 @@ export default function PushToggle({ uid }: Props) {
   // ================================
   const waitForSWReady = async (timeoutMs = 15000): Promise<ServiceWorkerRegistration> => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-      throw new Error('Service Worker not supported');
+      const err = withCode(new Error('Service Worker not supported'), 'NOT_SUPPORTED');
+      throw err;
     }
     const base = (window as unknown as { __swReadyPromise?: Promise<ServiceWorkerRegistration> })
       .__swReadyPromise;
@@ -318,9 +384,11 @@ export default function PushToggle({ uid }: Props) {
         regs.find((r) => r.waiting) ||
         regs.find((r) => r.installing) ||
         null;
-      if (!reg) throw new Error('No Service Worker registration');
+      if (!reg) {
+        const err = withCode(new Error('No Service Worker registration'), 'NoSW');
+        throw err;
+      }
     }
-
 
     // ③ registration 全体を監視（active/ controller / updatefound）＋ポーリング
     await new Promise<void>((resolve, reject) => {
@@ -329,29 +397,44 @@ export default function PushToggle({ uid }: Props) {
         10_000
       );
       const cleanups: Array<() => void> = [];
-      const done = () => { cleanups.forEach(fn => fn()); clearTimeout(deadline); resolve(); };
+      const done = () => {
+        cleanups.forEach((fn) => fn());
+        clearTimeout(deadline);
+        resolve();
+      };
       const check = () => {
-        if (reg.active?.state === 'activated' || navigator.serviceWorker.controller) done();
+        if (reg!.active?.state === 'activated' || navigator.serviceWorker.controller) done();
       };
       const watch = (w?: ServiceWorker | null) => {
         if (!w) return;
-        const on = () => { if (w.state === 'activated') check(); };
+        const on = () => {
+          if (w.state === 'activated') check();
+        };
         w.addEventListener('statechange', on);
         cleanups.push(() => w.removeEventListener('statechange', on));
       };
-      watch(reg.active); watch(reg.waiting); watch(reg.installing);
-      const onUpdateFound = () => { watch(reg.installing); };
+      watch(reg.active);
+      watch(reg.waiting);
+      watch(reg.installing);
+      const onUpdateFound = () => {
+        watch(reg.installing);
+      };
       reg.addEventListener('updatefound', onUpdateFound);
       cleanups.push(() => reg.removeEventListener('updatefound', onUpdateFound));
       const onCtrl = () => check();
       navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
       cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
-      const iv = setInterval(() => { try { reg.update(); } catch {} ; check(); }, 250);
+      const iv = setInterval(() => {
+        try {
+          reg.update();
+        } catch { }
+        check();
+      }, 250);
       cleanups.push(() => clearInterval(iv));
       check();
     });
 
-    // ④ ここまで来れば controller もほぼ付与済み。取りこぼし用に 4s レースだけ残す
+    // ④ 取りこぼし防止：controller 付与を 4s だけ待つ
     if (!navigator.serviceWorker.controller) {
       await Promise.race<void>([
         new Promise<void>((resolve) => {
@@ -376,11 +459,12 @@ export default function PushToggle({ uid }: Props) {
 
       if (!isSecure) {
         setIsSubscribed(false);
-        toast.error('HTTPS 環境でのみ通知が利用できます');
+        reportError('REFRESH', withCode(new Error('HTTPS required'), 'NOT_SECURE'));
         return;
       }
       if (!('serviceWorker' in navigator)) {
         setIsSubscribed(false);
+        reportError('REFRESH', withCode(new Error('Service Worker not supported'), 'NOT_SUPPORTED'));
         return;
       }
 
@@ -428,7 +512,6 @@ export default function PushToggle({ uid }: Props) {
       }
       setIsSubscribed(false);
     } catch (e) {
-      console.error('[push] refreshSubscribedState error', e);
       reportError('REFRESH', e);
       setIsSubscribed(false);
     }
@@ -469,26 +552,22 @@ export default function PushToggle({ uid }: Props) {
   const subscribe = async (): Promise<void> => {
     try {
       if (!('Notification' in window)) {
-        reportError('SUBSCRIBE', new Error('Notifications API not supported'));
-        toast.error('このブラウザは通知に対応していません');
+        reportError('SUBSCRIBE', withCode(new Error('Notifications API not supported'), 'NOT_SUPPORTED'));
         return;
       }
       if (!vapidKey) {
-        reportError('SUBSCRIBE', new Error('VAPID key missing'));
-        toast.error('VAPIDキーが設定されていません');
+        reportError('SUBSCRIBE', withCode(new Error('VAPID key missing'), 'VAPID_MISSING'));
         return;
       }
 
       if (Notification.permission === 'denied') {
-        reportError('SUBSCRIBE', new Error('Notification permission denied'));
-        toast.error('通知がOS/ブラウザ設定で拒否されています');
+        reportError('SUBSCRIBE', withCode(new Error('Notification permission denied'), 'PERMISSION_BLOCKED'));
         return;
       }
       if (Notification.permission === 'default') {
         const result = await Notification.requestPermission();
         if (result !== 'granted') {
-          reportError('SUBSCRIBE', new Error('Permission not granted'));
-          toast.error('通知の許可が必要です');
+          reportError('SUBSCRIBE', withCode(new Error('Permission not granted'), 'PERMISSION_NOT_GRANTED'));
           return;
         }
       }
@@ -500,15 +579,21 @@ export default function PushToggle({ uid }: Props) {
 
       // 2段リトライ（3s → 6s）。更新直後の race を吸収
       const tryReady = async (ms: number) => {
-        try { return await waitForSWReady(ms); } catch { return null; }
+        try {
+          return await waitForSWReady(ms);
+        } catch {
+          return null;
+        }
       };
-      reg = (await tryReady(3000))
-        ?? (await tryReady(6000))
-        ?? reg;
+      reg = (await tryReady(3000)) ?? (await tryReady(6000)) ?? reg;
       if (!reg) {
         // 最後の保険：既存 registration を直接拾う
         const regs = await getAllRegistrations();
-        for (const r of regs) { try { r.update(); } catch { } }
+        for (const r of regs) {
+          try {
+            r.update();
+          } catch { }
+        }
         reg =
           regs.find((r) => r.active) ||
           regs.find((r) => r.waiting) ||
@@ -517,13 +602,7 @@ export default function PushToggle({ uid }: Props) {
       }
 
       if (!reg) {
-        const err = new Error('Service Worker not ready');
-        reportError(
-          'SUBSCRIBE',
-          err,
-          undefined,
-          'Service Worker が準備できていません（sw.js の配置や scope を確認）'
-        );
+        reportError('SUBSCRIBE', withCode(new Error('Service Worker not ready'), 'NoSW'));
         setPhase('error');
         return;
       }
@@ -596,16 +675,11 @@ export default function PushToggle({ uid }: Props) {
       setPhase('idle');
       toast.success('通知を許可しました');
     } catch (e) {
-      let msg = '通知の許可に失敗しました';
-      if (isTimeoutError(e)) msg = '通信がタイムアウトしました';
       const maybe = e as { code?: unknown; status?: number; body?: string };
       if (typeof maybe?.code === 'string' && maybe.code.startsWith('HTTP_')) {
-        const status = maybe.status;
-        const body = maybe.body;
-        msg = `サーバー応答エラー（${status}）`;
-        reportError('SUBSCRIBE_API', e, body, msg);
+        reportError('SUBSCRIBE_API', e, maybe.body);
       } else {
-        reportError('SUBSCRIBE', e, undefined, msg);
+        reportError('SUBSCRIBE', e);
       }
       setPhase('error');
       await refreshSubscribedState();
@@ -635,8 +709,7 @@ export default function PushToggle({ uid }: Props) {
       setPhase('idle');
       toast.success('通知を解除しました');
     } catch (e) {
-      const msg = isTimeoutError(e) ? '通信がタイムアウトしました' : '通知の解除に失敗しました';
-      reportError('UNSUBSCRIBE', e, undefined, msg);
+      reportError('UNSUBSCRIBE', e, undefined);
       setPhase('error');
       await refreshSubscribedState();
     }
@@ -664,19 +737,13 @@ export default function PushToggle({ uid }: Props) {
       toast.success('テスト通知を送信しました');
       setTimeout(() => setPhase('idle'), 2500);
     } catch (e) {
-      let msg = 'テスト通知の送信に失敗しました';
-      if (isTimeoutError(e)) msg = '通信がタイムアウトしました';
-      const maybe = e as { code?: unknown; status?: number; body?: string };
-      if (typeof maybe?.code === 'string' && maybe.code.startsWith('HTTP_')) {
-        const status = maybe.status;
-        const body = maybe.body;
-        msg = `テスト送信のサーバー応答エラー（${status}）`;
-        reportError('TEST_SEND_API', e, body, msg);
+      const maybe = e as { code?: unknown; body?: string };
+      if (typeof maybe?.code === 'string' && String(maybe.code).startsWith('HTTP_')) {
+        reportError('TEST_SEND_API', e, maybe.body);
       } else {
-        reportError('TEST_SEND', e, undefined, msg);
+        reportError('TEST_SEND', e);
       }
       setPhase('error');
-      toast.error(msg);
       await refreshSubscribedState();
     }
   };
