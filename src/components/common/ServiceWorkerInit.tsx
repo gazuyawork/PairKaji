@@ -65,9 +65,31 @@ export default function ServiceWorkerInit() {
             const onCtrl = () => check();
             navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
             cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
-            // ポーリングで取りこぼし防止
-            const iv = setInterval(() => { try { reg.update(); } catch { }; check(); }, 250);
-            cleanups.push(() => clearInterval(iv));
+            // ポーリング: setInterval をやめ、指数バックオフの一回タイマー + InvalidStateError で停止
+            let stopped = false;
+            const tryUpdate = (delay = 500) => {
+              if (stopped) return;
+              const t = setTimeout(() => {
+                if (stopped) return;
+                try {
+                  reg.update();
+                } catch (e) {
+                  // 状態遷移中などで "InvalidStateError" が出たら以降の再試行はやめる
+                  if ((e as DOMException)?.name === 'InvalidStateError') {
+                    stopped = true;
+                    return;
+                  }
+                }
+                check();
+                // まだ controller も active も付いていなければ、次は少し待って再試行
+                if (!navigator.serviceWorker.controller && reg.active?.state !== 'activated') {
+                  tryUpdate(Math.min(Math.floor(delay * 1.5), 5000)); // 最大5sまで
+                }
+              }, delay);
+              cleanups.push(() => { stopped = true; clearTimeout(t); });
+            };
+            tryUpdate();
+
             // 初回判定
             check();
           });
@@ -118,8 +140,29 @@ export default function ServiceWorkerInit() {
             const onCtrl = () => check();
             navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
             cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
-            const iv = setInterval(() => { try { regReady.update(); } catch { }; check(); }, 250);
-            cleanups.push(() => clearInterval(iv));
+            // ポーリング: setInterval ではなく指数バックオフ + InvalidStateError で停止
+            let stopped = false;
+            const tryUpdate = (delay = 500) => {
+              if (stopped) return;
+              const t = setTimeout(() => {
+                if (stopped) return;
+                try {
+                  regReady.update();
+                } catch (e) {
+                  if ((e as DOMException)?.name === 'InvalidStateError') {
+                    stopped = true;
+                    return;
+                  }
+                }
+                check();
+                if (!navigator.serviceWorker.controller && regReady.active?.state !== 'activated') {
+                  tryUpdate(Math.min(Math.floor(delay * 1.5), 5000));
+                }
+              }, delay);
+              cleanups.push(() => { stopped = true; clearTimeout(t); });
+            };
+            tryUpdate();
+
             check();
           });
           // ★追いリロード保険（post-ready 時点でも controller が無い場合）
