@@ -23,6 +23,7 @@ const pwaOptions = {
   buildExcludes: [
     /middleware-manifest\.json$/,
     /app-build-manifest\.json$/, // dev では存在しないことがあるので除外
+    /(^|\/)sw\.js$/, // swSrc として手動で提供するため除外
   ],
 
   // ⚠️ InjectManifest では runtimeCaching は使用不可（未指定）
