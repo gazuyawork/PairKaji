@@ -107,6 +107,14 @@ export default function ServiceWorkerInit() {
               }
             });
           }
+          // ★追加: ページが SW に制御される（controller 付与）まで必ず待つ
+          if (!navigator.serviceWorker.controller) {
+            await new Promise<void>((resolve) => {
+              if (navigator.serviceWorker.controller) return resolve();
+              const onCtrl = () => resolve();
+              navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
+            });
+          }
           return regReady;
         })();
 

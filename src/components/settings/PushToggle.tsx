@@ -492,31 +492,22 @@ export default function PushToggle({ uid }: Props) {
       // 無ければ登録→待機まで（最大 6s）
       let reg: ServiceWorkerRegistration | null = await ensureRegistration(6000);
 
-      // ★変更: ここで必ず ready を厳密に待つ
-      try {
-        reg = await waitForSWReady(15_000);
-      } catch {
-        // ① ready が間に合わない → 2s レース
-        reg = (await Promise.race([
-          navigator.serviceWorker.ready,
-          delay(2000).then(() => null),
-        ])) as ServiceWorkerRegistration | null;
-        // ② まだ null → 既存 registration から active/waiting/installing を直接拾う
-        if (!reg) {
-          const regs = await getAllRegistrations();
-          for (const r of regs) {
-            try {
-              r.update();
-            } catch {
-              /* noop */
-            }
-          }
-          reg =
-            regs.find((r) => r.active) ||
-            regs.find((r) => r.waiting) ||
-            regs.find((r) => r.installing) ||
-            null;
-        }
+      // 2段リトライ（3s → 6s）。更新直後の race を吸収
+      const tryReady = async (ms: number) => {
+        try { return await waitForSWReady(ms); } catch { return null; }
+      };
+      reg = (await tryReady(3000))
+        ?? (await tryReady(6000))
+        ?? reg;
+      if (!reg) {
+        // 最後の保険：既存 registration を直接拾う
+        const regs = await getAllRegistrations();
+        for (const r of regs) { try { r.update(); } catch { } }
+        reg =
+          regs.find((r) => r.active) ||
+          regs.find((r) => r.waiting) ||
+          regs.find((r) => r.installing) ||
+          null;
       }
 
       if (!reg) {
@@ -545,6 +536,17 @@ export default function PushToggle({ uid }: Props) {
             w.addEventListener('statechange', onChange, { once: true });
           }),
           delay(2000),
+        ]);
+      }
+      // ★追加: controller 付与まで待つ（ここで取りこぼしを塞ぐ）
+      if (!navigator.serviceWorker.controller) {
+        await Promise.race<void>([
+          new Promise<void>((resolve) => {
+            if (navigator.serviceWorker.controller) return resolve();
+            const onCtrl = () => resolve();
+            navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
+          }),
+          delay(4000),
         ]);
       }
 
@@ -679,8 +681,8 @@ export default function PushToggle({ uid }: Props) {
       isSubscribed === null
         ? '状態を確認中…'
         : isSubscribed
-        ? '通知は有効です'
-        : '通知は無効です';
+          ? '通知は有効です'
+          : '通知は無効です';
     switch (phase) {
       case 'sending':
         return base + '（処理中…）';
@@ -721,7 +723,7 @@ export default function PushToggle({ uid }: Props) {
           <details className="mt-2">
             <summary className="cursor-pointer select-none">詳細ログ（開く）</summary>
             <pre className="mt-2 max-h-48 overflow-auto rounded bg-white/70 p-2 text-[11px] text-gray-800">
-{JSON.stringify(lastError, null, 2)}
+              {JSON.stringify(lastError, null, 2)}
             </pre>
           </details>
         </div>
