@@ -11,8 +11,22 @@ import { StaleWhileRevalidate, NetworkFirst } from 'workbox-strategies';
 self.skipWaiting();
 clientsClaim();
 
-// ★ここが“__WB_MANIFEST の差し込み先”です（必須）
-precacheAndRoute(self.__WB_MANIFEST || []);
+// ★修正: precache リストから「壊れやすい項目」を最終フィルタで除外してから登録する
+//  - /_next/*.json …… 環境やバージョンで生成されず 404 になり得る
+//  - /sw.js          …… SW 本体はキャッシュしない
+(() => {
+  const raw = self.__WB_MANIFEST || [];
+  const toUrl = (e) => (typeof e === 'string' ? e : e?.url || '');
+  const filtered = raw.filter((e) => {
+    const u = toUrl(e);
+    if (!u) return false;
+    if (/^\/?_next\/.*\.json$/i.test(u)) return false;
+    if (u === '/sw.js') return false;
+    return true;
+  });
+  precacheAndRoute(filtered);
+})();
+
 cleanupOutdatedCaches();
 
 // 【任意：例】HTMLはネット優先（オフライン時はキャッシュ）
