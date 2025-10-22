@@ -328,6 +328,44 @@ export default function PushToggle({ uid }: Props) {
     }
   };
 
+  // ================================
+  // ★追加: SW の ready を厳密に待つヘルパー
+  // ================================
+  const waitForSWReady = async (timeoutMs = 15000): Promise<ServiceWorkerRegistration> => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      throw new Error('Service Worker not supported');
+    }
+    const base = (window as any).__swReadyPromise as Promise<ServiceWorkerRegistration> | undefined;
+    const readyPromise = base ?? navigator.serviceWorker.ready;
+
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Service Worker not ready (timeout)')), timeoutMs)
+    );
+
+    const reg = (await Promise.race([readyPromise, timeout])) as ServiceWorkerRegistration;
+
+    const sw = reg.active || reg.waiting || reg.installing || null;
+    if (!sw) return reg;
+    if (sw.state === 'activated') return reg;
+
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(
+        () => reject(new Error('Service Worker not ready (statechange timeout)')),
+        7000
+      );
+      const onChange = () => {
+        if (sw.state === 'activated') {
+          clearTimeout(t);
+          (sw as any).removeEventListener?.('statechange', onChange);
+          resolve();
+        }
+      };
+      (sw as any).addEventListener?.('statechange', onChange);
+    });
+
+    return reg;
+  };
+
   // 初期化
   useEffect(() => {
     let cancelled = false;
@@ -392,8 +430,14 @@ export default function PushToggle({ uid }: Props) {
       // 無ければ登録→待機まで（最大 6s）
       let reg: ServiceWorkerRegistration | null = await ensureRegistration(6000);
 
-      // 保険で ready を 2s 待つ
-      if (!reg || !navigator.serviceWorker.controller) {
+      // ================================
+      // ★変更: ここで必ず ready を厳密に待つ
+      // ================================
+      try {
+        reg = await waitForSWReady(15000);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e) {
+        // ready 待機に失敗した場合でも最後の保険として ready 2s レースを残す
         reg = await Promise.race<ServiceWorkerRegistration | null>([
           navigator.serviceWorker.ready,
           delay(2000).then(() => null),
@@ -402,7 +446,12 @@ export default function PushToggle({ uid }: Props) {
 
       if (!reg) {
         const err = new Error('Service Worker not ready');
-        reportError('SUBSCRIBE', err, undefined, 'Service Worker が準備できていません（sw.js の配置や scope を確認）');
+        reportError(
+          'SUBSCRIBE',
+          err,
+          undefined,
+          'Service Worker が準備できていません（sw.js の配置や scope を確認）'
+        );
         setPhase('error');
         return;
       }
