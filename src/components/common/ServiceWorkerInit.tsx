@@ -20,6 +20,9 @@ export default function ServiceWorkerInit() {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
 
+    // ★追加: 無限リロード防止フラグ
+    const RELOAD_FLAG = 'pk_sw_reloaded_once';
+
     const init = async () => {
       try {
         // すでに ready を共有済みなら何もしない
@@ -68,6 +71,21 @@ export default function ServiceWorkerInit() {
             // 初回判定
             check();
           });
+          // ★追加: ここまで来て 500ms 待っても controller が無ければ「一度だけ」自動リロード
+          if (!navigator.serviceWorker.controller) {
+            await new Promise((r) => setTimeout(r, 500));
+            if (!navigator.serviceWorker.controller) {
+              try {
+                const once = sessionStorage.getItem(RELOAD_FLAG);
+                if (!once) {
+                  sessionStorage.setItem(RELOAD_FLAG, '1');
+                  console.log('[SW] Forcing one-time reload to attach controller');
+                  location.reload();
+                  return; // ここで復帰しない（リロードされる）
+                }
+              } catch { /* セッションストレージ使用不可でも無視 */ }
+            }
+          }
         }
 
 
@@ -104,6 +122,22 @@ export default function ServiceWorkerInit() {
             cleanups.push(() => clearInterval(iv));
             check();
           });
+          // ★追いリロード保険（post-ready 時点でも controller が無い場合）
+          if (!navigator.serviceWorker.controller) {
+            await new Promise((r) => setTimeout(r, 500));
+            if (!navigator.serviceWorker.controller) {
+              try {
+                const once = sessionStorage.getItem(RELOAD_FLAG);
+                if (!once) {
+                  sessionStorage.setItem(RELOAD_FLAG, '1');
+                  console.log('[SW] Forcing one-time reload to attach controller (post-ready)');
+                  location.reload();
+                }
+              } catch { }
+            } else {
+              try { sessionStorage.removeItem(RELOAD_FLAG); } catch { }
+            }
+          }
           return regReady;
         })();
 
@@ -113,7 +147,7 @@ export default function ServiceWorkerInit() {
           console.log('[SW] ready:', r.scope, s);
         });
       } catch (e) {
-        console.error('[ServiceWorkerInit] registration error:', e);
+        console.warn('[ServiceWorkerInit] registration warning:', e);
       }
     };
 
