@@ -51,11 +51,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+// ★★★ 追加インポート：TODO ショートカットカード ★★★
+import TodoShortcutsCard from '@/components/home/parts/TodoShortcutsCard';
+
 /* =========================================================
  * SortableCard
- * - 各カードを isolate（独立スタッキング）化
- * - カード内に overflow-hidden ラッパーを追加し、ハンドルのはみ出しを完全防止
- * - isDragging 中は元要素を透明化して DragOverlay の二重表示を防止
  * =======================================================*/
 function SortableCard({
   id,
@@ -88,9 +88,7 @@ function SortableCard({
 
   return (
     <div className={className}>
-      {/* 並び替え対象ボックス（max-w-xl 内側） */}
       <div ref={setNodeRef} style={style} className={`relative isolate ${boundClass}`}>
-        {/* ここでハンドルを必ずカード内に閉じ込める */}
         <div className="relative rounded-lg overflow-hidden">
           {isClient && showGrip && (
             <button
@@ -123,9 +121,7 @@ function DisabledCardWrapper({
 }) {
   return (
     <div className="relative">
-      {/* 中身は操作不可 */}
       <div className="pointer-events-none opacity-60 grayscale">{children}</div>
-      {/* 説明オーバーレイ（ハンドルより下のz-indexにしてドラッグは妨げない） */}
       <div className="absolute inset-0 rounded-lg bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-0">
         <span className="text-sm text-gray-700">{message}</span>
       </div>
@@ -272,7 +268,6 @@ export default function HomeView() {
     const unsubscribe = onSnapshot(
       qTasks,
       (snapshot) => {
-        // スナップショットをそのまま mapFirestoreDocToTask へ渡す
         const taskList = snapshot.docs.map((d) =>
           mapFirestoreDocToTask(d as QueryDocumentSnapshot<FirestoreTask>)
         );
@@ -335,12 +330,13 @@ export default function HomeView() {
 
   /* ---------------------------------------
    * カード順序 永続化 & DnD センサー
-   *  ※ 並び替え対象外：Flagged と「もう一度説明を見る」
    * -------------------------------------*/
   const HOME_CARD_ORDER_KEY = 'homeCardOrderV1';
   const DEFAULT_ORDER = [
     'pairInvite',
     'pairInviteNone',
+    // ★★★ 追加：TODOショートカット ★★★
+    'todoShortcuts',
     'expandableInfo',
     'hearts',
     'calendar',
@@ -360,14 +356,14 @@ export default function HomeView() {
         const missing = DEFAULT_ORDER.filter((d) => !filtered.includes(d));
         return [...filtered, ...missing];
       }
-    } catch { }
+    } catch {}
     return [...DEFAULT_ORDER];
   });
 
   useEffect(() => {
     try {
       localStorage.setItem(HOME_CARD_ORDER_KEY, JSON.stringify(cardOrder));
-    } catch { }
+    } catch {}
   }, [cardOrder]);
 
   const sensors = useSensors(
@@ -397,23 +393,31 @@ export default function HomeView() {
         return <PairInviteCard mode="invite-received" />;
       case 'pairInviteNone':
         return <PairInviteCard mode="no-partner" />;
+
+      // ★★★ 修正：uid が未取得の間は null を返し、取得後のみ描画 ★★★
+      case 'todoShortcuts': {
+        if (!uid) return null;
+        return <TodoShortcutsCard uid={uid} />;
+      }
+
       case 'expandableInfo':
         return (
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
-            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
+            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+              isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+            }`}
           >
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-                  }`}
+                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
               />
             </div>
           </div>
         );
       case 'hearts': {
-        // ペア未確定なら非活性表示（DnDハンドルは有効）
         const node = <HomeDashboardCard />;
         return isPairInactive ? (
           <DisabledCardWrapper message="ペア設定完了後に利用できます。">{node}</DisabledCardWrapper>
@@ -422,7 +426,6 @@ export default function HomeView() {
         );
       }
       case 'calendar': {
-        // ★★★ 変更：ここでフックは使わない。未マウントは上位で return null 済み。★★★
         return isLoading ? (
           <div className="space-y-2" suppressHydrationWarning>
             <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
@@ -441,9 +444,7 @@ export default function HomeView() {
           />
         );
       }
-
       case 'todayDone': {
-        // ペア未確定なら非活性表示（DnDハンドルは有効）
         const node = <PartnerCompletedTasksCard />;
         return isPairInactive ? (
           <DisabledCardWrapper message="ペア設定完了後に利用できます。">{node}</DisabledCardWrapper>
@@ -466,7 +467,6 @@ export default function HomeView() {
       <div
         className="flex-1 overflow-y-auto"
         ref={scrollRef}
-        // ドラッグ中は画面スクロールを無効化
         style={{
           overflowY: isDraggingCard ? 'hidden' : undefined,
           touchAction: isDraggingCard ? 'none' : undefined,
@@ -485,10 +485,8 @@ export default function HomeView() {
             transition={{ duration: 0.4 }}
             className="space-y-1.5"
           >
-            {/* ▼ 並び替え対象外：フラグ通知 */}
             {!isLoading && flaggedCount > 0 && <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />}
 
-            {/* ▼ 並び替え可能ブロック */}
             <DndContext
               sensors={sensors}
               onDragStart={(e) => {
@@ -496,14 +494,14 @@ export default function HomeView() {
                 setActiveCardId(String(e.active.id));
                 try {
                   document.body.style.overflow = 'hidden';
-                } catch { }
+                } catch {}
               }}
               onDragCancel={() => {
                 setIsDraggingCard(false);
                 setActiveCardId(null);
                 try {
                   document.body.style.overflow = '';
-                } catch { }
+                } catch {}
               }}
               onDragEnd={(event) => {
                 handleDragEnd(event);
@@ -511,19 +509,19 @@ export default function HomeView() {
                 setActiveCardId(null);
                 try {
                   document.body.style.overflow = '';
-                } catch { }
+                } catch {}
               }}
             >
               {(() => {
-                // 1) 表示条件に合う候補
                 const candidateSet = new Set<CardId>();
                 if (!isLoading && hasPairInvite) {
                   candidateSet.add('pairInvite');
                 } else if (!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed) {
                   candidateSet.add('pairInviteNone');
                 }
+                candidateSet.add('todoShortcuts');
                 candidateSet.add('expandableInfo');
-                candidateSet.add('hearts'); // 活動サマリー
+                candidateSet.add('hearts');
                 candidateSet.add('calendar');
                 // candidateSet.add('weeklyPoints');
                 candidateSet.add('todayDone');
@@ -531,7 +529,6 @@ export default function HomeView() {
                   candidateSet.add('ad');
                 }
 
-                // 2) 実際に描画できるカードだけ抽出
                 const visibleCards = cardOrder
                   .filter((id) => candidateSet.has(id))
                   .map((id) => ({ id, node: renderCardContent(id) }))
@@ -548,7 +545,6 @@ export default function HomeView() {
                       <div className="space-y-1.5">
                         {visibleCards.map(({ id, node }) => (
                           <div key={id}>
-                            {/* ハンドルはこのコンポーネントの内側から出ません */}
                             <SortableCard id={id} showGrip={true} boundClass="mx-auto w-full max-w-xl">
                               {node}
                             </SortableCard>
@@ -557,10 +553,9 @@ export default function HomeView() {
                       </div>
                     </SortableContext>
 
-                    {/* DragOverlay：実体があるカードのみ */}
                     <DragOverlay>
                       {activeCardId &&
-                        visibleCards.find((v) => v.id === (activeCardId as CardId)) ? (
+                      visibleCards.find((v) => v.id === (activeCardId as CardId)) ? (
                         <div className="rounded-lg">
                           {visibleCards.find((v) => v.id === (activeCardId as CardId))!.node}
                         </div>
@@ -571,7 +566,6 @@ export default function HomeView() {
               })()}
             </DndContext>
 
-            {/* ▼ もう一度説明を見る（固定・最下部・並び替え対象外／ハンドルなし） */}
             <div className="mt-6 flex justify-center relative z-0">
               <button
                 onClick={() => setShowOnboarding(true)}
@@ -584,7 +578,6 @@ export default function HomeView() {
         </main>
       </div>
 
-      {/* ▼ オンボーディングモーダル */}
       {showOnboarding && (
         <OnboardingModal
           slides={[

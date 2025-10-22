@@ -1,4 +1,3 @@
-// src/components/todo/parts/TodoView.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +34,7 @@ import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import { updateTodoTextInTask } from '@/lib/taskUtils';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, X, Search, ShoppingCart, Utensils, Briefcase, Home, Tag, Plane } from 'lucide-react';
+import { Eye, Search, ShoppingCart, Utensils, Briefcase, Home, Tag, Plane } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -49,6 +48,7 @@ import {
   verticalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
+import SlideUpModal from '@/components/common/modals/SlideUpModal'; // ★追加
 
 // 配列移動
 const moveItem = <T,>(arr: T[], from: number, to: number) => {
@@ -204,13 +204,13 @@ export default function TodoView() {
     return () => { document.body.style.overflow = prev || ''; };
   }, [isAddSheetOpen, selectedTaskId, mounted]);
 
-  // Escで閉じる
+  // Escで閉じる（AddSheet は SlideUpModal 内でハンドリング、ここは selectedTask 用）
   useEffect(() => {
-    if (!isAddSheetOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsAddSheetOpen(false); };
+    if (!selectedTaskId) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedTaskId(null); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isAddSheetOpen]);
+  }, [selectedTaskId]);
 
   // Firestore購読（★ name を正規化）
   useEffect(() => {
@@ -636,204 +636,165 @@ export default function TodoView() {
           document.body
         )}
 
-      {/* 追加用シート（非表示のToDo再表示） */}
-      {mounted &&
-        index === 2 &&
-        createPortal(
-          <AnimatePresence>
-            {isAddSheetOpen && (
-              <motion.div
-                role="dialog"
-                aria-modal="true"
-                className="fixed inset-0 z-[1200] flex flex-col"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <div
-                  className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-                  onClick={() => setIsAddSheetOpen(false)}
-                />
-                <motion.div
-                  className="relative mt-auto sm:mt-10 sm:mx-auto sm:max-w-2xl w-full
-                           bg-gradient-to-b from-white to-gray-50
-                           rounded-t-2xl sm:rounded-2xl border border-gray-200
-                           shadow-[0_20px_40px_rgba(0,0,0,0.18)]
-                           flex flex-col h-[70vh] sm:h-auto sm:max-h-[80vh]
-                           pb-[max(env(safe-area-inset-bottom),16px)]"
-                  initial={{ y: 48 }}
-                  animate={{ y: 0 }}
-                  exit={{ y: 48 }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-                >
-                  <div className="mx-auto mt-2 mb-1 h-1.5 w-12 rounded-full bg-gray-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" />
-                  <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-2 flex items-center gap-2 shadow-[0_6px_12px_rgba(0,0,0,0.06)]">
-                    <button className="p-2 rounded-full hover:bg-gray-100" onClick={() => setIsAddSheetOpen(false)} aria-label="閉じる">
-                      <X className="w-5 h-5 text-red-600" />
-                    </button>
-                    <h2 className="text-base font-semibold text-[#5E5E5E]">非表示のTodoを再表示</h2>
-                    <span className="ml-auto text-xs text-gray-500">
-                      {(() => {
-                        const q = addQuery.trim().toLowerCase();
-                        const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
-                        type WithCategory = { categoryId?: string | null; category?: string | null };
-                        const filteredByCategory = hidden.filter((t) => {
-                          const c = t as WithCategory;
-                          const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
-                          return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
-                        });
-                        const filtered = filteredByCategory.filter((t) =>
-                          q ? (t.name ?? '').toLowerCase().includes(q) : true
-                        );
-                        return q || addSelectedCategoryId !== null ? `一致: ${filtered.length}件` : `候補: ${hidden.length}件`;
-                      })()}
-                    </span>
-                  </div>
-
-                  <div className="px-4 pt-3">
-                    <div
-                      className="flex items-center gap-2 rounded-xl px-3 py-2
-                                  bg-gradient-to-b from-white to-gray-50
-                                  border border-gray-200
-                                  shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
-                    >
-                      <Search className="w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={addQuery}
-                        onChange={(e) => setAddQuery(e.target.value)}
-                        placeholder="キーワードで検索"
-                        className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
-                        autoFocus
-                      />
-                      {addQuery && (
-                        <button className="text-sm text-gray-600 hover:text-gray-800" onClick={() => setAddQuery('')}>
-                          クリア
-                        </button>
-                      )}
-                    </div>
-
-                    {/* カテゴリチップ（再表示シート） */}
-                    <div className="mt-3">
-                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
-                        <button
-                          type="button"
-                          onClick={() => setAddSelectedCategoryId(null)}
-                          className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-                            ${addSelectedCategoryId === null
-                              ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-                              : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
-                            active:translate-y-[1px]`}
-                          aria-pressed={addSelectedCategoryId === null}
-                          title="すべて"
-                        >
-                          すべて
-                        </button>
-
-                        {addAvailableCategories.map((c, idx) => {
-                          const active = addSelectedCategoryId === c.id;
-                          const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
-                          const key =
-                            typeof c?.id === 'string' || typeof c?.id === 'number'
-                              ? String(c.id)
-                              : `${c.label}-${idx}`;
-
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => setAddSelectedCategoryId(c.id)}
-                              className={[
-                                'shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1',
-                                active
-                                  ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
-                                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50',
-                                'active:translate-y-[1px]',
-                              ].join(' ')}
-                              aria-pressed={active}
-                              title={safeText(c.label)}   /* ★ 安全化 */
-                            >
-                              <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
-                              <span>{safeText(c.label)}</span>   {/* ★ 安全化 */}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
-                    {(() => {
-                      const q = addQuery.trim().toLowerCase();
-                      const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
-
-                      const byCategory = hidden.filter((t) => {
-                        type WithCategory = { categoryId?: string | null; category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
-                        const c = t as WithCategory;
-                        const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
-                        return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
-                      });
-
-                      const byKeyword = byCategory.filter((t) => q ? (t.name ?? '').toLowerCase().includes(q) : true);
-
-                      if (byKeyword.length === 0) {
-                        return <div className="text-center text-sm text-gray-500 py-10">一致するToDoが見つかりませんでした。</div>;
-                      }
-
-                      return (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {byKeyword.map((t) => {
-                            type WithCategory = { category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
-                            const catLabel =
-                              ((t as WithCategory).categoryName ??
-                                (t as WithCategory).categoryLabel ??
-                                (t as WithCategory).category ??
-                                '未分類') ?? '未分類';
-                            const { Icon, colorClass, label } = getCategoryMeta(catLabel);
-
-                            return (
-                              <button
-                                key={t.id}
-                                onClick={async () => {
-                                  await updateDoc(doc(db, 'tasks', t.id), {
-                                    visible: true,
-                                    updatedAt: serverTimestamp(),
-                                  });
-                                  toast.success('非表示のタスクを再表示しました。');
-                                  setFilterText('');
-                                  setSelectedCategoryId(null);
-                                  setAddSelectedCategoryId(null);
-                                  setSelectedTaskId(t.id);
-                                  setAddQuery('');
-                                  setIsAddSheetOpen(false);
-                                }}
-                                className="w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition
-                                           bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
-                                           shadow-[0_2px_1px_rgba(0,0,0,0.1)]
-                                           hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
-                                           hover:border-[#FFCB7D] active:translate-y-[1px]"
-                                title={safeText(t.name)}   /* ★ 安全化 */
-                              >
-                                <span className="line-clamp-2">{safeText(t.name)}</span> {/* ★ 安全化 */}
-                                <span className="mt-1 block text-[11px] text-gray-500">
-                                  <span className="inline-flex items-center gap-1">
-                                    <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
-                                    <span>{label}</span>
-                                  </span>
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </motion.div>
-              </motion.div>
+      {/* 追加用シート（非表示のToDo再表示） - ★置換：SlideUpModal を使用 */}
+      {mounted && index === 2 && (
+        <SlideUpModal
+          isOpen={isAddSheetOpen}
+          onClose={() => setIsAddSheetOpen(false)}
+          title="非表示のTodoを再表示"
+          rightInfo={
+            (() => {
+              const q = addQuery.trim().toLowerCase();
+              const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
+              type WithCategory = { categoryId?: string | null; category?: string | null };
+              const filteredByCategory = hidden.filter((t) => {
+                const c = t as WithCategory;
+                const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
+                return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
+              });
+              const filtered = filteredByCategory.filter((t) =>
+                q ? (t.name ?? '').toLowerCase().includes(q) : true
+              );
+              return q || addSelectedCategoryId !== null ? `一致: ${filtered.length}件` : `候補: ${hidden.length}件`;
+            })()
+          }
+        >
+          {/* 検索ボックス */}
+          <div
+            className="flex items-center gap-2 rounded-xl px-3 py-2
+                        bg-gradient-to-b from-white to-gray-50
+                        border border-gray-200
+                        shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
+          >
+            <Search className="w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={addQuery}
+              onChange={(e) => setAddQuery(e.target.value)}
+              placeholder="キーワードで検索"
+              className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
+              autoFocus
+            />
+            {addQuery && (
+              <button className="text-sm text-gray-600 hover:text-gray-800" onClick={() => setAddQuery('')}>
+                クリア
+              </button>
             )}
-          </AnimatePresence>,
-          document.body
-        )}
+          </div>
+
+          {/* カテゴリチップ（再表示シート） */}
+          <div className="mt-3">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+              <button
+                type="button"
+                onClick={() => setAddSelectedCategoryId(null)}
+                className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
+                  ${addSelectedCategoryId === null
+                    ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                    : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
+                  active:translate-y-[1px]`}
+                aria-pressed={addSelectedCategoryId === null}
+                title="すべて"
+              >
+                すべて
+              </button>
+
+              {addAvailableCategories.map((c, idx) => {
+                const active = addSelectedCategoryId === c.id;
+                const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
+                const key =
+                  typeof c?.id === 'string' || typeof c?.id === 'number'
+                    ? String(c.id)
+                    : `${c.label}-${idx}`;
+
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setAddSelectedCategoryId(c.id)}
+                    className={[
+                      'shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1',
+                      active
+                        ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
+                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgra(0,0,0,0.15)] hover:bg-gray-50',
+                      'active:translate-y-[1px]',
+                    ].join(' ')}
+                    aria-pressed={active}
+                    title={safeText(c.label)}   /* ★ 安全化 */
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
+                    <span>{safeText(c.label)}</span>   {/* ★ 安全化 */}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 一覧グリッド */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+            {(() => {
+              const q = addQuery.trim().toLowerCase();
+              const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
+
+              const byCategory = hidden.filter((t) => {
+                type WithCategory = { categoryId?: string | null; category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
+                const c = t as WithCategory;
+                const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
+                return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
+              });
+
+              const byKeyword = byCategory.filter((t) => q ? (t.name ?? '').toLowerCase().includes(q) : true);
+
+              if (byKeyword.length === 0) {
+                return <div className="col-span-full text-center text-sm text-gray-500 py-10">一致するToDoが見つかりませんでした。</div>;
+              }
+
+              return byKeyword.map((t) => {
+                type WithCategory = { category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
+                const catLabel =
+                  ((t as WithCategory).categoryName ??
+                    (t as WithCategory).categoryLabel ??
+                    (t as WithCategory).category ??
+                    '未分類') ?? '未分類';
+                const { Icon, colorClass, label } = getCategoryMeta(catLabel);
+
+                return (
+                  <button
+                    key={t.id}
+                    onClick={async () => {
+                      await updateDoc(doc(db, 'tasks', t.id), {
+                        visible: true,
+                        updatedAt: serverTimestamp(),
+                      });
+                      toast.success('非表示のタスクを再表示しました。');
+                      setFilterText('');
+                      setSelectedCategoryId(null);
+                      setAddSelectedCategoryId(null);
+                      setSelectedTaskId(t.id);
+                      setAddQuery('');
+                      setIsAddSheetOpen(false);
+                    }}
+                    className="w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition
+                               bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
+                               shadow-[0_2px_1px_rgba(0,0,0,0.1)]
+                               hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
+                               hover:border-[#FFCB7D] active:translate-y-[1px]"
+                    title={safeText(t.name)}   /* ★ 安全化 */
+                  >
+                    <span className="line-clamp-2">{safeText(t.name)}</span> {/* ★ 安全化 */}
+                    <span className="mt-1 block text-[11px] text-gray-500">
+                      <span className="inline-flex items-center gap-1">
+                        <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
+                        <span>{label}</span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </SlideUpModal>
+      )}
 
       {/* 詳細オーバーレイ */}
       {mounted &&
@@ -843,7 +804,7 @@ export default function TodoView() {
           <AnimatePresence>
             <motion.div
               key={selectedTask.id}
-              className="fixed inset-0 z-[1300] flex flex-col bg-white"  /* ★ タイポ修正 */
+              className="fixed inset-0 z-[1300] flex flex-col bg-white"
               role="dialog"
               aria-modal="true"
               initial={{ opacity: 0, y: 24 }}
