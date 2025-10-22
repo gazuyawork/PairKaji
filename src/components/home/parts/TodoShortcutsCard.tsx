@@ -144,6 +144,7 @@ function getCategoryMeta(raw?: unknown) {
 /* =========================
    スロット（小さいカード）
    ========================= */
+// 置換対象: SlotButton 全体
 function SlotButton(props: {
   filled: boolean;
   label?: string;
@@ -156,9 +157,10 @@ function SlotButton(props: {
       type="button"
       onClick={onClick}
       className={[
-        'group relative flex h-20 flex-1 items-center justify-center rounded-xl border',
+        'group relative flex flex-col items-center justify-center',
+        'h-20 w-full flex-1 min-w-0 rounded-xl border',
         'bg-white/80 dark:bg-white/[0.06] backdrop-blur',
-        'hover:shadow-md transition-shadow',
+        'hover:shadow-md transition-all duration-200',
         filled
           ? 'border-gray-300 dark:border-white/15'
           : 'border-dashed border-gray-300 dark:border-white/15',
@@ -166,32 +168,35 @@ function SlotButton(props: {
     >
       {filled ? (
         <>
-          <span className="max-w-[90%] truncate px-3 text-sm text-gray-800 dark:text-gray-100">
+          {/* ← テキストは右上バッジに重ならないよう余白を確保 */}
+          <span
+            className="px-3 text-sm leading-tight text-gray-800 dark:text-gray-100
+                       text-center line-clamp-2 break-words"
+          >
             {label}
           </span>
+
+          {/* ★ 罰ボタン：右上角に重なる赤丸・白× */}
           {onRemove && (
-            <span
-              className="absolute right-1 top-1 z-10
-                         opacity-100 md:opacity-0 md:group-hover:opacity-100
-                         transition-opacity"
+            <button
+              type="button"
+              aria-label="ショートカットを削除"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              className="absolute top-[-5px] right-[-5px] z-10 inline-flex items-center justify-center
+                         w-6 h-6 rounded-full bg-gray-400 text-white
+                         shadow ring-1 ring-white/70
+                         hover:bg-gray-500 active:scale-95
+                         focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
             >
-              <button
-                type="button"
-                aria-label="ショートカットを削除"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove();
-                }}
-                className="inline-flex items-center rounded-full p-1.5 text-gray-600
-                           hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <X size={16} />
-              </button>
-            </span>
+              <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+            </button>
           )}
         </>
       ) : (
-        <span className="flex items-center gap-1 text-gray-500 dark:text-gray-300">
+        <span className="flex items-center gap-1 text-gray-500 dark:text-gray-300 text-sm">
           <Plus size={18} />
           追加
         </span>
@@ -199,6 +204,7 @@ function SlotButton(props: {
     </button>
   );
 }
+
 
 /* =========================
    本体
