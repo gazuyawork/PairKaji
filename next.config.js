@@ -21,8 +21,6 @@ const pwaOptions = {
 
   // 生成物の一部を precache から除外（存在しない場合の衝突回避）
   buildExcludes: [
-    /middleware-manifest\.json$/,
-    /app-build-manifest\.json$/, // dev では存在しないことがあるので除外
     /middleware-manifest\.json$/,           // 既存
     /app-build-manifest\.json$/,            // 既存
     /(^|\/)sw\.js$/,                         // ★追加: SW 本体は precache しない
