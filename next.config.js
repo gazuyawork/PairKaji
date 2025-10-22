@@ -23,8 +23,11 @@ const pwaOptions = {
   buildExcludes: [
     /middleware-manifest\.json$/,
     /app-build-manifest\.json$/, // dev では存在しないことがあるので除外
-    /_next\/dynamic-css-manifest\.json$/, // ★追加: 本番で 404 になり得る → precache から除外
-    /(^|\/)sw\.js$/,                       // ★再掲: SW 本体は precache しない
+    /middleware-manifest\.json$/,           // 既存
+    /app-build-manifest\.json$/,            // 既存
+    /(^|\/)sw\.js$/,                         // ★追加: SW 本体は precache しない
+    /_next\/dynamic-css-manifest\.json$/,    // ★追加: 404 になり得る
+    /_next\/.*\.json$/,                      // ★追加: 念のため _next 配下の json を広く除外
   ],
 
   // ⚠️ InjectManifest では runtimeCaching は使用不可（未指定）
