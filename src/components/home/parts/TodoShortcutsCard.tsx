@@ -1,9 +1,19 @@
 // src/components/home/parts/TodoShortcutsCard.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import {
+  Plus,
+  X,
+  Search,
+  ShoppingCart,
+  Utensils,
+  Briefcase,
+  Home,
+  Tag,
+  Plane,
+  ListTodo, // ★ 追加：アイコンリンク用
+} from 'lucide-react';
 import {
   doc,
   onSnapshot,
@@ -21,6 +31,7 @@ import {
 import { db } from '@/lib/firebase';
 import SlideUpModal from '@/components/common/modals/SlideUpModal';
 import { toast } from 'sonner';
+import { useView } from '@/context/ViewContext';
 
 /* =========================
    型
@@ -34,11 +45,12 @@ type TodoOnlyTask = {
   isTodo?: boolean;
   type?: string | null;
   category?: string | null;
+  categoryName?: string | null;
+  categoryLabel?: string | null;
   todos?: Array<{ id: string; text: string; done?: boolean }> | unknown[];
 };
 
 type Props = {
-  /** 明示的に渡す場合。未指定なら auth コンテキスト等の Hook を使う実装に差し替えてください */
   uid: string;
   className?: string;
 };
@@ -48,18 +60,85 @@ const MAX_SLOTS = 3;
 /* =========================
    ユーティリティ
    ========================= */
-function Badge({ children }: { children: ReactNode }) {
-  return (
-    <span className="ml-2 inline-flex items-center rounded-full border px-2 text-xs text-gray-600 bg-white/60 dark:bg-white/10 dark:text-gray-200">
-      {children}
-    </span>
-  );
-}
-
 function normalizeName(v: unknown): string {
   if (typeof v === 'string') return v;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   return '';
+}
+const safeText = (v: unknown): string => {
+  if (typeof v === 'string' || typeof v === 'number') return String(v);
+  if (v === null || v === undefined) return '';
+  return '[invalid]';
+};
+
+/* =========================
+   カテゴリメタ（参考コード準拠）
+   ========================= */
+function getCategoryMeta(raw?: unknown) {
+  const normalized = String(raw ?? '').normalize('NFKC').trim();
+  const category =
+    normalized === '' ||
+    !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
+      ? '未分類'
+      : normalized;
+
+  switch (category) {
+    case '料理':
+      return {
+        Icon: Utensils,
+        colorClass: 'text-emerald-500',
+        label: '料理',
+        chipActiveClass:
+          'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
+        activeBg: 'from-emerald-500 to-emerald-600',
+      };
+    case '買い物':
+      return {
+        Icon: ShoppingCart,
+        colorClass: 'text-sky-500',
+        label: '買い物',
+        chipActiveClass:
+          'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
+        activeBg: 'from-sky-500 to-sky-600',
+      };
+    case '旅行':
+      return {
+        Icon: Plane,
+        colorClass: 'text-orange-500',
+        label: '旅行',
+        chipActiveClass:
+          'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
+        activeBg: 'from-orange-500 to-orange-600',
+      };
+    case '仕事':
+      return {
+        Icon: Briefcase,
+        colorClass: 'text-indigo-500',
+        label: '仕事',
+        chipActiveClass:
+          'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-indigo-600',
+        activeBg: 'from-indigo-500 to-indigo-600',
+      };
+    case '家事':
+      return {
+        Icon: Home,
+        colorClass: 'text-rose-500',
+        label: '家事',
+        chipActiveClass:
+          'bg-gradient-to-b from-rose-500 to-rose-600 text-white border-rose-600',
+        activeBg: 'from-rose-500 to-rose-600',
+      };
+    case '未分類':
+    default:
+      return {
+        Icon: Tag,
+        colorClass: 'text-gray-400',
+        label: '未分類',
+        chipActiveClass:
+          'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
+        activeBg: 'from-gray-500 to-gray-600',
+      };
+  }
 }
 
 /* =========================
@@ -91,7 +170,11 @@ function SlotButton(props: {
             {label}
           </span>
           {onRemove && (
-            <span className="absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <span
+              className="absolute right-1 top-1 z-10
+                         opacity-100 md:opacity-0 md:group-hover:opacity-100
+                         transition-opacity"
+            >
               <button
                 type="button"
                 aria-label="ショートカットを削除"
@@ -99,9 +182,10 @@ function SlotButton(props: {
                   e.stopPropagation();
                   onRemove();
                 }}
-                className="inline-flex items-center rounded-full p-1 text-gray-500 hover:bg-black/5 dark:hover:bg-white/10"
+                className="inline-flex items-center rounded-full p-1.5 text-gray-600
+                           hover:bg-black/5 dark:hover:bg-white/10"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </span>
           )}
@@ -117,31 +201,11 @@ function SlotButton(props: {
 }
 
 /* =========================
-   モーダル内の候補行
-   ========================= */
-function TodoPickRow({ task, onPick }: { task: TodoOnlyTask; onPick: (t: TodoOnlyTask) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onPick(task)}
-      className="flex w-full items-center justify-between rounded-lg border border-transparent px-3 py-2 text-left hover:border-gray-200 hover:bg-black/5 dark:hover:bg-white/[0.06]"
-    >
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium">{task.name}</div>
-        <div className="mt-0.5 text-xs text-gray-500">
-          {task.category ? <>カテゴリ: {task.category}</> : <>カテゴリ: 未設定</>}
-          {Array.isArray(task.todos) ? <Badge>Todo数: {task.todos.length}</Badge> : null}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-/* =========================
    本体
    ========================= */
 export default function TodoShortcutsCard({ uid, className = '' }: Props) {
-  const router = useRouter();
+  // setIndex が型に無い環境でも安全に呼べるよう any 経由
+  const view = useView() as any;
 
   // ショートカット（taskIdの配列）
   const [shortcuts, setShortcuts] = useState<string[]>([]);
@@ -149,13 +213,15 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
   const [candidateTodos, setCandidateTodos] = useState<TodoOnlyTask[]>([]);
   const [candidateLoading, setCandidateLoading] = useState<boolean>(true);
 
-  // モーダル制御（命名衝突回避）
+  // モーダル制御
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [targetSlot, setTargetSlot] = useState<number | null>(null);
 
-  /* ---------------------------
-   * Firestore: user_settings/{uid} 監視
-   * -------------------------- */
+  // モーダル内フィルタUI
+  const [modalQuery, setModalQuery] = useState('');
+  const [modalSelectedCategoryId, setModalSelectedCategoryId] = useState<string | null>(null);
+
+  /* user_settings 監視（ショートカット） */
   useEffect(() => {
     if (!uid) return;
     const ref = doc(db, 'user_settings', uid);
@@ -169,10 +235,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
     return () => unsub();
   }, [uid]);
 
-  /* ---------------------------
-   * Firestore: ペア確定ユーザーIDの収集 → tasks を購読
-   * 参考コードのロジックに準拠（pairs から confirmed を取得し userId in で tasks を購読）
-   * -------------------------- */
+  /* pairs→tasks 購読（参考コード準拠） */
   useEffect(() => {
     if (!uid) {
       setCandidateTodos([]);
@@ -186,7 +249,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
     (async () => {
       setCandidateLoading(true);
 
-      // 1) confirmed ペアに含まれる userId を収集
+      // confirmed ペアに含まれる userId を収集
       const pairsSnap = await getDocs(
         query(
           collection(db, 'pairs'),
@@ -205,10 +268,9 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
         }
       });
 
-      // Firestore の in 演算子は最大10件まで
       const ids = Array.from(userIds).slice(0, 10);
 
-      // 2) tasks を購読（userId in ids）
+      // tasks を購読（userId in ids）
       const tasksQ = query(collection(db, 'tasks'), where('userId', 'in', ids));
       unsubscribeTasks = onColSnapshot(
         tasksQ,
@@ -227,12 +289,12 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
               isTodo: (raw.isTodo as boolean) ?? undefined,
               type: (raw.type as string | null) ?? null,
               category: (raw.category as string | null) ?? null,
+              categoryName: (raw as any).categoryName ?? null,
+              categoryLabel: (raw as any).categoryLabel ?? null,
               todos: Array.isArray(raw.todos) ? (raw.todos as any[]) : [],
             };
 
-            // 参考実装に準拠：表示対象は
-            // - visible === true（一覧に出ている ToDo グループ）
-            // - 自分のタスク or private でない共有タスク
+            // 表示対象条件（参考実装に準拠）
             const ownerOk = task.userId === uid || task.private !== true;
             const visibleOk = task.visible !== false; // undefined は true とみなす
             const hasTodos = Array.isArray(task.todos) && task.todos.length > 0;
@@ -243,9 +305,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
             }
           });
 
-          // 名前でソート
           list.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ja'));
-
           setCandidateTodos(list);
           setCandidateLoading(false);
         },
@@ -273,11 +333,51 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
     return map;
   }, [candidateTodos]);
 
-  /* ---------------------------
-   * スロット操作
-   * -------------------------- */
+  /* --- モーダル候補は「ショートカット登録済みを除外」 --- */
+  const availableCandidates = useMemo(() => {
+    const selected = new Set(shortcuts.filter(Boolean));
+    return candidateTodos.filter((t) => !selected.has(t.id));
+  }, [candidateTodos, shortcuts]);
+
+  type TaskCategoryShape = {
+    categoryId?: string | null;
+    category?: string | null;
+    categoryName?: string | null;
+    categoryLabel?: string | null;
+  };
+
+  const categoryOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of availableCandidates) {
+      const c = t as TaskCategoryShape;
+      const id = (c?.categoryId ?? c?.category ?? null) ?? null;
+      const label =
+        (c?.categoryName ?? c?.categoryLabel ?? c?.category ?? '未分類') ?? '未分類';
+      if (id && !m.has(id)) m.set(id, String(label));
+    }
+    return Array.from(m.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? ''), 'ja'));
+  }, [availableCandidates]);
+
+  const filteredCandidates = useMemo(() => {
+    const q = modalQuery.trim().toLowerCase();
+    return availableCandidates.filter((t) => {
+      const textOk = q ? (t.name ?? '').toLowerCase().includes(q) : true;
+
+      const c = t as TaskCategoryShape;
+      const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
+      const catOk = modalSelectedCategoryId === null ? true : catId === modalSelectedCategoryId;
+
+      return textOk && catOk;
+    });
+  }, [availableCandidates, modalQuery, modalSelectedCategoryId]);
+
+  /* スロット操作 */
   const handleOpenPicker = (slotIndex: number) => {
     setTargetSlot(slotIndex);
+    setModalQuery('');
+    setModalSelectedCategoryId(null);
     setIsPickerOpen(true);
   };
 
@@ -289,7 +389,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
     const next = [...Array(MAX_SLOTS)].map((_, i) => shortcuts[i] ?? '');
     next[targetSlot] = task.id;
 
-    // 重複回避：他スロットに同一IDがあれば空にする
+    // 重複回避
     for (let i = 0; i < next.length; i++) {
       if (i !== targetSlot && next[i] === task.id) next[i] = '';
     }
@@ -314,11 +414,13 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
     }
   };
 
+  // ショートカット削除
   const handleRemove = async (slotIndex: number) => {
-    const next = [...Array(MAX_SLOTS)].map((_, i) => shortcuts[i] ?? '');
-    next[slotIndex] = '';
-    const compact = toCompact(next);
     try {
+      const next = [...shortcuts];
+      next[slotIndex] = '';
+      const compact = next.filter((s) => !!s);
+
       const settingsRef = doc(db, 'user_settings', uid);
       const exists = (await getDoc(settingsRef)).exists();
       if (!exists) {
@@ -326,19 +428,27 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
       } else {
         await updateDoc(settingsRef, { todoShortcuts: compact });
       }
+
       toast.success('ショートカットを削除しました');
     } catch (e) {
+      console.error('handleRemove error:', e);
       toast.error('削除に失敗しました');
-      console.error(e);
     }
   };
 
+  // タップで TODO タブへ切替＆対象タスクを選択（URL遷移なし）
   const goTodo = useCallback(
     (taskId?: string) => {
-      const qs = taskId ? `?focusTask=${encodeURIComponent(taskId)}` : '';
-      router.push(`/todo${qs}`);
+      if (taskId) {
+        try {
+          (view?.setSelectedTaskName)?.(taskId);
+        } catch {}
+      }
+      try {
+        (view?.setIndex)?.(2); // 仕様：index=2 が TODO
+      } catch {}
     },
-    [router],
+    [view],
   );
 
   // 3スロット配列へ整形
@@ -346,9 +456,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
     return [...Array(MAX_SLOTS)].map((_, i) => shortcuts[i] ?? '');
   }, [shortcuts]);
 
-  /* ---------------------------
-   * レンダリング
-   * -------------------------- */
+  /* レンダリング */
   return (
     <div
       className={[
@@ -357,14 +465,22 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
         className,
       ].join(' ')}
     >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-base font-semibold">TODOショートカット</div>
+      {/* ヘッダ：3カラムで中央揃え（左はダミー、右にアイコンボタン） */}
+      <div className="ml-8 mb-3 flex items-center justify-between">
+        <div className="flex-1 text-center">
+          <span className="text-base font-semibold">TODOショートカット</span>
+        </div>
         <button
           type="button"
-          className="text-xs text-gray-500 underline decoration-dotted underline-offset-4 hover:text-gray-700 dark:text-gray-300"
           onClick={() => goTodo()}
+          aria-label="TODOタブを開く"
+          title="TODOタブを開く"
+          className="ml-2 inline-flex items-center justify-center w-8 h-8 rounded-full
+                     text-gray-600 hover:text-gray-800
+                     hover:bg-black/5 dark:hover:bg-white/10
+                     focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
-          TODO画面を開く
+          <ListTodo className="w-5 h-5" />
         </button>
       </div>
 
@@ -384,17 +500,133 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
         })}
       </div>
 
-      {/* モーダル（スロットタップで開く） */}
-      <SlideUpModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title="TODOを選択">
-        <div className="space-y-2">
+      {/* モーダル（登録済みは非表示） */}
+      <SlideUpModal
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        title="TODOを選択"
+        rightInfo={
+          (() => {
+            if (candidateLoading) return '読み込み中';
+            const all = availableCandidates.length;
+            const shown = filteredCandidates.length;
+            return modalQuery || modalSelectedCategoryId !== null ? `一致: ${shown}件` : `候補: ${all}件`;
+          })()
+        }
+      >
+        {/* 検索ボックス */}
+        <div
+          className="flex items-center gap-2 rounded-xl px-3 py-2
+                      bg-gradient-to-b from-white to-gray-50
+                      border border-gray-200
+                      shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
+        >
+          <Search className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={modalQuery}
+            onChange={(e) => setModalQuery(e.target.value)}
+            placeholder="キーワードで検索"
+            className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400 bg-transparent"
+            autoFocus
+          />
+          {modalQuery && (
+            <button
+              type="button"
+              className="text-sm text-gray-600 hover:text-gray-800"
+              onClick={() => setModalQuery('')}
+            >
+              クリア
+            </button>
+          )}
+        </div>
+
+        {/* カテゴリチップ（availableCandidates ベース） */}
+        <div className="mt-3">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+            <button
+              type="button"
+              onClick={() => setModalSelectedCategoryId(null)}
+              className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
+                ${modalSelectedCategoryId === null
+                  ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
+                active:translate-y-[1px]`}
+              aria-pressed={modalSelectedCategoryId === null}
+              title="すべて"
+            >
+              すべて
+            </button>
+
+            {categoryOptions.map((c, idx) => {
+              const active = modalSelectedCategoryId === c.id;
+              const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
+              const key =
+                typeof c?.id === 'string' || typeof c?.id === 'number'
+                  ? String(c.id)
+                  : `${c.label}-${idx}`;
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setModalSelectedCategoryId(c.id)}
+                  className={[
+                    'shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1',
+                    active
+                      ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
+                      : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50',
+                    'active:translate-y-[1px]',
+                  ].join(' ')}
+                  aria-pressed={active}
+                  title={safeText(c.label)}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
+                  <span>{safeText(c.label)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 一覧グリッド（登録済みは非表示） */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
           {candidateLoading ? (
-            <div className="py-8 text-center text-sm text-gray-500">読み込み中...</div>
-          ) : candidateTodos.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-500">
+            <div className="col-span-full text-center text-sm text-gray-500 py-10">読み込み中...</div>
+          ) : filteredCandidates.length === 0 ? (
+            <div className="col-span-full text-center text-sm text-gray-500 py-10">
               選択可能なTODOがありません
             </div>
           ) : (
-            candidateTodos.map((t) => <TodoPickRow key={t.id} task={t} onPick={handlePick} />)
+            filteredCandidates.map((t) => {
+              const catLabel =
+                (t.categoryName ?? t.categoryLabel ?? t.category ?? '未分類') ?? '未分類';
+              const { Icon, colorClass, label } = getCategoryMeta(catLabel);
+
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => handlePick(t)}
+                  className="w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition
+                             bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
+                             shadow-[0_2px_1px_rgba(0,0,0,0.1)]
+                             hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
+                             hover:border-[#FFCB7D] active:translate-y-[1px]"
+                  title={safeText(t.name)}
+                >
+                  <span className="line-clamp-2">{safeText(t.name)}</span>
+                  <span className="mt-1 block text-[11px] text-gray-500">
+                    <span className="inline-flex items-center gap-1">
+                      <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
+                      <span>{label}</span>
+                    </span>
+                  </span>
+                  {Array.isArray(t.todos) ? (
+                    <span className="mt-1 block text-[11px] text-gray-500">ToDo数: {t.todos.length}</span>
+                  ) : null}
+                </button>
+              );
+            })
           )}
         </div>
       </SlideUpModal>
