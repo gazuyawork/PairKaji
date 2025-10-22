@@ -9,9 +9,20 @@ type Props = {
   uid: string;
 };
 
+type ErrorInfo = {
+  context: string;           // どの処理で発生したか（例: 'SUBSCRIBE', 'UNSUBSCRIBE', 'TEST_SEND', 'ENSURE_REG', 'REFRESH'）
+  message: string;           // 人間が読む用の主メッセージ
+  name?: string;             // Error.name
+  code?: string | number;    // エラーコード（TIMEOUT, HTTP_400, NoSW など）
+  stack?: string;            // スタック
+  extra?: unknown;           // レスポンス本文など
+  time: string;              // ISO時刻
+};
+
 export default function PushToggle({ uid }: Props) {
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [phase, setPhase] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [lastError, setLastError] = useState<ErrorInfo | null>(null);
 
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
   const ENV_BASE = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/+$/g, '');
@@ -28,11 +39,21 @@ export default function PushToggle({ uid }: Props) {
 
   const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-  const pTimeout = <T,>(p: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> =>
+  const withCode = <T extends Error>(err: T, code: string | number) => {
+    (err as any).code = code;
+    return err;
+  };
+
+  const pTimeout = <T,>(
+    p: Promise<T>,
+    ms: number,
+    onTimeout?: () => void
+  ): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const t = setTimeout(() => {
         onTimeout?.();
-        reject(new Error(`timeout:${ms}ms`));
+        const err = withCode(new Error(`timeout:${ms}ms`), 'TIMEOUT');
+        reject(err);
       }, ms);
       p.then((v) => {
         clearTimeout(t);
@@ -42,6 +63,52 @@ export default function PushToggle({ uid }: Props) {
         reject(e);
       });
     });
+
+  const isTimeoutError = (e: unknown) =>
+    typeof (e as any)?.message === 'string' && String((e as any).message).startsWith('timeout:');
+
+  const toErrorInfo = (context: string, e: unknown, extra?: unknown): ErrorInfo => {
+    const anyE = e as any;
+    const name = anyE?.name ?? 'Error';
+    const code = anyE?.code ?? anyE?.status ?? undefined;
+    const msgParts: string[] = [];
+    if (anyE?.message) msgParts.push(String(anyE.message));
+    if (typeof anyE === 'string') msgParts.push(anyE);
+    if (extra && typeof extra === 'string') msgParts.push(extra.slice(0, 300));
+    const message = msgParts.join(' | ') || 'Unknown error';
+    return {
+      context,
+      message,
+      name,
+      code,
+      stack: anyE?.stack,
+      extra,
+      time: new Date().toISOString(),
+    };
+  };
+
+  const reportError = (context: string, e: unknown, extra?: unknown, toastMsg?: string) => {
+    const info = toErrorInfo(context, e, extra);
+    setLastError(info);
+    console.error(`[push][${context}]`, e, extra ?? '');
+    if (toastMsg) toast.error(toastMsg);
+  };
+
+  const fetchWithDiagnostics = async (url: string, init: RequestInit, timeoutMs = 8000) => {
+    try {
+      const res = await pTimeout(fetch(url, init), timeoutMs);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        const err = withCode(new Error(`HTTP ${res.status}`), `HTTP_${res.status}`);
+        (err as any).status = res.status;
+        (err as any).body = text;
+        throw err;
+      }
+      return res;
+    } catch (e) {
+      throw e;
+    }
+  };
 
   /** basePath を推定（ENV > __NEXT_DATA__.assetPrefix > <base>） */
   const getBasePath = (): string => {
@@ -101,12 +168,12 @@ export default function PushToggle({ uid }: Props) {
     try {
       const def = await navigator.serviceWorker.getRegistration();
       if (def) regs.push(def);
-    } catch { }
+    } catch {}
     for (const c of getSWCandidates()) {
       try {
         const r = await navigator.serviceWorker.getRegistration(c.scope);
         if (r && !regs.includes(r)) regs.push(r);
-      } catch { }
+      } catch {}
     }
     return regs;
   };
@@ -128,11 +195,10 @@ export default function PushToggle({ uid }: Props) {
         if (await isReachable(c.url)) reachable.push(c);
       }
       if (reachable.length === 0) {
-        toast.error(
-          `Service Worker が準備できていません（${candidates
-            .map((c) => c.url)
-            .join(' or ')} が 200 で配信されていません）`,
-        );
+        reportError('ENSURE_REG', new Error('No reachable sw.js'), {
+          candidates: candidates.map((c) => c.url),
+        }, 'Service Worker が準備できていません（sw.js の配置や scope を確認）');
+        toast.error('Service Worker が準備できていません（sw.js の配置や scope を確認）');
         return null;
       }
       let lastErr: unknown = null;
@@ -145,7 +211,7 @@ export default function PushToggle({ uid }: Props) {
         }
       }
       if (!reg) {
-        console.error('[push] register failed', lastErr);
+        reportError('ENSURE_REG', lastErr ?? new Error('register failed'));
         return null;
       }
     }
@@ -252,11 +318,12 @@ export default function PushToggle({ uid }: Props) {
             setIsSubscribed(true);
             return;
           }
-        } catch { }
+        } catch {}
       }
       setIsSubscribed(false);
     } catch (e) {
       console.error('[push] refreshSubscribedState error', e);
+      reportError('REFRESH', e);
       setIsSubscribed(false);
     }
   };
@@ -278,7 +345,6 @@ export default function PushToggle({ uid }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   // SW が後から制御を握った場合に再チェック
   useEffect(() => {
     const handler = () => setTimeout(() => void refreshSubscribedState(), 200);
@@ -297,21 +363,25 @@ export default function PushToggle({ uid }: Props) {
   const subscribe = async (): Promise<void> => {
     try {
       if (!('Notification' in window)) {
+        reportError('SUBSCRIBE', new Error('Notifications API not supported'));
         toast.error('このブラウザは通知に対応していません');
         return;
       }
       if (!vapidKey) {
+        reportError('SUBSCRIBE', new Error('VAPID key missing'));
         toast.error('VAPIDキーが設定されていません');
         return;
       }
 
       if (Notification.permission === 'denied') {
+        reportError('SUBSCRIBE', new Error('Notification permission denied'));
         toast.error('通知がOS/ブラウザ設定で拒否されています');
         return;
       }
       if (Notification.permission === 'default') {
         const result = await Notification.requestPermission();
         if (result !== 'granted') {
+          reportError('SUBSCRIBE', new Error('Permission not granted'));
           toast.error('通知の許可が必要です');
           return;
         }
@@ -331,7 +401,8 @@ export default function PushToggle({ uid }: Props) {
       }
 
       if (!reg) {
-        toast.error('Service Worker が準備できていません（sw.js の配置や scope を確認）');
+        const err = new Error('Service Worker not ready');
+        reportError('SUBSCRIBE', err, undefined, 'Service Worker が準備できていません（sw.js の配置や scope を確認）');
         setPhase('error');
         return;
       }
@@ -345,7 +416,7 @@ export default function PushToggle({ uid }: Props) {
             existing = s;
             break;
           }
-        } catch { }
+        } catch {}
       }
 
       // 新規 subscribe は最大 6s で打ち切り
@@ -360,26 +431,32 @@ export default function PushToggle({ uid }: Props) {
           () => console.warn('[push] subscribe timeout'),
         ));
 
-      const res = await pTimeout<Response>(
-        fetch('/api/push/subscribe', {
+      await fetchWithDiagnostics(
+        '/api/push/subscribe',
+        {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ uid, subscription: sub.toJSON() }),
-        }),
-        8000,
-        () => console.warn('[push] /api/push/subscribe timeout'),
+        },
+        8000
       );
-
-      if (!res.ok) throw new Error('subscribe api failed');
 
       await refreshSubscribedState();
       setPhase('idle');
       toast.success('通知を許可しました');
     } catch (e) {
-      console.error('[push] subscribe error', e);
+      let msg = '通知の許可に失敗しました';
+      if (isTimeoutError(e)) msg = '通信がタイムアウトしました';
+      if ((e as any)?.code?.toString?.().startsWith('HTTP_')) {
+        const status = (e as any)?.status;
+        const body = (e as any)?.body;
+        msg = `サーバー応答エラー（${status}）`;
+        reportError('SUBSCRIBE_API', e, body, msg);
+      } else {
+        reportError('SUBSCRIBE', e, undefined, msg);
+      }
       setPhase('error');
       await refreshSubscribedState();
-      toast.error('通知の許可に失敗しました');
     }
   };
 
@@ -396,7 +473,7 @@ export default function PushToggle({ uid }: Props) {
             await pTimeout<boolean>(sub.unsubscribe(), 4000);
             any = true;
           }
-        } catch { }
+        } catch {}
       }
       if (!any) console.warn('[push] no subscription found on any registration');
 
@@ -404,18 +481,19 @@ export default function PushToggle({ uid }: Props) {
       setPhase('idle');
       toast.success('通知を解除しました');
     } catch (e) {
-      console.error('[push] unsubscribe error', e);
+      const msg = isTimeoutError(e) ? '通信がタイムアウトしました' : '通知の解除に失敗しました';
+      reportError('UNSUBSCRIBE', e, undefined, msg);
       setPhase('error');
       await refreshSubscribedState();
-      toast.error('通知の解除に失敗しました');
     }
   };
 
   const sendTest = async (): Promise<void> => {
     try {
       setPhase('sending');
-      const res = await pTimeout<Response>(
-        fetch('/api/push/test-send', {
+      await fetchWithDiagnostics(
+        '/api/push/test-send',
+        {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -425,17 +503,25 @@ export default function PushToggle({ uid }: Props) {
             url: '/main',
             badgeCount: 1,
           }),
-        }),
-        8000,
+        },
+        8000
       );
-      if (!res.ok) throw new Error('test-send api failed');
       setPhase('sent');
       toast.success('テスト通知を送信しました');
       setTimeout(() => setPhase('idle'), 2500);
     } catch (e) {
-      console.error('[push] sendTest error', e);
+      let msg = 'テスト通知の送信に失敗しました';
+      if (isTimeoutError(e)) msg = '通信がタイムアウトしました';
+      if ((e as any)?.code?.toString?.().startsWith('HTTP_')) {
+        const status = (e as any)?.status;
+        const body = (e as any)?.body;
+        msg = `テスト送信のサーバー応答エラー（${status}）`;
+        reportError('TEST_SEND_API', e, body, msg);
+      } else {
+        reportError('TEST_SEND', e, undefined, msg);
+      }
       setPhase('error');
-      toast.error('テスト通知の送信に失敗しました');
+      toast.error(msg);
       await refreshSubscribedState();
     }
   };
@@ -469,6 +555,24 @@ export default function PushToggle({ uid }: Props) {
     >
       <label className="text-[#5E5E5E] font-semibold">通知設定</label>
       <p className="text-sm text-gray-700 mt-4">{statusText}</p>
+
+      {phase === 'error' && lastError && (
+        <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-700">
+          <div className="font-semibold mb-1">エラー詳細</div>
+          <div className="space-y-0.5">
+            <div>発生箇所: <span className="font-mono">{lastError.context}</span></div>
+            {lastError.code && <div>コード: <span className="font-mono">{String(lastError.code)}</span></div>}
+            <div>内容: {lastError.message}</div>
+            <div>時刻: {new Date(lastError.time).toLocaleString()}</div>
+          </div>
+          <details className="mt-2">
+            <summary className="cursor-pointer select-none">詳細ログ（開く）</summary>
+            <pre className="mt-2 max-h-48 overflow-auto rounded bg-white/70 p-2 text-[11px] text-gray-800">
+{JSON.stringify(lastError, null, 2)}
+            </pre>
+          </details>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {isSubscribed === false && (
