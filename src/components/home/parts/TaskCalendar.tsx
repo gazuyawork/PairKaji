@@ -9,6 +9,7 @@ import { ja } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { startOfWeek, endOfWeek } from 'date-fns';
+import HelpPopover from '@/components/common/HelpPopover';
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -89,7 +90,29 @@ export default function TaskCalendar({ tasks }: Props) {
 
   return (
     <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center shadow-md border border-[#e5e5e5]">
-      <h2 className="text-base font-bold text-[#5E5E5E] mb-4">スケジュール {weekLabel}</h2>
+      <h2 className="text-base font-bold text-[#5E5E5E] mb-4 text-center">
+        <span className="inline-flex items-center gap-1 align-middle">
+          スケジュール {weekLabel}
+          <HelpPopover
+            className="ml-1"
+            preferredSide="top"     // 吹き出しを上側に
+            align="center"             // タイトル右端に寄せる
+            sideOffset={6}          // タイトルとの間隔
+            offsetX={-30} 
+            content={
+              <div className="space-y-2 text-sm">
+                <p>今週以降7日分の予定を一覧で確認できます。</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>当日列のみ完了済みタスクは非表示になります。</li>
+                  <li>不定期の<strong>期限切れ</strong>は当日の列に赤で表示します。</li>
+                  <li>各日のカードをタップすると、3件→全件に切り替わります。</li>
+                  <li>並び順は「期限切れ → 毎日 → 週次 → 不定期」、同カテゴリ内は50音順です。</li>
+                </ul>
+              </div>
+            }
+          />
+        </span>
+      </h2>
 
       <div
         className="overflow-x-auto horizontal-scroll"
@@ -215,15 +238,14 @@ export default function TaskCalendar({ tasks }: Props) {
                           exit="exit"
                           className={`mt-1 text-[12px] rounded px-1.5 py-[3px] font-semibold border border-white/30
                           ${isExpanded ? 'max-w-[160px] whitespace-normal break-words' : 'truncate'}
-                          ${
-                            isOverdue
+                          ${isOverdue
                               ? 'bg-gradient-to-b from-red-300 to-red-500 text-white' // ← 赤系グラデ
                               : isWeeklyTask
                                 ? 'bg-gradient-to-b from-gray-400 to-gray-600 text-white'
                                 : isDateTask
                                   ? 'bg-gradient-to-b from-orange-300 to-orange-500 text-white'
                                   : 'bg-gradient-to-b from-blue-300 to-blue-500 text-white'
-                          }
+                            }
                           `}
                         >
                           {task.name}

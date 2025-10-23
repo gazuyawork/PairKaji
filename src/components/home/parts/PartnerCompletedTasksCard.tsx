@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { getConfirmedPartnerUid } from '@/lib/pairs';
 import { getThisWeekRangeJST } from '@/lib/weeklyRange';
+import HelpPopover from '@/components/common/HelpPopover'; // ★追加
 
 type PartnerTask = {
   id: string;
@@ -100,14 +101,12 @@ export default function PartnerCompletedTasksCard() {
     const { start, end } = weekRange;
     const col = collection(db, 'tasks');
 
-    // 並び順：古い順（昇順）で受け取る
     const qTasks = query(
       col,
       where('done', '==', true),
       where('completedAt', '>=', Timestamp.fromDate(start)),
       where('completedAt', '<', Timestamp.fromDate(end)),
       where('completedBy', '==', partnerUid),
-      // 念のため共有対象に自分を含むものに限定
       where('userIds', 'array-contains', me.uid),
       orderBy('completedAt', 'asc'),
     );
@@ -118,28 +117,15 @@ export default function PartnerCompletedTasksCard() {
         const list: PartnerTask[] = snap.docs
           .map((d: QueryDocumentSnapshot) => {
             const data = d.data() as FirestoreTask;
-
             const name = toStringOr(data.name, '(名称未設定)');
             const completedBy = toStringOr(data.completedBy, null);
             const completedAt = data.completedAt instanceof Timestamp ? data.completedAt.toDate() : null;
-
-            // 一応のバリデーション（done=true, 自分が共有対象）
             const okDone = toBoolean(data.done, true);
             const okShared = toStringArray(data.userIds).includes(me.uid);
-            if (!okDone || !okShared) {
-              // 条件外は除外（後続 filter で落とす）
-            }
-
-            return {
-              id: d.id,
-              name,
-              completedAt,
-              completedBy,
-            };
+            if (!okDone || !okShared) {}
+            return { id: d.id, name, completedAt, completedBy };
           })
-          // 念のため completedAt が null のものは末尾へ
           .sort((a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0));
-
         setRows(list);
         setLoading(false);
       },
@@ -161,9 +147,9 @@ export default function PartnerCompletedTasksCard() {
       const pairs = await Promise.all(
         rows.map(async (r) => {
           const dateKey = toDateKey(r.completedAt);
-          if (!dateKey) return null; // completedAt 無しは対象外
+          if (!dateKey) return null;
           const likeKey = `${r.id}_${dateKey}`;
-          const heartId = `${likeKey}_${me.uid}`; // taskId_YYYYMMDD_meUid
+          const heartId = `${likeKey}_${me.uid}`;
           const ref = doc(db, COLLECTION, heartId);
           const snap = await getDoc(ref);
           return [likeKey, snap.exists()] as const;
@@ -179,13 +165,13 @@ export default function PartnerCompletedTasksCard() {
     })();
   }, [rows, partnerUid]);
 
-  // いいねトグル：完了インスタンス（日付）単位
+  // いいねトグル処理
   const toggleLike = useCallback(
     async (taskId: string, completedAt: Date | null | undefined) => {
       const me = auth.currentUser;
       if (!me || !partnerUid) return;
       const dateKey = toDateKey(completedAt);
-      if (!dateKey) return; // completedAt 無しは対象外
+      if (!dateKey) return;
 
       const likeKey = `${taskId}_${dateKey}`;
       const heartId = `${likeKey}_${me.uid}`;
@@ -193,33 +179,27 @@ export default function PartnerCompletedTasksCard() {
       const isLiked = likedMap[likeKey] === true;
 
       try {
-        // 多重タップ防止
         if (pendingMap[likeKey]) return;
         setPendingMap((p) => ({ ...p, [likeKey]: true }));
 
         if (isLiked) {
-          // 楽観更新（取り消し）
           setLikedMap((prev) => ({ ...prev, [likeKey]: false }));
           await deleteDoc(ref);
         } else {
-          // participants は並び順を固定（昇順）
           const participants = [me.uid, partnerUid].sort((a, b) => (a < b ? -1 : 1));
-
-          // 楽観更新（付与）
           setLikedMap((prev) => ({ ...prev, [likeKey]: true }));
           await setDoc(ref, {
             taskId,
             senderId: me.uid,
             receiverId: partnerUid,
             participants,
-            createdAt: serverTimestamp(), // サーバー時刻
-            dateKey,                      // 週集計や検索用
-            completedAt: completedAt ?? null, // 監査・デバッグ用
+            createdAt: serverTimestamp(),
+            dateKey,
+            completedAt: completedAt ?? null,
           });
         }
       } catch (e: unknown) {
         console.error('toggleLike error:', e);
-        // ロールバック
         setLikedMap((prev) => ({ ...prev, [likeKey]: isLiked }));
       } finally {
         setPendingMap((p) => ({ ...p, [likeKey]: false }));
@@ -228,29 +208,27 @@ export default function PartnerCompletedTasksCard() {
     [likedMap, partnerUid, pendingMap],
   );
 
-  // いいねボタン（押下で回転＋拡大アニメーション）
+  // いいねボタン
   const HeartButton: React.FC<{ liked: boolean; onClick: () => void; disabled?: boolean }> = ({
     liked,
     onClick,
     disabled,
-  }) => {
-    return (
-      <motion.button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="p-2 rounded-full hover:bg-gray-100 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-        whileTap={{ scale: 0.9 }}
-        animate={liked ? { rotate: [0, 20, -15, 0], scale: [1, 1.3, 1.05, 1] } : { scale: 1 }}
-        transition={{ duration: 0.45 }}
-        aria-label={liked ? 'いいねを取り消す' : 'いいねする'}
-      >
-        <HeartIcon className={`w-5 h-5 ${liked ? 'fill-rose-500 text-rose-500' : 'text-gray-400'}`} />
-      </motion.button>
-    );
-  };
+  }) => (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="p-2 rounded-full hover:bg-gray-100 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+      whileTap={{ scale: 0.9 }}
+      animate={liked ? { rotate: [0, 20, -15, 0], scale: [1, 1.3, 1.05, 1] } : { scale: 1 }}
+      transition={{ duration: 0.45 }}
+      aria-label={liked ? 'いいねを取り消す' : 'いいねする'}
+    >
+      <HeartIcon className={`w-5 h-5 ${liked ? 'fill-rose-500 text-rose-500' : 'text-gray-400'}`} />
+    </motion.button>
+  );
 
-  // 表示順序：未いいね（古→新） → いいね済み（古→新）
+  // 表示順序：未いいね → いいね済み
   const displayRows = useMemo(() => {
     if (rows.length === 0) return [];
     const arr = [...rows];
@@ -259,10 +237,10 @@ export default function PartnerCompletedTasksCard() {
       const bKey = toDateKey(b.completedAt);
       const aLiked = aKey ? (likedMap[`${a.id}_${aKey}`] === true ? 1 : 0) : 0;
       const bLiked = bKey ? (likedMap[`${b.id}_${bKey}`] === true ? 1 : 0) : 0;
-      if (aLiked !== bLiked) return aLiked - bLiked; // 未いいね(0)が先
+      if (aLiked !== bLiked) return aLiked - bLiked;
       const aTime = a.completedAt?.getTime() ?? 0;
       const bTime = b.completedAt?.getTime() ?? 0;
-      return aTime - bTime; // 古い順
+      return aTime - bTime;
     });
     return arr;
   }, [rows, likedMap]);
@@ -270,7 +248,27 @@ export default function PartnerCompletedTasksCard() {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 max-w-xl m-auto">
       <div className="mb-3 flex items-center justify-center gap-2">
-        <h2 className="text-base font-semibold text-gray-800">パートナーの完了タスク</h2>
+        <h2 className="text-base font-semibold text-gray-800 flex items-center gap-1">
+          パートナーの完了タスク
+          <HelpPopover
+            className="ml-1"
+            preferredSide="top"
+            align="center"
+            sideOffset={6}
+            offsetX={-30} 
+            content={
+              <div className="space-y-2 text-sm">
+                <p>今週、パートナーが完了したタスクの一覧です。</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>ハートを押すと「ありがとう」を送れます。</li>
+                  <li>一度押すとピンクのハートに変わり、再度押すと取り消せます。</li>
+                  <li>新しいタスクほど下に表示されます。</li>
+                  <li>未いいねのタスクが上に表示されます。</li>
+                </ul>
+              </div>
+            }
+          />
+        </h2>
       </div>
 
       {!partnerUid ? (
@@ -281,36 +279,37 @@ export default function PartnerCompletedTasksCard() {
         <p className="text-sm text-gray-500">今週の完了タスクはまだありません。</p>
       ) : (
         <motion.ul layout className="space-y-2" layoutScroll>
-           {displayRows.map((t) => {
+          {displayRows.map((t) => {
             const dateKey = toDateKey(t.completedAt);
             const likeKey = dateKey ? `${t.id}_${dateKey}` : `${t.id}_nodate`;
             const liked = likedMap[likeKey] === true;
-            const disabled = pendingMap[likeKey] === true || !dateKey; // 日付が無ければ無効化
+            const disabled = pendingMap[likeKey] === true || !dateKey;
 
             return (
               <motion.li
-                 key={t.id}
+                key={t.id}
                 layout
                 className="flex items-center justify-between border-b border-gray-200 px-3 pt-1 rounded-md"
                 initial={false}
-                animate={liked
-                  ? { backgroundColor: ['#ffffff', '#fff1f2', '#ffffff'] } // ほんのりピンク→白へ
-                  : { backgroundColor: '#ffffff' }
+                animate={
+                  liked
+                    ? { backgroundColor: ['#ffffff', '#fff1f2', '#ffffff'] }
+                    : { backgroundColor: '#ffffff' }
                 }
                 transition={{ duration: 0.6, type: 'tween' }}
-               >
-                 <div className="flex items-center gap-2">
-                   <CheckCircle className="w-4 h-4 text-emerald-700" />
-                   <span className="text-sm text-gray-800">{t.name}</span>
-                 </div>
-                 <HeartButton
-                   liked={liked}
-                   onClick={() => toggleLike(t.id, t.completedAt ?? null)}
-                   disabled={disabled}
-                 />
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-700" />
+                  <span className="text-sm text-gray-800">{t.name}</span>
+                </div>
+                <HeartButton
+                  liked={liked}
+                  onClick={() => toggleLike(t.id, t.completedAt ?? null)}
+                  disabled={disabled}
+                />
               </motion.li>
-             );
-           })}
+            );
+          })}
         </motion.ul>
       )}
     </div>

@@ -32,6 +32,7 @@ import { db } from '@/lib/firebase';
 import SlideUpModal from '@/components/common/modals/SlideUpModal';
 import { toast } from 'sonner';
 import { useView } from '@/context/ViewContext';
+import HelpPopover from '@/components/common/HelpPopover';
 
 /* =========================
    型
@@ -78,7 +79,7 @@ function getCategoryMeta(raw?: unknown) {
   const normalized = String(raw ?? '').normalize('NFKC').trim();
   const category =
     normalized === '' ||
-    !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
+      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
       ? '未分類'
       : normalized;
 
@@ -463,11 +464,11 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
       if (taskId) {
         try {
           (view?.setSelectedTaskName)?.(taskId);
-        } catch {}
+        } catch { }
       }
       try {
         (view?.setIndex)?.(2); // 仕様：index=2 が TODO
-      } catch {}
+      } catch { }
     },
     [view],
   );
@@ -489,7 +490,29 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
       {/* ヘッダ：3カラムで中央揃え（左はダミー、右にアイコンボタン） */}
       <div className="ml-8 mb-3 flex items-center justify-between">
         <div className="flex-1 text-center">
-          <span className="text-base font-semibold">TODOショートカット</span>
+          {/* ▼タイトル右横に？アイコンを追加 */}
+          <span className="inline-flex items-center gap-1 text-base font-semibold">
+            TODOショートカット
+            <HelpPopover
+              className="ml-1"
+              preferredSide="top"  // 上に出す
+              align="center"          // 右寄せで出す（タイトル右端から右側に沿わせるイメージ）
+              sideOffset={6}       // タイトルと吹き出しの距離
+              offsetX={-30}          // 必要に応じて ± で微調整
+              content={
+                <div className="space-y-2 text-sm">
+                  <p>
+                    よく使うTODOを<strong>{MAX_SLOTS}</strong>件まで登録できます。
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>「追加」から登録し、右上の×で削除できます。</li>
+                    <li>すでにショートカット登録済みのTODOは候補に表示されません。</li>
+                    <li>ショートカットをタップするとTODOタブへ移動します。</li>
+                  </ul>
+                </div>
+              }
+            />
+          </span>
         </div>
         <button
           type="button"
@@ -498,7 +521,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
           title="TODOタブを開く"
           className="ml-2 inline-flex items-center justify-center w-8 h-8 rounded-full
                      text-gray-600 hover:text-gray-800
-                     hover:bg-black/5 dark:hover:bg-white/10
+                     hover:bg-black/5 dark:hover:bg:white/10
                      focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           <ListTodo className="w-5 h-5" />
