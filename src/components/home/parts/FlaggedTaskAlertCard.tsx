@@ -80,10 +80,10 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="mb-3 relative"
+      className="relative"
     >
       <div
-        className="relative mx-auto w-full max-w-xl bg-white rounded-xl shadow-md border border-[#e5e5e5] px-6 py-5 cursor-pointer hover:shadow-lg transition overflow-hidden"
+        className="relative mx-auto w-full max-w-xl bg-white rounded-xl border border-[#e5e5e5] px-6 py-5 cursor-pointer hover:shadow-lg transition overflow-hidden"
         onClick={handleClick}
       >
         {isNew && (

@@ -144,18 +144,27 @@ function getCategoryMeta(raw?: unknown) {
 /* =========================
    スロット（小さいカード）
    ========================= */
-// 置換対象: SlotButton 全体
+// 【変更①】SlotButton 外側のメイン押下エリアを <button> → <div role="button"> に変更
+// 【変更②】右上の削除トリガを <button> → <span role="button"> に変更（赤丸・白×）
 function SlotButton(props: {
   filled: boolean;
   label?: string;
-  onClick: () => void;
+  onClick: (e?: React.MouseEvent | React.KeyboardEvent) => void;
   onRemove?: () => void;
 }) {
   const { filled, label, onClick, onRemove } = props;
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.(e);
+        }
+      }}
       className={[
         'group relative flex flex-col items-center justify-center',
         'h-20 w-full flex-1 min-w-0 rounded-xl border',
@@ -168,7 +177,6 @@ function SlotButton(props: {
     >
       {filled ? (
         <>
-          {/* ← テキストは右上バッジに重ならないよう余白を確保 */}
           <span
             className="px-3 text-sm leading-tight text-gray-800 dark:text-gray-100
                        text-center line-clamp-2 break-words"
@@ -176,14 +184,22 @@ function SlotButton(props: {
             {label}
           </span>
 
-          {/* ★ 罰ボタン：右上角に重なる赤丸・白× */}
+          {/* 【変更②】削除トリガを span[role=button] にし、赤丸・白×で右上固定 */}
           {onRemove && (
-            <button
-              type="button"
+            <span
+              role="button"
+              tabIndex={0}
               aria-label="ショートカットを削除"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRemove();
+                }
               }}
               className="absolute top-[-5px] right-[-5px] z-10 inline-flex items-center justify-center
                          w-6 h-6 rounded-full bg-gray-400 text-white
@@ -192,7 +208,7 @@ function SlotButton(props: {
                          focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
             >
               <X className="w-3.5 h-3.5" strokeWidth={2.5} />
-            </button>
+            </span>
           )}
         </>
       ) : (
@@ -201,10 +217,9 @@ function SlotButton(props: {
           追加
         </span>
       )}
-    </button>
+    </div>
   );
 }
-
 
 /* =========================
    本体

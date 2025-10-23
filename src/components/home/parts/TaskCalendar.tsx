@@ -162,7 +162,7 @@ export default function TaskCalendar({ tasks }: Props) {
             const isExpanded = !!selectedDate && isSameDay(day, selectedDate as Date);
 
             // ▼ 5件制限 & 全件表示トグル
-            const MAX_VISIBLE = 5;
+            const MAX_VISIBLE = 3;
             const visibleTasks = isExpanded ? sortedTasks : sortedTasks.slice(0, MAX_VISIBLE);
             const hiddenCount = Math.max(sortedTasks.length - visibleTasks.length, 0);
 
