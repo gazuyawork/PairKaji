@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import type React from 'react';
-import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react'; // ★★★ 変更：useCallback を追加
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
@@ -55,7 +55,7 @@ import { CSS } from '@dnd-kit/utilities';
 import TodoShortcutsCard from '@/components/home/parts/TodoShortcutsCard';
 
 /* =========================================================
- * SortableCard
+ * SortableCard（編集モードON時のみ使用）
  * =======================================================*/
 function SortableCard({
   id,
@@ -111,6 +111,29 @@ function SortableCard({
   );
 }
 
+/* =========================================================
+ * ★★★ 追加：StaticCard（編集モードOFF時に使用／DnD非依存）
+ * =======================================================*/
+function StaticCard({
+  children,
+  className = '',
+  boundClass = 'mx-auto w-full max-w-xl',
+}: {
+  children: ReactNode;
+  className?: string;
+  boundClass?: string;
+}) {
+  return (
+    <div className={className}>
+      <div className={`relative isolate ${boundClass}`}>
+        <div className="relative rounded-lg overflow-hidden">
+          <div className="rounded-lg">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** ペア未確定時にカード内を非活性化するラッパー（DnDハンドルは有効のまま） */
 function DisabledCardWrapper({
   children,
@@ -125,6 +148,66 @@ function DisabledCardWrapper({
       <div className="absolute inset-0 rounded-lg bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-0">
         <span className="text-sm text-gray-700">{message}</span>
       </div>
+    </div>
+  );
+}
+
+/* =========================================================
+ * ★★★ 追加：編集モード用のツールバー/マスク
+ * =======================================================*/
+function CardEditToolbar({
+  isHidden,
+  onHide,
+  onShow,
+}: {
+  isHidden: boolean;
+  onHide: () => void;
+  onShow: () => void;
+}) {
+  return (
+    <div className="absolute top-2 right-2 z-20 flex gap-2">
+      {isHidden ? (
+        <button
+          type="button"
+          className="px-2 py-1 text-xs rounded bg-emerald-600 text-white pointer-events-auto"
+          onClick={onShow}
+          aria-label="再表示"
+          title="再表示"
+        >
+          再表示
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="px-2 py-1 text-xs rounded bg-gray-700 text-white pointer-events-auto"
+          onClick={onHide}
+          aria-label="非表示にする"
+          title="非表示にする"
+        >
+          非表示
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 編集モード中はカード機能を無効化（クリック防止）し、視覚的にグレーアウト */
+function EditMask({
+  children,
+  isHidden,
+}: {
+  children: ReactNode;
+  isHidden: boolean;
+}) {
+  return (
+    <div className="relative">
+      <div
+        className={`rounded-lg ${isHidden ? 'opacity-40 grayscale' : 'opacity-75 grayscale'} pointer-events-none`}
+        aria-hidden="true"
+      >
+        {children}
+      </div>
+      <div className="absolute inset-0 rounded-lg ring-1 ring-dashed ring-gray-300 pointer-events-none" />
     </div>
   );
 }
@@ -159,7 +242,7 @@ export default function HomeView() {
   // 今週「パートナーから自分がもらった」ありがとう（ハート）の件数
   const [, setWeeklyThanksCount] = useState(0);
 
-  // DnD
+  // DnD（編集モードON時のみ実際に利用）
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
@@ -356,22 +439,22 @@ export default function HomeView() {
         const missing = DEFAULT_ORDER.filter((d) => !filtered.includes(d));
         return [...filtered, ...missing];
       }
-    } catch {}
+    } catch { }
     return [...DEFAULT_ORDER];
   });
 
   useEffect(() => {
     try {
       localStorage.setItem(HOME_CARD_ORDER_KEY, JSON.stringify(cardOrder));
-    } catch {}
+    } catch { }
   }, [cardOrder]);
 
+  // ★★★ 追加：センサーとDnDハンドラ（編集モードON時にのみ使用）
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
     }),
   );
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -404,15 +487,13 @@ export default function HomeView() {
         return (
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
-            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
-              isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-            }`}
+            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+              }`}
           >
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
-                  isExpanded ? 'rotate-180' : ''
-                }`}
+                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
+                  }`}
               />
             </div>
           </div>
@@ -459,6 +540,72 @@ export default function HomeView() {
     }
   };
 
+  /* ---------------------------------------
+   * ★★★ 追加：編集モード & 非表示カード状態（localStorage 永続化）
+   * -------------------------------------*/
+  const [editMode, setEditMode] = useState(false);
+  const [hiddenCards, setHiddenCards] = useState<Set<CardId>>(new Set());
+
+  const hiddenStorageKey = useMemo(
+    () => (uid ? `homeCardHiddenV1:${uid}` : undefined),
+    [uid]
+  );
+
+  useEffect(() => {
+    if (!hiddenStorageKey) return;
+    try {
+      const raw = localStorage.getItem(hiddenStorageKey);
+      if (raw) {
+        const arr = JSON.parse(raw) as CardId[];
+        setHiddenCards(new Set(arr));
+      } else {
+        setHiddenCards(new Set());
+      }
+    } catch {
+      setHiddenCards(new Set());
+    }
+  }, [hiddenStorageKey]);
+
+  const persistHidden = useCallback(
+    (next: Set<CardId>) => {
+      if (!hiddenStorageKey) return;
+      try {
+        localStorage.setItem(hiddenStorageKey, JSON.stringify(Array.from(next)));
+      } catch { }
+    },
+    [hiddenStorageKey]
+  );
+
+  const hideCard = useCallback(
+    (id: CardId) => {
+      setHiddenCards((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        persistHidden(next);
+        return next;
+      });
+    },
+    [persistHidden]
+  );
+
+  const showCard = useCallback(
+    (id: CardId) => {
+      setHiddenCards((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        persistHidden(next);
+        return next;
+      });
+    },
+    [persistHidden]
+  );
+
+  const showAllCards = useCallback(() => {
+    const next = new Set<CardId>();
+    setHiddenCards(next);
+    persistHidden(next);
+  }, [persistHidden]);
+
   // ★★★ 未マウント時は一切描画しない ★★★
   if (!isMounted) return null;
 
@@ -487,89 +634,154 @@ export default function HomeView() {
           >
             {!isLoading && flaggedCount > 0 && <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />}
 
-            <DndContext
-              sensors={sensors}
-              onDragStart={(e) => {
-                setIsDraggingCard(true);
-                setActiveCardId(String(e.active.id));
-                try {
-                  document.body.style.overflow = 'hidden';
-                } catch {}
-              }}
-              onDragCancel={() => {
-                setIsDraggingCard(false);
-                setActiveCardId(null);
-                try {
-                  document.body.style.overflow = '';
-                } catch {}
-              }}
-              onDragEnd={(event) => {
-                handleDragEnd(event);
-                setIsDraggingCard(false);
-                setActiveCardId(null);
-                try {
-                  document.body.style.overflow = '';
-                } catch {}
-              }}
-            >
-              {(() => {
-                const candidateSet = new Set<CardId>();
-                if (!isLoading && hasPairInvite) {
-                  candidateSet.add('pairInvite');
-                } else if (!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed) {
-                  candidateSet.add('pairInviteNone');
-                }
-                candidateSet.add('todoShortcuts');
-                candidateSet.add('expandableInfo');
-                candidateSet.add('hearts');
-                candidateSet.add('calendar');
-                // candidateSet.add('weeklyPoints');
-                candidateSet.add('todayDone');
-                if (!isLoading && !isChecking && plan === 'free') {
-                  candidateSet.add('ad');
-                }
+            {/* ★★★ 変更：編集モードONのときだけ DnD を有効化。OFFのときは静的描画 */}
+            {(() => {
+              const candidateSet = new Set<CardId>();
+              if (!isLoading && hasPairInvite) {
+                candidateSet.add('pairInvite');
+              } else if (!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed) {
+                candidateSet.add('pairInviteNone');
+              }
+              candidateSet.add('todoShortcuts');
+              candidateSet.add('expandableInfo');
+              candidateSet.add('hearts');
+              candidateSet.add('calendar');
+              // candidateSet.add('weeklyPoints');
+              candidateSet.add('todayDone');
+              if (!isLoading && !isChecking && plan === 'free') {
+                candidateSet.add('ad');
+              }
 
-                const visibleCards = cardOrder
-                  .filter((id) => candidateSet.has(id))
-                  .map((id) => ({ id, node: renderCardContent(id) }))
-                  .filter(
-                    (v): v is { id: CardId; node: ReactNode } =>
-                      v.node !== null && v.node !== false && v.node !== undefined,
-                  );
-
-                const visibleIds = visibleCards.map((v) => v.id);
-
-                return (
-                  <>
-                    <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
-                      <div className="space-y-1.5">
-                        {visibleCards.map(({ id, node }) => (
-                          <div key={id}>
-                            <SortableCard id={id} showGrip={true} boundClass="mx-auto w-full max-w-xl">
-                              {node}
-                            </SortableCard>
-                          </div>
-                        ))}
-                      </div>
-                    </SortableContext>
-
-                    <DragOverlay>
-                      {activeCardId &&
-                      visibleCards.find((v) => v.id === (activeCardId as CardId)) ? (
-                        <div className="rounded-lg">
-                          {visibleCards.find((v) => v.id === (activeCardId as CardId))!.node}
-                        </div>
-                      ) : null}
-                    </DragOverlay>
-                  </>
+              const allCards = cardOrder.filter((id) => candidateSet.has(id));
+              const items = allCards
+                .map((id) => {
+                  const node = renderCardContent(id);
+                  const isHidden = hiddenCards.has(id);
+                  // 編集OFFは非表示カードを描画から除外
+                  if (!editMode && isHidden) return null;
+                  return { id, node, isHidden };
+                })
+                .filter(
+                  (v): v is { id: CardId; node: ReactNode; isHidden: boolean } =>
+                    Boolean(v && v.node !== null && v.node !== false && v.node !== undefined),
                 );
-              })()}
-            </DndContext>
+
+              if (!editMode) {
+                // ---- 編集モードOFF：DnDなし、Gripなし、機能は通常通り、非表示は出さない
+                return (
+                  <div className="space-y-1.5">
+                    {items.map(({ id, node }) => (
+                      <div key={id}>
+                        <StaticCard boundClass="mx-auto w-full max-w-xl">{node}</StaticCard>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              // ---- 編集モードON：DnD有効、カード機能無効化、非表示カードもグレーで表示＋再表示ボタン
+              const dndIds = items.map((v) => v.id);
+              return (
+                <DndContext
+                  sensors={sensors}
+                  onDragStart={(e) => {
+                    setIsDraggingCard(true);
+                    setActiveCardId(String(e.active.id));
+                    try {
+                      document.body.style.overflow = 'hidden';
+                    } catch { }
+                  }}
+                  onDragCancel={() => {
+                    setIsDraggingCard(false);
+                    setActiveCardId(null);
+                    try {
+                      document.body.style.overflow = '';
+                    } catch { }
+                  }}
+                  onDragEnd={(event) => {
+                    handleDragEnd(event);
+                    setIsDraggingCard(false);
+                    setActiveCardId(null);
+                    try {
+                      document.body.style.overflow = '';
+                    } catch { }
+                  }}
+                >
+                  <SortableContext items={dndIds} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-1.5">
+                      {items.map(({ id, node, isHidden }) => (
+                        <div key={id} className="relative">
+                          <SortableCard id={id} showGrip={true} boundClass="mx-auto w-full max-w-xl">
+                            <EditMask isHidden={isHidden}>{node}</EditMask>
+                            <CardEditToolbar
+                              isHidden={isHidden}
+                              onHide={() => hideCard(id)}
+                              onShow={() => showCard(id)}
+                            />
+                          </SortableCard>
+                        </div>
+                      ))}
+                    </div>
+                  </SortableContext>
+
+                  <DragOverlay>
+                    {activeCardId &&
+                      items.find((v) => v.id === (activeCardId as CardId)) ? (
+                      <div className="rounded-lg">
+                        {items.find((v) => v.id === (activeCardId as CardId))!.node}
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              );
+            })()}
+
+            {/* ★★★ 改修：編集モードトグル＆全再表示（非表示カードがあるときのみ活性）★★★ */}
+            <div className="mt-5 mb-4 flex flex-col items-center gap-3">
+              <div className="flex items-center gap-3">
+                {/* スイッチ風トグル */}
+                <button
+                  type="button"
+                  onClick={() => setEditMode(!editMode)}
+                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 ${editMode ? 'bg-emerald-500' : 'bg-gray-300'
+                    }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${editMode ? 'translate-x-7' : 'translate-x-1'
+                      }`}
+                  />
+                </button>
+                <span className="text-sm font-medium text-gray-700 select-none">
+                  {editMode ? '編集 ON' : '編集 OFF'}
+                </span>
+              </div>
+
+              {/* 全再表示ボタン：1件以上非表示があるときだけ活性 */}
+              {editMode && (
+                <motion.button
+                  type="button"
+                  onClick={hiddenCards.size > 0 ? showAllCards : undefined}
+                  whileTap={hiddenCards.size > 0 ? { scale: 0.95 } : undefined}
+                  disabled={hiddenCards.size === 0}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all ${hiddenCards.size > 0
+                      ? 'text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm hover:shadow-md hover:brightness-105'
+                      : 'text-gray-400 bg-gray-200 cursor-not-allowed'
+                    }`}
+                  title={
+                    hiddenCards.size > 0
+                      ? '非表示カードをすべて再表示します'
+                      : '非表示カードはありません'
+                  }
+                >
+                  すべて再表示
+                </motion.button>
+              )}
+            </div>
 
             <div className="mt-6 flex justify-center relative z-0">
               <button
                 onClick={() => setShowOnboarding(true)}
-                className="px-4 py-2 text-sm text-gray-500 underline hover:text-blue-800"
+                className="px-4 py- text-sm text-gray-500 underline hover:text-blue-800"
               >
                 もう一度説明を見る
               </button>
