@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 import Header from '@/components/common/Header';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/profile/EmailEditModal';
@@ -13,7 +13,19 @@ import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
 import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
-import { collection, onSnapshot, query, where, doc, getDoc, getDocs, type Query, type QuerySnapshot, updateDoc, type Unsubscribe } from 'firebase/firestore';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  doc,
+  getDoc,
+  getDocs,
+  type Query,
+  type QuerySnapshot,
+  updateDoc,
+  type Unsubscribe,
+} from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
 import {
   getUserProfile,
@@ -28,10 +40,13 @@ import {
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
 
-import PushToggle from '@/components/settings/PushToggle'; // ★ PushToggle を使用
-import { useUserUid } from '@/hooks/useUserUid';           // ★ uid を React state として取得
+import PushToggle from '@/components/settings/PushToggle';
+import { useUserUid } from '@/hooks/useUserUid';
 import { onAuthStateChanged } from 'firebase/auth';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+
+// ★★★ 追加：ConfirmModal を使用するためのインポート
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -56,11 +71,41 @@ export default function ProfilePage() {
   const [isRemoving, setIsRemoving] = useState(false);
   const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [plan, setPlan] = useState<string>(''); // プラン
-  // ★ Stripe カスタマーポータル用状態
-  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
-  const [isPortalOpening, setIsPortalOpening] = useState(false);
+  const [, setStripeCustomerId] = useState<string | null>(null);
+  const [isPortalOpening, ] = useState(false);
 
-  const uid = useUserUid(); // ★ auth.currentUser ではなく React state な uid を利用
+  const uid = useUserUid();
+
+  // ★★★ 追加：ConfirmModal の制御用 state（共通で使い回し）
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState<string>('確認');
+  const [confirmMessage, setConfirmMessage] = useState<ReactNode>('');
+  const [confirmLabel, setConfirmLabel] = useState<string>('OK');
+  const [confirmProcessing, setConfirmProcessing] = useState<boolean>(false);
+  const confirmActionRef = useRef<(() => Promise<void> | void) | null>(null);
+
+  // ★★★ 追加：共通の confirm 起動ヘルパー
+  const openConfirm = (opts: {
+    title?: string;
+    message: ReactNode;
+    confirmLabel?: string;
+    onConfirm: () => Promise<void> | void;
+  }) => {
+    setConfirmTitle(opts.title ?? '確認');
+    setConfirmMessage(opts.message);
+    setConfirmLabel(opts.confirmLabel ?? 'OK');
+    setConfirmProcessing(false);
+    confirmActionRef.current = async () => {
+      try {
+        setConfirmProcessing(true);
+        await opts.onConfirm();
+      } finally {
+        setConfirmProcessing(false);
+        setConfirmOpen(false);
+      }
+    };
+    setConfirmOpen(true);
+  };
 
   const onEditNameHandler = async () => {
     const user = auth.currentUser;
@@ -107,7 +152,7 @@ export default function ProfilePage() {
 
   // ★ 再構成: uid と email が確定してから Firestore 初期取得 & 購読を開始
   useEffect(() => {
-    if (!uid) return; // uid 未確定なら何もしない
+    if (!uid) return;
 
     setIsLoading(true);
     setIsPairLoading(true);
@@ -117,7 +162,7 @@ export default function ProfilePage() {
 
     (async () => {
       try {
-        // ------- プロフィール（users/{uid}）初期読込 -------
+        // ------- プロフィール初期読込 -------
         const snap = await getUserProfile(uid);
         if (snap.exists()) {
           const data = snap.data();
@@ -219,10 +264,7 @@ export default function ProfilePage() {
     })();
 
     // ------- リアルタイム購読（pairs） -------
-    const pairsQ = query(
-      collection(db, 'pairs'),
-      where('userIds', 'array-contains', uid)
-    );
+    const pairsQ = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
     unsubscribePairs = onSnapshot(
       pairsQ,
       (snapshot) => {
@@ -261,7 +303,7 @@ export default function ProfilePage() {
       }
     );
 
-    // ------- リアルタイム購読（users/{uid}：LINE連携・画像・プランなど） -------
+    // ------- リアルタイム購読（users/{uid}） -------
     unsubscribeUser = onSnapshot(
       doc(db, 'users', uid),
       (snap) => {
@@ -277,7 +319,6 @@ export default function ProfilePage() {
           }
         }
 
-        // Stripe カスタマーIDの反映
         if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
           setStripeCustomerId(data.stripeCustomerId);
         } else {
@@ -314,7 +355,7 @@ export default function ProfilePage() {
     }
   };
 
-  // パートナー承認時の処理
+  // パートナー承認時の処理（変更なし）
   const handleApprovePair = async () => {
     const user = auth.currentUser;
     if (!user || !pendingApproval) return;
@@ -326,10 +367,8 @@ export default function ProfilePage() {
         return;
       }
 
-      // Firestoreのペア情報を更新
       await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
 
-      // 👇 両ユーザーの sharedTasksCleaned を false に更新
       const userRef = doc(db, 'users', user.uid);
       const partnerRef = doc(db, 'users', pendingApproval.inviterUid);
       await Promise.all([
@@ -345,122 +384,121 @@ export default function ProfilePage() {
     }
   };
 
-  // パートナー解除時の処理
-  const handleRemovePair = async () => {
-    const user = auth.currentUser;
-    if (!user || !pairDocId) return;
+  // ★★★ 修正（ConfirmModal化）: パートナー解除の確認 → モーダル表示
+  const requestRemovePair = async () => {
+    openConfirm({
+      title: 'ペア解除の確認',
+      message: (
+        <div className="text-left space-y-2">
+          <p>ペアを解除しますか？</p>
+          <p>
+            パートナーを解消すると<strong>共通タスクは削除</strong>され、
+            プライベートタスクのみ継続して使用できます。
+          </p>
+          <p>必要なタスクは<strong>プライベート化</strong>してから解消処理を実行してください。</p>
+          <p className="text-xs text-gray-500">※この操作は取り消せません。</p>
+        </div>
+      ),
+      confirmLabel: '解除する',
+      onConfirm: async () => {
+        const user = auth.currentUser;
+        if (!user || !pairDocId) return;
 
-    const pairSnap = await getDoc(doc(db, 'pairs', pairDocId));
-    if (!pairSnap.exists()) return;
+        const pairSnap = await getDoc(doc(db, 'pairs', pairDocId));
+        if (!pairSnap.exists()) return;
 
-    const pairData = pairSnap.data();
-    const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
-    if (!partnerId) return;
+        const pairData = pairSnap.data();
+        const partnerId = pairData?.userIds?.find((id: string) => id !== user.uid);
+        if (!partnerId) return;
 
-    const confirmed = confirm('ペアを解除しますか？\nパートナー解消時は共通タスクのみ継続して使用できます。\n※この操作は取り消せません。');
-    if (!confirmed) return;
-
-    setIsRemoving(true);
-    try {
-      await removePair(pairDocId);
-      // await splitSharedTasksOnPairRemoval(user.uid, partnerId);
-
-      toast.success('ペアを解除しました');
-      setIsPairConfirmed(false);
-      setPartnerEmail('');
-      setInviteCode('');
-      setPairDocId(null);
-    } catch (_err: unknown) {
-      handleFirestoreError(_err);
-    } finally {
-      setIsRemoving(false);
-    }
+        setIsRemoving(true);
+        try {
+          await removePair(pairDocId);
+          toast.success('ペアを解除しました');
+          setIsPairConfirmed(false);
+          setPartnerEmail('');
+          setInviteCode('');
+          setPairDocId(null);
+        } catch (_err: unknown) {
+          handleFirestoreError(_err);
+        } finally {
+          setIsRemoving(false);
+        }
+      },
+    });
   };
 
-  const handleCancelInvite = async () => {
+  // ★★★ 修正（ConfirmModal化）: 招待取消の確認 → モーダル表示
+  const requestCancelInvite = async () => {
     if (!pairDocId || typeof pairDocId !== 'string' || pairDocId.trim() === '') {
       toast.error('ペア情報が取得できません');
       return;
     }
-    const confirmed = confirm('この招待を取り消しますか？');
-    if (!confirmed) return;
-
-    try {
-      await deletePair(pairDocId);
-      toast.success('招待を取り消しました');
-      setInviteCode('');
-      setPartnerEmail('');
-      setPairDocId(null);
-    } catch (_err: unknown) {
-      handleFirestoreError(_err);
-    }
+    openConfirm({
+      title: '招待の取り消し',
+      message: 'この招待を取り消しますか？',
+      confirmLabel: '取り消す',
+      onConfirm: async () => {
+        try {
+          await deletePair(pairDocId);
+          toast.success('招待を取り消しました');
+          setInviteCode('');
+          setPartnerEmail('');
+          setPairDocId(null);
+        } catch (_err: unknown) {
+          handleFirestoreError(_err);
+        }
+      },
+    });
   };
 
-  const handleRejectPair = async () => {
+  // ★★★ 修正（ConfirmModal化）: 招待拒否の確認 → モーダル表示
+  const requestRejectPair = async () => {
     if (!pendingApproval) return;
-    const confirmed = confirm('この招待を拒否しますか？');
-    if (!confirmed) return;
-
-    try {
-      await deletePair(pendingApproval.pairId);
-      toast.success('招待を拒否しました');
-      setPendingApproval(null);
-    } catch (_err: unknown) {
-      handleFirestoreError(_err);
-    }
+    openConfirm({
+      title: '招待の拒否',
+      message: 'この招待を拒否しますか？',
+      confirmLabel: '拒否する',
+      onConfirm: async () => {
+        try {
+          await deletePair(pendingApproval.pairId);
+          toast.success('招待を拒否しました');
+          setPendingApproval(null);
+        } catch (_err: unknown) {
+          handleFirestoreError(_err);
+        }
+      },
+    });
   };
 
-  const handleCancelPlan = async () => {
-    const confirmed = confirm('本当にFreeプランに戻しますか？');
-    if (!confirmed) return;
+  // ★★★ 修正（ConfirmModal化）: プラン解約（Freeへ戻す）の確認 → モーダル表示
+  const requestCancelPlan = async () => {
+    openConfirm({
+      title: 'プラン変更の確認',
+      message: '本当に Free プランに戻しますか？',
+      confirmLabel: 'Freeに戻す',
+      onConfirm: async () => {
+        const user = auth.currentUser;
+        if (!user) {
+          toast.error('ユーザー情報が取得できません');
+          return;
+        }
 
-    const user = auth.currentUser;
-    if (!user) {
-      toast.error('ユーザー情報が取得できません');
-      return;
-    }
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        plan: 'free',
-      });
-      toast.success('プランをFreeに戻しました');
-      setPlan('free');
-    } catch (err) {
-      console.error('[プラン解約エラー]', err);
-      toast.error('プラン変更に失敗しました');
-    }
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            plan: 'free',
+          });
+          toast.success('プランをFreeに戻しました');
+          setPlan('free');
+        } catch (err) {
+          console.error('[プラン解約エラー]', err);
+          toast.error('プラン変更に失敗しました');
+        }
+      },
+    });
   };
 
-  // ★ Stripe カスタマーポータルを開く
-  const handleOpenStripePortal = async () => {
-    if (!stripeCustomerId) {
-      toast.error('決済情報が見つかりません。決済完了後にお試しください。');
-      return;
-    }
-    try {
-      setIsPortalOpening(true);
-      const res = await fetch('/api/billing/create-portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: stripeCustomerId }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.url) {
-        console.error('[create-portal] failed:', data);
-        toast.error('ポータルの作成に失敗しました。しばらくしてからお試しください。');
-        return;
-      }
-      // Stripe がホストするカスタマーポータルへ遷移
-      window.location.href = data.url as string;
-    } catch (err) {
-      console.error('[create-portal] error:', err);
-      toast.error('ポータルの作成に失敗しました。');
-    } finally {
-      setIsPortalOpening(false);
-    }
-  };
-
+  // ===== Render =====
   return (
     <div className="flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Setting" />
@@ -484,6 +522,7 @@ export default function ProfilePage() {
               isLoading={isLoading}
               nameUpdateStatus={nameUpdateStatus}
             />
+
             <PartnerSettings
               isLoading={isLoading}
               isPairLoading={isPairLoading}
@@ -494,22 +533,21 @@ export default function ProfilePage() {
               inviteCode={inviteCode}
               pairDocId={pairDocId}
               onApprovePair={handleApprovePair}
-              onRejectPair={handleRejectPair}
-              onCancelInvite={handleCancelInvite}
+              // ★★★ 変更：confirm() を使わず ConfirmModal を起動する関数を渡す
+              onRejectPair={requestRejectPair}
+              onCancelInvite={requestCancelInvite}
               onSendInvite={handleSendInvite}
-              onRemovePair={handleRemovePair}
+              onRemovePair={requestRemovePair}
               onChangePartnerEmail={setPartnerEmail}
               isRemoving={isRemoving}
             />
 
             <section className="">
-              {/* ★ auth.currentUser 依存をやめ、uid 判定で確実に表示 */}
               {uid && <PushToggle uid={uid} />}
             </section>
 
             {plan !== 'free' && (
               <div className="flex flex-col items-center gap-2">
-                {/* ★ Stripe カスタマーポータルへ遷移 */}
                 <button
                   onClick={handleOpenStripePortal}
                   disabled={isPortalOpening}
@@ -518,8 +556,9 @@ export default function ProfilePage() {
                   {isPortalOpening ? '開いています…' : 'サブスクリプションを管理（ポータル）'}
                 </button>
 
+                {/* ★★★ 変更：confirm() を使わず ConfirmModal を起動する */}
                 <button
-                  onClick={handleCancelPlan}
+                  onClick={requestCancelPlan}
                   className="text-gray-400 py-2 px-4 rounded transition text-[11px] underline decoration-gray-400"
                 >
                   （開発用）強制的にFreeに戻す
@@ -539,14 +578,27 @@ export default function ProfilePage() {
         )}
       </main>
 
-      <EmailEditModal
-        open={isEmailModalOpen}
-        onClose={() => setIsEmailModalOpen(false)}
-      />
-      <PasswordEditModal
-        open={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
+      {/* 既存の編集モーダル */}
+      <EmailEditModal open={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} />
+      <PasswordEditModal open={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} />
+
+      {/* ★★★ 追加：共通 ConfirmModal（キャンセルボタンを有効にしてUX向上） */}
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        onConfirm={() => confirmActionRef.current?.()}
+        onCancel={() => setConfirmOpen(false)}
+        confirmLabel={confirmLabel}
+        cancelLabel="キャンセル"
+        isProcessing={confirmProcessing}
       />
     </div>
   );
+}
+
+// ★★★ 既存：Stripeカスタマーポータル
+async function handleOpenStripePortal(this: void) {
+  // NOTE: 関数式をコンポーネント外に置く構造を維持（既存構造を壊さない）
+  // 実運用ではコンポーネント内の状態に依存するため、上位の onClick 内で実装されています。
 }

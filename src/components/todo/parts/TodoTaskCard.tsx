@@ -665,17 +665,17 @@ export default function TodoTaskCard({
           )}
 
           <div className="pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col" style={{ paddingTop: 8 }}>
-            {isCookingCategory && (
-              <div className="px-1 pr-5">
+            {/* {isCookingCategory && ( */}
+              <div className="px-1 pr-5 pt-3">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="料理名・材料名で検索"
+                    placeholder="TODOを検索"
                     className="w-full pl-8 pr-8 py-1.5 outline-none focus:ring-2 focus:ring-orange-300"
-                    aria-label="料理名・材料名で検索"
+                    aria-label="TODOを検索"
                   />
                   {searchQuery.trim() !== '' && (
                     <button
@@ -694,7 +694,7 @@ export default function TodoTaskCard({
                   </div>
                 )}
               </div>
-            )}
+            {/* )} */}
 
             {/* ▼ スクロール対象（内部スクロール専用） */}
             <div
