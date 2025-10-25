@@ -19,7 +19,6 @@ import {
 import { getThisWeekRangeJST } from '@/lib/weeklyRange';
 import PointsMiniCard from './parts_internal/PointsMiniCard';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
-import HelpPopover from '@/components/common/HelpPopover';
 
 export default function HomeDashboardCard() {
   const today = new Date();
@@ -113,24 +112,6 @@ export default function HomeDashboardCard() {
         <h2 className="text-base font-semibold text-gray-800 text-center">
           <span className="inline-flex items-center gap-1 align-middle">
             活動記録 {weekLabel}
-            <HelpPopover
-              className="ml-1"
-              preferredSide="top"   // 上方向に表示
-              align="center"           // 右寄せ（タイトル右端に合わせる）
-              sideOffset={6}        // タイトルとの距離
-              offsetX={-30} 
-              content={
-                <div className="space-y-2 text-sm">
-                  <p>今週の活動サマリーを表示します。</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>左のカードでポイントの累計と配分状況を確認できます。</li>
-                    <li>「ありがとう」はパートナーから受け取った件数です。</li>
-                    <li>「タスク」は今週完了したタスク数です。</li>
-                    <li>各カードをタップすると詳細モーダルが開きます。</li>
-                  </ul>
-                </div>
-              }
-            />
           </span>
         </h2>
       </div>

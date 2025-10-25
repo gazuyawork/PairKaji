@@ -591,7 +591,7 @@ export default function EditTaskModal({
                 className="ml-1"
                 content={
                   <div className="space-y-2">
-                    Todoがそれぞれのカテゴリに応じて変わります。
+                    Todoがそれぞれのカテゴリに応じて表示が変わります。
                     <ul className="list-disc pl-5 space-y-1">
                       <li>料理：レシピの管理におすすめです。</li>
                       <li>買い物：買い物リストとしての利用に便利です。</li>
@@ -675,7 +675,7 @@ export default function EditTaskModal({
                     <ul className="list-disc pl-5 space-y-1">
                       <li>毎日：毎日おこなうタスクに使用します。</li>
                       <li>週次：週間のタスクに使用します。</li>
-                      <li>不定期：日程の決まっているタスクに使用します。</li>
+                      <li>不定期：不定期に実施するタスクに使用します。</li>
                     </ul>
                   </div>
                 }
@@ -832,10 +832,10 @@ export default function EditTaskModal({
                   className="ml-1"
                   content={
                     <div className="space-y-2">
-                      ポイントを設定すると、完了時に担当者へポイントが付与されます。
-                      <ul className="list-disc pl-5 space-y-1">
+                      ポイントを設定すると、タスクの完了時に実施したユーザーへポイントが付与されます。
+                      {/* <ul className="list-disc pl-5 space-y-1">
                         <li>0ptの場合はタスク一覧に表示されません。</li>
-                      </ul>
+                      </ul> */}
                     </div>
                   }
                 />
@@ -927,14 +927,12 @@ export default function EditTaskModal({
                     content={
                       <div className="space-y-2">
                         <p>
-                          プライベートをオンにすると、このタスクは
-                          <span className="font-semibold">自分だけ</span>の管理対象になります。
+                          オンにすると、このタスクは
+                          <span className="font-semibold">自分だけ</span>に表示されます。
                         </p>
                         <ul className="list-disc pl-5 space-y-1">
-                          <li>パートナーの画面には表示されません。</li>
-                          <li>ポイント付与や担当者の選択は無効化されます。</li>
-                          <li>後から共有に戻すこともできます。</li>
-                          <li>パートナーが作成したタスクをプライベートにするときはコピーとして作成されます。</li>
+                          <li>ポイントや担当者の設定は無効化されます。</li>
+                          <li>パートナーが作成したタスクをプライベートに変更するときはコピーとして作成されます。</li>
                         </ul>
                       </div>
                     }
@@ -969,7 +967,17 @@ export default function EditTaskModal({
               <label className="w-35 text-gray-600 shrink-0 flex items-center">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   TODO表示
-                  <HelpPopover className="ml-1" content={<div className="space-y-2">オンにすると、Todo画面で表示状態となります。</div>} />
+                  <HelpPopover 
+                    className="ml-1" 
+                    content={
+                      <div className="space-y-2">
+                        <p>オンにすると、Todo画面で表示状態となります。</p>
+                        {/* <ul className="list-disc pl-5 space-y-1">
+                          <li>ポイントや担当者の設定は無効化されます。</li>
+                          <li>パートナーが作成したタスクをプライベートに変更するときはコピーとして作成されます。</li>
+                        </ul> */}
+                      </div>
+                    } />
                   <span>：</span>
                 </span>
               </label>

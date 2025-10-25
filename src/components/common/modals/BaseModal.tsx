@@ -117,7 +117,6 @@ export default function BaseModal({
       <div
         ref={overlayRef}
         className="fixed inset-0 bg-white/80"
-        onClick={onClose}
       />
 
       {/* モーダル本体：ここでは縦スクロールさせない */}

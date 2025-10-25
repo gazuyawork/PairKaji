@@ -102,12 +102,9 @@ export default function TaskCalendar({ tasks }: Props) {
             content={
               <div className="space-y-2 text-sm">
                 <p>今週以降7日分の予定を一覧で確認できます。</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>当日列のみ完了済みタスクは非表示になります。</li>
-                  <li>不定期の<strong>期限切れ</strong>は当日の列に赤で表示します。</li>
-                  <li>各日のカードをタップすると、3件→全件に切り替わります。</li>
+                {/* <ul className="list-disc pl-5 space-y-1">
                   <li>並び順は「期限切れ → 毎日 → 週次 → 不定期」、同カテゴリ内は50音順です。</li>
-                </ul>
+                </ul> */}
               </div>
             }
           />

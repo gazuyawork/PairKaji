@@ -505,9 +505,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
                     よく使うTODOを<strong>{MAX_SLOTS}</strong>件まで登録できます。
                   </p>
                   <ul className="list-disc pl-5 space-y-1">
-                    <li>「追加」から登録し、右上の×で削除できます。</li>
-                    <li>すでにショートカット登録済みのTODOは候補に表示されません。</li>
-                    <li>ショートカットをタップするとTODOタブへ移動します。</li>
+                    <li>登録したショートカットをタップするとTODOへ移動します。</li>
                   </ul>
                 </div>
               }

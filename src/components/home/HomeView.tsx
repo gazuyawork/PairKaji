@@ -764,8 +764,8 @@ export default function HomeView() {
                   whileTap={hiddenCards.size > 0 ? { scale: 0.95 } : undefined}
                   disabled={hiddenCards.size === 0}
                   className={`px-4 py-2 rounded-full text-xs font-semibold transition-all ${hiddenCards.size > 0
-                      ? 'text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm hover:shadow-md hover:brightness-105'
-                      : 'text-gray-400 bg-gray-200 cursor-not-allowed'
+                    ? 'text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm hover:shadow-md hover:brightness-105'
+                    : 'text-gray-400 bg-gray-200 cursor-not-allowed'
                     }`}
                   title={
                     hiddenCards.size > 0
@@ -796,10 +796,12 @@ export default function HomeView() {
             {
               blocks: [
                 { src: '/onboarding/welcome.png' },
+
+                // メインコピー：短く・間を作る
                 {
-                  subtitle: 'ご利用ありがとうございます。',
+                  subtitle: 'ようこそ、PairKajiへ。',
                   description:
-                    'このアプリは「家事を見える化して、お互いに協力して日々の家事を行う」をコンセプトにしています。\nまずはこのアプリの基本的な使い方を説明します。\n不要な方は右上の×でスキップできます。',
+                    '家事を、ふたりで心地よく分け合うためのアプリです。\nまずは基本の使い方を、かんたんにご紹介します。\n\n※ 説明が不要な場合は右上の × からスキップできます。\n※ ホーム画面の下部の「もう１度説明を見る」をタップで確認することができます。'
                 },
               ],
             },

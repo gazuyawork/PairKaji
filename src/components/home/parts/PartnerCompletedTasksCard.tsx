@@ -260,10 +260,7 @@ export default function PartnerCompletedTasksCard() {
               <div className="space-y-2 text-sm">
                 <p>今週、パートナーが完了したタスクの一覧です。</p>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>ハートを押すと「ありがとう」を送れます。</li>
-                  <li>一度押すとピンクのハートに変わり、再度押すと取り消せます。</li>
-                  <li>新しいタスクほど下に表示されます。</li>
-                  <li>未いいねのタスクが上に表示されます。</li>
+                  <li>ハートを押すとパートナーに「ありがとう」を送れます。</li>
                 </ul>
               </div>
             }

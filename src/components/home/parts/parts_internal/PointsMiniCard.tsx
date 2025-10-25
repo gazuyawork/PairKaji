@@ -19,6 +19,7 @@ import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from '@/components/home/parts/EditPointModal';
 import { fetchPairUserIds } from '@/lib/firebaseUtils';
 import { useUserUid } from '@/hooks/useUserUid';
+import HelpPopover from '@/components/common/HelpPopover'; // ★追加：ヘルプポップオーバー
 
 type UserInfo = {
   id: string;
@@ -109,6 +110,9 @@ export default function PointsMiniCard() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
   const today = new Date();
+  theWeek: {
+    /* ラベル計算は一度でOK */
+  }
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
@@ -397,7 +401,35 @@ export default function PointsMiniCard() {
           {/* <span className="rounded-md border border-gray-300 bg-white p-1 group-hover:shadow-sm">
             <Star className="w-4 h-4" />
           </span> */}
-          <span className="text-xs pb-2">今週の目標ポイント</span>
+          <span className="text-xs pb-2 inline-flex items-center">
+            今週の目標ポイント
+            {/* ★ここから：?アイコン（HelpPopover）。カードを開かないようイベントを止める */}
+            <span
+              className="ml-1 inline-flex"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <HelpPopover
+                className="align-middle"
+                preferredSide="top"
+                align="center"
+                sideOffset={6}
+                offsetX={-30}
+                content={
+                  <div className="space-y-2 text-sm">
+                    <p>今週の目標ポイントです。ここで目標値と内訳を設定できます。</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {/* <li>タップで編集モーダルを開き、目標値を更新できます。</li>
+                      <li>棒グラフは、あなた/パートナーの今週の獲得ポイントを示します。</li> */}
+                      <li>「Update」バッジは、タスクが追加・編集された時に表示されます。</li>
+                    </ul>
+                  </div>
+                }
+              />
+            </span>
+            {/* ★ここまで */}
+          </span>
         </div>
 
         {/* 合計 / 目標（パーセンテージは出さない） */}
