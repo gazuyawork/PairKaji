@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, doc, getDocs, onSnapshot } from 'firebase/firestore';
-import { useUserUid } from '@/hooks/useUserUid'
+import { useUserUid } from '@/hooks/useUserUid';
 
 /**
  * ポイント編集モーダル用のカスタムフック。
@@ -23,18 +23,23 @@ export function useEditPointData(
   /**
    * Firestore上のタスク情報から合計ポイントを計算。
    * 各タスクの頻度・ポイントに応じて週次ポイントを算出。
+   * ※ プライベートタスク（private: true）は除外。
    */
   const calculatePoints = useCallback(async () => {
-    
     if (!uid) return;
 
     try {
-      const q = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
-      const snapshot = await getDocs(q);
+      // 🔽 プライベートタスクを除外
+      const q = query(
+        collection(db, 'tasks'),
+        where('userIds', 'array-contains', uid),
+        where('private', '==', false)
+      );
 
+      const snapshot = await getDocs(q);
       let total = 0;
 
-      snapshot.docs.forEach(docSnap => {
+      snapshot.docs.forEach((docSnap) => {
         const data = docSnap.data();
         const pt = data.point ?? 0;
         const freq = data.period;
@@ -63,15 +68,12 @@ export function useEditPointData(
     if (!uid) return;
 
     if (initialPoint && initialPoint > 0) {
-      // 明示的に初期ポイントが与えられている場合はそれを使用
       setPoint(initialPoint);
       setSelfPoint(Math.ceil(initialPoint / 2));
     } else {
-      // そうでなければ自動算出処理を実行
       calculatePoints();
     }
 
-    // Firestore上の自分のポイントデータにリアルタイムで反応
     const unsubscribe = onSnapshot(doc(db, 'points', uid), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -91,7 +93,6 @@ export function useEditPointData(
       }
     });
 
-    // コンポーネントアンマウント時に監視解除
     return () => unsubscribe();
   }, [initialPoint, setRouletteEnabled, setRouletteOptions, calculatePoints, uid]);
 
