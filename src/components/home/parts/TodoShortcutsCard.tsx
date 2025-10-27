@@ -319,10 +319,10 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
             // 表示対象条件（参考実装に準拠）
             const ownerOk = task.userId === uid || task.private !== true;
             const visibleOk = task.visible !== false; // undefined は true とみなす
-            const hasTodos = Array.isArray(task.todos) && task.todos.length > 0;
-            const markedTodo = task.isTodo === true || task.type === 'todo';
+            // const hasTodos = Array.isArray(task.todos) && task.todos.length > 0;
+            // const markedTodo = task.isTodo === true || task.type === 'todo';
 
-            if (ownerOk && visibleOk && (hasTodos || markedTodo)) {
+            if (ownerOk && visibleOk) {
               list.push(task);
             }
           });

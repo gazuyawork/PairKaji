@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react'; // ★変更：useRef を追加
 // import { Star } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import {
@@ -77,6 +77,23 @@ function getBadgeStorageKey(uid: string, start: Date, end: Date) {
   return `pointsMiniCard:updateBadge:${uid}:${s}_${e}`;
 }
 
+/** ★追加：タスクの「作成者」を推定して返す（存在する可能性がある代表キーを順に参照） */
+function getCreatorId(data: Record<string, unknown> | undefined): string | undefined {
+  if (!isRecord(data)) return undefined;
+  const candidates = [
+    'createdBy',
+    'ownerId',
+    'createdUserId',
+    'authorId',
+    'userId', // 一部スキーマでは作成者＝userIdで保存されているケースに対応
+  ];
+  for (const key of candidates) {
+    const v = data[key];
+    if (typeof v === 'string' && v) return v;
+  }
+  return undefined;
+}
+
 /**
  * ミニカード：提供いただいた棒グラフスタイルをそのまま採用
  * - 合計: 「今週の合計ポイント（M/D〜M/D）」の見出し
@@ -90,6 +107,10 @@ function getBadgeStorageKey(uid: string, start: Date, end: Date) {
  * - 初回スナップショットは既存状態としてバッジは出さない
  * - ★ 保存成功までバッジは消さない（モーダルを開いても維持）
  * - ★ バッジ状態は localStorage に保存してリロード後も維持
+ * - ★ ポイント（points コレクション）の更新でも Update バッジを表示（自分の保存直後のみ一度だけ抑止）
+ * - ★ 共有→private への切替時：
+ *     ・自分が作成：バッジ表示
+ *     ・パートナーが作成（コピー作成フロー）：バッジ非表示
  */
 export default function PointsMiniCard() {
   const uid = useUserUid();
@@ -108,6 +129,9 @@ export default function PointsMiniCard() {
   const [targetIds, setTargetIds] = useState<string[]>([]);
   // タスク更新促し用バッジフラグ（localStorage で永続化）
   const [needsRefresh, setNeedsRefresh] = useState(false);
+
+  // ★追加：自分の points 保存直後の onSnapshot を一度だけ無視するためのフラグ
+  const suppressNextPointsChangeRef = useRef(false);
 
   const today = new Date();
   theWeek: {
@@ -272,7 +296,7 @@ export default function PointsMiniCard() {
     };
   }, [uid, targetIds, weekStart, weekEnd]);
 
-  // tasks の追加/削除を監視して「要更新」バッジをON（localStorage にも保存）
+  // ★変更：tasks の追加/削除/（ポイント変更・private→共有切替・共有→private切替(条件付き)）を監視して「要更新」バッジON
   useEffect(() => {
     if (!uid || targetIds.length === 0) return;
     if (targetIds.length > 10) return; // Firestore 制限（array-contains-any は最大10）
@@ -280,16 +304,100 @@ export default function PointsMiniCard() {
     const colRef = collection(db, 'tasks');
     const qTasks = query(colRef, where('userIds', 'array-contains-any', targetIds));
 
+    // ★追加：直前状態を保持（初回に埋めて、2回目以降の modified 比較に使う）
+    type MinimalTask = {
+      private?: boolean;
+      point?: number | null;
+      userIds?: unknown;
+      _creatorId?: string | undefined; // 作成者ID（推定）
+    };
+    const prevMap = new Map<string, MinimalTask>();
+
+    // 対象ユーザー（自分/パートナー）と userIds が交差しているか
+    const intersectsTarget = (userIds: unknown): boolean => {
+      if (!Array.isArray(userIds)) return false;
+      const ids = userIds.filter((x): x is string => typeof x === 'string');
+      return ids.some((id) => targetIds.includes(id));
+    };
+
     let initialized = false; // 初回は既存読み込みなのでバッジ出さない
     const unsub = onSnapshot(qTasks, (snap) => {
       if (!initialized) {
+        // ★初回：prevMap を埋めて終了（点灯しない）
+        snap.docs.forEach((d) => {
+          const data = d.data() as DocumentData;
+          prevMap.set(d.id, {
+            private: data?.private === true,
+            point: typeof data?.point === 'number' ? data.point : null,
+            userIds: data?.userIds,
+            _creatorId: getCreatorId(data as Record<string, unknown>),
+          });
+        });
         initialized = true;
         return;
       }
-      const hasAddOrRemove = snap.docChanges().some(
-        (ch) => ch.type === 'added' || ch.type === 'removed'
-      );
-      if (hasAddOrRemove) {
+
+      let shouldBadge = false;
+
+      snap.docChanges().forEach((ch) => {
+        const id = ch.doc.id;
+        const data = ch.doc.data() as DocumentData;
+
+        const curr: MinimalTask = {
+          private: data?.private === true,
+          point: typeof data?.point === 'number' ? data.point : null,
+          userIds: data?.userIds,
+          _creatorId: getCreatorId(data as Record<string, unknown>),
+        };
+        const prev = prevMap.get(id);
+
+        if (ch.type === 'added') {
+          // ★追加：非プライベートかつ関与しているタスクのみ点灯
+          if (!curr.private && intersectsTarget(curr.userIds)) {
+            shouldBadge = true;
+          }
+        } else if (ch.type === 'removed') {
+          // ★削除：関与タスクの削除は点灯（厳密に prev を見る場合は intersectsTarget(prev?.userIds) でもOK）
+          shouldBadge = true;
+        } else if (ch.type === 'modified') {
+          // ★変更：prev と curr を比較して点灯判定
+          const wasPrivate = prev?.private === true;
+          const isPrivate = curr.private === true;
+
+          const becameShared = wasPrivate && !isPrivate; // private true → 共有へ
+          const becamePrivate = !wasPrivate && isPrivate; // 共有 → private へ
+          const pointChanged = (prev?.point ?? null) !== (curr.point ?? null);
+
+          const prevIntersects = intersectsTarget(prev?.userIds);
+          const nowIntersects = intersectsTarget(curr.userIds);
+
+          // 作成者ID（推定）
+          const creatorId = curr._creatorId ?? prev?._creatorId;
+
+          // 1) private → 共有 になったら（共有化）点灯（今の状態が共有なので nowIntersects を見る）
+          if (becameShared && nowIntersects) {
+            shouldBadge = true;
+          }
+
+          // 2) 共有 → private になった場合は「作成者が自分のときのみ」点灯（パートナー作成＝コピー作成フローは非表示）
+          if (becamePrivate && prevIntersects) {
+            // 作成者が自分なら点灯／不明または他者なら点灯しない（＝要求仕様）
+            if (creatorId === uid) {
+              shouldBadge = true;
+            }
+          }
+
+          // 3) ポイントが変わり、非プライベート かつ 関与しているなら点灯
+          if (pointChanged && !isPrivate && nowIntersects) {
+            shouldBadge = true;
+          }
+        }
+
+        // ★最後に prevMap を更新
+        prevMap.set(id, curr);
+      });
+
+      if (shouldBadge) {
         setNeedsRefresh(true);
         try {
           const key = getBadgeStorageKey(uid, weekStart, weekEnd);
@@ -301,6 +409,55 @@ export default function PointsMiniCard() {
     });
 
     return () => unsub();
+  }, [uid, targetIds, weekStart, weekEnd]);
+
+  // ★追加：points（あなた＋パートナー）の更新で「Update」点灯（初回除外／自分の保存直後は一度だけ抑止）
+  useEffect(() => {
+    if (!uid || targetIds.length === 0) return;
+
+    const initializedMap = new Map<string, boolean>();
+    const unsubs: Array<() => void> = [];
+
+    const idsToWatch = Array.from(new Set(targetIds));
+    idsToWatch.forEach((id) => {
+      const ref = doc(db, 'points', id);
+      initializedMap.set(id, false);
+
+      const unsub = onSnapshot(ref, (snap) => {
+        if (!snap.exists()) {
+          // ドキュメント未作成の場合も初回消化扱いにする
+          if (initializedMap.get(id) === false) initializedMap.set(id, true);
+          return;
+        }
+
+        // 初回は既存状態として無視
+        if (initializedMap.get(id) === false) {
+          initializedMap.set(id, true);
+          return;
+        }
+
+        // 自分の保存直後の一回だけ無視（誤点灯防止）
+        if (id === uid && suppressNextPointsChangeRef.current) {
+          suppressNextPointsChangeRef.current = false;
+          return;
+        }
+
+        // ここまで来たら「更新があった」→ Update バッジ点灯＆永続化
+        setNeedsRefresh(true);
+        try {
+          const key = getBadgeStorageKey(uid, weekStart, weekEnd);
+          localStorage.setItem(key, '1');
+        } catch {
+          /* noop */
+        }
+      });
+
+      unsubs.push(unsub);
+    });
+
+    return () => {
+      unsubs.forEach((u) => u && u());
+    };
   }, [uid, targetIds, weekStart, weekEnd]);
 
   // 目標（合計/各自）をリアルタイムで購読（あなた＋パートナー）
@@ -349,6 +506,9 @@ export default function PointsMiniCard() {
     const partnerUids = await fetchPairUserIds(uid);
 
     setMaxPoints(newPoint);
+
+    // ★追加：保存直後の自分 points 更新による誤点灯を一度だけ抑止
+    suppressNextPointsChangeRef.current = true;
 
     await setDoc(
       doc(db, 'points', uid),
@@ -403,7 +563,7 @@ export default function PointsMiniCard() {
           </span> */}
           <span className="text-xs pb-2 inline-flex items-center">
             今週の目標ポイント
-            {/* ★ここから：?アイコン（HelpPopover）。カードを開かないようイベントを止める */}
+            {/* ★変更：?アイコン（HelpPopover）の説明文を実装に合わせて更新 */}
             <span
               className="ml-1 inline-flex"
               onClick={(e) => e.stopPropagation()}
@@ -420,9 +580,7 @@ export default function PointsMiniCard() {
                   <div className="space-y-2 text-sm">
                     <p>今週の目標ポイントです。ここで目標値と内訳を設定できます。</p>
                     <ul className="list-disc pl-5 space-y-1">
-                      {/* <li>タップで編集モーダルを開き、目標値を更新できます。</li>
-                      <li>棒グラフは、あなた/パートナーの今週の獲得ポイントを示します。</li> */}
-                      <li>「Update」バッジは、タスクが追加・編集された時に表示されます。</li>
+                      <li>「Update」バッジは、タスクの追加・削除、ポイント更新、private⇄共有の切替（※共有→privateは自分作成時のみ）で表示されます。</li>
                     </ul>
                   </div>
                 }
