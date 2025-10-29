@@ -548,7 +548,7 @@ export default function PointsMiniCard() {
         {/* 左上：更新促しバッジ（角：左上＋右下のみ丸） */}
         {needsRefresh && (
           <span
-            className="absolute -top-0.5 -left-0.5 inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 h-6 shadow-md ring-2 ring-white rounded-br-xl rounded-tl-xl"
+            className="absolute -top-0.5 -left-0.5 inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 h-6 shadow-md rounded-br-xl rounded-tl-xl"
             aria-label="新しい変更があります。保存して反映してください。"
             title="新しい変更があります。保存して反映してください。"
           >
