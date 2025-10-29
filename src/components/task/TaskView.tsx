@@ -1390,46 +1390,50 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                     </button>
 
                     {/* 一括コピー（選択中のみ表示） */}
-                    {selectionMode && (
-                      <button
-                        onClick={handleBulkCopy}
-                        disabled={selectedIds.size === 0}
-                        className={[
-                          'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                          'shrink-0',
-                          selectedIds.size === 0
-                            ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
-                            : 'bg-gradient-to-b from-sky-400 to-sky-600 text-white border-[2px] border-sky-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)] hover:brightness-105',
-                        ].join(' ')}
-                        title="選択したタスクをコピーして新規作成"
-                      >
-                        <Copy className="w-6 h-6" />
-                      </button>
-                    )}
+                    <>
+                      {/* 仕切り */}
+                      <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+                      {selectionMode && (
+                        <button
+                          onClick={handleBulkCopy}
+                          disabled={selectedIds.size === 0}
+                          className={[
+                            'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                            'shrink-0',
+                            selectedIds.size === 0
+                              ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
+                              : 'bg-gradient-to-b from-sky-400 to-sky-600 text-white border-[2px] border-sky-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)] hover:brightness-105',
+                          ].join(' ')}
+                          title="選択したタスクをコピーして新規作成"
+                        >
+                          <Copy className="w-6 h-6" />
+                        </button>
+                      )}
 
-                    {/* 一括削除（選択中のみ表示） */}
-                    {selectionMode && (
-                      <button
-                        onClick={handleBulkDelete}
-                        disabled={selectedIds.size === 0}
-                        className={[
-                          'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                          'shrink-0',
-                          selectedIds.size === 0
-                            ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
-                            : 'bg-gradient-to-b from-rose-400 to-rose-600 text-white border-[2px] border-rose-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)] hover:brightness-105',
-                        ].join(' ')}
-                        title="選択したタスクを削除"
-                      >
-                        <Trash2 className="w-6 h-6" />
-                      </button>
-                    )}
+                      {/* 一括削除（選択中のみ表示） */}
+                      {selectionMode && (
+                        <button
+                          onClick={handleBulkDelete}
+                          disabled={selectedIds.size === 0}
+                          className={[
+                            'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                            'shrink-0',
+                            selectedIds.size === 0
+                              ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
+                              : 'bg-gradient-to-b from-rose-400 to-rose-600 text-white border-[2px] border-rose-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)] hover:brightness-105',
+                          ].join(' ')}
+                          title="選択したタスクを削除"
+                        >
+                          <Trash2 className="w-6 h-6" />
+                        </button>
+                      )}
+
+                    </>
 
                     {/* ===== フィルタ群は複数選択モード中は非表示 ===== */}
                     {!selectionMode && (
                       <>
-                        {/* 仕切り */}
-                        <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+
 
                         {/* 📅 本日フィルター */}
                         <button
@@ -1492,12 +1496,14 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           <Flag className="w-6 h-6" />
                         </button>
 
-                        {/* 仕切り */}
-                        <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+
                       </>
                     )}
 
                     {/* 🔎 検索（虫眼鏡） */}
+
+                    {/* 仕切り */}
+                    <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
                     <button
                       onPointerDown={handleToggleSearch}
                       aria-pressed={isSearchVisible}
