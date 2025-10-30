@@ -1,6 +1,6 @@
-// src/components/home/parts/TodoShortcutsCard.tsx
 'use client';
 
+import type React from 'react';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Plus,
@@ -13,6 +13,7 @@ import {
   Tag,
   Plane,
   ListTodo, // ★ 追加：アイコンリンク用
+  Loader2,   // ★ 追加：ローディング用アイコン
 } from 'lucide-react';
 import {
   doc,
@@ -79,7 +80,7 @@ function getCategoryMeta(raw?: unknown) {
   const normalized = String(raw ?? '').normalize('NFKC').trim();
   const category =
     normalized === '' ||
-      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
+    !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
       ? '未分類'
       : normalized;
 
@@ -145,24 +146,31 @@ function getCategoryMeta(raw?: unknown) {
 /* =========================
    スロット（小さいカード）
    ========================= */
-// 【変更①】SlotButton 外側のメイン押下エリアを <button> → <div role="button"> に変更
-// 【変更②】右上の削除トリガを <button> → <span role="button"> に変更（赤丸・白×）
+// 【変更①】SlotButton 外側のメイン押下エリアを <button> → <div role="button"> に変更（既存）
+// 【変更②】右上の削除トリガを <button> → <span role="button"> に変更（既存）
+// 【変更③】label が未解決（undefined）の間はスピナーを表示し、押下不可に（★今回の改修）
 function SlotButton(props: {
   filled: boolean;
-  label?: string;
+  label?: string; // ← label が undefined のときはローディング扱いにする
   onClick: (e?: React.MouseEvent | React.KeyboardEvent) => void;
   onRemove?: () => void;
 }) {
   const { filled, label, onClick, onRemove } = props;
 
+  const isLabelLoading = filled && label === undefined; // ★追加
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onClick}
+      onClick={(e) => {
+        if (isLabelLoading) return; // ★追加：ローディング中は押下無効
+        onClick?.(e);
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          if (isLabelLoading) return; // ★追加：ローディング中は押下無効
           onClick?.(e);
         }
       }}
@@ -174,39 +182,55 @@ function SlotButton(props: {
         filled
           ? 'border-gray-300 dark:border-white/15'
           : 'border-dashed border-gray-300 dark:border-white/15',
+        isLabelLoading ? 'cursor-wait pointer-events-none opacity-70' : '', // ★追加：押下不可＆見た目
       ].join(' ')}
+      aria-disabled={isLabelLoading ? true : undefined} // ★追加：アクセシビリティ
     >
       {filled ? (
         <>
-          <span
-            className="px-3 text-sm leading-tight text-gray-800 dark:text-gray-100
-                       text-center line-clamp-2 break-words"
-          >
-            {label}
-          </span>
+          {isLabelLoading ? (
+            // ★変更：読み込み中はスピナー表示
+            <span className="flex items-center gap-2 text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" aria-label="読み込み中" />
+              {/* <span className="text-sm">読み込み中</span> */}
+            </span>
+          ) : (
+            <span
+              className="px-3 text-sm leading-tight text-gray-800 dark:text-gray-100
+                         text-center line-clamp-2 break-words"
+            >
+              {label}
+            </span>
+          )}
 
-          {/* 【変更②】削除トリガを span[role=button] にし、赤丸・白×で右上固定 */}
+          {/* 右上の削除ボタン（ロード中は押せない） */}
           {onRemove && (
             <span
               role="button"
               tabIndex={0}
               aria-label="ショートカットを削除"
               onClick={(e) => {
+                if (isLabelLoading) return; // ★追加
                 e.stopPropagation();
                 onRemove();
               }}
               onKeyDown={(e) => {
+                if (isLabelLoading) return; // ★追加
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   e.stopPropagation();
                   onRemove();
                 }
               }}
-              className="absolute top-[-5px] right-[-5px] z-10 inline-flex items-center justify-center
-                         w-6 h-6 rounded-full bg-gray-400 text-white
-                         shadow ring-1 ring-white/70
-                         hover:bg-gray-500 active:scale-95
-                         focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+              className={[
+                'absolute top-[-5px] right-[-5px] z-10 inline-flex items-center justify-center',
+                'w-6 h-6 rounded-full bg-gray-400 text-white',
+                'shadow ring-1 ring-white/70',
+                'hover:bg-gray-500 active:scale-95',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300',
+                isLabelLoading ? 'opacity-50 pointer-events-none' : '', // ★追加
+              ].join(' ')}
+              aria-disabled={isLabelLoading ? true : undefined} // ★追加
             >
               <X className="w-3.5 h-3.5" strokeWidth={2.5} />
             </span>
@@ -319,8 +343,6 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
             // 表示対象条件（参考実装に準拠）
             const ownerOk = task.userId === uid || task.private !== true;
             const visibleOk = task.visible !== false; // undefined は true とみなす
-            // const hasTodos = Array.isArray(task.todos) && task.todos.length > 0;
-            // const markedTodo = task.isTodo === true || task.type === 'todo';
 
             if (ownerOk && visibleOk) {
               list.push(task);
@@ -464,11 +486,11 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
       if (taskId) {
         try {
           (view?.setSelectedTaskName)?.(taskId);
-        } catch { }
+        } catch {}
       }
       try {
         (view?.setIndex)?.(2); // 仕様：index=2 が TODO
-      } catch { }
+      } catch {}
     },
     [view],
   );
@@ -495,10 +517,10 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
             TODOショートカット
             <HelpPopover
               className="ml-1"
-              preferredSide="top"  // 上に出す
-              align="center"          // 右寄せで出す（タイトル右端から右側に沿わせるイメージ）
-              sideOffset={6}       // タイトルと吹き出しの距離
-              offsetX={-30}          // 必要に応じて ± で微調整
+              preferredSide="top" // 上に出す
+              align="center" // 右寄せで出す（タイトル右端から右側に沿わせるイメージ）
+              sideOffset={6} // タイトルと吹き出しの距離
+              offsetX={-30} // 必要に応じて ± で微調整
               content={
                 <div className="space-y-2 text-sm">
                   <p>
@@ -529,7 +551,8 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
       <div className="flex gap-2">
         {slots.map((taskId, idx) => {
           const filled = !!taskId;
-          const label = taskId ? nameById.get(taskId) ?? '(読み込み中...)' : undefined;
+          // ★変更：nameById 未解決のときは undefined を渡し、SlotButton 内でスピナー表示＆押下不可にする
+          const label = taskId ? nameById.get(taskId) : undefined;
           return (
             <SlotButton
               key={idx}
@@ -548,12 +571,19 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
         onClose={() => setIsPickerOpen(false)}
         title="TODOを選択"
         rightInfo={
-          (() => {
-            if (candidateLoading) return '読み込み中';
-            const all = availableCandidates.length;
-            const shown = filteredCandidates.length;
-            return modalQuery || modalSelectedCategoryId !== null ? `一致: ${shown}件` : `候補: ${all}件`;
-          })()
+          candidateLoading ? (
+            // ★変更：テキストではなくローディングアイコン
+            <span className="inline-flex items-center gap-2 text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" aria-label="読み込み中" />
+              {/* <span className="sr-only">読み込み中</span> */}
+            </span>
+          ) : (() => {
+              const all = availableCandidates.length;
+              const shown = filteredCandidates.length;
+              return modalQuery || modalSelectedCategoryId !== null
+                ? `一致: ${shown}件`
+                : `候補: ${all}件`;
+            })()
         }
       >
         {/* 検索ボックス */}
@@ -571,12 +601,14 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
             placeholder="キーワードで検索"
             className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400 bg-transparent"
             autoFocus
+            disabled={candidateLoading} // ★追加：ロード中は入力不可
           />
           {modalQuery && (
             <button
               type="button"
               className="text-sm text-gray-600 hover:text-gray-800"
               onClick={() => setModalQuery('')}
+              disabled={candidateLoading} // ★追加
             >
               クリア
             </button>
@@ -590,12 +622,17 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
               type="button"
               onClick={() => setModalSelectedCategoryId(null)}
               className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-                ${modalSelectedCategoryId === null
-                  ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
-                active:translate-y-[1px]`}
+                ${
+                  modalSelectedCategoryId === null
+                    ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                    : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'
+                }
+                active:translate-y-[1px] ${
+                  candidateLoading ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''
+                }`} // ★追加
               aria-pressed={modalSelectedCategoryId === null}
               title="すべて"
+              disabled={candidateLoading} // ★追加
             >
               すべて
             </button>
@@ -619,9 +656,11 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
                       ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
                       : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50',
                     'active:translate-y-[1px]',
+                    candidateLoading ? 'opacity-60 cursor-not-allowed pointer-events-none' : '', // ★追加
                   ].join(' ')}
                   aria-pressed={active}
                   title={safeText(c.label)}
+                  disabled={candidateLoading} // ★追加
                 >
                   <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
                   <span>{safeText(c.label)}</span>
@@ -634,7 +673,10 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
         {/* 一覧グリッド（登録済みは非表示） */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
           {candidateLoading ? (
-            <div className="col-span-full text-center text-sm text-gray-500 py-10">読み込み中...</div>
+            // ★変更：スピナーを中央表示＋全体の押下無効
+            <div className="col-span-full flex items-center justify-center py-10 pointer-events-none">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-500" aria-label="読み込み中" />
+            </div>
           ) : filteredCandidates.length === 0 ? (
             <div className="col-span-full text-center text-sm text-gray-500 py-10">
               選択可能なTODOがありません
@@ -649,12 +691,16 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
                 <button
                   key={t.id}
                   onClick={() => handlePick(t)}
-                  className="w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition
-                             bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
-                             shadow-[0_2px_1px_rgba(0,0,0,0.1)]
-                             hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
-                             hover:border-[#FFCB7D] active:translate-y-[1px]"
+                  className={[
+                    'w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition',
+                    'bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200',
+                    'shadow-[0_2px_1px_rgba(0,0,0,0.1)]',
+                    'hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]',
+                    'hover:border-[#FFCB7D] active:translate-y-[1px]',
+                    candidateLoading ? 'opacity-60 cursor-not-allowed pointer-events-none' : '', // ★追加（保険）
+                  ].join(' ')}
                   title={safeText(t.name)}
+                  disabled={candidateLoading} // ★追加（保険）
                 >
                   <span className="line-clamp-2">{safeText(t.name)}</span>
                   <span className="mt-1 block text-[11px] text-gray-500">
@@ -664,7 +710,9 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
                     </span>
                   </span>
                   {Array.isArray(t.todos) ? (
-                    <span className="mt-1 block text-[11px] text-gray-500">ToDo数: {t.todos.length}</span>
+                    <span className="mt-1 block text-[11px] text-gray-500">
+                      ToDo数: {t.todos.length}
+                    </span>
                   ) : null}
                 </button>
               );
