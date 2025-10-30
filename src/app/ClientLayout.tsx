@@ -104,7 +104,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       {/* ★重要変更: トーストは「key 付きラッパーの外」に配置して
           ルートや状態による再マウントの影響を受けないようにする */}
       <Toaster
-        position="bottom-center"
+        position="top-center"
         richColors
         closeButton
         expand
