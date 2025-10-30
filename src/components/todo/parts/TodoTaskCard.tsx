@@ -666,34 +666,34 @@ export default function TodoTaskCard({
 
           <div className="pl-4 pr-2 space-y-2 min-h-0 h-full flex flex-col" style={{ paddingTop: 8 }}>
             {/* {isCookingCategory && ( */}
-              <div className="px-1 pr-5 pt-3">
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="TODOを検索"
-                    className="w-full pl-8 pr-8 py-1.5 outline-none focus:ring-2 focus:ring-orange-300"
-                    aria-label="TODOを検索"
-                  />
-                  {searchQuery.trim() !== '' && (
-                    <button
-                      type="button"
-                      aria-label="検索をクリア"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 mr-2"
-                    >
-                      <X size={18} />
-                    </button>
-                  )}
-                </div>
+            <div className="px-1 pr-5 pt-3">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="TODOを検索"
+                  className="w-full pl-8 pr-8 py-1.5 outline-none focus:ring-2 focus:ring-orange-300"
+                  aria-label="TODOを検索"
+                />
                 {searchQuery.trim() !== '' && (
-                  <div className="mt-1 text-xs text-gray-500">
-                    「{searchQuery}」に一致：{finalFilteredTodos.length} 件
-                  </div>
+                  <button
+                    type="button"
+                    aria-label="検索をクリア"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 mr-2"
+                  >
+                    <X size={18} />
+                  </button>
                 )}
               </div>
+              {searchQuery.trim() !== '' && (
+                <div className="mt-1 text-xs text-gray-500">
+                  「{searchQuery}」に一致：{finalFilteredTodos.length} 件
+                </div>
+              )}
+            </div>
             {/* )} */}
 
             {/* ▼ スクロール対象（内部スクロール専用） */}
@@ -731,18 +731,52 @@ export default function TodoTaskCard({
                         todo.recipe?.ingredients?.some((i) => typeof i?.name === 'string' && i.name.trim() !== '')) ||
                         (Array.isArray(todo.recipe?.steps) &&
                           todo.recipe?.steps?.some((s) => typeof s === 'string' && s.trim() !== '')));
+
+
+
+
                     const hasReferenceUrls =
                       Array.isArray(todo.referenceUrls) &&
                       todo.referenceUrls.some((u) => typeof u === 'string' && u.trim() !== '');
 
-                    // 変更後（任意の安全化）
+                    // ★ 追加：チェックリスト
+                    const hasChecklist =
+                      Array.isArray((todo as any).checklist) &&
+                      (todo as any).checklist.some((item: any) => {
+                        if (!item) return false;
+
+                        // 文字列チェック
+                        if (typeof item === 'string') {
+                          return item.trim() !== '';
+                        }
+
+                        // オブジェクトの場合は text プロパティをチェック
+                        if (typeof item === 'object' && 'text' in item) {
+                          return typeof (item as { text?: string }).text === 'string' && (item as { text: string }).text.trim() !== '';
+                        }
+
+                        return false;
+                      });
+
                     const hasTravelTime =
                       category === '旅行' &&
                       (String(todo.timeStart ?? '').trim() !== '' || String(todo.timeEnd ?? '').trim() !== '');
 
-
+                    // ★ 統合
                     const hasContentForIcon =
-                      hasMemo || hasShopping || hasImage || hasRecipe || hasReferenceUrls || hasTravelTime;
+                      hasMemo ||
+                      hasShopping ||
+                      hasImage ||
+                      hasRecipe ||
+                      hasReferenceUrls ||
+                      hasTravelTime ||
+                      hasChecklist;
+
+
+
+
+
+
 
                     return (
                       <div key={todo.id} data-todo-row>
