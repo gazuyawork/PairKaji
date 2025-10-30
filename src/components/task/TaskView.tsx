@@ -342,6 +342,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   // 並び替え（ドラッグ＆ドロップ）用：表示順のローカルオーバーライド（task.id -> order）
   const [localOrderMap, setLocalOrderMap] = useState<Record<string, number>>({});
 
+  // onSnapshot 内でも常に最新の localOrderMap を参照できるようにする
+  const localOrderRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    localOrderRef.current = localOrderMap;
+  }, [localOrderMap]);
+
   // === [Fix]（前回の修正） onSnapshot巻き戻し対策用フラグ
   const pendingOrderPeriods = useRef<Set<Period>>(new Set());
 
@@ -746,8 +752,18 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           const isPending = pendingOrderPeriods.current.has(p);
           list.forEach((t, idx) => {
             const ord = getOpt(t, 'order');
-            // pending中はFirestoreのorderを無視
-            nextOrderMap[t.id] = isPending ? (nextOrderMap[t.id] ?? idx) : typeof ord === 'number' ? ord : idx;
+
+            // pending 中は "直前にユーザーが確定した localOrder" を最優先し、なければ Firestore の order、最後に idx
+            const prevLocal = localOrderRef.current[t.id];
+            if (isPending) {
+              nextOrderMap[t.id] =
+                typeof prevLocal === 'number'
+                  ? prevLocal
+                  : (typeof ord === 'number' ? ord : idx);
+            } else {
+              nextOrderMap[t.id] = (typeof ord === 'number' ? ord : idx);
+            }
+
           });
         }
 
@@ -1326,7 +1342,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
                         if (selectionMode) {
                           // === 選択モード：dnd-kit で並び替え（表示中アイテムのみドラッグ可能）
-                          const sortedIds = orderedAllForPeriod.map((t) => t.id);
                           const visibleIds = visibleList.map((t) => t.id); // === [Fix2] 可視IDを handleDragEnd へ
 
                           return (
@@ -1336,7 +1351,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                               modifiers={[restrictToVerticalAxis]}
                               onDragEnd={(e) => handleDragEnd(period, e, periodAll, visibleIds)}
                             >
-                              <SortableContext items={sortedIds} strategy={verticalListSortingStrategy}>
+                              {/* ★修正: items は "表示されている要素の配列" と一致させる */}
+                              <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
                                 {visibleList.map((task) => (
                                   <SelectModeRow
                                     key={task.id}
