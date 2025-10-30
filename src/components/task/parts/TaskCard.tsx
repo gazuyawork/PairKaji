@@ -462,8 +462,8 @@ export default function TaskCard({
                 }}
                 className="px-3 py-1.5 rounded-md bg-blue-500/80 backdrop-blur-sm shadow ring-1 ring-black/10 flex items-center gap-2"
               >
-                <span className="text-[13px] font-semibold text-white">Todo</span>
-                <ArrowRight className="w-5 h-5 text-white" />
+                <span className="text-[12px] font-semibold text-white">Todo</span>
+                <ArrowRight className="w-4 h-4 text-white" />
               </motion.div>
             </div>
           </div>
@@ -504,8 +504,8 @@ export default function TaskCard({
                 }}
                 className="px-3 py-1.5 rounded-md bg-orange-500/80 backdrop-blur-sm shadow ring-1 ring-black/10 flex items-center gap-2"
               >
-                <ArrowLeft className="w-5 h-5 text-white" />
-                <span className="text-[13px] font-semibold text-white">SKIP</span>
+                <ArrowLeft className="w-4 h-4 text-white" />
+                <span className="text-[12px] font-semibold text-white">SKIP</span>
               </motion.div>
             </div>
           </div>
