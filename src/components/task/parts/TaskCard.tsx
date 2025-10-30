@@ -315,7 +315,7 @@ export default function TaskCard({
       {swipeDirection === 'left' && deletingTaskId === task.id && !showActions && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
-            className="w-16 h-11 text-sm font-bold text-white flex items-center justify-center rounded-xl bg-gradient-to-b from-indigo-300 to-indigo-600 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
+            className="w-16 h-11 text-sm font-bold text-white flex items-center justify-center rounded-xl bg-gradient-to-b from-orange-300 to-orange-500 shadow-md ring-1 ring-white/30 ring-2 ring-white active:translate-y-[1px] transition-transform"
             onClick={(e) => {
               e.stopPropagation();
               onSkip?.(task.id);
