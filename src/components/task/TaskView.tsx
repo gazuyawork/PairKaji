@@ -20,6 +20,7 @@ import {
   DocumentData,
   QueryDocumentSnapshot,
   writeBatch,
+  setDoc, // ★★★ 追加：CB(Cloud側別領域)への順序保存で使用
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { isToday, parseISO } from 'date-fns';
@@ -250,11 +251,8 @@ function SelectModeRow({
       style={style}
       className={[
         'relative transition-all duration-200 rounded-xl border',
-        // 色味を白基調で統一（グラデは任意）
         'bg-white shadow-sm',
-        // ★ 最低高さを指定（例：72px）
         'min-h-[58px]',
-        // 中の余白も合わせておくと見た目が安定
         'px-2 py-2',
         selected ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200',
         isDragging ? 'shadow-lg' : '',
@@ -741,28 +739,64 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           }
         }
 
-        setTasksState(grouped);
+        // ==== 並び順のローカルマップ生成 ====
+        const nextOrderMap: Record<string, number> = {};
+        for (const p of periods) {
+          const list = grouped[p];
+          const isPending = pendingOrderPeriods.current.has(p);
+          list.forEach((t, idx) => {
+            const ord = getOpt(t, 'order');
+            // pending中はFirestoreのorderを無視
+            nextOrderMap[t.id] = isPending ? (nextOrderMap[t.id] ?? idx) : typeof ord === 'number' ? ord : idx;
+          });
+        }
 
-        // === [Fix] Firestoreの order をローカル初期値に反映。
-        // 保存直後は pending を尊重して巻き戻しを防ぐ。
-        setLocalOrderMap((prev) => {
-          const next: Record<string, number> = { ...prev };
-          for (const p of periods) {
-            const list = grouped[p];
-            const isPending = pendingOrderPeriods.current.has(p);
-            list.forEach((t, idx) => {
-              if (isPending && typeof prev[t.id] === 'number') {
-                return; // pending 中は prev を維持
-              }
-              const ord = getOpt(t, 'order');
-              next[t.id] = typeof ord === 'number' ? ord : idx;
+        // ==== CB（Cloud Backup）に保存された順序を適用 ====
+        try {
+          if (uid) {
+            const cbMaps: Array<Promise<{ period: Period; ids: string[] | null }>> = periods.map(async (p) => {
+              const cbRef = doc(collection(doc(db, 'user_configs', uid), 'task_orders'), p);
+              const snap = await getDoc(cbRef);
+              if (!snap.exists()) return { period: p, ids: null };
+              const data = snap.data() as { ids?: unknown };
+              const ids = Array.isArray(data?.ids) ? (data!.ids as string[]) : null;
+              return { period: p, ids };
             });
-          }
-          return next;
-        });
 
-        setIsLoading(false);
+            const results = await Promise.all(cbMaps);
+            for (const { period: p, ids } of results) {
+              if (!ids || pendingOrderPeriods.current.has(p)) continue; // pending中はCBで上書きしない
+              const periodTasks = (grouped[p] ?? []).map((t) => t.id);
+              const idSet = new Set(periodTasks);
+              const ordered = ids.filter((id) => idSet.has(id));
+              const remain = periodTasks.filter((id) => !idSet.has(id) || !ordered.includes(id));
+              const merged = [...ordered, ...remain];
+              merged.forEach((id, idx) => {
+                nextOrderMap[id] = idx;
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[CB load] 並び順の読込に失敗しました（処理は継続します）:', e);
+        }
+
+        // ==== 並び替え済みデータを初期描画に反映 ====
+        const sortedGrouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
+        for (const p of periods) {
+          const list = grouped[p];
+          const sorted = list
+            .slice()
+            .sort((a, b) => (nextOrderMap[a.id] ?? 0) - (nextOrderMap[b.id] ?? 0));
+          sortedGrouped[p] = sorted;
+        }
+
+        setLocalOrderMap(nextOrderMap);
+        setTasksState(sortedGrouped);
+
+        // ==== すべて更新後にローディング解除 ====
+        requestAnimationFrame(() => setIsLoading(false));
       });
+
     })().catch(console.error);
 
     return () => {
@@ -981,7 +1015,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [uid, selectedIds, tasksState]);
 
   // 一括削除
-  // ✅ TaskCard と同じ ConfirmModal 方式に統一
   const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
@@ -1007,41 +1040,48 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   }, [selectedIds]);
 
-
   /* =========================================================
    * 並び替え（複数選択モード時のみ）
    * =======================================================*/
 
   // 指定 period の表示順を Firestore に保存（period 全体の ID 順）
-  const persistOrderForPeriod = useCallback(async (period: Period, orderedIds: string[]) => {
-    try {
-      const batch = writeBatch(db);
-      orderedIds.forEach((id, idx) => {
-        const ref = doc(db, 'tasks', id);
-        batch.update(ref, { order: idx, updatedAt: serverTimestamp() });
-      });
-      await batch.commit();
-      toast.success('並び順を保存しました');
-    } catch (e) {
-      console.error('[persistOrderForPeriod] 失敗:', e);
-      toast.error('並び順の保存に失敗しました');
-    }
-  }, []);
+  const persistOrderForPeriod = useCallback(
+    async (period: Period, orderedIds: string[]) => {
+      try {
+        const batch = writeBatch(db);
+        orderedIds.forEach((id, idx) => {
+          const ref = doc(db, 'tasks', id);
+          batch.update(ref, { order: idx, updatedAt: serverTimestamp() });
+        });
+        await batch.commit();
+
+        // ★★★ 追加：CB（Cloud側別領域）にも「ID配列の順序」を保存
+        // パス: user_configs/{uid}/task_orders/{period}
+        if (uid) {
+          const cbDocRef = doc(collection(doc(db, 'user_configs', uid), 'task_orders'), period);
+          await setDoc(cbDocRef, { ids: orderedIds, updatedAt: serverTimestamp() }, { merge: true });
+        }
+
+        toast.success('並び順を保存しました');
+      } catch (e) {
+        console.error('[persistOrderForPeriod] 失敗:', e);
+        toast.error('並び順の保存に失敗しました');
+      }
+    },
+    [uid]
+  );
 
   // === [Fix2] 可視リストの移動を period 全体の順序へ合成するユーティリティ
   const mergeVisibleReorderIntoFull = useCallback(
     (fullOrderedIds: string[], visibleOldIds: string[], visibleNewIds: string[]) => {
-      // full から可視IDの位置（index群）を抽出して昇順に
       const slots = fullOrderedIds
         .map((id, idx) => ({ id, idx }))
         .filter((x) => visibleOldIds.includes(x.id))
         .map((x) => x.idx)
         .sort((a, b) => a - b);
 
-      // 一旦、可視IDを抜いた full の骨格を作る
       const skeleton = fullOrderedIds.filter((id) => !visibleOldIds.includes(id));
 
-      // 抜いた位置に、新しい可視順を同じスロットに差し戻す
       const result = skeleton.slice();
       visibleNewIds.forEach((id, i) => {
         const pos = slots[i];
@@ -1053,7 +1093,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   );
 
   // dnd-kit: ドラッグ終了（period 全体順で処理）
-  // === [Fix2] 第3引数: period 全体（未フィルタ）／ 第4引数: 可視（表示中）ID の配列
   const handleDragEnd = useCallback(
     async (period: Period, event: DragEndEvent, periodAll: Task[], visibleIds: string[]) => {
       const { active, over } = event;
@@ -1084,11 +1123,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
       pendingOrderPeriods.current.add(period);
 
-      // 5) Firestore に period 全体の順序を保存
+      // 5) Firestore/CB に period 全体の順序を保存
       await persistOrderForPeriod(period, nextFullIds);
 
       // 6) 保存直後のスナップショット遅延に備えて、短時間 pending を維持（巻き戻し防止）
-      //    既存のタイマーがあればクリアしてから、再度 1200ms 保持
       const t = pendingTimers.current[period];
       if (typeof t === 'number') {
         window.clearTimeout(t);
@@ -1184,7 +1222,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                   <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
                     {isSearchVisible && (
                       <div className="mb-3">
-                        {/* URL反映に合わせ ref と value/onChange を使用 */}
                         <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
                       </div>
                     )}
@@ -1427,14 +1464,11 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                           <Trash2 className="w-6 h-6" />
                         </button>
                       )}
-
                     </>
 
                     {/* ===== フィルタ群は複数選択モード中は非表示 ===== */}
                     {!selectionMode && (
                       <>
-
-
                         {/* 📅 本日フィルター */}
                         <button
                           onClick={() => setTodayFilter((prev) => !prev)}
@@ -1445,7 +1479,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                             'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
                             'shrink-0',
                             todayFilter
-                              ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text-white border-[2px] border-[#f0a93a] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                              ? 'bg-gradient-to-b from-[#ffd38a] to-[#f5b94f] text白 border-[2px] border-[#f0a93a] shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
                               : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-[#FFCB7D] hover:text-white hover:border-[#FFCB7D]',
                           ].join(' ')}
                         >
@@ -1495,14 +1529,10 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
                         >
                           <Flag className="w-6 h-6" />
                         </button>
-
-
                       </>
                     )}
 
                     {/* 🔎 検索（虫眼鏡） */}
-
-                    {/* 仕切り */}
                     <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
                     <button
                       onPointerDown={handleToggleSearch}
@@ -1545,7 +1575,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         confirmLabel="削除する"
         cancelLabel="キャンセル"
       />
-
     </div>
   );
 }
