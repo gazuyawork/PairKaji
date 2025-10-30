@@ -4,13 +4,12 @@
 export const dynamic = 'force-dynamic';
 
 /* 変更点サマリ
-  - ★変更: <Toaster /> を bottom-center + dynamic offset（visualViewport 連動）に変更
-  - ★追加: キーボード高さに応じて CSS 変数へオフセットを設定する useEffect を追加
-  - 既存: <ServiceWorkerInit /> を key 付きラッパーの外に配置（再マウント影響を回避）
+  - ★重要変更: <Toaster /> を key 付きラッパーの「外」に移動（再マウント喪失対策）
+  - ★重要変更: visualViewport から算出した数値(px)を offset に渡す方式へ変更（calc()依存を回避）
   - 既存: SetViewportHeight / PreventBounce / PairInit / TaskSplitMonitor はそのまま
 */
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import PairInit from '@/components/common/PairInit';
 import PreventBounce from '@/components/common/PreventBounce';
@@ -50,29 +49,47 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
 
   useUnlockBodyOnUnmount();
 
-  /* ★追加: SP のソフトキーボードに隠れないよう、visualViewport に応じて
-     下部オフセットを CSS 変数へ反映（--toast-bottom-dynamic-offset） */
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
+  /* ★重要追加: SP のソフトキーボードに隠れないよう、visualViewport に応じて
+     数値(px) のオフセットを算出して Toaster の offset に直接渡す */
+  const [toastOffsetPx, setToastOffsetPx] = useState<number>(16);
 
-    const vv = window.visualViewport;
-    const update = () => {
-      // キーボード相当の高さを推定（端末回転やスクロールも考慮）
-      const keyboardHeight = Math.max(0, window.innerHeight - (vv!.height + vv!.offsetTop));
-      // 16px 余白を加算、上限は任意で制限（過大なズレ防止）
-      const px = Math.round(Math.min(480, keyboardHeight + 16));
-      document.documentElement.style.setProperty('--toast-bottom-dynamic-offset', `${px}px`);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // env(safe-area-inset-bottom) は JS から直接取得できないため、最低限の余白として 8px 加算
+    const SAFE_AREA_FALLBACK = 8;
+
+    const compute = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        // iOS/Android でのキーボード表示分を概算
+        const keyboardHeight = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+        const px = Math.round(Math.min(480, keyboardHeight + 16 + SAFE_AREA_FALLBACK));
+        setToastOffsetPx(px);
+      } else {
+        // visualViewport 非対応ブラウザのフォールバック
+        setToastOffsetPx(24 + SAFE_AREA_FALLBACK);
+      }
     };
 
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    window.addEventListener('orientationchange', update);
+    compute();
+
+    // ★追加: リサイズ/スクロール/向き変更で再計算
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', compute);
+    vv?.addEventListener('scroll', compute);
+    window.addEventListener('orientationchange', compute);
+
+    // ★追加: フォーカス/ブラーでも再計算（入力開始/終了に追従）
+    window.addEventListener('focusin', compute);
+    window.addEventListener('focusout', compute);
 
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      window.removeEventListener('orientationchange', update);
+      vv?.removeEventListener('resize', compute);
+      vv?.removeEventListener('scroll', compute);
+      window.removeEventListener('orientationchange', compute);
+      window.removeEventListener('focusin', compute);
+      window.removeEventListener('focusout', compute);
     };
   }, []);
 
@@ -83,6 +100,22 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
 
       {/* 既存: ViewportHeight の補正は常時マウント */}
       <SetViewportHeight />
+
+      {/* ★重要変更: トーストは「key 付きラッパーの外」に配置して
+          ルートや状態による再マウントの影響を受けないようにする */}
+      <Toaster
+        position="bottom-center"
+        richColors
+        closeButton
+        expand
+        /* ★変更: 文字列 calc ではなく数値(px) を直接渡す */
+        offset={toastOffsetPx}
+        toastOptions={{
+          duration: 2600, // 微調整: SP で読める程度に+200ms
+          style: { zIndex: 2147483646 },
+          className: 'z-[2147483646] will-change-transform', // ★追加: iOSでの再描画安定化
+        }}
+      />
 
       {/* 既存: allowTouch のときは PreventBounce を外す */}
       {!allowTouch && <PreventBounce />}
@@ -99,21 +132,6 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
         <PairInit />
         <TaskSplitMonitor />
         {children}
-
-        {/* ★変更: トーストを bottom-center にし、safe-area + キーボード高さで動的に持ち上げる。
-           z-index を最大級に上げ、固定ヘッダーやモーダルより前面に表示 */}
-        <Toaster
-          position="bottom-center"
-          richColors
-          closeButton
-          expand
-          offset="calc(env(safe-area-inset-bottom, 0px) + var(--toast-bottom-dynamic-offset, 16px))"
-          toastOptions={{
-            duration: 2400,
-            style: { zIndex: 2147483646 },
-            className: 'z-[2147483646]',
-          }}
-        />
       </div>
     </>
   );
