@@ -5,7 +5,9 @@ export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, Notebook, X, SquareUser } from 'lucide-react';
+/* ★変更: 矢印アイコンを両方向で使うため ArrowRight/ArrowLeft を追加 */
+/* ★追加: タップ促し用に MousePointerClick を追加 */
+import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, Notebook, X, SquareUser, ArrowRight, ArrowLeft, MousePointerClick } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -16,7 +18,10 @@ import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import { createPortal } from 'react-dom';
 import LinkifiedText from '@/components/common/LinkifiedText';
-
+/* ★追加: react-swipeable のイベント型 */
+import type { SwipeEventData } from 'react-swipeable';
+/* ★追加: ヘルプON/OFFのグローバル状態 */
+import { useHelpHints } from '@/context/HelpHintsContext';
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
@@ -80,6 +85,10 @@ export default function TaskCard({
   isDragging,
 }: Props) {
   const { setIndex, setSelectedTaskName } = useView();
+
+  /* ★追加: 「？」ボタンON/OFF（グローバル） */
+  const { enabled: helpEnabled } = useHelpHints();
+
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
@@ -90,11 +99,48 @@ export default function TaskCard({
   const pendingConfirmResolver = useRef<((ok: boolean) => void) | null>(null);
   const [localDone, setLocalDone] = useState(task.done);
 
+  // ★追加: ヒントのフェーズ制御（2往復 → exit で吸い込まれる）
+  const [leftHintPhase, setLeftHintPhase] = useState<'loop' | 'exit' | null>(null);
+  const [rightHintPhase, setRightHintPhase] = useState<'loop' | 'exit' | null>(null);
+
   // 備考モーダル開閉
   const [showNote, setShowNote] = useState(false);
 
   const noteText = (task as TaskWithNote).note?.trim();
 
+  /* ★追加: 表示範囲検知用（ToDo画面に切替わってカードが見えたら発火） */
+  const [isInView, setIsInView] = useState(false);
+
+  /* ★追加: 促しアニメ表示フラグ（左→中央付近） */
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+
+  /* ★追加: 右端→左に「←SKIP」アニメ（？アイコンON時のみ） */
+  const [showSkipHint, setShowSkipHint] = useState(false);
+
+  /* ★追加: スワイプ方向ブースト（右スワイプ=左ヒント加速、左スワイプ=右ヒント加速） */
+  const [swipeBoost, setSwipeBoost] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
+  const boostTimerRef = useRef<{ left: number | null; right: number | null }>({ left: null, right: null });
+
+  /** ★追加: 指を動かしている間＆離した直後に一定時間ブーストを維持 */
+  const triggerBoost = (dir: 'left' | 'right', holdMs = 300) => {
+    setSwipeBoost((prev) => ({ ...prev, [dir]: true }));
+    const key = dir;
+    if (boostTimerRef.current[key] != null) {
+      clearTimeout(boostTimerRef.current[key]!);
+    }
+    boostTimerRef.current[key] = window.setTimeout(() => {
+      setSwipeBoost((prev) => ({ ...prev, [key]: false }));
+      boostTimerRef.current[key] = null;
+    }, holdMs);
+  };
+
+  useEffect(() => {
+    return () => {
+      // ★追加: アンマウント時にブーストタイマーをクリア
+      if (boostTimerRef.current.left != null) clearTimeout(boostTimerRef.current.left);
+      if (boostTimerRef.current.right != null) clearTimeout(boostTimerRef.current.right);
+    };
+  }, []);
 
   useEffect(() => {
     setLocalDone(task.done);
@@ -149,6 +195,7 @@ export default function TaskCard({
     }
   };
 
+  // ★変更: onSwiping を追加して実スワイプ方向で促しアニメを加速（ヘルプON時のみ）
   const swipeable = useSwipeable({
     onSwipedLeft: () => {
       setSwipeDirection('left');
@@ -159,8 +206,43 @@ export default function TaskCard({
       setSwipeDirection('right');
       setShowActions(false);
     },
+    onSwiping: (e: SwipeEventData) => {
+      if (!helpEnabled) return; // ★ヘルプOFFならブースト無効
+      if (e.dir === 'Left') {
+        // 左へスワイプ中 → 右ヒント(←SKIP)を加速
+        triggerBoost('left');
+      } else if (e.dir === 'Right') {
+        // 右へスワイプ中 → 左ヒント(Todo→)を加速
+        triggerBoost('right');
+      }
+    },
     trackTouch: true,
   });
+
+  // ★変更: 左ヒント（Todo）表示トリガー。isInView かつ ヘルプON になったら loop フェーズ開始
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (helpEnabled && task.visible && isInView) {
+      setShowSwipeHint(true);
+      setLeftHintPhase('loop');
+    } else {
+      // OFFや非可視になったら即リセット
+      setShowSwipeHint(false);
+      setLeftHintPhase(null);
+    }
+  }, [helpEnabled, task.visible, isInView]);
+
+  // ★変更: 右ヒント（SKIP）表示トリガー。同様にヘルプON時のみ loop フェーズ開始
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (helpEnabled && isInView) {
+      setShowSkipHint(true);
+      setRightHintPhase('loop');
+    } else {
+      setShowSkipHint(false);
+      setRightHintPhase(null);
+    }
+  }, [helpEnabled, isInView]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -200,15 +282,36 @@ export default function TaskCard({
     setIndex(2);
   };
 
+  /* ★変更: メニュー自動クローズ時間（誤 50000 → 正 5000ms に修正） */
   useEffect(() => {
     if (!showActions) return;
     const timeout = setTimeout(() => setShowActions(false), 5000);
     return () => clearTimeout(timeout);
   }, [showActions]);
 
+  /* ★追加: IntersectionObserver で「カードが50%以上見えたら isInView=true」 */
+  useEffect(() => {
+    if (!cardRef.current) return;
+    const el = cardRef.current;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setIsInView(entry.isIntersecting && entry.intersectionRatio >= 0.5);
+      },
+      { threshold: [0, 0.5, 1] }
+    );
+    io.observe(el);
+    return () => io.unobserve(el);
+  }, []);
+
+  /* ★追加: スワイプ加速用の可変パラメータ（右スワイプ=左ヒント加速 / 左スワイプ=右ヒント加速） */
+  const leftLoopDuration = swipeBoost.right ? 0.7 : 1.6;  // 右へスワイプ中は左ヒント(Todo→)を加速
+  const rightLoopDuration = swipeBoost.left ? 0.7 : 1.6;  // 左へスワイプ中は右ヒント(←SKIP)を加速
+  const leftEase: any = swipeBoost.right ? 'easeOut' : 'easeInOut';
+  const rightEase: any = swipeBoost.left ? 'easeOut' : 'easeInOut';
+
   return (
     <div className="relative" ref={cardRef}>
-
       {swipeDirection === 'left' && deletingTaskId === task.id && !showActions && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <button
@@ -220,7 +323,6 @@ export default function TaskCard({
             }}
             title="スキップ（ポイント加算なし）"
           >
-            {/* <SkipForward className="w-5 h-5 text-white [text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]" /> */}
             <span className="[text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]">SKIP</span>
           </button>
         </div>
@@ -241,7 +343,6 @@ export default function TaskCard({
       {showActions && showActionButtons && swipeDirection === null && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-6">
-
             {/* 削除 */}
             <button
               onClick={(e) => {
@@ -266,8 +367,8 @@ export default function TaskCard({
                 task.done
                   ? 'bg-gray-300 opacity-30 cursor-not-allowed'
                   : task.flagged
-                    ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
-                    : 'bg-gray-300 ring-1 ring-gray-300 text-white'
+                  ? 'bg-gradient-to-b from-red-300 to-red-500 ring-1 ring-red-300'
+                  : 'bg-gray-300 ring-1 ring-gray-300 text-white'
               )}
               title="重要マーク"
             >
@@ -285,7 +386,6 @@ export default function TaskCard({
             >
               <Pencil className="w-5 h-5" />
             </button>
-
           </div>
         </div>
       )}
@@ -300,21 +400,18 @@ export default function TaskCard({
         className={clsx(
           // 新しいベースクラス
           'w-full relative flex justify-between items-center px-2.5 py-2 overflow-hidden [touch-action:pan-y] cursor-pointer min-h-[58px]',
-
           // 両方のデザイン統合
           'group text-[#5E5E5E]',
           'rounded-xl border border-gray-200 border-[#e5e5e5]',
           'bg-gradient-to-b from-white to-gray-50 bg-white',
-          'shadow-[0_2px_1px_rgba(0,0,0,0.08)] hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)] hover:shadow-md',
+          'shadow-[0_2px_1px_rgba(0,0,0,0.08)] hover:shadow-[0,14px,28px_rgba(0,0,0,0.16)] hover:shadow-md',
           'transition-all duration-300 will-change-transform',
           'active:translate-y-[1px]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCB7D]/50',
-
           // 状態による動的クラス
           task.done && 'opacity-50 scale-[0.99]',
           isDragging && 'opacity-70'
         )}
-
       >
         {/* TODOバッジ（左上） */}
         {task.visible && (
@@ -323,6 +420,117 @@ export default function TaskCard({
             style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
           >
             <span className="translate-y-[-6px] translate-x-[-4px]">T</span>
+          </div>
+        )}
+
+        {/* ★変更: 左端→中央 促し（2往復 → exitで内側に縮小しつつフェードアウト） */}
+        {helpEnabled && task.visible && showSwipeHint && (
+          <div className="absolute inset-0 z-40 pointer-events-none">
+            <div className="absolute inset-y-0 left-0 flex items-center">
+              <motion.div
+                key="hint-left"
+                initial={{ opacity: 0.95, x: '0%', scale: 1 }}
+                animate={
+                  leftHintPhase === 'exit'
+                    ? {
+                        // ★exit: カード内へ「吸い込まれる」演出（少し内側へ + 縮小 + フェード）
+                        x: '16%',
+                        scale: 0.6,
+                        opacity: 0,
+                        transition: { duration: 0.35, ease: 'easeIn' },
+                      }
+                    : {
+                        // ★loop: 2往復（行って戻る × 2回）
+                        x: ['0%', '40%', '0%'],
+                        transition: {
+                          times: [0, 0.5, 1],
+                          duration: leftLoopDuration, // ★可変
+                          ease: leftEase,             // ★可変
+                          repeat: 0,
+                        },
+                      }
+                }
+                onAnimationComplete={() => {
+                  if (leftHintPhase === 'loop') {
+                    // 2往復が終わったら exit フェーズへ
+                    setLeftHintPhase('exit');
+                  } else if (leftHintPhase === 'exit') {
+                    // 吸い込みフェード完了で DOM から取り除く
+                    setShowSwipeHint(false);
+                    setLeftHintPhase(null);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-md bg-blue-500/80 backdrop-blur-sm shadow ring-1 ring-black/10 flex items-center gap-2"
+              >
+                <span className="text-[13px] font-semibold text-white">Todo</span>
+                <ArrowRight className="w-5 h-5 text-white" />
+              </motion.div>
+            </div>
+          </div>
+        )}
+
+        {/* ★変更: 右端→左へ 促し（2往復 → exitで内側に縮小しつつフェードアウト） */}
+        {helpEnabled && showSkipHint && (
+          <div className="absolute inset-0 z-40 pointer-events-none">
+            <div className="absolute inset-y-0 right-0 flex items-center">
+              <motion.div
+                key="hint-right"
+                initial={{ opacity: 0.95, x: '0%', scale: 1 }}
+                animate={
+                  rightHintPhase === 'exit'
+                    ? {
+                        x: '-16%',
+                        scale: 0.6,
+                        opacity: 0,
+                        transition: { duration: 0.35, ease: 'easeIn' },
+                      }
+                    : {
+                        x: ['0%', '-40%', '0%'],
+                        transition: {
+                          times: [0, 0.5, 1],
+                          duration: rightLoopDuration, // ★可変
+                          ease: rightEase,             // ★可変
+                          repeat: 0,
+                        },
+                      }
+                }
+                onAnimationComplete={() => {
+                  if (rightHintPhase === 'loop') {
+                    setRightHintPhase('exit');
+                  } else if (rightHintPhase === 'exit') {
+                    setShowSkipHint(false);
+                    setRightHintPhase(null);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-md bg-orange-500/80 backdrop-blur-sm shadow ring-1 ring-black/10 flex items-center gap-2"
+              >
+                <ArrowLeft className="w-5 h-5 text-white" />
+                <span className="text-[13px] font-semibold text-white">SKIP</span>
+              </motion.div>
+            </div>
+          </div>
+        )}
+
+        {/* ★追加: タップ促しアイコン（〇に囲まれた指）— 促しアニメ表示中のみ（ヘルプON時） */}
+        {helpEnabled && (showSwipeHint || showSkipHint) && (
+          <div className="absolute inset-0 z-50 pointer-events-none flex items-center justify-center">
+            <motion.div
+              aria-hidden
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{
+                opacity: 0.95,
+                scale: [0.96, 1.02, 0.96],
+              }}
+              transition={{
+                duration: 1.2,
+                ease: 'easeInOut',
+                repeat: Infinity,
+                repeatType: 'reverse',
+              }}
+              className="pointer-events-none rounded-full bg-white/85 backdrop-blur-sm shadow-md ring-2 ring-[#5E5E5E]/15 w-12 h-12 flex items-center justify-center"
+            >
+              <MousePointerClick className="w-6 h-6 text-[#5E5E5E]" />
+            </motion.div>
           </div>
         )}
 
@@ -359,7 +567,6 @@ export default function TaskCard({
             <div className="flex items-center gap-1 min-w-0">
               {task.flagged && <Flag className="text-red-500 w-4 h-4 shrink-0" />}
               <span className="text-[#5E5E5E] font-bold font-sans truncate">{task.name}</span>
-              {/* ★ 削除: 以前ここにあった備考Infoアイコンは右側（ポイント左）へ移動 */}
             </div>
             {/* 2行目：日付・曜日・時間 */}
             <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
@@ -426,7 +633,6 @@ export default function TaskCard({
               </div>
             </div>
           ) : !task.private ? (
-            // ★ 備考Infoボタンは共通判定に統一（挙動は従来通り）
             <div className="flex items-center gap-2 w-">
               {noteText && (
                 <button
@@ -442,7 +648,6 @@ export default function TaskCard({
                   <Notebook className="w-5 h-5 text-yellow-500" />
                 </button>
               )}
-
 
               {task.point > 0 && (
                 <p className="text-[#5E5E5E] font-sans min-w-[34px] text-right">
@@ -482,12 +687,10 @@ export default function TaskCard({
               <div className="w-[10px] h-[30px]" />
             </div>
           )}
-
         </div>
       </motion.div>
 
-      {/* 備考モーダル（トリガー位置を右へ移したがモーダル本体は従来通り） */}
-      {/* 備考モーダルを body 直下へポータル */}
+      {/* 備考モーダル */}
       {showNote &&
         typeof window !== 'undefined' &&
         createPortal(
@@ -510,9 +713,8 @@ export default function TaskCard({
               aria-label="タスク備考"
             >
               <div className="flex items-start gap-3 mb-3">
-                {/* インフォアイコン：オレンジ */}
                 <Notebook className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
-                <h3 className="text-base font-semibold text-gray-800">備考</h3>
+                <h3 className="text;base font-semibold text-gray-800">備考</h3>
 
                 {/* 右上 × ボタン */}
                 <button
@@ -529,17 +731,15 @@ export default function TaskCard({
                 </button>
               </div>
 
-              {/* ★ 変更：URLをクリック可能に */}
+              {/* URLをクリック可能に */}
               <LinkifiedText
                 text={(task as Task & { note?: string }).note?.trim() || ''}
                 className="whitespace-pre-wrap break-words text-[15px] leading-6 text-gray-700"
               />
-
             </div>
           </div>,
           document.body
-        )
-      }
+        )}
 
       <ConfirmModal
         isOpen={confirmOpen}

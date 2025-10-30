@@ -1,4 +1,3 @@
-// src/components/common/HelpHintsToggle.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -44,15 +43,12 @@ export default function HelpHintsToggle({ className = '' }: Props) {
         'rounded-full border p-2 shadow-sm transition-all backdrop-blur-md',
         'hover:scale-105 active:scale-95',
         enabled
-          ? 'bg-[rgba(255,255,255,0.5)] border-gray-300 text-gray-700 hover:bg-[rgba(255,255,255,0.7)]'
-          : 'bg-[rgba(75,75,75,0.5)] border-gray-600 text-white hover:bg-[rgba(75,75,75,0.7)]',
+          ? 'bg-orange-300 border-orange-400 text-white hover:bg-orange-500'
+          : 'bg-transparent border-gray-400 text-gray-500 hover:bg-gray-100',
         className,
       ].join(' ')}
     >
-      <HelpCircle
-        size={18}
-        className={enabled ? 'text-gray-700' : 'text-white'}
-      />
+      <HelpCircle size={18} />
     </button>
   );
 }
