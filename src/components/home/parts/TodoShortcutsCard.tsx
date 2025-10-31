@@ -180,7 +180,7 @@ function SlotButton(props: {
         'bg-white/80 dark:bg-white/[0.06] backdrop-blur',
         'hover:shadow-md transition-all duration-200',
         filled
-          ? 'border-gray-300 dark:border-white/15'
+          ? 'border-2 border-orange-200 dark:border-white/15'
           : 'border-dashed border-gray-300 dark:border-white/15',
         isLabelLoading ? 'cursor-wait pointer-events-none opacity-70' : '', // ★追加：押下不可＆見た目
       ].join(' ')}

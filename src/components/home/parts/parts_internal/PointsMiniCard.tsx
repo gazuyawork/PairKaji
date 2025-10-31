@@ -392,7 +392,7 @@ export default function PointsMiniCard() {
             aria-label="パートナーが目標ポイント（または内訳）を更新しました。"
             title="パートナーが更新しました。"
           >
-            Update
+            Updated
           </span>
         )}
 
