@@ -77,7 +77,7 @@ function toMillis(v: unknown): number | null {
     if (hasToDate(v)) return v.toDate().getTime();
     if (typeof v === 'number' && Number.isFinite(v)) return v;
     if (typeof v === 'string' && v.length > 0) return new Date(v).getTime();
-  } catch { }
+  } catch {}
   return null;
 }
 function getBadgeStorageKey(uid: string, start: Date, end: Date) {
@@ -121,11 +121,10 @@ export default function PointsMiniCard() {
   // 自分の保存直後のスナップショットを一度だけ無視
   const suppressNextSelfChangeRef = useRef<boolean>(false);
 
-  // トースト表示用
+  // トースト（固定文言）表示用
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    // 3秒で自動クローズ
     window.setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -143,7 +142,7 @@ export default function PointsMiniCard() {
     try {
       const key = getBadgeStorageKey(uid, weekStart, weekEnd);
       setNeedsRefresh(localStorage.getItem(key) === '1');
-    } catch { }
+    } catch {}
   }, [uid, weekStart, weekEnd]);
 
   // ペア検出
@@ -237,6 +236,7 @@ export default function PointsMiniCard() {
 
   /* ================================================================
      差分検知：保存した本人には Update を出さず、相手にだけ出す
+     ＋（名前取得はやめ）固定文言のトーストを表示する
   ================================================================= */
   useEffect(() => {
     if (!uid || targetIds.length === 0) return;
@@ -287,13 +287,13 @@ export default function PointsMiniCard() {
         const wChanged = (prev.weeklyTargetPoint ?? null) !== (curr.weeklyTargetPoint ?? null);
         const sChanged = (prev.selfPoint ?? null) !== (curr.selfPoint ?? null);
 
-        // 差分があり、かつ lastChangedBy が「自分以外」 → 点灯
+        // 差分があり、かつ lastChangedBy が「自分以外」 → 点灯（名前は取得せず固定文言に）
         if ((wChanged || sChanged) && curr.lastChangedBy && curr.lastChangedBy !== uid) {
           setNeedsRefresh(true);
           try {
             const key = getBadgeStorageKey(uid, weekStart, weekEnd);
             localStorage.setItem(key, '1');
-          } catch { }
+          } catch {}
         }
 
         // 表示値の更新
@@ -311,48 +311,15 @@ export default function PointsMiniCard() {
 
   /* ================================================================
      モーダルを開いたとき：
-     - パートナー側ならトースト表示（◯◯が目標ポイントを更新しました。）
+     - パートナー側ならトースト表示（固定文言）
      - その後に既読化（バッジと localStorage を消す）
   ================================================================= */
   const handleOpenModal = async () => {
     setIsModalOpen(true);
 
-    // needsRefresh が立っている = 「相手が更新した」未読状態
     if (needsRefresh && uid) {
-      // 最新の更新者（自分以外）を points/{ownerUid} から探す
-      let latestBy: string | null = null;
-      let latestAt: number = -1;
-
-      for (const ownerUid of targetIds) {
-        try {
-          const snap = await getDoc(doc(db, 'points', ownerUid));
-          if (!snap.exists()) continue;
-          const data = snap.data() as PointsDoc;
-          const by = typeof data.lastChangedBy === 'string' ? data.lastChangedBy : null;
-          const atMs = toMillis(data.lastChangedAt ?? null) ?? 0;
-          if (by && by !== uid && atMs >= latestAt) {
-            latestAt = atMs;
-            latestBy = by;
-          }
-        } catch {
-          /* noop */
-        }
-      }
-
-      // 表示名の取得（設定画面の登録名を優先）
-      if (latestBy) {
-        let display = 'パートナー';
-        try {
-          const uSnap = await getDoc(doc(db, 'users', latestBy));
-          if (uSnap.exists()) {
-            const u = uSnap.data() as { displayName?: string; name?: string };
-            display = (u.displayName || u.name || display) as string;
-          }
-        } catch {
-          /* noop */
-        }
-        showToast(`${display}が目標ポイントを更新しました。`);
-      }
+      // 固定文言で通知（名前取得は行わない）
+      showToast('パートナーが目標ポイントを更新しました。');
     }
 
     // 既読化（バッジOFF + 永続フラグ削除）
@@ -361,7 +328,7 @@ export default function PointsMiniCard() {
         const key = getBadgeStorageKey(uid, weekStart, weekEnd);
         localStorage.removeItem(key);
       }
-    } catch { }
+    } catch {}
     setNeedsRefresh(false);
   };
 
@@ -414,7 +381,7 @@ export default function PointsMiniCard() {
     try {
       const key = getBadgeStorageKey(uid, weekStart, weekEnd);
       localStorage.removeItem(key);
-    } catch { }
+    } catch {}
     setNeedsRefresh(false);
 
     setIsModalOpen(false);
@@ -466,7 +433,7 @@ export default function PointsMiniCard() {
                     <p>ここでは「合計目標（weeklyTargetPoint）」と「あなたの内訳（selfPoint）」を設定します。</p>
                     <ul className="list-disc pl-5 space-y-1">
                       <li>Update バッジは<strong>パートナーが更新した</strong>ときだけ表示されます（自分が更新しても表示されません）。</li>
-                      <li>モーダルを開くと既読になり、必要に応じてトーストでお知らせします。</li>
+                      <li>モーダルを開くと既読になり、必要に応じて固定メッセージのトーストでお知らせします。</li>
                     </ul>
                   </div>
                 }
@@ -523,10 +490,10 @@ export default function PointsMiniCard() {
         users={users}
       />
 
-      {/* シンプルなトースト（上部中央） */}
+      {/* シンプルなトースト（上部中央／最前面） */}
       {toastMessage && (
         <div
-          className="fixed left-1/2 top-4 z-[9999] -translate-x-1/2 rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg"
+          className="fixed left-1/2 top-4 z-[2147483647] -translate-x-1/2 rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg"
           role="status"
           aria-live="polite"
         >
