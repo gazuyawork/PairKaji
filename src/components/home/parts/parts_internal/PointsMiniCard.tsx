@@ -77,7 +77,7 @@ function toMillis(v: unknown): number | null {
     if (hasToDate(v)) return v.toDate().getTime();
     if (typeof v === 'number' && Number.isFinite(v)) return v;
     if (typeof v === 'string' && v.length > 0) return new Date(v).getTime();
-  } catch {}
+  } catch { }
   return null;
 }
 function getBadgeStorageKey(uid: string, start: Date, end: Date) {
@@ -142,7 +142,7 @@ export default function PointsMiniCard() {
     try {
       const key = getBadgeStorageKey(uid, weekStart, weekEnd);
       setNeedsRefresh(localStorage.getItem(key) === '1');
-    } catch {}
+    } catch { }
   }, [uid, weekStart, weekEnd]);
 
   // ペア検出
@@ -293,7 +293,7 @@ export default function PointsMiniCard() {
           try {
             const key = getBadgeStorageKey(uid, weekStart, weekEnd);
             localStorage.setItem(key, '1');
-          } catch {}
+          } catch { }
         }
 
         // 表示値の更新
@@ -317,20 +317,19 @@ export default function PointsMiniCard() {
   const handleOpenModal = async () => {
     setIsModalOpen(true);
 
-    if (needsRefresh && uid) {
-      // 固定文言で通知（名前取得は行わない）
-      showToast('パートナーが目標ポイントを更新しました。');
-    }
-
-    // 既読化（バッジOFF + 永続フラグ削除）
-    try {
-      if (uid) {
-        const key = getBadgeStorageKey(uid, weekStart, weekEnd);
+    // ✅ localStorage の未読フラグを直接参照して確実にトーストを出す
+    if (uid) {
+      const key = getBadgeStorageKey(uid, weekStart, weekEnd);
+      const isUnread = localStorage.getItem(key) === '1';
+      if (isUnread) {
+        showToast('パートナーが目標ポイントを更新しました。');
+        // 既読化（フラグ削除＋バッジ消灯）
         localStorage.removeItem(key);
+        setNeedsRefresh(false);
       }
-    } catch {}
-    setNeedsRefresh(false);
+    }
   };
+
 
   // 保存：本人は Update を出さない（lastChangedBy を自分で書く）
   const handleSave = async (newPoint: number, newSelfPoint: number) => {
@@ -381,7 +380,7 @@ export default function PointsMiniCard() {
     try {
       const key = getBadgeStorageKey(uid, weekStart, weekEnd);
       localStorage.removeItem(key);
-    } catch {}
+    } catch { }
     setNeedsRefresh(false);
 
     setIsModalOpen(false);
