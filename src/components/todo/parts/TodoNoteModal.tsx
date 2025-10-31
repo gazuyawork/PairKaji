@@ -419,8 +419,6 @@ export default function TodoNoteModal({
     (!!timeStart && !!timeEnd) ||
     (isUncategorized && hasChecklist);
 
-  const showMemo = useMemo(() => !isPreview || hasMemo, [isPreview, hasMemo]);
-
   const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
     if (a === b) return true;
     if (a.ingredients.length !== b.ingredients.length) return false;
@@ -1124,562 +1122,561 @@ export default function TodoNoteModal({
     [checklist, saveChecklistToFirestore]
   );
 
-  // --- 描画（SSR ガード & ローディング表示） ---
+  // --- 描画（SSR ガード） ---
   if (!mounted) return null;
 
-  if (initialLoad) {
-    return (
-      <BaseModal
-        isOpen={isOpen}
-        onClose={onClose}
-        isSaving={false}
-        saveComplete={false}
-        onSaveClick={() => { }}
-        saveLabel="保存"
-        hideActions
-      >
-        <div className="flex items-center justify-center py-10 text-gray-500 text-sm">
-          読み込み中です…
-        </div>
-      </BaseModal>
-    );
-  }
-
-  const showPreviewToggle = hasContent;
+  // ★追加: ローディングフラグをモーダル内表示に切り替え
+  const isLoading = initialLoad;
 
   return (
     <BaseModal
       isOpen={isOpen}
-      isSaving={isSaving}
+      isSaving={isSaving || isLoading}   // ★追加: 読み込み中は操作不可
       saveComplete={saveComplete}
       onClose={onClose}
       onSaveClick={handleSave}
       saveLabel={saveLabel}
-      hideActions={false}
+      hideActions={isLoading}            // ★追加: 読み込み中はアクション非表示
     >
-      {/* ヘッダー */}
-      <div className="flex items-start justify-between ml-2 mr-1">
-        <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">{todoText}</h1>
-        {showPreviewToggle && (
-          <button
-            type="button"
-            onClick={() => setIsPreview((v) => !v)}
-            className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition flex-shrink-0"
-            aria-pressed={isPreview}
-            aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
-            title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
-          >
-            {isPreview ? (<><Pencil size={16} /><span>編集</span></>) : (<><Eye size={16} /><span>プレビュー</span></>)}
-          </button>
+      {/* ★追加: 同一モーダル内でオーバーレイ＋本文フェード */}
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+            <div className="inline-flex items-center gap-2 text-gray-600 text-sm">
+              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" opacity="0.25" />
+                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" fill="none" />
+              </svg>
+              <span>読み込み中…</span>
+            </div>
+          </div>
         )}
-      </div>
 
-      {/* 画像挿入UI */}
-      <div className="mb-3 ml-2">
-        {!isPreview && (
-          <div className="flex items-center gap-3">
-            <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageSelect}
-                aria-label="画像を選択"
-              />
-              {isUploadingImage ? '圧縮中…' : '画像を選択'}
-            </label>
-
-            {(imageUrl || previewUrl) && (
+        <div
+          className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          style={{ minHeight: 240 }}
+        >
+          {/* ヘッダー */}
+          <div className="flex items-start justify-between ml-2 mr-1">
+            <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">{todoText}</h1>
+            {(hasContent) && (
               <button
                 type="button"
-                onClick={handleClearImage}
-                className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-800"
-                aria-label="挿入画像を削除"
-                title="挿入画像を削除"
+                onClick={() => setIsPreview((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition flex-shrink-0"
+                aria-pressed={isPreview}
+                aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+                title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
               >
-                画像を削除
+                {isPreview ? (<><Pencil size={16} /><span>編集</span></>) : (<><Eye size={16} /><span>プレビュー</span></>)}
               </button>
             )}
           </div>
-        )}
 
-        {showMediaFrame && (
-          <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
-            <div className="absolute inset-0">
-              <NextImage
-                src={displaySrc!}
-                alt="挿入画像プレビュー"
-                fill
-                sizes="(max-width: 640px) 100vw, 640px"
-                className="object-contain transition-opacity duration-200"
-                style={{ opacity: imgReady ? 1 : 0 }}
-                priority={false}
-              />
-              {!imgReady && <div className="absolute inset-0 animate-pulse bg-gray-100" />}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* textarea（備考） */}
-      {showMemo && (
-        <div className="relative pr-8 mt-6">
-          <textarea
-            ref={memoRef}
-            data-scrollable="true"
-            onScroll={onTextareaScroll}
-            value={memo}
-            rows={1}
-            placeholder="備考を入力"
-            onChange={(e) => setMemo(e.target.value)}
-            onTouchMove={(e) => e.stopPropagation()}
-            readOnly={isPreview}
-            aria-readonly={isPreview}
-            className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-          />
-
-          {isIOS && showScrollHint && (
-            <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-              <ChevronDown size={16} className="text-white" />
-            </div>
-          )}
-          {isIOS && showScrollUpHint && (
-            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
-              <ChevronUp size={16} className="text-white" />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ▼▼ 参考URL ▼▼ */}
-      {(!isPreview || hasReference) && (
-        <div className="pb-2">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-medium">参考リンク</h3>
+          {/* 画像挿入UI */}
+          <div className="mb-3 ml-2">
             {!isPreview && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={addUrl}
-                  className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
-                >
-                  <Plus size={16} />
-                  追加
-                </button>
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageSelect}
+                    aria-label="画像を選択"
+                  />
+                  {isUploadingImage ? '圧縮中…' : '画像を選択'}
+                </label>
+
+                {(imageUrl || previewUrl) && (
+                  <button
+                    type="button"
+                    onClick={handleClearImage}
+                    className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-800"
+                    aria-label="挿入画像を削除"
+                    title="挿入画像を削除"
+                  >
+                    画像を削除
+                  </button>
+                )}
+              </div>
+            )}
+
+            {showMediaFrame && (
+              <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
+                <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
+                <div className="absolute inset-0">
+                  <NextImage
+                    src={displaySrc!}
+                    alt="挿入画像プレビュー"
+                    fill
+                    sizes="(max-width: 640px) 100vw, 640px"
+                    className="object-contain transition-opacity duration-200"
+                    style={{ opacity: imgReady ? 1 : 0 }}
+                    priority={false}
+                  />
+                  {!imgReady && <div className="absolute inset-0 animate-pulse bg-gray-100" />}
+                </div>
               </div>
             )}
           </div>
 
-          {!isPreview ? (
-            <>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-                onDragEnd={(e: DragEndEvent) => {
-                  const { active, over } = e;
-                  if (!over || active.id === over.id) return;
-                  const oldIndex = urlIds.findIndex((id) => id === active.id);
-                  const newIndex = urlIds.findIndex((id) => id === over.id);
-                  if (oldIndex < 0 || newIndex < 0) return;
-                  setUrlIds((prev) => arrayMove(prev, oldIndex, newIndex));
-                  setReferenceUrls((prev) => arrayMove(prev, oldIndex, newIndex));
-                  setReferenceLabels((prev) => arrayMove(prev, oldIndex, newIndex));
-                }}
-              >
-                <SortableContext items={urlIds} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-2">
-                    {referenceUrls.map((u, idx) => (
-                      <SortableUrlRow key={urlIds[idx] ?? `url_k_${idx}`} id={urlIds[idx] ?? `url_id_${idx}`}>
-                        {({ attributes, listeners }) => (
-                          <>
-                            {/* ドラッグハンドル */}
-                            <button
-                              type="button"
-                              className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
-                              aria-label="行を並び替え"
-                              {...attributes}
-                              {...listeners}
-                            >
-                              <GripVertical size={16} />
-                            </button>
+          {/* textarea（備考） */}
+          {(!isPreview || hasMemo) && (
+            <div className="relative pr-8 mt-6">
+              <textarea
+                ref={memoRef}
+                data-scrollable="true"
+                onScroll={onTextareaScroll}
+                value={memo}
+                rows={1}
+                placeholder="備考を入力"
+                onChange={(e) => setMemo(e.target.value)}
+                onTouchMove={(e) => e.stopPropagation()}
+                readOnly={isPreview}
+                aria-readonly={isPreview}
+                className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none ml-2 pb-1 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+              />
 
-                            {/* 行番号 */}
-                            <div className="col-span-1 pt-1 text-sm text-gray-500 select-none text-center">
-                              {idx + 1}.
-                            </div>
-
-                            {/* 入力（URL）+ ラベルUI */}
-                            <div className="col-span-9 flex items-center gap-2 min-w-0">
-                              {/* ★ ここから削除：ファビコン表示（NextImage） */}
-                              {/* ★ 削除済み */}
-                              {/* 入力欄 */}
-                              <input
-                                ref={(el) => { urlRefs.current[idx] = el; }}
-                                value={u}
-                                onChange={(e) => changeUrl(idx, e.target.value)}
-                                onKeyDown={(e) => onUrlKeyDown(e, idx)}
-                                placeholder="https://example.com/..."
-                                className="flex-1 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500 min-w-0"
-                                inputMode="url"
-                                aria-invalid={errorsShown && !!urlErrors[idx]}
-                                aria-describedby={errorsShown && urlErrors[idx] ? `url-err-${idx}` : undefined}
-                              />
-                            </div>
-
-                            {/* 削除 */}
-                            {referenceUrls.length >= 2 && (
-                              <button
-                                type="button"
-                                onClick={() => removeUrl(idx)}
-                                aria-label="URLを削除"
-                                className="col-span-1 flex items-center justify-center w-5 h-8 text-gray-700 hover:text-red-600"
-                              >
-                                <span aria-hidden className="text-lg leading-none">×</span>
-                              </button>
-                            )}
-
-                            {/* URL エラー（対象入力直下） */}
-                            {errorsShown && urlErrors[idx] && (
-                              <div className="col-span-12">
-                                <p id={`url-err-${idx}`} className="mt-1 text-xs text-red-500">
-                                  {urlErrors[idx]}
-                                </p>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </SortableUrlRow>
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            </>
-          ) : (
-            <ul className="list-disc list-inside text-sm text-blue-500">
-              {referenceUrls
-                .map((url, i) => ({ url: url.trim(), label: (referenceLabels[i] ?? '').trim() }))
-                .filter((p) => p.url !== '')
-                .map((p, i) => (
-                  <li key={`pv_url_${i}`} className="mb-1">
-                    <a href={p.url} target="_blank" rel="noreferrer" className="underline break-all">
-                      {p.label || p.url}
-                    </a>
-                  </li>
-                ))}
-            </ul>
-          )}
-        </div>
-      )}
-      {/* ▲▲ 参考URLここまで ▲▲ */}
-
-      {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
-      {isUncategorized && (!isPreview || hasChecklist) && (
-        <div className="pt-2 pb-3 mt-2">
-          <div className="mb-3 flex items中心 justify-between">
-            <h3 className="font-medium">チェックリスト</h3>
-            {!isPreview && (
-              <button
-                type="button"
-                onClick={() => {
-                  const id = `cl_${Math.random().toString(16).slice(2)}`;
-                  setChecklist((prev) => {
-                    const next = [...prev, { id, text: '', done: false }];
-                    return next;
-                  });
-                  setCheckIds((prev) => [...prev, id]);
-                  setPendingCheckFocusIndex(checkIds.length);
-                }}
-                className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
-              >
-                <Plus size={16} />
-                追加
-              </button>
-            )}
-          </div>
-
-          {!isPreview ? (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-              onDragEnd={(e: DragEndEvent) => {
-                const { active, over } = e;
-                if (!over || active.id === over.id) return;
-                const oldIndex = checkIds.findIndex((id) => id === active.id);
-                const newIndex = checkIds.findIndex((id) => id === over.id);
-                if (oldIndex < 0 || newIndex < 0) return;
-                setCheckIds((prev) => arrayMove(prev, oldIndex, newIndex));
-                setChecklist((prev) => arrayMove(prev, oldIndex, newIndex));
-              }}
-            >
-              <SortableContext items={checkIds} strategy={verticalListSortingStrategy}>
-                <div className="space-y-2">
-                  {checklist.map((item, idx) => (
-                    <SortableUrlRow key={checkIds[idx] ?? item.id} id={checkIds[idx] ?? item.id}>
-                      {({ attributes, listeners }) => (
-                        <>
-                          <button
-                            type="button"
-                            className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
-                            aria-label="行を並び替え"
-                            {...attributes}
-                            {...listeners}
-                          >
-                            <GripVertical size={16} />
-                          </button>
-
-                          <div className="col-span-1 flex items-center justify-center">
-                            <input
-                              type="checkbox"
-                              checked={!!item.done}
-                              onChange={(e) => {
-                                const val = e.currentTarget.checked;
-                                setChecklist((prev) =>
-                                  prev.map((c, i) => (i === idx ? { ...c, done: val } : c)),
-                                );
-                              }}
-                              aria-label="完了"
-                              className="w-4 h-4"
-                            />
-                          </div>
-
-                          <input
-                            ref={(el) => { checkInputRefs.current[idx] = el; }}
-                            value={item.text}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setChecklist((prev) =>
-                                prev.map((c, i) => (i === idx ? { ...c, text: val } : c)),
-                              );
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                const id = `cl_${Math.random().toString(16).slice(2)}`;
-                                const newIndex = idx + 1;
-                                setChecklist((prev) => {
-                                  const arr = [...prev];
-                                  arr.splice(newIndex, 0, { id, text: '', done: false });
-                                  return arr;
-                                });
-                                setCheckIds((prev) => {
-                                  const arr = [...prev];
-                                  arr.splice(newIndex, 0, id);
-                                  return arr;
-                                });
-                                setPendingCheckFocusIndex(newIndex);
-                              }
-                            }}
-                            placeholder="項目を入力（Enterで下に追加）"
-                            className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500"
-                          />
-
-                          {checklist.length >= 2 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setChecklist((prev) => {
-                                  if (prev.length <= 1) return [{ ...prev[0], text: '', done: false }];
-                                  return prev.filter((_, i) => i !== idx);
-                                });
-                                setCheckIds((prev) => {
-                                  if (prev.length <= 1) return prev;
-                                  return prev.filter((_, i) => i !== idx);
-                                });
-                              }}
-                              aria-label="項目を削除"
-                              className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
-                            >
-                              <span aria-hidden className="text-lg leading-none">×</span>
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </SortableUrlRow>
-                  ))}
+              {isIOS && showScrollHint && (
+                <div className="pointer-events-none absolute bottom-3 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+                  <ChevronDown size={16} className="text-white" />
                 </div>
-              </SortableContext>
-            </DndContext>
-          ) : (
-            <ul className="space-y-2">
-              {checklist
-                .filter((c) => (c.text ?? '').trim() !== '')
-                .map((c) => {
-                  const isSaving = !!savingById[c.id];
-                  return (
-                    <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5"
-                        checked={!!c.done}
-                        disabled={isSaving}
-                        onChange={(e) => {
-                          const next = e.currentTarget.checked;
-                          void handlePreviewToggleChecklist(c.id, next);
-                        }}
-                        aria-label={`${c.text} を${c.done ? '未完了にする' : '完了にする'}`}
-                      />
-                      <button
-                        type="button"
-                        className={`text-left break-words ${c.done ? 'line-through text-gray-400' : 'text-gray-800'} ${isSaving ? 'opacity-60' : 'hover:opacity-80'} transition`}
-                        onClick={() => void handlePreviewToggleChecklist(c.id, !c.done)}
-                        disabled={isSaving}
-                        aria-disabled={isSaving}
-                        title="クリックでチェックを切り替え"
-                      >
-                        {c.text}
-                      </button>
-                    </li>
-                  );
-                })}
-            </ul>
-          )}
-        </div>
-      )}
-      {/* ▲▲ チェックリストここまで ▲▲ */}
-
-      {/* 旅行カテゴリ */}
-      {category === '旅行' && (
-        <div className="mt-4 ml-2">
-          <h3 className="font-medium">時間帯</h3>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="relative">
-              {isPreview ? (
-                <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                  {timeStart || '— —'}
-                </span>
-              ) : (
-                <input
-                  type="time"
-                  value={timeStart}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTimeStart(v);
-                    const n = Number.parseInt(durationMin, 10);
-                    if (Number.isFinite(n) && n > 0) {
-                      const autoEnd = addMinutesToHHmm(v, n);
-                      setTimeEnd(autoEnd);
-                      const err = validateTimeRange(v, autoEnd);
-                      setTimeError(err);
-                    } else {
-                      setTimeError(validateTimeRange(v, timeEnd));
-                    }
-                    const diff2 = minutesBetweenHHmm(v, timeEnd);
-                    if (diff2 != null) setDurationMin(String(diff2));
-                  }}
-                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg透明 pb-1 tabular-nums text-center"
-                  aria-label="開始時刻"
-                />
+              )}
+              {isIOS && showScrollUpHint && (
+                <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 animate-pulse">
+                  <ChevronUp size={16} className="text-white" />
+                </div>
               )}
             </div>
+          )}
 
-            <span className="text-gray-500">~</span>
+          {/* ▼▼ 参考URL ▼▼ */}
+          {(!isPreview || hasReference) && (
+            <div className="pb-2">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-medium">参考リンク</h3>
+                {!isPreview && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={addUrl}
+                      className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                    >
+                      <Plus size={16} />
+                      追加
+                    </button>
+                  </div>
+                )}
+              </div>
 
-            <div className="relative">
-              {isPreview ? (
+              {!isPreview ? (
                 <>
-                  <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                    {timeEnd || '— —'}
-                  </span>
-                  {previewDurationMin !== null && !(errorsShown && timeError) && (
-                    <span className="ml-2 text-gray-700">（所要時間：{previewDurationMin}分）</span>
-                  )}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                    onDragEnd={(e: DragEndEvent) => {
+                      const { active, over } = e;
+                      if (!over || active.id === over.id) return;
+                      const oldIndex = urlIds.findIndex((id) => id === active.id);
+                      const newIndex = urlIds.findIndex((id) => id === over.id);
+                      if (oldIndex < 0 || newIndex < 0) return;
+                      setUrlIds((prev) => arrayMove(prev, oldIndex, newIndex));
+                      setReferenceUrls((prev) => arrayMove(prev, oldIndex, newIndex));
+                      setReferenceLabels((prev) => arrayMove(prev, oldIndex, newIndex));
+                    }}
+                  >
+                    <SortableContext items={urlIds} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {referenceUrls.map((u, idx) => (
+                          <SortableUrlRow key={urlIds[idx] ?? `url_k_${idx}`} id={urlIds[idx] ?? `url_id_${idx}`}>
+                            {({ attributes, listeners }) => (
+                              <>
+                                {/* ドラッグハンドル */}
+                                <button
+                                  type="button"
+                                  className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
+                                  aria-label="行を並び替え"
+                                  {...attributes}
+                                  {...listeners}
+                                >
+                                  <GripVertical size={16} />
+                                </button>
+
+                                {/* 行番号 */}
+                                <div className="col-span-1 pt-1 text-sm text-gray-500 select-none text-center">
+                                  {idx + 1}.
+                                </div>
+
+                                {/* 入力（URL）+ ラベルUI */}
+                                <div className="col-span-9 flex items-center gap-2 min-w-0">
+                                  <input
+                                    ref={(el) => { urlRefs.current[idx] = el; }}
+                                    value={u}
+                                    onChange={(e) => changeUrl(idx, e.target.value)}
+                                    onKeyDown={(e) => onUrlKeyDown(e, idx)}
+                                    placeholder="https://example.com/..."
+                                    className="flex-1 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500 min-w-0"
+                                    inputMode="url"
+                                    aria-invalid={errorsShown && !!urlErrors[idx]}
+                                    aria-describedby={errorsShown && urlErrors[idx] ? `url-err-${idx}` : undefined}
+                                  />
+                                </div>
+
+                                {/* 削除 */}
+                                {referenceUrls.length >= 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeUrl(idx)}
+                                    aria-label="URLを削除"
+                                    className="col-span-1 flex items-center justify-center w-5 h-8 text-gray-700 hover:text-red-600"
+                                  >
+                                    <span aria-hidden className="text-lg leading-none">×</span>
+                                  </button>
+                                )}
+
+                                {/* URL エラー（対象入力直下） */}
+                                {errorsShown && urlErrors[idx] && (
+                                  <div className="col-span-12">
+                                    <p id={`url-err-${idx}`} className="mt-1 text-xs text-red-500">
+                                      {urlErrors[idx]}
+                                    </p>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </SortableUrlRow>
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 </>
               ) : (
-                <input
-                  type="time"
-                  value={timeEnd}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTimeEnd(v);
-                    setTimeError(validateTimeRange(timeStart, v));
-                    const diff = minutesBetweenHHmm(timeStart, v);
-                    if (diff != null) setDurationMin(String(diff));
-                  }}
-                  className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
-                  aria-label="終了時刻"
-                />
+                <ul className="list-disc list-inside text-sm text-blue-500">
+                  {referenceUrls
+                    .map((url, i) => ({ url: url.trim(), label: (referenceLabels[i] ?? '').trim() }))
+                    .filter((p) => p.url !== '')
+                    .map((p, i) => (
+                      <li key={`pv_url_${i}`} className="mb-1">
+                        <a href={p.url} target="_blank" rel="noreferrer" className="underline break-all">
+                          {p.label || p.url}
+                        </a>
+                      </li>
+                    ))}
+                </ul>
               )}
             </div>
-
-            {!isPreview && (
-              <div className="flex items-center gap-1 ml-2">
-                <span className="text-gray-500 text-sm">所要</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  step={1}
-                  value={durationMin}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/[^\d]/g, '');
-                    setDurationMin(v);
-                    const n = Number.parseInt(v, 10);
-                    if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
-                      const autoEnd = addMinutesToHHmm(timeStart, n);
-                      setTimeEnd(autoEnd);
-                      setTimeError(validateTimeRange(timeStart, autoEnd));
-                    } else {
-                      setTimeError(validateTimeRange(timeStart, timeEnd));
-                    }
-                  }}
-                  placeholder="分"
-                  className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
-                  aria-label="所要時間（分）"
-                />
-                <span className="text-gray-500 text-sm">分</span>
-              </div>
-            )}
-          </div>
-          {errorsShown && timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
-        </div>
-      )}
-
-      {/* 買い物カテゴリ */}
-      {category === '買い物' && (
-        <>
-          <ShoppingDetailsEditor
-            price={price}
-            quantity={quantity}
-            unit={unit}
-            compareMode={compareMode}
-            comparePrice={comparePrice}
-            compareQuantity={compareQuantity}
-            onChangePrice={setPrice}
-            onChangeQuantity={setQuantity}
-            onChangeUnit={setUnit}
-            onToggleCompareMode={(next) => setCompareMode(next)}
-            onChangeComparePrice={setComparePrice}
-            onChangeCompareQuantity={setCompareQuantity}
-            animatedDifference={animatedDifference}
-            animationComplete={diffAnimationComplete}
-            isPreview={isPreview}
-            onRequestEditMode={() => setIsPreview(false)}
-          />
-          {errorsShown && (shoppingErrors.price || shoppingErrors.quantity || shoppingErrors.unit) && (
-            <ul className="mt-2 text-xs text-red-500 list-disc list-inside">
-              {shoppingErrors.price && <li>{shoppingErrors.price}</li>}
-              {shoppingErrors.quantity && <li>{shoppingErrors.quantity}</li>}
-              {shoppingErrors.unit && <li>{shoppingErrors.unit}</li>}
-            </ul>
           )}
-        </>
-      )}
+          {/* ▲▲ 参考URLここまで ▲▲ */}
 
-      {/* 料理カテゴリ（保存押下時にエラー表示を固定） */}
-      {category === '料理' && (
-        <RecipeEditor
-          ref={recipeEditorRef}
-          headerNote=""
-          value={recipe}
-          onChange={handleRecipeChange}
-          isPreview={isPreview}
-        // showErrors={errorsShown} // RecipeEditor 側に未定義なら渡さない
-        />
-      )}
+          {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
+          {isUncategorized && (!isPreview || hasChecklist) && (
+            <div className="pt-2 pb-3 mt-2">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-medium">チェックリスト</h3>
+                {!isPreview && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = `cl_${Math.random().toString(16).slice(2)}`;
+                      setChecklist((prev) => {
+                        const next = [...prev, { id, text: '', done: false }];
+                        return next;
+                      });
+                      setCheckIds((prev) => [...prev, id]);
+                      setPendingCheckFocusIndex(checkIds.length);
+                    }}
+                    className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                  >
+                    <Plus size={16} />
+                    追加
+                  </button>
+                )}
+              </div>
+
+              {!isPreview ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                  onDragEnd={(e: DragEndEvent) => {
+                    const { active, over } = e;
+                    if (!over || active.id === over.id) return;
+                    const oldIndex = checkIds.findIndex((id) => id === active.id);
+                    const newIndex = checkIds.findIndex((id) => id === over.id);
+                    if (oldIndex < 0 || newIndex < 0) return;
+                    setCheckIds((prev) => arrayMove(prev, oldIndex, newIndex));
+                    setChecklist((prev) => arrayMove(prev, oldIndex, newIndex));
+                  }}
+                >
+                  <SortableContext items={checkIds} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {checklist.map((item, idx) => (
+                        <SortableUrlRow key={checkIds[idx] ?? item.id} id={checkIds[idx] ?? item.id}>
+                          {({ attributes, listeners }) => (
+                            <>
+                              <button
+                                type="button"
+                                className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
+                                aria-label="行を並び替え"
+                                {...attributes}
+                                {...listeners}
+                              >
+                                <GripVertical size={16} />
+                              </button>
+
+                              <div className="col-span-1 flex items-center justify-center">
+                                <input
+                                  type="checkbox"
+                                  checked={!!item.done}
+                                  onChange={(e) => {
+                                    const val = e.currentTarget.checked;
+                                    setChecklist((prev) =>
+                                      prev.map((c, i) => (i === idx ? { ...c, done: val } : c)),
+                                    );
+                                  }}
+                                  aria-label="完了"
+                                  className="w-4 h-4"
+                                />
+                              </div>
+
+                              <input
+                                ref={(el) => { checkInputRefs.current[idx] = el; }}
+                                value={item.text}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setChecklist((prev) =>
+                                    prev.map((c, i) => (i === idx ? { ...c, text: val } : c)),
+                                  );
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    const id = `cl_${Math.random().toString(16).slice(2)}`;
+                                    const newIndex = idx + 1;
+                                    setChecklist((prev) => {
+                                      const arr = [...prev];
+                                      arr.splice(newIndex, 0, { id, text: '', done: false });
+                                      return arr;
+                                    });
+                                    setCheckIds((prev) => {
+                                      const arr = [...prev];
+                                      arr.splice(newIndex, 0, id);
+                                      return arr;
+                                    });
+                                    setPendingCheckFocusIndex(newIndex);
+                                  }
+                                }}
+                                placeholder="項目を入力（Enterで下に追加）"
+                                className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500"
+                              />
+
+                              {checklist.length >= 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setChecklist((prev) => {
+                                      if (prev.length <= 1) return [{ ...prev[0], text: '', done: false }];
+                                      return prev.filter((_, i) => i !== idx);
+                                    });
+                                    setCheckIds((prev) => {
+                                      if (prev.length <= 1) return prev;
+                                      return prev.filter((_, i) => i !== idx);
+                                    });
+                                  }}
+                                  aria-label="項目を削除"
+                                  className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
+                                >
+                                  <span aria-hidden className="text-lg leading-none">×</span>
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </SortableUrlRow>
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <ul className="space-y-2">
+                  {checklist
+                    .filter((c) => (c.text ?? '').trim() !== '')
+                    .map((c) => {
+                      const isSaving = !!savingById[c.id];
+                      return (
+                        <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={!!c.done}
+                            disabled={isSaving}
+                            onChange={(e) => {
+                              const next = e.currentTarget.checked;
+                              void handlePreviewToggleChecklist(c.id, next);
+                            }}
+                            aria-label={`${c.text} を${c.done ? '未完了にする' : '完了にする'}`}
+                          />
+                          <button
+                            type="button"
+                            className={`text-left break-words ${c.done ? 'line-through text-gray-400' : 'text-gray-800'} ${isSaving ? 'opacity-60' : 'hover:opacity-80'} transition`}
+                            onClick={() => void handlePreviewToggleChecklist(c.id, !c.done)}
+                            disabled={isSaving}
+                            aria-disabled={isSaving}
+                            title="クリックでチェックを切り替え"
+                          >
+                            {c.text}
+                          </button>
+                        </li>
+                      );
+                    })}
+                </ul>
+              )}
+            </div>
+          )}
+          {/* ▲▲ チェックリストここまで ▲▲ */}
+
+          {/* 旅行カテゴリ */}
+          {category === '旅行' && (
+            <div className="mt-4 ml-2">
+              <h3 className="font-medium">時間帯</h3>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="relative">
+                  {isPreview ? (
+                    <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                      {timeStart || '— —'}
+                    </span>
+                  ) : (
+                    <input
+                      type="time"
+                      value={timeStart}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setTimeStart(v);
+                        const n = Number.parseInt(durationMin, 10);
+                        if (Number.isFinite(n) && n > 0) {
+                          const autoEnd = addMinutesToHHmm(v, n);
+                          setTimeEnd(autoEnd);
+                          const err = validateTimeRange(v, autoEnd);
+                          setTimeError(err);
+                        } else {
+                          setTimeError(validateTimeRange(v, timeEnd));
+                        }
+                        const diff2 = minutesBetweenHHmm(v, timeEnd);
+                        if (diff2 != null) setDurationMin(String(diff2));
+                      }}
+                      className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                      aria-label="開始時刻"
+                    />
+                  )}
+                </div>
+
+                <span className="text-gray-500">~</span>
+
+                <div className="relative">
+                  {isPreview ? (
+                    <>
+                      <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
+                        {timeEnd || '— —'}
+                      </span>
+                      {previewDurationMin !== null && !(errorsShown && timeError) && (
+                        <span className="ml-2 text-gray-700">（所要時間：{previewDurationMin}分）</span>
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      type="time"
+                      value={timeEnd}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setTimeEnd(v);
+                        setTimeError(validateTimeRange(timeStart, v));
+                        const diff = minutesBetweenHHmm(timeStart, v);
+                        if (diff != null) setDurationMin(String(diff));
+                      }}
+                      className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
+                      aria-label="終了時刻"
+                    />
+                  )}
+                </div>
+
+                {!isPreview && (
+                  <div className="flex items-center gap-1 ml-2">
+                    <span className="text-gray-500 text-sm">所要</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step={1}
+                      value={durationMin}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^\d]/g, '');
+                        setDurationMin(v);
+                        const n = Number.parseInt(v, 10);
+                        if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
+                          const autoEnd = addMinutesToHHmm(timeStart, n);
+                          setTimeEnd(autoEnd);
+                          setTimeError(validateTimeRange(timeStart, autoEnd));
+                        } else {
+                          setTimeError(validateTimeRange(timeStart, timeEnd));
+                        }
+                      }}
+                      placeholder="分"
+                      className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
+                      aria-label="所要時間（分）"
+                    />
+                    <span className="text-gray-500 text-sm">分</span>
+                  </div>
+                )}
+              </div>
+              {errorsShown && timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
+            </div>
+          )}
+
+          {/* 買い物カテゴリ */}
+          {category === '買い物' && (
+            <>
+              <ShoppingDetailsEditor
+                price={price}
+                quantity={quantity}
+                unit={unit}
+                compareMode={compareMode}
+                comparePrice={comparePrice}
+                compareQuantity={compareQuantity}
+                onChangePrice={setPrice}
+                onChangeQuantity={setQuantity}
+                onChangeUnit={setUnit}
+                onToggleCompareMode={(next) => setCompareMode(next)}
+                onChangeComparePrice={setComparePrice}
+                onChangeCompareQuantity={setCompareQuantity}
+                animatedDifference={animatedDifference}
+                animationComplete={diffAnimationComplete}
+                isPreview={isPreview}
+                onRequestEditMode={() => setIsPreview(false)}
+              />
+              {errorsShown && (shoppingErrors.price || shoppingErrors.quantity || shoppingErrors.unit) && (
+                <ul className="mt-2 text-xs text-red-500 list-disc list-inside">
+                  {shoppingErrors.price && <li>{shoppingErrors.price}</li>}
+                  {shoppingErrors.quantity && <li>{shoppingErrors.quantity}</li>}
+                  {shoppingErrors.unit && <li>{shoppingErrors.unit}</li>}
+                </ul>
+              )}
+            </>
+          )}
+
+          {/* 料理カテゴリ（保存押下時にエラー表示を固定） */}
+          {category === '料理' && (
+            <RecipeEditor
+              ref={recipeEditorRef}
+              headerNote=""
+              value={recipe}
+              onChange={handleRecipeChange}
+              isPreview={isPreview}
+            />
+          )}
+        </div>
+      </div>
     </BaseModal>
   );
 }
