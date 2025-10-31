@@ -1,4 +1,3 @@
-// src/components/home/parts/EditPointModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +12,7 @@ import { auth, db } from '@/lib/firebase';
 import { getConfirmedPartnerUid } from '@/lib/pairs';
 import { doc, getDoc } from 'firebase/firestore';
 import { useProfileImages } from '@/hooks/useProfileImages';
+import { useUserUid } from '@/hooks/useUserUid';
 
 type UserInfo = {
   id: string;
@@ -26,12 +26,21 @@ type PartnerProfile = {
   imageUrl: string;
 } | null;
 
-// Firestore users ドキュメントの想定フィールド（必要最小限）
 type FirestoreUserDoc = {
   displayName?: string;
   name?: string;
   photoURL?: string;
   imageUrl?: string;
+};
+
+export type HistoryEntry = {
+  atMs: number;
+  ownerUid: string;
+  changedBy?: string;
+  wBefore?: number | null;
+  wAfter?: number | null;
+  sBefore?: number | null;
+  sAfter?: number | null;
 };
 
 interface Props {
@@ -44,6 +53,7 @@ interface Props {
   rouletteEnabled: boolean;
   setRouletteEnabled: (enabled: boolean) => void;
   users: UserInfo[];
+  historyEntries?: HistoryEntry[]; // ← 履歴を受け取る
 }
 
 export default function EditPointModal({
@@ -56,6 +66,7 @@ export default function EditPointModal({
   rouletteEnabled,
   setRouletteEnabled,
   users,
+  historyEntries = [],
 }: Props) {
   // ===== 入力/保存処理 =====
   const [error, setError] = useState<string>('');
@@ -72,39 +83,33 @@ export default function EditPointModal({
     return !hasAtLeastOne || hasEmpty;
   };
 
+  const uid = useUserUid();
+
   // ===== users フォールバック（空でもログイン中なら自分1人で表示可能にする） =====
   const meUid = auth.currentUser?.uid ?? null;
 
-  // 他画面（TaskView）と同様に、設定済みプロフィール画像を取得
   const { profileImage, partnerImage } = useProfileImages();
 
-  // 画像URLの簡易正規化（gs:// や空文字は既定画像に）
   const normalizeImage = (url?: string) => {
     if (!url || url.trim() === '') return '/images/default.png';
     if (url.startsWith('gs://') || (!url.startsWith('http') && !url.startsWith('/'))) {
-      console.warn('Storageパス検出: 事前に getDownloadURL での変換を推奨します ->', url);
       return '/images/default.png';
     }
     return url;
   };
 
-  // ペアプロフィール（親が1名だけ渡してくるケースで合成するための情報）
   const [partnerUser, setPartnerUser] = useState<PartnerProfile>(null);
 
-  // 親が1名（あるいは0名）しか渡していない場合は、確定ペアを探してもう1名ぶんを合成
   useEffect(() => {
     const run = async () => {
       if (!meUid) {
         setPartnerUser(null);
         return;
       }
-      // 親から2名以上来ていれば合成不要
       if (Array.isArray(users) && users.length >= 2) {
         setPartnerUser(null);
         return;
       }
-
-      // 確定しているパートナーUIDを取得
       let partnerUid: string | null = null;
       try {
         partnerUid = await getConfirmedPartnerUid(meUid);
@@ -115,8 +120,6 @@ export default function EditPointModal({
         setPartnerUser(null);
         return;
       }
-
-      // Firestoreの users/{uid} からプロフィールを取得（型を明確化）
       try {
         const snap = await getDoc(doc(db, 'users', partnerUid));
         const data: FirestoreUserDoc | null = snap.exists()
@@ -126,11 +129,9 @@ export default function EditPointModal({
         setPartnerUser({
           id: partnerUid,
           name: (data?.displayName || data?.name || 'パートナー') as string,
-          // 表示は partnerImage を最優先（未設定時のみ Firestore 値を利用）
           imageUrl: (partnerImage || data?.photoURL || data?.imageUrl || '/images/default.png') as string,
         });
       } catch {
-        // 取得できなくても行だけは合成して表示できるようにする
         setPartnerUser({
           id: partnerUid,
           name: 'パートナー',
@@ -142,9 +143,8 @@ export default function EditPointModal({
     run();
   }, [users, meUid, partnerImage]);
 
-  // safeUsers 構築（親が2名以上 → そのまま / それ以外 → 自分 + 合成パートナー）
+  // safeUsers 構築
   const safeUsers = useMemo<UserInfo[]>(() => {
-    // 親が2名以上ならそれを尊重
     if (Array.isArray(users) && users.length >= 2) return users;
 
     const base: UserInfo[] = meUid
@@ -152,13 +152,11 @@ export default function EditPointModal({
           {
             id: meUid,
             name: auth.currentUser?.displayName || 'あなた',
-            // Googleアイコン(photoURL)ではなく「設定したプロフィール画像」に差し替え
             imageUrl: normalizeImage(profileImage),
           },
         ]
       : [];
 
-    // 合成したパートナーを追加（重複は避ける）
     if (partnerUser && !base.some((b) => b.id === partnerUser.id)) {
       base.push({
         id: partnerUser.id,
@@ -167,7 +165,6 @@ export default function EditPointModal({
       });
     }
 
-    // 親が1名（＝自分以外）だけ渡してくるケースにも対応しておく
     if (Array.isArray(users) && users.length === 1) {
       users.forEach((u) => {
         if (!base.some((b) => b.id === u.id)) base.push(u);
@@ -177,14 +174,12 @@ export default function EditPointModal({
     return base;
   }, [users, meUid, partnerUser, profileImage, partnerImage]);
 
-  // 自分のID（safeUsers から算出）
   const selfId: string | null =
     safeUsers.find((u) => u.id === meUid)?.id ?? safeUsers[0]?.id ?? null;
 
   // ===== ユーザー別割当（内訳）=====
   const [alloc, setAlloc] = useState<Record<string, number>>({});
 
-  // 合計（UI確認用。ペア自動モード時は PointAllocInputs 内で自動表示されるが、汎用チェック用に維持）
   const sumAlloc = useMemo(
     () =>
       Object.values(alloc).reduce(
@@ -194,11 +189,9 @@ export default function EditPointModal({
     [alloc],
   );
 
-  // 初期化 & 目標変更時の再配分（点滅防止のため selfPoint 依存は持たない）
   useEffect(() => {
     if (!isOpen || !safeUsers.length || !selfId) return;
 
-    // 自分は切り上げで半分（端数は自分） … 既存仕様踏襲
     const nextSelf = Math.ceil(point / 2);
 
     let remaining = Math.max(point - nextSelf, 0);
@@ -216,26 +209,17 @@ export default function EditPointModal({
     });
 
     setAlloc(next);
-    // selfPoint 同期はここでは行わない（alloc を唯一のソースに）
   }, [isOpen, safeUsers, point, selfId]);
-
-  // ★ 以前は alloc 変更時に selfPoint を同期していたが、
-  //    再配分ループとチカチカの原因になるため削除。
-  //    selfPoint は保存直前に alloc[selfId] から一度だけ確定する。
 
   const handleSave = async (): Promise<void> => {
     if (point < 1) {
       setError('1以上の数値を入力してください');
       return;
     }
-
-    // ペア＝2人のときは UI 側で相手が自動差し引きになるため合計は常に一致する想定。
-    // 1人 or 3人以上のときのみ汎用チェックを行う。
     if (sumAlloc !== point && safeUsers.length !== 2) {
       setError(`内訳の合計 (${sumAlloc}pt) が週間目標ポイント (${point}pt) と一致しません`);
       return;
     }
-
     if (invalidRouletteConditions()) {
       setError('ご褒美入力に不備があります');
       return;
@@ -244,7 +228,6 @@ export default function EditPointModal({
     setError('');
     setIsSaving(true);
 
-    // 自分のポイントは alloc から確定（同期ループを避ける）
     const finalSelfPoint =
       selfId && Number.isFinite(alloc[selfId]) ? Number(alloc[selfId]) : 0;
 
@@ -260,7 +243,6 @@ export default function EditPointModal({
 
   const handleAuto = (): void => {
     calculatePoints();
-    // 自動計算結果に合わせて alloc も再配分（自分多めルール）
     if (!safeUsers.length || !selfId) return;
     const half = Math.floor(point / 2);
     const extra = point % 2;
@@ -284,11 +266,10 @@ export default function EditPointModal({
   const handlePointChange = (value: number): void => {
     setPoint(value);
 
-    // 「自分多め（端数は自分）」の既存ロジックを維持
     const half = Math.floor(value / 2);
     const extra = value % 2;
     const nextSelf = half + extra;
-    setSelfPoint(nextSelf); // ← これは表示値のために残すが、保存時は alloc から最終確定
+    setSelfPoint(nextSelf);
 
     if (!safeUsers.length || !selfId) return;
 
@@ -341,6 +322,51 @@ export default function EditPointModal({
 
         {error && <p className="text-red-500 text-center text-sm pt-2">{error}</p>}
       </div>
+
+      {/* === 変更履歴（直近） === */}
+      {Array.isArray(historyEntries) && historyEntries.length > 0 && (
+        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+          <div className="text-sm font-semibold text-gray-700">変更履歴（直近）</div>
+          <ul className="mt-2 space-y-1">
+            {historyEntries.map((h, i) => {
+              const d = h.atMs ? new Date(h.atMs) : null;
+              const timeLabel = d
+                ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(
+                    d.getDate(),
+                  ).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(
+                    d.getMinutes(),
+                  ).padStart(2, '0')}`
+                : '—';
+
+              const ownerLabel =
+                uid && h.ownerUid
+                  ? h.ownerUid === uid
+                    ? 'あなた'
+                    : 'パートナー'
+                  : '—';
+
+              const wDiff =
+                h.wBefore !== h.wAfter
+                  ? `合計 ${h.wBefore ?? '—'} → ${h.wAfter ?? '—'}`
+                  : null;
+              const sDiff =
+                h.sBefore !== h.sAfter
+                  ? `内訳 ${h.sBefore ?? '—'} → ${h.sAfter ?? '—'}`
+                  : null;
+
+              return (
+                <li key={i} className="text-xs text-gray-700">
+                  <span className="inline-block min-w-[108px] text-gray-500">{timeLabel}</span>
+                  <span className="inline-block ml-2">{ownerLabel}</span>
+                  <span className="inline-block ml-2">
+                    {[wDiff, sDiff].filter(Boolean).join(' / ')}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </BaseModal>
   );
 }
