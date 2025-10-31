@@ -314,19 +314,25 @@ export default function PointsMiniCard() {
      - パートナー側ならトースト表示（固定文言）
      - その後に既読化（バッジと localStorage を消す）
   ================================================================= */
-  const handleOpenModal = async () => {
+  // PointsMiniCard.tsx 内の handleOpenModal
+  const handleOpenModal = () => {
     setIsModalOpen(true);
 
-    // ✅ localStorage の未読フラグを直接参照して確実にトーストを出す
-    if (uid) {
-      const key = getBadgeStorageKey(uid, weekStart, weekEnd);
-      const isUnread = localStorage.getItem(key) === '1';
-      if (isUnread) {
-        showToast('パートナーが目標ポイントを更新しました。');
-        // 既読化（フラグ削除＋バッジ消灯）
-        localStorage.removeItem(key);
-        setNeedsRefresh(false);
+    // localStorage と state の両方を見て “絶対に” 出す
+    const key = uid ? getBadgeStorageKey(uid, weekStart, weekEnd) : null;
+    const isUnreadByStorage = key ? localStorage.getItem(key) === '1' : false;
+
+    // needsRefresh（state）か、localStorage のどちらかが立っていれば表示
+    if (needsRefresh || isUnreadByStorage) {
+      showToast('パートナーが目標ポイントを更新しました。');
+
+      // 既読化（両方クリア）
+      if (key) {
+        try {
+          localStorage.removeItem(key);
+        } catch {/* noop */ }
       }
+      setNeedsRefresh(false);
     }
   };
 
