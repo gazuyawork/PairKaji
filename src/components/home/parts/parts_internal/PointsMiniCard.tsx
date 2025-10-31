@@ -11,9 +11,7 @@ import {
   doc,
   DocumentData,
   getDoc,
-  limit as fsLimit,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -79,7 +77,7 @@ function toMillis(v: unknown): number | null {
     if (hasToDate(v)) return v.toDate().getTime();
     if (typeof v === 'number' && Number.isFinite(v)) return v;
     if (typeof v === 'string' && v.length > 0) return new Date(v).getTime();
-  } catch {}
+  } catch { }
   return null;
 }
 function getBadgeStorageKey(uid: string, start: Date, end: Date) {
@@ -131,9 +129,12 @@ export default function PointsMiniCard() {
     window.setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const today = new Date();
+  const todayRef = React.useRef<Date>(new Date());
+  const today = todayRef.current;
+
   const weekStart = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), [today]);
   const weekEnd = useMemo(() => endOfWeek(today, { weekStartsOn: 1 }), [today]);
+
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
 
   // 既読状態の復元（週キー）
@@ -142,7 +143,7 @@ export default function PointsMiniCard() {
     try {
       const key = getBadgeStorageKey(uid, weekStart, weekEnd);
       setNeedsRefresh(localStorage.getItem(key) === '1');
-    } catch {}
+    } catch { }
   }, [uid, weekStart, weekEnd]);
 
   // ペア検出
@@ -155,9 +156,10 @@ export default function PointsMiniCard() {
         setTargetIds([uid]);
         return;
       }
-      const userIds = (snap.docs[0].data() as any)?.userIds;
+      const raw = snap.docs[0].data() as DocumentData;
+      const userIds = (raw?.userIds ?? []) as unknown[];
       const arr = Array.isArray(userIds)
-        ? userIds.filter((x: unknown): x is string => typeof x === 'string')
+        ? userIds.filter((x): x is string => typeof x === 'string')
         : [uid];
       const unique = Array.from(new Set(arr));
       setHasPartner(unique.length > 1);
@@ -291,7 +293,7 @@ export default function PointsMiniCard() {
           try {
             const key = getBadgeStorageKey(uid, weekStart, weekEnd);
             localStorage.setItem(key, '1');
-          } catch {}
+          } catch { }
         }
 
         // 表示値の更新
@@ -359,7 +361,7 @@ export default function PointsMiniCard() {
         const key = getBadgeStorageKey(uid, weekStart, weekEnd);
         localStorage.removeItem(key);
       }
-    } catch {}
+    } catch { }
     setNeedsRefresh(false);
   };
 
@@ -412,7 +414,7 @@ export default function PointsMiniCard() {
     try {
       const key = getBadgeStorageKey(uid, weekStart, weekEnd);
       localStorage.removeItem(key);
-    } catch {}
+    } catch { }
     setNeedsRefresh(false);
 
     setIsModalOpen(false);
