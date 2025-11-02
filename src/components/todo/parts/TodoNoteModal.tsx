@@ -1371,12 +1371,12 @@ export default function TodoNoteModal({
                 </>
               ) : (
                 // src/components/todo/parts/TodoNoteModal.tsx
-                <ul className="list-disc list-inside text-md text-blue-500">
+                <ul className="list-disc list-inside text-md text-blue-500 marker:text-black">
                   {referenceUrls
                     .map((url, i) => ({ url: url.trim(), label: (referenceLabels[i] ?? '').trim() }))
                     .filter((p) => p.url !== '')
                     .map((p, i) => (
-                      <li key={`pv_url_${i}`} className="mb-1">
+                      <li key={`pv_url_${i}`} className="mb-1 ml-2">
                         <a href={p.url} target="_blank" rel="noreferrer" className="underline break-all">
                           {p.url}
                         </a>
@@ -1523,7 +1523,7 @@ export default function TodoNoteModal({
                     .map((c) => {
                       const isSaving = !!savingById[c.id];
                       return (
-                        <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-md">
+                        <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-md ml-1">
                           <input
                             type="checkbox"
                             className="mt-0.5"
