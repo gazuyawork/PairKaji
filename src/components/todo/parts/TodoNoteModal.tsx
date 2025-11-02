@@ -1523,10 +1523,10 @@ export default function TodoNoteModal({
                     .map((c) => {
                       const isSaving = !!savingById[c.id];
                       return (
-                        <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-md ml-1">
+                        <li key={`pv_cl_${c.id}`} className="flex items-center gap-3 text-md ml-1">
                           <input
                             type="checkbox"
-                            className="mt-0.5"
+                            className="scale-130 accent-blue-500 cursor-pointer"
                             checked={!!c.done}
                             disabled={isSaving}
                             onChange={(e) => {
