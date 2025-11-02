@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
   - 既存: SetViewportHeight / PreventBounce / PairInit / TaskSplitMonitor はそのまま
 */
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Toaster } from 'sonner';
 import PairInit from '@/components/common/PairInit';
 import PreventBounce from '@/components/common/PreventBounce';
@@ -55,7 +55,6 @@ function usePWAStandaloneScrollFix() {
     const isStandalone =
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
       // iOS 古め対策（Android でも true を返す環境あり、害はない）
-      // @ts-ignore
       (window.navigator as any).standalone === true;
 
     if (!isStandalone) return;
