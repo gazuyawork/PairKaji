@@ -824,16 +824,32 @@ export default function TodoNoteModal({
   };
 
   // URL変更時：ラベル未設定なら候補補完
+  // 変更後（置き換え）
   const changeUrl = (idx: number, val: string) => {
-    setReferenceUrls((prev) => prev.map((u, i) => (i === idx ? val : u)));
-    setReferenceLabels((prev) => {
-      const next = [...prev];
-      if ((next[idx] ?? '').trim() === '') {
+    // URLを「前の値」を参照しつつ更新
+    setReferenceUrls((prevUrls) => {
+      const prevUrl = prevUrls[idx] ?? '';
+      const nextUrls = prevUrls.map((u, i) => (i === idx ? val : u));
+
+      // ラベル更新方針：
+      //  - いまのラベルが「空」または「前回URLからの自動ラベル」と一致 ⇒ 自動追従させる
+      //  - それ以外（ユーザーが手で編集したとみなせる） ⇒ ラベルは触らない
+      setReferenceLabels((prevLabels) => {
+        const current = (prevLabels[idx] ?? '').trim();
+        const prevAuto = suggestLabelFromUrl(prevUrl).trim();
+        const wasAuto = current === '' || current === prevAuto;
+
+        if (!wasAuto) return prevLabels;
+
+        const next = [...prevLabels];
         next[idx] = suggestLabelFromUrl(val);
-      }
-      return next;
+        return next;
+      });
+
+      return nextUrls;
     });
   };
+
 
   const onUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
@@ -1157,7 +1173,7 @@ export default function TodoNoteModal({
           style={{ minHeight: 240 }}
         >
           {/* ヘッダー */}
-          <div className="flex items-start justify-between ml-2 mr-1">
+          <div className="flex items-start justify-between mr-1">
             <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">{todoText}</h1>
             {(hasContent) && (
               <button
@@ -1174,10 +1190,10 @@ export default function TodoNoteModal({
           </div>
 
           {/* 画像挿入UI */}
-          <div className="mb-3 ml-2">
+          <div className="mb-3">
             {!isPreview && (
               <div className="flex items-center gap-3">
-                <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer">
+                <label className="inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-300 hover:bg-gray-50 cursor-pointer mt-5">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1255,7 +1271,7 @@ export default function TodoNoteModal({
           {/* ▼▼ 参考URL ▼▼ */}
           {(!isPreview || hasReference) && (
             <div className="pb-2">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 mt-5 flex items-center justify-between">
                 <h3 className="font-medium">参考リンク</h3>
                 {!isPreview && (
                   <div className="flex items-center gap-2">
@@ -1318,7 +1334,7 @@ export default function TodoNoteModal({
                                     onChange={(e) => changeUrl(idx, e.target.value)}
                                     onKeyDown={(e) => onUrlKeyDown(e, idx)}
                                     placeholder="https://example.com/..."
-                                    className="flex-1 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500 min-w-0"
+                                    className="flex-1 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-md focus:outline-none focus:border-blue-500 min-w-0"
                                     inputMode="url"
                                     aria-invalid={errorsShown && !!urlErrors[idx]}
                                     aria-describedby={errorsShown && urlErrors[idx] ? `url-err-${idx}` : undefined}
@@ -1354,14 +1370,15 @@ export default function TodoNoteModal({
                   </DndContext>
                 </>
               ) : (
-                <ul className="list-disc list-inside text-sm text-blue-500">
+                // src/components/todo/parts/TodoNoteModal.tsx
+                <ul className="list-disc list-inside text-md text-blue-500">
                   {referenceUrls
                     .map((url, i) => ({ url: url.trim(), label: (referenceLabels[i] ?? '').trim() }))
                     .filter((p) => p.url !== '')
                     .map((p, i) => (
                       <li key={`pv_url_${i}`} className="mb-1">
                         <a href={p.url} target="_blank" rel="noreferrer" className="underline break-all">
-                          {p.label || p.url}
+                          {p.url}
                         </a>
                       </li>
                     ))}
@@ -1470,7 +1487,7 @@ export default function TodoNoteModal({
                                   }
                                 }}
                                 placeholder="項目を入力（Enterで下に追加）"
-                                className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-blue-500"
+                                className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-md focus:outline-none focus:border-blue-500"
                               />
 
                               {checklist.length >= 2 && (
@@ -1506,7 +1523,7 @@ export default function TodoNoteModal({
                     .map((c) => {
                       const isSaving = !!savingById[c.id];
                       return (
-                        <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-sm">
+                        <li key={`pv_cl_${c.id}`} className="flex items-start gap-2 text-md">
                           <input
                             type="checkbox"
                             className="mt-0.5"
