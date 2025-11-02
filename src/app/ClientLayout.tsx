@@ -4,8 +4,9 @@
 export const dynamic = 'force-dynamic';
 
 /* 変更点サマリ
-  - ★重要変更: <Toaster /> を key 付きラッパーの「外」に移動（再マウント喪失対策）
-  - ★重要変更: visualViewport から算出した数値(px)を offset に渡す方式へ変更（calc()依存を回避）
+  - ★重要追加: PWA初回/復帰/可視化で body スクロールロックを強制解除するフックを追加
+  - ★重要追加: ルート遷移時（pathname 変更）にも毎回 body ロックを解除
+  - ★既存維持: <Toaster /> を key 付きラッパーの「外」に配置し、visualViewport に応じた offset(px) を適用
   - 既存: SetViewportHeight / PreventBounce / PairInit / TaskSplitMonitor はそのまま
 */
 
@@ -18,7 +19,7 @@ import TaskSplitMonitor from '@/components/common/TaskSplitMonitor';
 import { usePathname } from 'next/navigation';
 import ServiceWorkerInit from '@/components/common/ServiceWorkerInit';
 
-/* 既存: body ロック解除のクリーンアップ */
+/* 既存: body ロック解除のクリーンアップ（アンマウント時） */
 function useUnlockBodyOnUnmount() {
   useEffect(() => {
     return () => {
@@ -31,9 +32,53 @@ function useUnlockBodyOnUnmount() {
   }, []);
 }
 
-export default function ClientLayout({ children }: { children: ReactNode }) {
+/* =========================
+   ★追加: スクロールロック確実解除ユーティリティ/フック
+========================= */
+// ★追加: 直接 body の一時的な固定を解除
+function forceUnlockBody() {
+  const s = document.body.style;
+  s.overflow = '';
+  s.position = '';
+  s.top = '';
+  s.width = '';
+}
+
+// ★追加: Android PWA（standalone）での初回表示/可視化/復帰タイミングで確実に解除
+function usePWAStandaloneScrollFix() {
+  useEffect(() => {
+    // 初回マウント直後に二度呼んで、初期化順序ズレの取りこぼしを防止
+    forceUnlockBody();
+    setTimeout(forceUnlockBody, 0);
+
+    // PWA standalone 判定
+    const isStandalone =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      // iOS 古め対策（Android でも true を返す環境あり、害はない）
+      // @ts-ignore
+      (window.navigator as any).standalone === true;
+
+    if (!isStandalone) return;
+
+    const onVisible = () => forceUnlockBody();
+    const onPageShow = () => forceUnlockBody();
+
+    document.addEventListener('visibilitychange', onVisible, { passive: true });
+    window.addEventListener('pageshow', onPageShow, { passive: true });
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible as any);
+      window.removeEventListener('pageshow', onPageShow as any);
+    };
+  }, []);
+}
+
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLanding = pathname?.startsWith('/landing') ?? false;
+
+  // ★追加: PWA 初回/復帰スクロール不具合への恒久対策
+  usePWAStandaloneScrollFix();
 
   // 既存判定
   const isProfile = pathname?.startsWith('/profile') ?? false;
@@ -49,38 +94,40 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
 
   useUnlockBodyOnUnmount();
 
-  /* ★重要追加: SP のソフトキーボードに隠れないよう、visualViewport に応じて
-     数値(px) のオフセットを算出して Toaster の offset に直接渡す */
+  // ★追加: ルート遷移のたびに body ロックを初期化（初回取りこぼし/残存対策）
+  useEffect(() => {
+    forceUnlockBody();
+  }, [pathname]);
+
+  /* ★重要: SP のソフトキーボードに隠れないよう、visualViewport に応じた
+     数値(px) のオフセットを Toaster に直接渡す */
   const [toastOffsetPx, setToastOffsetPx] = useState<number>(16);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // env(safe-area-inset-bottom) は JS から直接取得できないため、最低限の余白として 8px 加算
+    // env(safe-area-inset-bottom) は直接参照できないため、最低限の余白として 8px 加算
     const SAFE_AREA_FALLBACK = 8;
 
     const compute = () => {
       const vv = window.visualViewport;
       if (vv) {
-        // iOS/Android でのキーボード表示分を概算
+        // キーボード表示分を概算（innerHeight - 可視領域）
         const keyboardHeight = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
         const px = Math.round(Math.min(480, keyboardHeight + 16 + SAFE_AREA_FALLBACK));
         setToastOffsetPx(px);
       } else {
-        // visualViewport 非対応ブラウザのフォールバック
         setToastOffsetPx(24 + SAFE_AREA_FALLBACK);
       }
     };
 
     compute();
 
-    // ★追加: リサイズ/スクロール/向き変更で再計算
+    // リサイズ/スクロール/向き変更/フォーカス変化で再計算
     const vv = window.visualViewport;
     vv?.addEventListener('resize', compute);
     vv?.addEventListener('scroll', compute);
     window.addEventListener('orientationchange', compute);
-
-    // ★追加: フォーカス/ブラーでも再計算（入力開始/終了に追従）
     window.addEventListener('focusin', compute);
     window.addEventListener('focusout', compute);
 
@@ -101,19 +148,18 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       {/* 既存: ViewportHeight の補正は常時マウント */}
       <SetViewportHeight />
 
-      {/* ★重要変更: トーストは「key 付きラッパーの外」に配置して
-          ルートや状態による再マウントの影響を受けないようにする */}
+      {/* 既存: トーストは key 付きラッパーの外に配置（再マウント影響回避） */}
       <Toaster
         position="top-center"
         richColors
         closeButton
         expand
-        /* ★変更: 文字列 calc ではなく数値(px) を直接渡す */
+        /* 文字列 calc ではなく数値(px) を直接渡す（★既存維持） */
         offset={toastOffsetPx}
         toastOptions={{
-          duration: 2600, // 微調整: SP で読める程度に+200ms
+          duration: 2600,
           style: { zIndex: 2147483646 },
-          className: 'z-[2147483646] will-change-transform', // ★追加: iOSでの再描画安定化
+          className: 'z-[2147483646] will-change-transform',
         }}
       />
 
