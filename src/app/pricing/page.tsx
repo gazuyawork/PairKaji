@@ -41,6 +41,8 @@ export default function PricingPage() {
                     <ul className="flex-1 space-y-2 text-sm text-gray-700 mb-6">
                         <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 基本機能</li>
                         <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 広告なし</li>
+                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> プッシュ通知</li>
+                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> ホーム画面のカスタマイズ</li>
                     </ul>
                     <Link
                         href="/subscribe/lite"

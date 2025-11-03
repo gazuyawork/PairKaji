@@ -1,3 +1,4 @@
+// src/components/task/parts/EditTaskModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,6 @@ import {
   type LucideIcon,
   ChevronRight,
 } from 'lucide-react';
-import UrlAwareTextarea from '@/components/common/UrlAwareTextarea';
 import HelpPopover from '@/components/common/HelpPopover';
 import { forkTaskAsPrivateForSelf } from '@/lib/firebaseUtils';
 
@@ -189,6 +189,9 @@ export default function EditTaskModal({
   const [isIOSMobileSafari, setIsIOSMobileSafari] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
+  // ★追加: 備考のスクロール担当ラッパー
+  const noteWrapRef = useRef<HTMLDivElement | null>(null);
+  // 既存: テキストエリア（キャレット復元用途など）
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -276,57 +279,52 @@ export default function EditTaskModal({
     };
   }, [isOpen]);
 
+  // ★変更: ヒント計算は「ラッパー」のスクロール量で判定
   const updateHints = useCallback(() => {
-    const el = memoRef.current;
-    if (!el) return;
-    const canScroll = el.scrollHeight > el.clientHeight + 1;
-    const notAtBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-    const notAtTop = el.scrollTop > 1;
+    const wrap = noteWrapRef.current;
+    if (!wrap) return;
+    const canScroll = wrap.scrollHeight > wrap.clientHeight + 1;
+    const notAtBottom = wrap.scrollTop + wrap.clientHeight < wrap.scrollHeight - 1;
+    const notAtTop = wrap.scrollTop > 1;
     setShowScrollHint(canScroll && notAtBottom);
     setShowScrollUpHint(canScroll && notAtTop);
   }, []);
 
-  const onTextareaScroll = useCallback(() => updateHints(), [updateHints]);
+  const onNoteWrapScroll = useCallback(() => updateHints(), [updateHints]);
 
-  const resizeTextarea = useCallback(() => {
-    const el = memoRef.current;
-    if (!el) return;
+  // ★変更: 高さ調整はラッパーに対して実施（CSSのみでも成立するが安全に反映）
+  const resizeNoteWrap = useCallback(() => {
+    const wrap = noteWrapRef.current;
+    if (!wrap) return;
     const maxHeightPx =
       (typeof window !== 'undefined' ? window.innerHeight : 0) * (MAX_TEXTAREA_VH / 100);
-    el.style.height = 'auto';
-    el.style.maxHeight = `${maxHeightPx}px`;
-    (el.style as unknown as { webkitOverflowScrolling?: string }).webkitOverflowScrolling = 'touch';
-    if (el.scrollHeight > maxHeightPx) {
-      el.style.height = `${maxHeightPx}px`;
-      el.style.overflowY = 'auto';
-    } else {
-      el.style.height = `${el.scrollHeight}px`;
-      el.style.overflowY = 'hidden';
-    }
+    wrap.style.maxHeight = `${Math.max(200, Math.floor(maxHeightPx))}px`;
+    wrap.style.overflowY = 'auto';
+    (wrap.style as unknown as { webkitOverflowScrolling?: string }).webkitOverflowScrolling = 'touch';
     updateHints();
   }, [updateHints]);
 
   useEffect(() => {
     if (!isOpen) return;
     requestAnimationFrame(() => {
-      resizeTextarea();
-      requestAnimationFrame(resizeTextarea);
+      resizeNoteWrap();
+      requestAnimationFrame(resizeNoteWrap);
     });
-  }, [isOpen, resizeTextarea]);
+  }, [isOpen, resizeNoteWrap]);
 
   useEffect(() => {
     if (!editedTask) return;
     requestAnimationFrame(() => {
-      resizeTextarea();
-      requestAnimationFrame(resizeTextarea);
+      resizeNoteWrap();
+      requestAnimationFrame(resizeNoteWrap);
     });
-  }, [editedTask, resizeTextarea]);
+  }, [editedTask, resizeNoteWrap]);
 
   useEffect(() => {
-    const onResize = () => resizeTextarea();
+    const onResize = () => resizeNoteWrap();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [resizeTextarea]);
+  }, [resizeNoteWrap]);
 
   const update = useCallback(
     <K extends keyof TaskWithNote>(key: K, value: TaskWithNote[K]) => {
@@ -833,9 +831,6 @@ export default function EditTaskModal({
                   content={
                     <div className="space-y-2">
                       ポイントを設定すると、タスクの完了時に実施したユーザーへポイントが付与されます。
-                      {/* <ul className="list-disc pl-5 space-y-1">
-                        <li>0ptの場合はタスク一覧に表示されません。</li>
-                      </ul> */}
                     </div>
                   }
                 />
@@ -972,10 +967,6 @@ export default function EditTaskModal({
                     content={
                       <div className="space-y-2">
                         <p>オンにすると、Todo画面で表示状態となります。</p>
-                        {/* <ul className="list-disc pl-5 space-y-1">
-                          <li>ポイントや担当者の設定は無効化されます。</li>
-                          <li>パートナーが作成したタスクをプライベートに変更するときはコピーとして作成されます。</li>
-                        </ul> */}
                       </div>
                     } />
                   <span>：</span>
@@ -1002,61 +993,115 @@ export default function EditTaskModal({
           );
         })()}
 
-        {/* 📝 備考 */}
-        <div className="relative pr-8">
-          <div className="flex items-top">
-            <label className="w-20 text-gray-600 shrink-0">備考：</label>
+        {/* 📝 備考（←ここを全面改修） */}
+        <div className="relative w-full max-w-full min-w-0">
+          <label className="block text-gray-600 mb-2">備考：</label>
 
-            <UrlAwareTextarea
-              ref={memoRef}
-              data-scrollable="true"
-              onScroll={onTextareaScroll}
-              value={editedTask.note ?? ''}
-              rows={1}
-              placeholder="備考を入力"
-              onChange={(e) => {
-                const el = e.currentTarget;
-                const native = e.nativeEvent as unknown as { inputType?: string; isComposing?: boolean };
-
-                let start = el.selectionStart ?? el.value.length;
-                let end = el.selectionEnd ?? el.value.length;
-
-                const isLineBreak =
-                  native?.inputType === 'insertLineBreak' && native?.isComposing !== true;
-
-                if (isLineBreak && start === end) {
-                  start += 1;
-                  end = start;
-                }
-
-                caretRef.current = { start, end };
-
-                const nextV = el.value;
-                if (nextV.length > NOTE_MAX) setNoteError('500文字以内で入力してください。');
-                else setNoteError(null);
-                setEditedTask((prev) => (prev ? { ...prev, note: nextV } : prev));
+          {/* 親は枠線のみ（スクロールは持たせない） */}
+          <div
+            className={[
+              'relative w-full max-w-full min-w-0',
+              'rounded-md border border-gray-200',
+              'overflow-hidden', // 横漏れ抑止のみ
+            ].join(' ')}
+            data-scroll-lock-ignore
+          >
+            {/* ▼ スクロール専用ラッパー（親の抑止を回避） ▼ */}
+            <div
+              ref={noteWrapRef}
+              role="region"
+              aria-label="備考スクロール領域"
+              onScroll={onNoteWrapScroll}
+              onScrollCapture={(e) => e.stopPropagation()}
+              onTouchStartCapture={(e) => e.stopPropagation()}
+              onTouchMoveCapture={(e) => e.stopPropagation()}
+              onPointerDownCapture={(e) => e.stopPropagation()}
+              onWheel={(e) => e.stopPropagation()}
+              onWheelCapture={(e) => e.stopPropagation()}
+              className={[
+                'relative w-full',
+                'max-h-[50vh] overflow-y-auto overflow-x-hidden',
+                '[-webkit-overflow-scrolling:touch]',
+                'touch-pan-y overscroll-y-contain',
+                'px-0 py-0',
+              ].join(' ')}
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-y',
+                overscrollBehavior: 'contain',
               }}
-              onFocus={handleMemoFocus}
-              onTouchMove={(e) => e.stopPropagation()}
-              className="w-full border-b border-gray-300 focus:outline-none focus:border-blue-500 resize-none mb-0 ml-0 pb-0 touch-pan-y overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-            />
+              data-scroll-lock-ignore
+              tabIndex={0}
+            >
+              {/* テキストエリア本体（スクロールは親が担当） */}
+              <textarea
+                ref={memoRef}
+                data-scrollable="true"
+                data-allow-scroll="true"
+                data-scroll-lock-ignore
+                value={editedTask.note ?? ''}
+                rows={4}
+                placeholder="備考を入力"
+                wrap="soft"
+                onChange={(e) => {
+                  const el = e.currentTarget;
+                  const native = e.nativeEvent as unknown as { inputType?: string; isComposing?: boolean };
+
+                  let start = el.selectionStart ?? el.value.length;
+                  let end = el.selectionEnd ?? el.value.length;
+
+                  const isLineBreak =
+                    native?.inputType === 'insertLineBreak' && native?.isComposing !== true;
+
+                  if (isLineBreak && start === end) {
+                    start += 1;
+                    end = start;
+                  }
+
+                  caretRef.current = { start, end };
+
+                  const nextV = el.value;
+                  if (nextV.length > NOTE_MAX) setNoteError('500文字以内で入力してください。');
+                  else setNoteError(null);
+                  setEditedTask((prev) => (prev ? { ...prev, note: nextV } : prev));
+                  requestAnimationFrame(updateHints);
+                }}
+                onFocus={handleMemoFocus}
+                className={[
+                  'block w-full',
+                  'min-h-[160px] overflow-visible', // ← スクロールは親に任せる
+                  'resize-none px-3 py-2 bg-white',
+                  'focus:outline-none focus:ring-2 focus:ring-blue-300',
+                  'whitespace-pre-wrap break-words border-0',
+                  'pointer-events-auto',
+                ].join(' ')}
+                style={{
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                }}
+              />
+            </div>
+            {/* ▲ スクロール専用ラッパーここまで ▲ */}
+
+            {/* iOSスクロールヒント（必要なら残す） */}
+            {isIOS && showScrollHint && (
+              <div className="pointer-events-none absolute bottom-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
+                <ChevronDown size={16} className="text-white" />
+              </div>
+            )}
+            {isIOS && showScrollUpHint && (
+              <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
+                <ChevronUp size={16} className="text-white" />
+              </div>
+            )}
           </div>
+
           <div className="mt-1 pr-1 flex justify-end">
             <span className={`${(editedTask.note?.length ?? 0) > NOTE_MAX ? 'text-red-500' : 'text-gray-400'} text-xs`}>
               {(editedTask.note?.length ?? 0)}/{NOTE_MAX}
             </span>
           </div>
-          {noteError && <p className="text-xs text-red-500 ml-20 mt-1">{noteError}</p>}
-          {isIOS && showScrollHint && (
-            <div className="pointer-events-none absolute bottom-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
-              <ChevronDown size={16} className="text-white" />
-            </div>
-          )}
-          {isIOS && showScrollUpHint && (
-            <div className="pointer-events-none absolute top-1 right-1 flex items-center justify-center w-6 h-6 rounded-full bg-black/50 animate-pulse">
-              <ChevronUp size={16} className="text-white" />
-            </div>
-          )}
+          {noteError && <p className="text-xs text-red-500 mt-1">{noteError}</p>}
         </div>
       </div>
     </BaseModal>,
