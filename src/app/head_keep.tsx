@@ -5,8 +5,8 @@ export default function Head() {
     <>
       <title>PairKaji</title>
       <meta name="description" content="家事を2人で分担するアプリ" />
-      <link rel="manifest" href="/manifest.json" />
-      <meta name="theme-color" content="#5E8BC7" />
+      {/* <link rel="manifest" href="/manifest.json" /> */}
+      <meta name="theme-color" content="#ff9800" />
       <link rel="icon" href="/icons/icon-192.png" />
 
       {/* ✅ AdSenseのサイト所有確認用 metaタグ（これが必要です） */}

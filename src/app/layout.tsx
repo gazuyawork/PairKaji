@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   },
 
   // 既存の全体設定は維持
-  manifest: '/manifest.json',
+  // manifest: '/manifest.json',
   icons: {
     icon: '/icons/icon-192.png',
     shortcut: '/icons/icon-192.png',
