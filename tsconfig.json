@@ -18,12 +18,20 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",             // ← ルート基準
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["src/*"]          // ← ここをシンプルに修正（"./"を削除）
     },
-    "typeRoots": ["./src/types", "./node_modules/@types"],
-    "baseUrl": "."
+    "typeRoots": ["./src/types", "./node_modules/@types"]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/hooks/useProfileImages.ts", "functions/index.ts", "functions/src/sendUpcomingTaskReminder.ts.bk"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/hooks/useProfileImages.ts",
+    "functions/index.ts",
+    "functions/src/sendUpcomingTaskReminder.ts.bk"
+  ],
   "exclude": ["node_modules"]
 }

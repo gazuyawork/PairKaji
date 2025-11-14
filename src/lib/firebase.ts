@@ -20,6 +20,9 @@ import {
 } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
+// ★ 追加：Cloud Functions 用
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+
 // import { setLogLevel } from 'firebase/firestore';
 // setLogLevel('debug');
 
@@ -191,5 +194,19 @@ try {
 
 const storage = getStorage(app);
 
+/* --------------------------- ★ 追加: Cloud Functions --------------------------- */
+// getFunctions で Cloud Functions クライアントを初期化
+const functions = getFunctions(app); // リージョン指定するなら第2引数: getFunctions(app, 'asia-northeast1')
+
+// 任意：ローカル開発用のエミュレータ接続（不要なら削除OK）
+if (process.env.NEXT_PUBLIC_USE_FUNCTIONS_EMULATOR === 'true') {
+  try {
+    connectFunctionsEmulator(functions, 'localhost', 5001);
+    console.info('[Firebase] Connected to Functions Emulator (localhost:5001)');
+  } catch (e) {
+    console.warn('[Firebase] Failed to connect to Functions Emulator', e);
+  }
+}
+
 /** ここからエクスポート（ユーティリティは“宣言時 export 済み”のため重複させない） */
-export { auth, db, storage, app };
+export { auth, db, storage, app, functions };

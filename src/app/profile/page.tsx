@@ -48,6 +48,10 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 // ★★★ 追加：ConfirmModal を使用するためのインポート
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
+// android ネイティブ課金ボタン
+import SubscriptionButton from '@/components/SubscriptionButton';
+
+
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPairLoading, setIsPairLoading] = useState(true);
@@ -72,7 +76,7 @@ export default function ProfilePage() {
   const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [plan, setPlan] = useState<string>(''); // プラン
   const [, setStripeCustomerId] = useState<string | null>(null);
-  const [isPortalOpening, ] = useState(false);
+  const [isPortalOpening,] = useState(false);
 
   const uid = useUserUid();
 
@@ -593,6 +597,20 @@ export default function ProfilePage() {
         cancelLabel="キャンセル"
         isProcessing={confirmProcessing}
       />
+
+
+      {uid && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-2">プレミアムプラン</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            ペア機能をさらに便利に使えるプレミアム（月額250円）
+          </p>
+          <SubscriptionButton userId={uid} />
+        </div>
+      )}
+
+
+
     </div>
   );
 }

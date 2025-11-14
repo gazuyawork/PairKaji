@@ -6,3 +6,4 @@ export * from './pointUtils';
 export * from './imageUtils';
 export * from './errorUtils';
 export * from './codeUtils';
+export { functions } from './firebase';

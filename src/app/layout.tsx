@@ -66,6 +66,9 @@ export const viewport: Viewport = {
 // 変更箇所のみ抜粋（前後文脈つき）
 // [変更] HelpHintsProvider で全体をラップし、右上に固定トグルを配置
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // [追加] .env に NEXT_PUBLIC_ADSENSE_CLIENT が無いときは Script を読まないようにする
+  const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
+
   return (
     <html
       lang="ja"
@@ -76,18 +79,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AppBadgeInitializer />
 
         {/* AdSenseローダーはアプリ全体で1回だけ読み込む */}
-        <Script
-          id="adsbygoogle-loader"
-          async
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT}`}
-        />
+        {/* [変更] クライアントIDが存在するときだけ Script を読み込むことで 404 を防止 */}
+        {adsenseClient && (
+          <Script
+            id="adsbygoogle-loader"
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
+          />
+        )}
 
         {/* ▼▼▼ 追加：全画面のHelpPopover表示ON/OFFのグローバルProviderでラップ ▼▼▼ */}
-        <HelpHintsProvider> {/* [追加] */}
+        <HelpHintsProvider>
           {/* 右上固定ON/OFFスイッチ（全画面共通）。OFF時は全ての「？」が非表示になります */}
-          <HelpHintsToggle /> {/* [追加] */}
+          <HelpHintsToggle />
 
           {/* ▼ 既存：アプリの認証プロバイダ＆クライアントレイアウト */}
           <AuthProvider>
