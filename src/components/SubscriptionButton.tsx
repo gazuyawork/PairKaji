@@ -36,7 +36,10 @@ export default function SubscriptionButton({
   productType = 'subs',
 }: Props) {
   useEffect(() => {
-    if (!isNative()) return;
+    const native = isNative();
+    console.log('[SubscriptionButton] effect, isNative =', native);
+
+    if (!native) return;
 
     // Google Play Billing の購入完了イベントを監視
     const off: PurchaseCompletedUnsubscribe = onPurchaseCompleted(
@@ -69,16 +72,25 @@ export default function SubscriptionButton({
   }, [userId]);
 
   const handleClick = async () => {
-    if (isNative()) {
+    const native = isNative();
+    console.log('[SubscriptionButton] clicked, isNative =', native);
+
+    if (native) {
       // ネイティブ環境（Androidアプリ内）
+      toast('Androidアプリで購入処理を開始します…');
+
       try {
         await purchase({
           productId: PAIRKAJI_PREMIUM_SUBSCRIPTION_ID,
           productType,
         });
+
+        // BillingPlugin.purchase 呼び出し自体が成功した場合
+        toast.success('購入画面を開きました（または開こうとしました）');
       } catch (err) {
         console.error('purchase error:', err);
-        toast.error('購入処理に失敗しました');
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(`購入処理に失敗しました: ${message}`);
       }
     } else {
       // Web（Stripeなど別課金導線）
