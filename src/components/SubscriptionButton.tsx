@@ -14,12 +14,17 @@ type Props = {
   productType?: 'inapp' | 'subs';
 };
 
-// ★ 追加: onPurchaseCompleted の戻り値用の型（unsubscribe / remove 両対応）
+// 購入完了イベントの解除用型（unsubscribe / remove 両対応）
 type PurchaseCompletedUnsubscribe =
   | (() => void)
   | {
       remove?: () => void;
     };
+
+// 購入完了イベントで受け取るペイロード型
+type PurchaseCompletedPayload = {
+  purchaseToken: string;
+};
 
 /**
  * サブスクリプションまたは単発課金ボタン。
@@ -35,8 +40,7 @@ export default function SubscriptionButton({
 
     // Google Play Billing の購入完了イベントを監視
     const off: PurchaseCompletedUnsubscribe = onPurchaseCompleted(
-      // ★ 変更: コールバック引数に型を明示して implicit any を回避
-      async ({ purchaseToken }: { purchaseToken: string }) => {
+      async ({ purchaseToken }: PurchaseCompletedPayload) => {
         try {
           const verify = httpsCallable(functions, 'onVerifyGoogle');
           await verify({
@@ -52,7 +56,7 @@ export default function SubscriptionButton({
       }
     );
 
-    // ★ 変更: no-unused-expressions / no-explicit-any を回避するために if 文で明示的に呼び出し
+    // クリーンアップ：リスナー登録解除
     return () => {
       if (typeof off === 'function') {
         // 関数として返ってくる場合
@@ -78,6 +82,7 @@ export default function SubscriptionButton({
       }
     } else {
       // Web（Stripeなど別課金導線）
+      // TODO: Stripe チェックアウトページへの遷移などに差し替え可能
       toast('WebではStripe決済を利用します。');
     }
   };

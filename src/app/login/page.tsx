@@ -1,4 +1,3 @@
-// src/app/login/page.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +20,7 @@ import { motion } from 'framer-motion';
 import { FirebaseError } from 'firebase/app';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { Capacitor } from '@capacitor/core';
 
 /**
  * ラッパー: Suspense で useSearchParams を含む内側を包む
@@ -159,6 +159,26 @@ function LoginInner() {
     setEmailError('');
     setPasswordError('');
     setLoginError('');
+
+    // ★追加: ネイティブ（Capacitor WebView）では最初からリダイレクト方式を使う
+    if (Capacitor.isNativePlatform()) {
+      try {
+        setIsLoading(true);
+        await signInWithRedirect(auth, googleProvider);
+        // 戻りは getRedirectResult で処理
+        return;
+      } catch (e) {
+        setIsLoading(false);
+        if (e instanceof FirebaseError) {
+          setLoginError('ログインに失敗しました：' + e.message);
+        } else {
+          setLoginError('予期せぬエラーが発生しました');
+        }
+        return;
+      }
+    }
+
+    // ★従来どおり: ブラウザ/PWA ではまずポップアップ、その後必要に応じてリダイレクトへフォールバック
     try {
       setIsLoading(true);
       // まずはポップアップ
