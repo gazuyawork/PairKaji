@@ -72,6 +72,9 @@ export default function SubscriptionButton({
   }, [userId]);
 
   const handleClick = async () => {
+    // ★デバッグ用：クリックされたことを強制的に見える形にする
+    alert('「プレミアムにアップグレード」ボタンがクリックされました');
+
     const native = isNative();
     console.log('[SubscriptionButton] clicked, isNative =', native);
 
@@ -94,7 +97,6 @@ export default function SubscriptionButton({
       }
     } else {
       // Web（Stripeなど別課金導線）
-      // TODO: Stripe チェックアウトページへの遷移などに差し替え可能
       toast('WebではStripe決済を利用します。');
     }
   };
