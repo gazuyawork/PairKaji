@@ -2,7 +2,14 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   signInWithEmailAndPassword,
@@ -20,7 +27,6 @@ import { motion } from 'framer-motion';
 import { FirebaseError } from 'firebase/app';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { Capacitor } from '@capacitor/core';
 
 /**
  * ラッパー: Suspense で useSearchParams を含む内側を包む
@@ -60,11 +66,11 @@ function LoginInner() {
   const [passwordError, setPasswordError] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // ★追加: 認証状態の「復元待ち」フラグと現在ユーザー
+  // 認証状態の「復元待ち」フラグと現在ユーザー
   const [isAuthResolved, setIsAuthResolved] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
 
-  // ★追加: 起動時に onAuthStateChanged で復元完了を待ち、既ログインなら自動で next へ遷移
+  // 起動時に onAuthStateChanged で復元完了を待ち、既ログインなら自動で next へ遷移
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setAuthUser(u);
@@ -77,7 +83,7 @@ function LoginInner() {
     return () => unsub();
   }, [router, next]);
 
-  // ★変更: reauth=1 の時でも「明示ログアウト時のみ」 Firebase セッションをクリア
+  // reauth=1 の時でも「明示ログアウト時のみ」 Firebase セッションをクリア
   useEffect(() => {
     if (!reauth) return;
     try {
@@ -155,30 +161,16 @@ function LoginInner() {
     }
   };
 
+  /**
+   * Web 版向け Google ログイン:
+   * - 基本は signInWithPopup
+   * - ポップアップブロックなどの一部エラー時のみ signInWithRedirect にフォールバック
+   */
   const handleGoogleLogin = useCallback(async () => {
     setEmailError('');
     setPasswordError('');
     setLoginError('');
 
-    // ★追加: ネイティブ（Capacitor WebView）では最初からリダイレクト方式を使う
-    if (Capacitor.isNativePlatform()) {
-      try {
-        setIsLoading(true);
-        await signInWithRedirect(auth, googleProvider);
-        // 戻りは getRedirectResult で処理
-        return;
-      } catch (e) {
-        setIsLoading(false);
-        if (e instanceof FirebaseError) {
-          setLoginError('ログインに失敗しました：' + e.message);
-        } else {
-          setLoginError('予期せぬエラーが発生しました');
-        }
-        return;
-      }
-    }
-
-    // ★従来どおり: ブラウザ/PWA ではまずポップアップ、その後必要に応じてリダイレクトへフォールバック
     try {
       setIsLoading(true);
       // まずはポップアップ
@@ -186,10 +178,14 @@ function LoginInner() {
       router.replace(next);
     } catch (err) {
       const fe = err as FirebaseError;
+
+      // ユーザーが自分でポップアップを閉じた場合
       if (fe?.code === 'auth/popup-closed-by-user') {
         setIsLoading(false);
         return;
       }
+
+      // 環境依存でポップアップが使えない場合などはリダイレクトにフォールバック
       const needRedirect =
         fe?.code === 'auth/popup-blocked' ||
         fe?.code === 'auth/operation-not-supported-in-this-environment' ||
@@ -199,7 +195,8 @@ function LoginInner() {
         try {
           setIsLoading(true);
           await signInWithRedirect(auth, googleProvider);
-          return; // 以後は getRedirectResult で処理
+          // 以後は getRedirectResult で処理する
+          return;
         } catch (e) {
           setIsLoading(false);
           if (e instanceof FirebaseError) {
@@ -210,12 +207,13 @@ function LoginInner() {
           return;
         }
       }
+
       setIsLoading(false);
       setLoginError('ログインに失敗しました：' + fe?.message);
     }
   }, [googleProvider, next, router]);
 
-  // ★追加: 認証復元が未確定の間はローディングのみ表示（チラつき/誤判定防止）
+  // 認証復元が未確定の間はローディングのみ表示（チラつき/誤判定防止）
   if (!isAuthResolved) {
     return (
       <div className="relative min-h-screen flex items-center justify-center bg-white">
@@ -224,7 +222,7 @@ function LoginInner() {
     );
   }
 
-  // ★追加: 既ログイン（replace 中）なら何も描画しない
+  // 既ログイン（replace 中）なら何も描画しない
   if (authUser) return null;
 
   // UI
@@ -236,7 +234,9 @@ function LoginInner() {
       transition={{ duration: 0.7 }}
     >
       {/* ロゴとサブタイトル */}
-      <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">PairKaji</h1>
+      <h1 className="text-[40px] text-[#5E5E5E] font-pacifico mb-1 mt-[20px]">
+        PairKaji
+      </h1>
       <p className="text-[#5E5E5E] mb-[40px] font-sans">ログイン</p>
 
       {/* カード（フェードのみ） */}
@@ -249,7 +249,9 @@ function LoginInner() {
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {/* メール */}
           <div className="space-y-1">
-            <label className="text-[#5E5E5E] text-[16px] font-medium">メールアドレス</label>
+            <label className="text-[#5E5E5E] text-[16px] font-medium">
+              メールアドレス
+            </label>
             <input
               type="email"
               className="text-[16px] px-3.5 py-3 rounded-xl border border-[#d8d5cf] bg-white/90 shadow-inner outline-none
@@ -261,12 +263,16 @@ function LoginInner() {
               autoComplete="email"
               inputMode="email"
             />
-            {emailError && <p className="text-sm text-red-500">{emailError}</p>}
+            {emailError && (
+              <p className="text-sm text-red-500">{emailError}</p>
+            )}
           </div>
 
           {/* パスワード */}
           <div className="space-y-1">
-            <label className="text-[#5E5E5E] text-[16px] font-medium">パスワード</label>
+            <label className="text-[#5E5E5E] text-[16px] font-medium">
+              パスワード
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -288,10 +294,14 @@ function LoginInner() {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
+            {passwordError && (
+              <p className="text-sm text-red-500">{passwordError}</p>
+            )}
           </div>
 
-          {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+          {loginError && (
+            <p className="text-sm text-red-500">{loginError}</p>
+          )}
 
           {/* ログインボタン（青色） */}
           <motion.button
@@ -304,7 +314,10 @@ function LoginInner() {
             {isLoading ? '認証中…' : 'ログインする'}
           </motion.button>
 
-          <Link href="/forgot-password" className="text-xs text-center text-[#5E5E5E] underline font-sans mt-1">
+          <Link
+            href="/forgot-password"
+            className="text-xs text-center text-[#5E5E5E] underline font-sans mt-1"
+          >
             パスワードを忘れた方はこちら
           </Link>
 
