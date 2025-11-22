@@ -1,8 +1,12 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "app.vercel.pair_kaji.twa",
-        "sha256_cert_fingerprints": ["0B:B7:A7:C3:12:A1:48:82:03:5D:AC:D4:1E:2B:5A:82:C7:BC:C6:66:4B:05:E3:22:65:62:E8:63:4E:10:14:5E"]
-      }
-    }]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.pairkaji.app",
+      "sha256_cert_fingerprints": [
+        "0B:B7:A7:C3:12:A1:48:82:03:5D:AC:D4:1E:2B:5A:82:C7:BC:C6:66:4B:05:E3:22:65:62:E8:63:4E:10:14:5E"
+      ]
+    }
+  }
+]
