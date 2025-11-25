@@ -1,11 +1,63 @@
-// src/app/pricing/page.tsx
 'use client';
 
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 import Header from '@/components/common/Header';
+import { useEffect, useState } from 'react';
+import { isPlayBillingAvailable, purchaseSubscription } from '@/lib/playBilling';
 
 export default function PricingPage() {
+    // ★Play Console で作成した Premium 用の「商品ID」に書き換えてください
+    // 例: const PLAY_SUBSCRIPTION_SKU = 'pairkaji_premium';
+    const PLAY_SUBSCRIPTION_SKU = 'YOUR_PLAY_SUBSCRIPTION_SKU';
+
+    const [playSupported, setPlaySupported] = useState(false);
+    const [processingPremium, setProcessingPremium] = useState(false);
+    const [message, setMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const check = async () => {
+            const available = await isPlayBillingAvailable();
+            if (!mounted) return;
+            setPlaySupported(available);
+        };
+
+        void check();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const handlePremiumClick = async () => {
+        if (processingPremium) return;
+
+        // Play Billing が使えない環境（ブラウザ / iOS など）は既存の Web 課金画面へ遷移
+        if (!playSupported) {
+            window.location.href = '/subscribe/premium';
+            return;
+        }
+
+        setProcessingPremium(true);
+        setMessage(null);
+
+        try {
+            const ok = await purchaseSubscription(PLAY_SUBSCRIPTION_SKU);
+            if (ok) {
+                setMessage('Google Play でのサブスク登録が完了しました。');
+            } else {
+                setMessage('購入処理がキャンセルされました。');
+            }
+        } catch (e) {
+            console.error(e);
+            setMessage('購入処理中にエラーが発生しました。');
+        } finally {
+            setProcessingPremium(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 py-10 px-4 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-12 overflow-y-auto">
             <Header title="Subscription" />
@@ -24,10 +76,17 @@ export default function PricingPage() {
                         <p className="text-sm text-gray-500">0円 / 月</p>
                     </div>
                     <ul className="flex-1 space-y-2 text-sm text-gray-700 mb-6">
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 基本機能</li>
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 広告あり</li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> 基本機能
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> 広告あり
+                        </li>
                     </ul>
-                    <button disabled className="rounded-lg bg-gray-200 py-3 text-sm text-gray-500 cursor-not-allowed">
+                    <button
+                        disabled
+                        className="rounded-lg bg-gray-200 py-3 text-sm text-gray-500 cursor-not-allowed"
+                    >
                         現在のプラン
                     </button>
                 </div>
@@ -39,10 +98,18 @@ export default function PricingPage() {
                         <p className="text-sm text-gray-500">100円 / 月</p>
                     </div>
                     <ul className="flex-1 space-y-2 text-sm text-gray-700 mb-6">
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 基本機能</li>
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> 広告なし</li>
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> プッシュ通知</li>
-                        <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> ホーム画面のカスタマイズ</li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> 基本機能
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> 広告なし
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> プッシュ通知
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" /> ホーム画面のカスタマイズ
+                        </li>
                     </ul>
                     <Link
                         href="/subscribe/lite"
@@ -94,14 +161,26 @@ export default function PricingPage() {
                         </li>
                     </ul>
 
-                    <Link
-                        href="/subscribe/premium"
-                        className="rounded-md bg-gradient-to-r from-[#2c3e50] to-[#000000] px-6 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition duration-300 hover:from-[#3a506b] hover:to-[#1a1a1a] hover:shadow-xl text-center"
+                    <button
+                        type="button"
+                        onClick={handlePremiumClick}
+                        disabled={processingPremium}
+                        className="rounded-md bg-gradient-to-r from-[#2c3e50] to-[#000000] px-6 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition duration-300 hover:from-[#3a506b] hover:to-[#1a1a1a] hover:shadow-xl text-center disabled:opacity-50"
                     >
-                        ✨ Premiumに申し込む
-                    </Link>
+                        {processingPremium
+                            ? '処理中...'
+                            : playSupported
+                                ? '✨ Google PlayでPremiumに申し込む'
+                                : '✨ Premiumに申し込む'}
+                    </button>
                 </div>
             </div>
+
+            {message && (
+                <div className="mt-4 text-center">
+                    <p className="text-sm text-green-700">{message}</p>
+                </div>
+            )}
 
             <div className="mt-6 text-center">
                 <Link href="/" className="text-sm text-gray-600 hover:underline">
