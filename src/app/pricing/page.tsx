@@ -9,7 +9,7 @@ import { isPlayBillingAvailable, purchaseSubscription } from '@/lib/playBilling'
 export default function PricingPage() {
     // ★Play Console で作成した Premium 用の「商品ID」に書き換えてください
     // 例: const PLAY_SUBSCRIPTION_SKU = 'pairkaji_premium';
-    const PLAY_SUBSCRIPTION_SKU = 'YOUR_PLAY_SUBSCRIPTION_SKU';
+    const PLAY_SUBSCRIPTION_SKU = 'pairkaji_premium_monthly';
 
     const [playSupported, setPlaySupported] = useState(false);
     const [processingPremium, setProcessingPremium] = useState(false);
