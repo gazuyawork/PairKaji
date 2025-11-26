@@ -5,10 +5,12 @@ import { CheckCircle } from 'lucide-react';
 import Header from '@/components/common/Header';
 import { useEffect, useState } from 'react';
 import { isPlayBillingAvailable, purchaseSubscription } from '@/lib/playBilling';
+import { getAuth } from 'firebase/auth';
+import { activatePremiumWithGooglePlay } from '@/lib/firebaseUtils';
+
 
 export default function PricingPage() {
-    // ★Play Console で作成した Premium 用の「商品ID」に書き換えてください
-    // 例: const PLAY_SUBSCRIPTION_SKU = 'pairkaji_premium';
+    // Play Console で作成した Premium 用の Product ID
     const PLAY_SUBSCRIPTION_SKU = 'pairkaji_premium_monthly';
 
     const [playSupported, setPlaySupported] = useState(false);
@@ -34,6 +36,14 @@ export default function PricingPage() {
     const handlePremiumClick = async () => {
         if (processingPremium) return;
 
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+            setMessage('Premiumプランに申し込むにはログインが必要です。');
+            return;
+        }
+
         // Play Billing が使えない環境（ブラウザ / iOS など）は既存の Web 課金画面へ遷移
         if (!playSupported) {
             window.location.href = '/subscribe/premium';
@@ -45,8 +55,16 @@ export default function PricingPage() {
 
         try {
             const ok = await purchaseSubscription(PLAY_SUBSCRIPTION_SKU);
+
             if (ok) {
-                setMessage('Google Play でのサブスク登録が完了しました。');
+                // 購入成功時に Firestore の users ドキュメントを Premium 状態に更新
+                await activatePremiumWithGooglePlay({
+                    uid: currentUser.uid,
+                    productId: PLAY_SUBSCRIPTION_SKU,
+                    // purchaseToken は後で取得できるように拡張予定
+                });
+
+                setMessage('Google Play でのサブスク登録が完了し、Premiumプランが有効になりました。');
             } else {
                 setMessage('購入処理がキャンセルされました。');
             }
