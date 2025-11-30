@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 import Header from '@/components/common/Header';
+import { useEffect, useState } from 'react';
 import { isPlayBillingAvailable, purchaseSubscription } from '@/lib/playBilling';
+import { getAuth } from 'firebase/auth';
 import { activatePremiumWithGooglePlay } from '@/lib/firebaseUtils';
-import { auth } from '@/lib/firebase';
+
 
 export default function PricingPage() {
-    // Google Play Console で作成した Premium 用の Product ID
+    // Play Console で作成した Premium 用の Product ID
     const PLAY_SUBSCRIPTION_SKU = 'pairkaji_premium_monthly';
 
     const [playSupported, setPlaySupported] = useState(false);
@@ -35,6 +36,7 @@ export default function PricingPage() {
     const handlePremiumClick = async () => {
         if (processingPremium) return;
 
+        const auth = getAuth();
         const currentUser = auth.currentUser;
 
         if (!currentUser) {
@@ -59,7 +61,7 @@ export default function PricingPage() {
                 await activatePremiumWithGooglePlay({
                     uid: currentUser.uid,
                     productId: PLAY_SUBSCRIPTION_SKU,
-                    // purchaseToken は今後 Play Billing 側を拡張した際に渡す想定
+                    // purchaseToken は後で取得できるように拡張予定
                 });
 
                 setMessage('Google Play でのサブスク登録が完了し、Premiumプランが有効になりました。');
@@ -181,7 +183,7 @@ export default function PricingPage() {
                         type="button"
                         onClick={handlePremiumClick}
                         disabled={processingPremium}
-                        className="rounded-md bg-gradient-to-r from-[#2c3e50] to-[#000000] px-6 py-3 text-sm font-semibold tracking-wide text白 shadow-lg transition duration-300 hover:from-[#3a506b] hover:to-[#1a1a1a] hover:shadow-xl text-center disabled:opacity-50"
+                        className="rounded-md bg-gradient-to-r from-[#2c3e50] to-[#000000] px-6 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition duration-300 hover:from-[#3a506b] hover:to-[#1a1a1a] hover:shadow-xl text-center disabled:opacity-50"
                     >
                         {processingPremium
                             ? '処理中...'
