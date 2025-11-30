@@ -1,16 +1,15 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 import Header from '@/components/common/Header';
-import { useEffect, useState } from 'react';
 import { isPlayBillingAvailable, purchaseSubscription } from '@/lib/playBilling';
-import { getAuth } from 'firebase/auth';
 import { activatePremiumWithGooglePlay } from '@/lib/firebaseUtils';
-
+import { auth } from '@/lib/firebase';
 
 export default function PricingPage() {
-    // Play Console で作成した Premium 用の Product ID
+    // Google Play Console で作成した Premium 用の Product ID
     const PLAY_SUBSCRIPTION_SKU = 'pairkaji_premium_monthly';
 
     const [playSupported, setPlaySupported] = useState(false);
@@ -36,7 +35,6 @@ export default function PricingPage() {
     const handlePremiumClick = async () => {
         if (processingPremium) return;
 
-        const auth = getAuth();
         const currentUser = auth.currentUser;
 
         if (!currentUser) {
@@ -61,7 +59,7 @@ export default function PricingPage() {
                 await activatePremiumWithGooglePlay({
                     uid: currentUser.uid,
                     productId: PLAY_SUBSCRIPTION_SKU,
-                    // purchaseToken は後で取得できるように拡張予定
+                    // purchaseToken は今後 Play Billing 側を拡張した際に渡す想定
                 });
 
                 setMessage('Google Play でのサブスク登録が完了し、Premiumプランが有効になりました。');
