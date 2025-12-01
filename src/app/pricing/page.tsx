@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 import Header from '@/components/common/Header';
 import { isPlayBillingAvailable, purchaseSubscription } from '@/lib/playBilling';
-import { activatePremiumWithGooglePlay } from '@/lib/firebaseUtils';
+import { activatePremiumWithGooglePlay, getUserProfile } from '@/lib/firebaseUtils';
 import { auth } from '@/lib/firebase';
 
 export default function PricingPage() {
@@ -15,14 +15,36 @@ export default function PricingPage() {
     const [playSupported, setPlaySupported] = useState(false);
     const [processingPremium, setProcessingPremium] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
+    const [isPremium, setIsPremium] = useState(false); // ★ 追加：現在のユーザーがPremiumかどうか
 
     useEffect(() => {
         let mounted = true;
 
         const check = async () => {
+            // Play Billing 対応状況チェック
             const available = await isPlayBillingAvailable();
             if (!mounted) return;
             setPlaySupported(available);
+
+            // ログインユーザーのプランを取得してPremiumかどうか判定
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
+
+            try {
+                const snap = await getUserProfile(currentUser.uid);
+                if (!snap.exists()) return;
+
+                const data = snap.data() as {
+                    plan?: string;
+                    subscriptionStatus?: string;
+                };
+
+                if (data.plan === 'premium' && data.subscriptionStatus === 'active') {
+                    setIsPremium(true);
+                }
+            } catch (err) {
+                console.error('Failed to load user subscription status:', err);
+            }
         };
 
         void check();
@@ -33,7 +55,7 @@ export default function PricingPage() {
     }, []);
 
     const handlePremiumClick = async () => {
-        if (processingPremium) return;
+        if (processingPremium || isPremium) return;
 
         const currentUser = auth.currentUser;
 
@@ -62,6 +84,7 @@ export default function PricingPage() {
                     // purchaseToken は今後 Play Billing 側を拡張した際に渡す想定
                 });
 
+                setIsPremium(true); // ★ 購入成功後は画面上でもPremium扱いにする
                 setMessage('Google Play でのサブスク登録が完了し、Premiumプランが有効になりました。');
             } else {
                 setMessage('購入処理がキャンセルされました。');
@@ -84,7 +107,7 @@ export default function PricingPage() {
                 </p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3 max-w-5xl mx-auto">
+            <div className="grid gap-3 md:grid-cols-2 max-w-5xl mx-auto">
                 {/* Free プラン */}
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm flex flex-col">
                     <div className="flex items-center gap-3 mb-4">
@@ -100,15 +123,26 @@ export default function PricingPage() {
                         </li>
                     </ul>
                     <button
-                        disabled
-                        className="rounded-lg bg-gray-200 py-3 text-sm text-gray-500 cursor-not-allowed"
+                        type="button"
+                        disabled={!isPremium}
+                        onClick={() => {
+                            if (!isPremium) return;
+                            // Google Play の定期購入管理画面を開く
+                            window.open('https://play.google.com/store/account/subscriptions', '_blank');
+                        }}
+                        className={
+                            isPremium
+                                ? 'rounded-lg bg-gradient-to-r from-[#fbbf24] to-[#f97316] py-3 text-sm font-medium tracking-wide text-white shadow-md transition duration-300 hover:from-[#facc15] hover:to-[#ea580c] hover:shadow-lg text-center'
+                                : 'rounded-lg bg-gray-200 py-3 text-sm text-gray-500 cursor-not-allowed'
+                        }
                     >
-                        現在のプラン
+                        {isPremium ? 'Freeプランに戻す' : '現在のプラン'}
                     </button>
+
                 </div>
 
                 {/* Lite プラン */}
-                <div className="rounded-2xl border border-orange-300 bg-white p-6 shadow-md flex flex-col">
+                {/* <div className="rounded-2xl border border-orange-300 bg-white p-6 shadow-md flex flex-col">
                     <div className="flex items-center gap-3 mb-4">
                         <h2 className="text-xl font-semibold text-gray-800">Liteプラン</h2>
                         <p className="text-sm text-gray-500">100円 / 月</p>
@@ -133,7 +167,7 @@ export default function PricingPage() {
                     >
                         🌟 Liteに申し込む
                     </Link>
-                </div>
+                </div> */}
 
                 {/* Premium プラン */}
                 <div className="rounded-2xl border border-indigo-300 bg-white p-6 shadow-md flex flex-col">
@@ -180,14 +214,16 @@ export default function PricingPage() {
                     <button
                         type="button"
                         onClick={handlePremiumClick}
-                        disabled={processingPremium}
+                        disabled={processingPremium || isPremium}
                         className="rounded-md bg-gradient-to-r from-[#2c3e50] to-[#000000] px-6 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition duration-300 hover:from-[#3a506b] hover:to-[#1a1a1a] hover:shadow-xl text-center disabled:opacity-50"
                     >
-                        {processingPremium
-                            ? '処理中...'
-                            : playSupported
-                                ? '✨ Google PlayでPremiumに申し込む'
-                                : '✨ Premiumに申し込む'}
+                        {isPremium
+                            ? '現在のプラン'
+                            : processingPremium
+                                ? '処理中...'
+                                : playSupported
+                                    ? '✨ Google PlayでPremiumに申し込む'
+                                    : '✨ Premiumに申し込む'}
                     </button>
                 </div>
             </div>

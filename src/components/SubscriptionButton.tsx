@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import { motion } from 'framer-motion';
 
 type Props = {
   userId: string;
@@ -36,11 +37,24 @@ export default function SubscriptionButton({
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className="rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-4 py-2 transition"
+    <motion.div
+      className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-4 mx-auto w-full max-w-xl"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      プレミアムにアップグレード
-    </button>
+      <p className="text-[#5E5E5E] font-semibold">プレミアムプラン</p>
+
+      <p className="text-sm text-gray-600">
+        広告なし・通知機能付きのプレミアムプランにアップグレードできます。
+      </p>
+
+      <button
+        onClick={handleClick}
+        className="w-full bg-[#FFCB7D] text-white py-2 rounded shadow text-sm transition hover:brightness-105"
+      >
+        プレミアムにアップグレード
+      </button>
+    </motion.div>
   );
 }

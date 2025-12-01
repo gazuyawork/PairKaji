@@ -546,6 +546,10 @@ export default function ProfilePage() {
               isRemoving={isRemoving}
             />
 
+            {uid && (
+                <SubscriptionButton userId={uid} />
+            )}
+
             <section className="">
               {uid && <PushToggle uid={uid} />}
             </section>
@@ -580,6 +584,7 @@ export default function ProfilePage() {
             </div>
           </>
         )}
+
       </main>
 
       {/* 既存の編集モーダル */}
@@ -599,15 +604,7 @@ export default function ProfilePage() {
       />
 
 
-      {uid && (
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold mb-2">プレミアムプラン</h2>
-          <p className="text-sm text-gray-600 mb-3">
-            ペア機能をさらに便利に使えるプレミアム（月額250円）
-          </p>
-          <SubscriptionButton userId={uid} />
-        </div>
-      )}
+
 
 
 
