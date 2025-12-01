@@ -89,19 +89,28 @@ export default function PricingPage() {
             } else {
                 setMessage('購入処理がキャンセルされました。');
             }
-        } catch (e) {
-            console.error(e);
-            const errorMessage =
-                e instanceof Error
-                    ? e.message
-                    : typeof e === 'string'
-                        ? e
-                        : JSON.stringify(e);
+    } catch (e) {
+        console.error(e);
 
+        const errorMessage =
+            e instanceof Error
+                ? e.message
+                : typeof e === 'string'
+                    ? e
+                    : JSON.stringify(e);
+
+        if (String(errorMessage).includes('clientAppUnavailable')) {
+            setMessage(
+                'この購入は Google Play ストアからインストールしたアプリでのみ行えます。\n' +
+                'Play ストアの内部テスト版をインストールしてから再度お試しください。'
+            );
+        } else {
             setMessage(`購入処理中にエラーが発生しました: ${errorMessage}`);
-        } finally {
-            setProcessingPremium(false);
         }
+    } finally {
+        setProcessingPremium(false);
+    }
+
 
     };
 
