@@ -91,10 +91,18 @@ export default function PricingPage() {
             }
         } catch (e) {
             console.error(e);
-            setMessage('購入処理中にエラーが発生しました。');
+            const errorMessage =
+                e instanceof Error
+                    ? e.message
+                    : typeof e === 'string'
+                        ? e
+                        : JSON.stringify(e);
+
+            setMessage(`購入処理中にエラーが発生しました: ${errorMessage}`);
         } finally {
             setProcessingPremium(false);
         }
+
     };
 
     return (
