@@ -319,6 +319,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [flaggedFilter, setFlaggedFilter] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingConfirmResolver = useRef<((value: boolean) => void) | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const pendingDeleteResolver = useRef<((value: boolean) => void) | null>(null);
   const [showCompletedMap, setShowCompletedMap] = useState<Record<Period, boolean>>({
     毎日: false,
     週次: false,
@@ -1031,12 +1033,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [uid, selectedIds, tasksState]);
 
   // 一括削除
+  // 変更「後」
   const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
     const proceed = await new Promise<boolean>((resolve) => {
-      pendingConfirmResolver.current = resolve;
-      setConfirmOpen(true);
+      pendingDeleteResolver.current = resolve;     // ★ こちらに変更
+      setDeleteConfirmOpen(true);                 // ★ 一括削除専用モーダルを開く
     });
 
     if (!proceed) return;
@@ -1055,6 +1058,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       toast.error('一括削除に失敗しました');
     }
   }, [selectedIds]);
+
 
   /* =========================================================
    * 並び替え（複数選択モード時のみ）
@@ -1575,22 +1579,23 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
       {/* 一括削除確認モーダル */}
       <ConfirmModal
-        isOpen={confirmOpen}
+        isOpen={deleteConfirmOpen}  // ★ 一括削除専用フラグ
         title=""
         message={<div className="text-xl font-semibold">{`${selectedIds.size}件のタスクを削除しますか？`}</div>}
         onConfirm={() => {
-          setConfirmOpen(false);
-          pendingConfirmResolver.current?.(true);
-          pendingConfirmResolver.current = null;
+          setDeleteConfirmOpen(false);
+          pendingDeleteResolver.current?.(true);
+          pendingDeleteResolver.current = null;
         }}
         onCancel={() => {
-          setConfirmOpen(false);
-          pendingConfirmResolver.current?.(false);
-          pendingConfirmResolver.current = null;
+          setDeleteConfirmOpen(false);
+          pendingDeleteResolver.current?.(false);
+          pendingDeleteResolver.current = null;
         }}
         confirmLabel="削除する"
         cancelLabel="キャンセル"
       />
+
     </div>
   );
 }

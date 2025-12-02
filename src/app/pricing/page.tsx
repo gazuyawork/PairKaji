@@ -190,11 +190,11 @@ export default function PricingPage() {
                 <div className="rounded-2xl border border-indigo-300 bg-white p-6 shadow-md flex flex-col">
                     <div className="flex items-center gap-3 mb-1">
                         <h2 className="text-xl font-semibold text-gray-800">Premiumプラン</h2>
-                        <p className="text-sm text-gray-500">300円 / 月</p>
+                        <p className="text-sm text-gray-500">150円 / 月</p>
                     </div>
 
                     <p className="text-xs text-gray-500 mb-4">
-                        ※ パートナーとご利用される場合でも、2人で 300円 / 月 でご利用いただけます。
+                        ※ パートナーとご利用される場合でも、2人で 150円 / 月 でご利用いただけます。
                     </p>
 
                     <ul className="flex-1 space-y-2 text-sm text-gray-700 mb-2">

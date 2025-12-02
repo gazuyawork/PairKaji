@@ -50,13 +50,13 @@ export default function SubscribeConfirm({ plan }: Props) {
     }
     return {
       title: 'Premium プランの確認',
-      price: '300円 / 月',
+      price: '150円 / 月',
       bullets: ['基本機能', '広告なし', 'プッシュ通知 機能'],
-      cta: '支払いへ進む（300円 / 月）',
+      cta: '支払いへ進む（150円 / 月）',
       gradientFrom: '#2c3e50',
       gradientTo: '#000000',
       apiPlan: 'premium' as const,
-      note: 'パートナー利用でも 2人で 300円 / 月。広告非表示などの拡張機能をご利用いただけます。',
+      note: 'パートナー利用でも 2人で 150円 / 月。広告非表示などの拡張機能をご利用いただけます。',
     };
   }, [plan]);
 
