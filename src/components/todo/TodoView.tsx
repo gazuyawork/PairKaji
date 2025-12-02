@@ -667,14 +667,15 @@ export default function TodoView() {
                         shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
           >
             <Search className="w-4 h-4 text-gray-400" />
+
             <input
               type="text"
               value={addQuery}
               onChange={(e) => setAddQuery(e.target.value)}
               placeholder="キーワードで検索"
               className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
-              autoFocus
             />
+
             {addQuery && (
               <button className="text-sm text-gray-600 hover:text-gray-800" onClick={() => setAddQuery('')}>
                 クリア
