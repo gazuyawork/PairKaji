@@ -1069,7 +1069,7 @@ export default function EditTaskModal({
                 onFocus={handleMemoFocus}
                 className={[
                   'block w-full',
-                  'min-h-[160px] overflow-visible', // ← スクロールは親に任せる
+                  'min-h-[100px] overflow-visible', // ← スクロールは親に任せる
                   'resize-none px-3 py-2 bg-white',
                   'focus:outline-none focus:ring-2 focus:ring-blue-300',
                   'whitespace-pre-wrap break-words border-0',
