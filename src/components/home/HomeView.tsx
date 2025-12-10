@@ -34,6 +34,8 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 
+import { toast } from 'sonner';
+
 // ▼ DnD Kit
 import {
   DndContext,
@@ -742,7 +744,18 @@ export default function HomeView() {
                 {/* スイッチ風トグル */}
                 <button
                   type="button"
-                  onClick={() => setEditMode(!editMode)}
+                  onClick={() => {
+                    const next = !editMode;
+                    setEditMode(next);
+
+                    if (next) {
+                      // 🔛 OFF → ON
+                      toast.success('編集モードに切り替えました');
+                    } else {
+                      // 🔚 ON → OFF
+                      toast.success('編集モードを終了しました');
+                    }
+                  }}
                   className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 ${editMode ? 'bg-emerald-500' : 'bg-gray-300'
                     }`}
                 >
@@ -751,6 +764,7 @@ export default function HomeView() {
                       }`}
                   />
                 </button>
+
                 <span className="text-sm font-medium text-gray-700 select-none">
                   {editMode ? '編集 ON' : '編集 OFF'}
                 </span>

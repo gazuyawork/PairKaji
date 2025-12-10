@@ -881,13 +881,21 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   }, [isSearchVisible]);
 
-  // 選択モード関連ハンドラ
-  const toggleSelectionMode = useCallback(() => {
-    setSelectionMode((prev) => {
-      if (prev) setSelectedIds(new Set()); // OFF時は選択クリア
-      return !prev;
-    });
-  }, []);
+// 選択モード関連ハンドラ
+const toggleSelectionMode = useCallback(() => {
+  const next = !selectionMode;
+
+  setSelectionMode(next);
+
+  if (next) {
+    // 🔛 OFF → ON
+    toast.success('編集モードに切り替えました');
+  } else {
+    // 🔚 ON → OFF
+    setSelectedIds(new Set());
+    toast.success('編集モードを終了しました');
+  }
+}, [selectionMode]);
 
   const toggleSelect = useCallback((taskId: string) => {
     setSelectedIds((prev) => {
