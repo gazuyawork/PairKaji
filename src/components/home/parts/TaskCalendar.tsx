@@ -30,7 +30,7 @@ export default function TaskCalendar({ tasks }: Props) {
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const weekLabel = `（${format(weekStart, 'M/d')}〜${format(weekEnd, 'M/d')}）`;
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isExpandedAll, setIsExpandedAll] = useState(false);
   const startToday = startOfDay(today);
 
   // ✅ 1週間分（本日含む7日）
@@ -98,7 +98,7 @@ export default function TaskCalendar({ tasks }: Props) {
             preferredSide="top"     // 吹き出しを上側に
             align="center"             // タイトル右端に寄せる
             sideOffset={6}          // タイトルとの間隔
-            offsetX={-30} 
+            offsetX={-30}
             content={
               <div className="space-y-2 text-sm">
                 <p>今週以降7日分の予定を一覧で確認できます。</p>
@@ -179,7 +179,8 @@ export default function TaskCalendar({ tasks }: Props) {
             const hasTask = sortedTasks.length > 0;
             const bgColor = hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]';
 
-            const isExpanded = !!selectedDate && isSameDay(day, selectedDate as Date);
+            const isExpanded = isExpandedAll;
+
 
             // ▼ 5件制限 & 全件表示トグル
             const MAX_VISIBLE = 3;
@@ -194,15 +195,12 @@ export default function TaskCalendar({ tasks }: Props) {
                 initial="collapsed"
                 animate={isExpanded ? 'expanded' : 'collapsed'}
                 className={`w-2/5 sm:w-[100px] flex-shrink-0 rounded-lg p-2 min-h-[60px] border border-gray-300 shadow-inner ${bgColor} cursor-pointer select-none`}
-                onClick={() =>
-                  isSameDay(selectedDate ?? new Date(0), day)
-                    ? setSelectedDate(null) // 同じ日ならトグルで閉じる
-                    : setSelectedDate(day)  // 違う日なら新たに展開
-                }
+                onClick={() => setIsExpandedAll((prev) => !prev)} // ← どの日をタップしても全体トグル
                 role="button"
                 aria-pressed={isExpanded}
-                title={isExpanded ? '5件表示に戻す' : 'タップで全件表示'}
+                title={isExpanded ? '件数を絞って表示' : 'タップで全件表示'}
               >
+
                 <div className="font-semibold text-gray-600">
                   {format(day, 'M/d (EEE)', { locale: ja })}
                 </div>

@@ -80,7 +80,7 @@ function getCategoryMeta(raw?: unknown) {
   const normalized = String(raw ?? '').normalize('NFKC').trim();
   const category =
     normalized === '' ||
-    !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
+      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
       ? '未分類'
       : normalized;
 
@@ -486,11 +486,11 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
       if (taskId) {
         try {
           (view?.setSelectedTaskName)?.(taskId);
-        } catch {}
+        } catch { }
       }
       try {
         (view?.setIndex)?.(2); // 仕様：index=2 が TODO
-      } catch {}
+      } catch { }
     },
     [view],
   );
@@ -578,12 +578,12 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
               {/* <span className="sr-only">読み込み中</span> */}
             </span>
           ) : (() => {
-              const all = availableCandidates.length;
-              const shown = filteredCandidates.length;
-              return modalQuery || modalSelectedCategoryId !== null
-                ? `一致: ${shown}件`
-                : `候補: ${all}件`;
-            })()
+            const all = availableCandidates.length;
+            const shown = filteredCandidates.length;
+            return modalQuery || modalSelectedCategoryId !== null
+              ? `一致: ${shown}件`
+              : `候補: ${all}件`;
+          })()
         }
       >
         {/* 検索ボックス */}
@@ -600,7 +600,6 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
             onChange={(e) => setModalQuery(e.target.value)}
             placeholder="キーワードで検索"
             className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400 bg-transparent"
-            autoFocus
             disabled={candidateLoading} // ★追加：ロード中は入力不可
           />
           {modalQuery && (
@@ -622,13 +621,11 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
               type="button"
               onClick={() => setModalSelectedCategoryId(null)}
               className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-                ${
-                  modalSelectedCategoryId === null
-                    ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-                    : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'
+                ${modalSelectedCategoryId === null
+                  ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'
                 }
-                active:translate-y-[1px] ${
-                  candidateLoading ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''
+                active:translate-y-[1px] ${candidateLoading ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''
                 }`} // ★追加
               aria-pressed={modalSelectedCategoryId === null}
               title="すべて"
