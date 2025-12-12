@@ -1,4 +1,3 @@
-// src/components/todo/parts/TodoNoteModal.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -12,10 +11,6 @@ import {
   useMemo,
 } from 'react';
 import { ChevronDown, ChevronUp, Eye, Pencil, Plus, GripVertical } from 'lucide-react';
-import RecipeEditor, {
-  type Recipe,
-  type RecipeEditorHandle,
-} from '@/components/todo/parts/RecipeEditor';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
@@ -303,7 +298,6 @@ export default function TodoNoteModal({
   todoId,
   taskId,
 }: TodoNoteModalProps) {
-  const recipeEditorRef = useRef<RecipeEditorHandle>(null);
   const isIOS =
     typeof navigator !== 'undefined' &&
     /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
@@ -336,9 +330,6 @@ export default function TodoNoteModal({
   const [timeStart, setTimeStart] = useState<string>('');
   const [timeEnd, setTimeEnd] = useState<string>('');
   const [durationMin, setDurationMin] = useState<string>('');
-
-  // レシピ
-  const [recipe, setRecipe] = useState<Recipe>({ ingredients: [], steps: [] });
 
   // 画像
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -376,15 +367,6 @@ export default function TodoNoteModal({
   const hasMemo = useMemo(() => memo.trim().length > 0, [memo]);
   const hasImage = useMemo(() => imageUrl !== null, [imageUrl]);
 
-  const hasRecipe = useMemo(() => {
-    if (category !== '料理') return false;
-    const ings = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
-    const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
-    const hasAnyIngredient = ings.some((i) => (i?.name ?? '').trim() !== '');
-    const hasAnyStep = steps.some((s) => (s ?? '').trim() !== '');
-    return hasAnyIngredient || hasAnyStep;
-  }, [category, recipe]);
-
   const hasShopping = useMemo(() => {
     if (category !== '買い物') return false;
     const p = Number.parseFloat(price);
@@ -413,33 +395,10 @@ export default function TodoNoteModal({
   const hasContent =
     hasMemo ||
     hasImage ||
-    hasRecipe ||
     hasShopping ||
     hasReference ||
     (!!timeStart && !!timeEnd) ||
     (isUncategorized && hasChecklist);
-
-  const shallowEqualRecipe = useCallback((a: Recipe, b: Recipe) => {
-    if (a === b) return true;
-    if (a.ingredients.length !== b.ingredients.length) return false;
-    for (let i = 0; i < a.ingredients.length; i++) {
-      const x = a.ingredients[i];
-      const y = b.ingredients[i];
-      if (!x || !y) return false;
-      if (x.id !== y.id || x.name !== y.name || x.unit !== y.unit || x.amount !== y.amount)
-        return false;
-    }
-    if (a.steps.length !== b.steps.length) return false;
-    for (let i = 0; i < a.steps.length; i++) if (a.steps[i] !== b.steps[i]) return false;
-    return true;
-  }, []);
-
-  const handleRecipeChange = useCallback(
-    (next: Recipe) => {
-      setRecipe((prev) => (shallowEqualRecipe(prev, next) ? prev : next));
-    },
-    [shallowEqualRecipe]
-  );
 
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -514,26 +473,8 @@ export default function TodoNoteModal({
           setCompareQuantity(String(todo.quantity));
         }
 
-        const existing = todo.recipe;
-        if (existing) {
-          const safeIngredients: Ingredient[] = Array.isArray(existing.ingredients)
-            ? existing.ingredients.map((ing, idx) => ({
-              id: isString(ing?.id) ? ing!.id : `ing_${idx}`,
-              name: isString(ing?.name) ? ing!.name : '',
-              amount: isNumber(ing?.amount) ? ing!.amount : null,
-              unit: isString(ing?.unit) ? ing!.unit : '適量',
-            }))
-            : [];
-          setRecipe({
-            ingredients: safeIngredients.length > 0 ? safeIngredients : [{ id: 'ing_0', name: '', amount: null, unit: '適量' }],
-            steps: Array.isArray(existing.steps) ? existing.steps.filter(isString) : [],
-          });
-        } else {
-          setRecipe({
-            ingredients: [{ id: 'ing_0', name: '', amount: null, unit: '適量' }],
-            steps: [''],
-          });
-        }
+        // ✅ 料理カテゴリの「材料/手順 UI」は一旦撤去するため、
+        //    ここでは recipe を state に取り込んだり、保存時に上書きしません。
 
         const existingImageUrl = isString(todo.imageUrl) ? todo.imageUrl : null;
         setImageUrl(existingImageUrl);
@@ -824,7 +765,6 @@ export default function TodoNoteModal({
   };
 
   // URL変更時：ラベル未設定なら候補補完
-  // 変更後（置き換え）
   const changeUrl = (idx: number, val: string) => {
     // URLを「前の値」を参照しつつ更新
     setReferenceUrls((prevUrls) => {
@@ -849,7 +789,6 @@ export default function TodoNoteModal({
       return nextUrls;
     });
   };
-
 
   const onUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
@@ -900,18 +839,10 @@ export default function TodoNoteModal({
     setErrorsShown(true); // 保存押下で初めてエラー表示
     const okCommon = runValidation();
 
-    // 料理の材料：子コンポーネント側で一回だけ表示をオンにする（ちらつき防止）
-    let okRecipe = true;
-    if (category === '料理') {
-      const result = recipeEditorRef.current?.validateAndShowErrors();
-      if (!result || result.hasErrors) okRecipe = false;
-    }
-
-    if (!(okCommon && okRecipe)) return; // どちらかエラーなら保存中断
+    // ✅ 料理カテゴリのレシピUI/バリデーション呼び出しは一旦撤去
+    if (!okCommon) return;
 
     setIsSaving(true);
-
-    const committedIngredients = recipeEditorRef.current?.commitAllAmounts();
 
     const nPrice = Number.parseFloat(price);
     const nQty = Number.parseFloat(quantity);
@@ -973,16 +904,7 @@ export default function TodoNoteModal({
         (payload as { imageUrl?: string | null }).imageUrl = nextImage;
       }
 
-      if (category === '料理') {
-        const finalIngredients = committedIngredients ?? recipe.ingredients;
-        (payload as { recipe?: Recipe }).recipe = {
-          ingredients: finalIngredients
-            .filter((i) => i.name.trim() !== '')
-            .map((i) => ({ id: i.id, name: i.name.trim(), amount: typeof i.amount === 'number' ? i.amount : null, unit: i.unit || '適量' })),
-          steps: recipe.steps.map((s) => s.trim()).filter((s) => s !== ''),
-        };
-      }
-
+      // ✅ 料理カテゴリの recipe 保存は一旦触らない（既存データを上書きしない）
       if (category === '旅行') {
         (payload as { timeStart?: string | null }).timeStart = timeStart || null;
         (payload as { timeEnd?: string | null }).timeEnd = timeEnd || null;
@@ -1326,7 +1248,7 @@ export default function TodoNoteModal({
                                   {idx + 1}.
                                 </div>
 
-                                {/* 入力（URL）+ ラベルUI */}
+                                {/* 入力（URL） */}
                                 <div className="col-span-9 flex items-center gap-2 min-w-0">
                                   <input
                                     ref={(el) => { urlRefs.current[idx] = el; }}
@@ -1370,7 +1292,6 @@ export default function TodoNoteModal({
                   </DndContext>
                 </>
               ) : (
-                // src/components/todo/parts/TodoNoteModal.tsx
                 <ul className="list-disc list-inside text-md text-blue-500 marker:text-black">
                   {referenceUrls
                     .map((url, i) => ({ url: url.trim(), label: (referenceLabels[i] ?? '').trim() }))
@@ -1388,8 +1309,8 @@ export default function TodoNoteModal({
           )}
           {/* ▲▲ 参考URLここまで ▲▲ */}
 
-          {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
-          {isUncategorized && (!isPreview || hasChecklist) && (
+          {/* ▼▼ チェックリスト（カテゴリ未選択と料理のときだけ表示・必須ではない） ▼▼ */}
+          {(isUncategorized || category === '料理') && (!isPreview || hasChecklist) && (
             <div className="pt-2 pb-3 mt-2">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-medium">チェックリスト</h3>
@@ -1682,16 +1603,7 @@ export default function TodoNoteModal({
             </>
           )}
 
-          {/* 料理カテゴリ（保存押下時にエラー表示を固定） */}
-          {category === '料理' && (
-            <RecipeEditor
-              ref={recipeEditorRef}
-              headerNote=""
-              value={recipe}
-              onChange={handleRecipeChange}
-              isPreview={isPreview}
-            />
-          )}
+          {/* ✅ 料理カテゴリの RecipeEditor は一旦表示も呼び出しも撤去 */}
         </div>
       </div>
     </BaseModal>

@@ -70,10 +70,6 @@ type TodoDoc = {
   imageUrl?: string | null;
   referenceUrls?: string[];
   referenceUrlLabels?: string[];
-  recipe?: {
-    ingredients?: unknown[];
-    steps?: string[];
-  };
   /** 旅行時の時間帯（"HH:mm"）。存在しない場合は未定義 */
   timeStart?: string;
   timeEnd?: string;
@@ -612,6 +608,7 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
 /* =========================================================
  * ToDo 部分更新（旅行の時間帯保存に対応）
  *  + チェックリスト保存を追加
+ *  ※ 料理の材料/手順(recipe)はバグ多発のため保存対象から除外
  * =======================================================*/
 export const updateTodoInTask = async (
   taskId: string,
@@ -622,7 +619,6 @@ export const updateTodoInTask = async (
     quantity?: number | null;
     unit?: string;
     imageUrl?: string | null;
-    recipe?: { ingredients: unknown[]; steps: string[] } | null;
     referenceUrls?: string[];
     referenceUrlLabels?: string[];
     /** 旅行時の時間帯。null指定でフィールド削除 */
@@ -676,16 +672,14 @@ export const updateTodoInTask = async (
   // --- referenceUrlLabels（配列を整える） ---
   if (typeof updates.referenceUrlLabels !== 'undefined') {
     const labels = Array.isArray(updates.referenceUrlLabels)
-      ? updates.referenceUrlLabels.map((s) =>
-          typeof s === 'string' ? s.trim() : ''
-        )
+      ? updates.referenceUrlLabels.map((s) => (typeof s === 'string' ? s.trim() : ''))
       : [];
 
     // もし URL 数とラベル数がズレていれば、URL数に合わせて切り詰め/穴埋め
     const urlCount = Array.isArray(next.referenceUrls) ? next.referenceUrls.length : 0;
     const normalized =
       urlCount > 0
-        ? Array.from({ length: urlCount }, (_ , i) => labels[i] ?? '')
+        ? Array.from({ length: urlCount }, (_, i) => labels[i] ?? '')
         : [];
 
     next = { ...next, referenceUrlLabels: normalized };
@@ -699,16 +693,6 @@ export const updateTodoInTask = async (
     next = rest as TodoDoc;
   } else if (typeof updates.imageUrl === 'string') {
     next = { ...next, imageUrl: updates.imageUrl };
-  }
-
-  // --- recipe の扱い ---
-  if (updates.recipe === null) {
-    // プロパティごと除去
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { recipe: _omit, ...rest } = next;
-    next = rest as TodoDoc;
-  } else if (typeof updates.recipe !== 'undefined') {
-    next = { ...next, recipe: updates.recipe };
   }
 
   // --- checklist の扱い（配列置換） ---
