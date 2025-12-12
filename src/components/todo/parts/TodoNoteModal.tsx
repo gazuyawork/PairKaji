@@ -791,10 +791,15 @@ export default function TodoNoteModal({
   };
 
   const onUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    // ★ IME変換中（全角確定Enter）は無視
+    if ((e.nativeEvent as any).isComposing) return;
+    if ((e.nativeEvent as any).keyCode === 229) return;
+
     if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
     addUrlAt(idx);
   };
+
 
   /* =========================
    *  バリデーション（保存時）
@@ -1390,10 +1395,15 @@ export default function TodoNoteModal({
                                   );
                                 }}
                                 onKeyDown={(e) => {
+                                  // ★ IME変換中は Enter を無視
+                                  if ((e.nativeEvent as any).isComposing) return;
+                                  if ((e.nativeEvent as any).keyCode === 229) return;
+
                                   if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
                                     const id = `cl_${Math.random().toString(16).slice(2)}`;
                                     const newIndex = idx + 1;
+
                                     setChecklist((prev) => {
                                       const arr = [...prev];
                                       arr.splice(newIndex, 0, { id, text: '', done: false });
@@ -1407,6 +1417,7 @@ export default function TodoNoteModal({
                                     setPendingCheckFocusIndex(newIndex);
                                   }
                                 }}
+
                                 placeholder="項目を入力（Enterで下に追加）"
                                 className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-md focus:outline-none focus:border-blue-500"
                               />
