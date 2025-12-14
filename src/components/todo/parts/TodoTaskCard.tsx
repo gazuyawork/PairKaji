@@ -151,6 +151,9 @@ export default function TodoTaskCard({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [, setInputError] = useState<string | null>(null);
 
+  // 追加：blur確定をスキップするためのフラグ（×や外側タップで閉じる場合に誤追加を防ぐ）
+  const skipCommitOnBlurRef = useRef(false);
+
   // 編集中の行のエラー
   const [editingErrors, setEditingErrors] = useState<Record<string, string>>({});
 
@@ -241,6 +244,10 @@ export default function TodoTaskCard({
       const target = e.target as Node | null;
       if (!target) return;
       if (inputWrapRef.current && inputWrapRef.current.contains(target)) return;
+
+      // 外側タップで閉じる場合は「確定しない」
+      skipCommitOnBlurRef.current = true;
+
       closeAddInput();
     };
 
@@ -602,6 +609,23 @@ export default function TodoTaskCard({
                           if (isComposingAdd) return;
                           handleAdd();
                         }}
+                        onBlur={() => {
+                          // 「閉じる操作」由来のblurなら確定しない
+                          if (skipCommitOnBlurRef.current) {
+                            skipCommitOnBlurRef.current = false;
+                            return;
+                          }
+
+                          // SPでキーボードを閉じた等でblurした場合に確定させる
+                          if (tab !== 'undone') return;
+                          if (!canAdd) return;
+                          if (isComposingAdd) return;
+
+                          const trimmed = newTodoText.trim();
+                          if (!trimmed) return;
+
+                          handleAdd();
+                        }}
                         onCompositionStart={() => setIsComposingAdd(true)}
                         onCompositionEnd={() => setIsComposingAdd(false)}
                         disabled={tab !== 'undone' || !canAdd}
@@ -620,6 +644,8 @@ export default function TodoTaskCard({
                       />
                       <button
                         type="button"
+                        onMouseDown={() => { skipCommitOnBlurRef.current = true; }}
+                        onTouchStart={() => { skipCommitOnBlurRef.current = true; }}
                         onClick={closeAddInput}
                         className="px-1 text-gray-400 hover:text-gray-600"
                         aria-label="入力を閉じる"
@@ -732,9 +758,6 @@ export default function TodoTaskCard({
                         (Array.isArray(todo.recipe?.steps) &&
                           todo.recipe?.steps?.some((s) => typeof s === 'string' && s.trim() !== '')));
 
-
-
-
                     const hasReferenceUrls =
                       Array.isArray(todo.referenceUrls) &&
                       todo.referenceUrls.some((u) => typeof u === 'string' && u.trim() !== '');
@@ -771,12 +794,6 @@ export default function TodoTaskCard({
                       hasReferenceUrls ||
                       hasTravelTime ||
                       hasChecklist;
-
-
-
-
-
-
 
                     return (
                       <div key={todo.id} data-todo-row>
