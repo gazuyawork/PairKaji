@@ -56,6 +56,9 @@ import { CSS } from '@dnd-kit/utilities';
 // ★★★ 追加インポート：TODO ショートカットカード ★★★
 import TodoShortcutsCard from '@/components/home/parts/TodoShortcutsCard';
 
+// ★★★ 追加：単価比較カード ★★★
+import UnitPriceCompareCard from '@/components/home/parts/UnitPriceCompareCard';
+
 /* =========================================================
  * SortableCard（編集モードON時のみ使用）
  * =======================================================*/
@@ -354,12 +357,12 @@ export default function HomeView() {
       qTasks,
       (snapshot) => {
         const taskList = snapshot.docs.map((d) =>
-          mapFirestoreDocToTask(d as QueryDocumentSnapshot<FirestoreTask>)
+          mapFirestoreDocToTask(d as QueryDocumentSnapshot<FirestoreTask>),
         );
         setTasks(taskList);
         setTimeout(() => setIsLoading(false), 50);
       },
-      (err) => console.warn('[HomeView] tasks onSnapshot error:', err)
+      (err) => console.warn('[HomeView] tasks onSnapshot error:', err),
     );
 
     return () => unsubscribe();
@@ -422,6 +425,8 @@ export default function HomeView() {
     'pairInviteNone',
     // ★★★ 追加：TODOショートカット ★★★
     'todoShortcuts',
+    // ★★★ 追加：単価比較 ★★★
+    'unitPriceCompare',
     'expandableInfo',
     'hearts',
     'calendar',
@@ -431,24 +436,29 @@ export default function HomeView() {
   ] as const;
   type CardId = (typeof DEFAULT_ORDER)[number];
 
-  const [cardOrder, setCardOrder] = useState<CardId[]>(() => {
+  // ✅ SSR安全：初期値は固定、マウント後に localStorage を読む
+  const [cardOrder, setCardOrder] = useState<CardId[]>([...DEFAULT_ORDER]);
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(HOME_CARD_ORDER_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as string[];
-        const knownSet = new Set(DEFAULT_ORDER);
-        const filtered = parsed.filter((x) => knownSet.has(x as CardId)) as CardId[];
-        const missing = DEFAULT_ORDER.filter((d) => !filtered.includes(d));
-        return [...filtered, ...missing];
-      }
-    } catch { }
-    return [...DEFAULT_ORDER];
-  });
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as string[];
+      const knownSet = new Set(DEFAULT_ORDER);
+      const filtered = parsed.filter((x) => knownSet.has(x as CardId)) as CardId[];
+      const missing = DEFAULT_ORDER.filter((d) => !filtered.includes(d));
+      setCardOrder([...filtered, ...missing]);
+    } catch {
+      // 失敗時は DEFAULT_ORDER のまま
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem(HOME_CARD_ORDER_KEY, JSON.stringify(cardOrder));
-    } catch { }
+    } catch {}
   }, [cardOrder]);
 
   // ★★★ 追加：センサーとDnDハンドラ（編集モードON時にのみ使用）
@@ -485,21 +495,28 @@ export default function HomeView() {
         return <TodoShortcutsCard uid={uid} />;
       }
 
+      // ★★★ 追加：単価比較カード ★★★
+      case 'unitPriceCompare':
+        return <UnitPriceCompareCard />;
+
       case 'expandableInfo':
         return (
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
-            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
+            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${
+              isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+            }`}
           >
             <div className="absolute top-5 right-6 pointer-events-none z-10">
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-                  }`}
+                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
               />
             </div>
           </div>
         );
+
       case 'hearts': {
         const node = <HomeDashboardCard />;
         return isPairInactive ? (
@@ -508,6 +525,7 @@ export default function HomeView() {
           node
         );
       }
+
       case 'calendar': {
         return isLoading ? (
           <div className="space-y-2" suppressHydrationWarning>
@@ -527,6 +545,7 @@ export default function HomeView() {
           />
         );
       }
+
       case 'todayDone': {
         const node = <PartnerCompletedTasksCard />;
         return isPairInactive ? (
@@ -535,8 +554,10 @@ export default function HomeView() {
           node
         );
       }
+
       case 'ad':
         return !isChecking && plan === 'free' ? <AdCard /> : null;
+
       default:
         return null;
     }
@@ -548,10 +569,7 @@ export default function HomeView() {
   const [editMode, setEditMode] = useState(false);
   const [hiddenCards, setHiddenCards] = useState<Set<CardId>>(new Set());
 
-  const hiddenStorageKey = useMemo(
-    () => (uid ? `homeCardHiddenV1:${uid}` : undefined),
-    [uid]
-  );
+  const hiddenStorageKey = useMemo(() => (uid ? `homeCardHiddenV1:${uid}` : undefined), [uid]);
 
   useEffect(() => {
     if (!hiddenStorageKey) return;
@@ -573,9 +591,9 @@ export default function HomeView() {
       if (!hiddenStorageKey) return;
       try {
         localStorage.setItem(hiddenStorageKey, JSON.stringify(Array.from(next)));
-      } catch { }
+      } catch {}
     },
-    [hiddenStorageKey]
+    [hiddenStorageKey],
   );
 
   const hideCard = useCallback(
@@ -587,7 +605,7 @@ export default function HomeView() {
         return next;
       });
     },
-    [persistHidden]
+    [persistHidden],
   );
 
   const showCard = useCallback(
@@ -599,7 +617,7 @@ export default function HomeView() {
         return next;
       });
     },
-    [persistHidden]
+    [persistHidden],
   );
 
   const showAllCards = useCallback(() => {
@@ -644,12 +662,15 @@ export default function HomeView() {
               } else if (!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed) {
                 candidateSet.add('pairInviteNone');
               }
+
               candidateSet.add('todoShortcuts');
+              candidateSet.add('unitPriceCompare'); // ★★★ 追加 ★★★
               candidateSet.add('expandableInfo');
               candidateSet.add('hearts');
               candidateSet.add('calendar');
               // candidateSet.add('weeklyPoints');
               candidateSet.add('todayDone');
+
               if (!isLoading && !isChecking && plan === 'free') {
                 candidateSet.add('ad');
               }
@@ -691,14 +712,14 @@ export default function HomeView() {
                     setActiveCardId(String(e.active.id));
                     try {
                       document.body.style.overflow = 'hidden';
-                    } catch { }
+                    } catch {}
                   }}
                   onDragCancel={() => {
                     setIsDraggingCard(false);
                     setActiveCardId(null);
                     try {
                       document.body.style.overflow = '';
-                    } catch { }
+                    } catch {}
                   }}
                   onDragEnd={(event) => {
                     handleDragEnd(event);
@@ -706,7 +727,7 @@ export default function HomeView() {
                     setActiveCardId(null);
                     try {
                       document.body.style.overflow = '';
-                    } catch { }
+                    } catch {}
                   }}
                 >
                   <SortableContext items={dndIds} strategy={verticalListSortingStrategy}>
@@ -727,8 +748,7 @@ export default function HomeView() {
                   </SortableContext>
 
                   <DragOverlay>
-                    {activeCardId &&
-                      items.find((v) => v.id === (activeCardId as CardId)) ? (
+                    {activeCardId && items.find((v) => v.id === (activeCardId as CardId)) ? (
                       <div className="rounded-lg">
                         {items.find((v) => v.id === (activeCardId as CardId))!.node}
                       </div>
@@ -756,12 +776,14 @@ export default function HomeView() {
                       toast.success('編集モードを終了しました');
                     }
                   }}
-                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 ${editMode ? 'bg-emerald-500' : 'bg-gray-300'
-                    }`}
+                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 ${
+                    editMode ? 'bg-emerald-500' : 'bg-gray-300'
+                  }`}
                 >
                   <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${editMode ? 'translate-x-7' : 'translate-x-1'
-                      }`}
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${
+                      editMode ? 'translate-x-7' : 'translate-x-1'
+                    }`}
                   />
                 </button>
 
@@ -777,14 +799,13 @@ export default function HomeView() {
                   onClick={hiddenCards.size > 0 ? showAllCards : undefined}
                   whileTap={hiddenCards.size > 0 ? { scale: 0.95 } : undefined}
                   disabled={hiddenCards.size === 0}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all ${hiddenCards.size > 0
-                    ? 'text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm hover:shadow-md hover:brightness-105'
-                    : 'text-gray-400 bg-gray-200 cursor-not-allowed'
-                    }`}
-                  title={
+                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all ${
                     hiddenCards.size > 0
-                      ? '非表示カードをすべて再表示します'
-                      : '非表示カードはありません'
+                      ? 'text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm hover:shadow-md hover:brightness-105'
+                      : 'text-gray-400 bg-gray-200 cursor-not-allowed'
+                  }`}
+                  title={
+                    hiddenCards.size > 0 ? '非表示カードをすべて再表示します' : '非表示カードはありません'
                   }
                 >
                   すべて再表示
@@ -815,7 +836,7 @@ export default function HomeView() {
                 {
                   subtitle: 'ようこそ、PairKajiへ。',
                   description:
-                    '家事を、ふたりで心地よく分け合うためのアプリです。\nまずは基本の使い方を、かんたんにご紹介します。\n\n※ 説明が不要な場合は右上の × からスキップできます。\n※ ホーム画面の下部の「もう１度説明を見る」をタップで確認することができます。'
+                    '家事を、ふたりで心地よく分け合うためのアプリです。\nまずは基本の使い方を、かんたんにご紹介します。\n\n※ 説明が不要な場合は右上の × からスキップできます。\n※ ホーム画面の下部の「もう１度説明を見る」をタップで確認することができます。',
                 },
               ],
             },
