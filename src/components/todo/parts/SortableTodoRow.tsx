@@ -10,6 +10,7 @@ import type { Variants } from 'framer-motion';
 import { toast } from 'sonner';
 import TravelTimeBar from './TravelTimeBar';
 import type { SimpleTodo } from './hooks/useTodoSearchAndSort';
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
 const SHAKE_VARIANTS: Variants = {
   shake: { x: [0, -6, 6, -4, 4, -2, 2, 0], transition: { duration: 0.4 } },
@@ -63,6 +64,25 @@ export default function SortableTodoRow({
   const [isEditingRow, setIsEditingRow] = useState(false);
   const [text, setText] = useState<string>(todo.text ?? '');
   const [isComposingRow, setIsComposingRow] = useState(false);
+
+  // ✅ 確認モーダル制御（ブラウザconfirmではなく自作ConfirmModalを使用）
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingConfirmResolver, setPendingConfirmResolver] = useState<((v: boolean) => void) | null>(null);
+
+  const confirmDelete = () => {
+    return new Promise<boolean>((resolve) => {
+      setPendingConfirmResolver(() => resolve);
+      setConfirmOpen(true);
+    });
+  };
+
+  const closeConfirm = (result: boolean) => {
+    setConfirmOpen(false);
+    if (pendingConfirmResolver) {
+      pendingConfirmResolver(result);
+      setPendingConfirmResolver(null);
+    }
+  };
 
   // グローバルロック購読（他行も含めてアニメ中はチェック禁止）
   const [isLocked, setIsLocked] = useState<boolean>(GLOBAL_TOGGLE_LOCK);
@@ -123,16 +143,13 @@ export default function SortableTodoRow({
     onBlurTodo(todo.id, newText);
   };
 
-  /* =============== 削除（1回クリック → 確認ダイアログ） =============== */
-  const handleTodoDeleteClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  /* =============== 削除（1回クリック → 確認モーダル） =============== */
+  const handleTodoDeleteClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     e.preventDefault();
     if (isLocked) return;
 
-    const ok =
-      typeof window === 'undefined'
-        ? true
-        : window.confirm('このTODOを削除します。よろしいですか？（元に戻せません）');
+    const ok = await confirmDelete();
     if (!ok) return;
 
     try {
@@ -174,6 +191,21 @@ export default function SortableTodoRow({
       data-todo-row
       className={clsx('flex flex-col', isDragging && 'opacity-60')}
     >
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="確認"
+        message={
+          <>
+            <div>このTODOを削除します。よろしいですか？</div>
+            <div>（元に戻せません）</div>
+          </>
+        }
+        confirmLabel="削除する"
+        cancelLabel="キャンセル"
+        onConfirm={() => closeConfirm(true)}
+        onCancel={() => closeConfirm(false)}
+      />
+
       <div className="flex items-center gap-2">
         {/* Drag handle（ドラッグ専用。ゴミ箱には付けない） */}
         <span
@@ -267,7 +299,9 @@ export default function SortableTodoRow({
           type="button"
           className={clsx(
             'mr-1',
-            hasContentForIcon ? 'text-orange-400 hover:text-orange-500 active:text-orange-600' : 'text-gray-400 hover:text-emerald-500 active:text-yellow-600',
+            hasContentForIcon
+              ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
+              : 'text-gray-400 hover:text-emerald-500 active:text-yellow-600',
             isLocked && 'cursor-not-allowed opacity-70'
           )}
           onClick={() => onOpenNote(todo.text)}
@@ -278,23 +312,17 @@ export default function SortableTodoRow({
           <Notebook size={22} />
         </button>
 
-        {/* ゴミ箱（1回クリック→確認ダイアログ） */}
+        {/* ゴミ箱（1回クリック→確認モーダル） */}
         <motion.button
           type="button"
-          onClick={handleTodoDeleteClick}  // 1回クリックで確認→削除
-          variants={SHAKE_VARIANTS}        // （今後使う可能性に備え残すが、animateは指定しない）
+          onClick={handleTodoDeleteClick} // 1回クリックで確認→削除
+          variants={SHAKE_VARIANTS} // （今後使う可能性に備え残すが、animateは指定しない）
           disabled={isLocked}
-          className={clsx(
-            'p-1 rounded-md',
-            isLocked && 'cursor-not-allowed opacity-70'
-          )}
+          className={clsx('p-1 rounded-md', isLocked && 'cursor-not-allowed opacity-70')}
           aria-label="削除"
           title="削除"
         >
-          <Trash2
-            size={22}
-            className="text-gray-400 hover:text-red-500 transition-colors"
-          />
+          <Trash2 size={22} className="text-gray-400 hover:text-red-500 transition-colors" />
         </motion.button>
       </div>
 
