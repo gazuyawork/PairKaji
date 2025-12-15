@@ -88,20 +88,29 @@ export default function CookingTimerCard() {
                 className={`rounded-2xl border ${isActive ? 'border-emerald-300' : 'border-gray-200'} bg-white px-4 py-3`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setTimerActive(t.id)}
-                    className="text-left min-w-0 flex-1"
-                    aria-label="このタイマーを選択"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="font-semibold text-gray-900 truncate">{t.name}</div>
-                      <span className={`shrink-0 px-2 py-1 text-[11px] rounded-full border ${badge}`}>
-                        {phaseLabel}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-sm font-mono text-gray-900">{remainText}</div>
-                  </button>
+<button
+  type="button"
+  onClick={() => setTimerActive(t.id)}
+  className="text-left min-w-0 flex-1"
+  aria-label="このタイマーを選択"
+>
+  {/* タイマー名・状態ラベルは表示しない */}
+
+  <div
+    className={`font-mono tracking-tight leading-none ${
+      t.phase === 'running'
+        ? 'text-gray-900'
+        : t.phase === 'paused'
+        ? 'text-amber-700'
+        : t.phase === 'finished'
+        ? 'text-sky-700'
+        : 'text-gray-900'
+    } text-4xl sm:text-5xl`}
+  >
+    {remainText}
+  </div>
+</button>
+
 
                   <div className="flex items-center gap-2">
                     {t.phase === 'idle' && (
