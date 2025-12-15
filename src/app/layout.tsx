@@ -4,6 +4,7 @@ import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import ClientLayout from './ClientLayout';
 import Script from 'next/script';
 import type { Metadata, Viewport } from 'next';
+import { TimerProvider } from '@/components/timer/TimerProvider';
 
 // ▼ 追加：起動直後にキャッシュ値でバッジ反映する初期化コンポーネント
 import AppBadgeInitializer from '@/components/system/AppBadgeInitializer';
@@ -75,31 +76,33 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
     >
       <body className="font-sans bg-white text-gray-800 h-full antialiased">
-        {/* 起動直後にローカルキャッシュの未読数でバッジを即時反映 */}
-        <AppBadgeInitializer />
+        <TimerProvider>
+          {/* 起動直後にローカルキャッシュの未読数でバッジを即時反映 */}
+          <AppBadgeInitializer />
 
-        {/* AdSenseローダーはアプリ全体で1回だけ読み込む */}
-        {/* [変更] クライアントIDが存在するときだけ Script を読み込むことで 404 を防止 */}
-        {adsenseClient && (
-          <Script
-            id="adsbygoogle-loader"
-            strategy="afterInteractive"
-            crossOrigin="anonymous"
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
-          />
-        )}
+          {/* AdSenseローダーはアプリ全体で1回だけ読み込む */}
+          {/* [変更] クライアントIDが存在するときだけ Script を読み込むことで 404 を防止 */}
+          {adsenseClient && (
+            <Script
+              id="adsbygoogle-loader"
+              strategy="afterInteractive"
+              crossOrigin="anonymous"
+              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
+            />
+          )}
 
-        {/* ▼▼▼ 追加：全画面のHelpPopover表示ON/OFFのグローバルProviderでラップ ▼▼▼ */}
-        <HelpHintsProvider>
-          {/* 右上固定ON/OFFスイッチ（全画面共通）。OFF時は全ての「？」が非表示になります */}
-          <HelpHintsToggle />
+          {/* ▼▼▼ 追加：全画面のHelpPopover表示ON/OFFのグローバルProviderでラップ ▼▼▼ */}
+          <HelpHintsProvider>
+            {/* 右上固定ON/OFFスイッチ（全画面共通）。OFF時は全ての「？」が非表示になります */}
+            <HelpHintsToggle />
 
-          {/* ▼ 既存：アプリの認証プロバイダ＆クライアントレイアウト */}
-          <AuthProvider>
-            <ClientLayout>{children}</ClientLayout>
-          </AuthProvider>
-        </HelpHintsProvider>
-        {/* ▲▲▲ 追加ここまで ▲▲▲ */}
+            {/* ▼ 既存：アプリの認証プロバイダ＆クライアントレイアウト */}
+            <AuthProvider>
+              <ClientLayout>{children}</ClientLayout>
+            </AuthProvider>
+          </HelpHintsProvider>
+          {/* ▲▲▲ 追加ここまで ▲▲▲ */}
+        </TimerProvider>
       </body>
     </html>
   );
