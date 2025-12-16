@@ -18,7 +18,6 @@ import SetViewportHeight from '@/components/common/SetViewportHeight';
 import TaskSplitMonitor from '@/components/common/TaskSplitMonitor';
 import { usePathname } from 'next/navigation';
 import ServiceWorkerInit from '@/components/common/ServiceWorkerInit';
-import CookingTimerModal from '@/components/timer/CookingTimerModal';
 
 /* 既存: body ロック解除のクリーンアップ（アンマウント時） */
 function useUnlockBodyOnUnmount() {
@@ -178,7 +177,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <PairInit />
         <TaskSplitMonitor />
         {children}
-        <CookingTimerModal />
       </div>
     </>
   );

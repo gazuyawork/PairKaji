@@ -645,7 +645,7 @@ const DEFAULT_ORDER = [
           }
         }}
       >
-        <main className="overflow-y-auto px-4 py-5">
+        <main className="px-4 py-5">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: isLoading ? 0 : 1 }}
