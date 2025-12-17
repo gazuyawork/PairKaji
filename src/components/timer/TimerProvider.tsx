@@ -687,8 +687,9 @@ function TimerModal() {
     <div className="fixed inset-0 z-[9999]">
       <div className="absolute inset-0 bg-black/40" onClick={closeTimerUi} />
 
-      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:flex md:items-center md:justify-center">
-        <div className="w-full md:max-w-xl bg-white md:rounded-2xl rounded-t-2xl shadow-xl overflow-hidden">
+<div className="absolute inset-0 flex items-center justify-center p-4">
+  <div className="w-full max-w-xl bg-white rounded-lg shadow-xl overflow-hidden">
+
           <div className="px-4 py-3 border-b flex items-center justify-between">
             <div className="font-semibold text-gray-900">お料理タイマー</div>
             <button

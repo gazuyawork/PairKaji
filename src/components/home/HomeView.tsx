@@ -58,7 +58,7 @@ import { CSS } from '@dnd-kit/utilities';
 import TodoShortcutsCard from '@/components/home/parts/TodoShortcutsCard';
 
 // ★★★ 追加：単価比較カード ★★★
-import UnitPriceCompareCard from '@/components/home/parts/UnitPriceCompareCard';
+import UnitPriceCompareToolCard from '@/components/home/parts/UnitPriceCompareToolCard';
 
 /* =========================================================
  * SortableCard（編集モードON時のみ使用）
@@ -496,7 +496,7 @@ const DEFAULT_ORDER = [
 
       // ★★★ 追加：単価比較カード ★★★
       case 'unitPriceCompare':
-        return <UnitPriceCompareCard />;
+        return <UnitPriceCompareToolCard />;
 
       case 'expandableInfo':
         return (

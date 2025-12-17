@@ -13,8 +13,8 @@ export default function CookingTimerCard() {
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
-            <Timer className="w-5 h-5 text-emerald-700" />
+          <div className="h-10 w-10 rounded-2xl bg-gray-50 flex items-center justify-center">
+            <Timer className="w-5 h-5" />
           </div>
           <div className="min-w-0">
             <div className="text-base font-semibold text-gray-900">お料理タイマー</div>
@@ -25,7 +25,7 @@ export default function CookingTimerCard() {
         <button
           type="button"
           onClick={() => openTimerUi()}
-          className="h-10 px-3 rounded-full bg-emerald-600 text-white flex items-center gap-2"
+          className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
           aria-label="タイマーを開く"
           title="タイマーを開く"
         >
