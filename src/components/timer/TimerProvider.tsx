@@ -1,4 +1,3 @@
-// src/components/timer/TimerProvider.tsx
 'use client';
 
 import React, {
@@ -11,9 +10,13 @@ import React, {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2, Play, Pause, RotateCcw } from 'lucide-react';
+import { X, Plus, Trash2, Play, Pause, RotateCcw, Clock, Square } from 'lucide-react';
 import { createAlarmController } from '../../lib/timer/alarm';
-import { cancelTimerNotification, ensureNotificationPermission, scheduleTimerNotification } from '@/lib/timer/nativeNotifications';
+import {
+  cancelTimerNotification,
+  ensureNotificationPermission,
+  scheduleTimerNotification,
+} from '@/lib/timer/nativeNotifications';
 
 type Phase = 'idle' | 'running' | 'paused' | 'finished';
 
@@ -56,7 +59,6 @@ type TimerContextValue = {
 };
 
 const TimerContext = createContext<TimerContextValue | null>(null);
-
 const STORAGE_KEY = 'pairkaji_cooking_timers_v1';
 
 function uid() {
@@ -69,7 +71,11 @@ function clampInt(n: number, min: number, max: number) {
 }
 
 function totalSecOf(t: Pick<TimerItem, 'hours' | 'minutes' | 'seconds'>) {
-  return clampInt(t.hours, 0, 23) * 3600 + clampInt(t.minutes, 0, 59) * 60 + clampInt(t.seconds, 0, 59);
+  return (
+    clampInt(t.hours, 0, 23) * 3600 +
+    clampInt(t.minutes, 0, 59) * 60 +
+    clampInt(t.seconds, 0, 59)
+  );
 }
 
 function pad2(n: number) {
@@ -89,8 +95,8 @@ function normalizeLoadedTimers(raw: unknown): TimerItem[] {
   if (!Array.isArray(raw)) return [];
 
   const now = Date.now();
-
   const out: TimerItem[] = [];
+
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
 
@@ -284,37 +290,34 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     let id: number | null = null;
 
     const tick = () => {
-      const now = Date.now();
+      setTimers((prev: TimerItem[]): TimerItem[] => {
+        const now = Date.now();
+        let changed = false;
 
-setTimers((prev: TimerItem[]): TimerItem[] => {
-  const now = Date.now();
-  let changed = false;
+        const next: TimerItem[] = prev.map((t): TimerItem => {
+          if (t.phase !== 'running' || !t.endAtMs) return t;
 
-  const next: TimerItem[] = prev.map((t): TimerItem => {
-    if (t.phase !== 'running' || !t.endAtMs) return t;
+          const remain = Math.max(0, Math.ceil((t.endAtMs - now) / 1000));
+          if (remain === t.remainingSec) return t;
 
-    const remain = Math.max(0, Math.ceil((t.endAtMs - now) / 1000));
-    if (remain === t.remainingSec) return t;
+          changed = true;
 
-    changed = true;
+          if (remain <= 0) {
+            return {
+              ...t,
+              phase: 'finished',
+              remainingSec: 0,
+              endAtMs: null,
+              remainingAtPause: 0,
+              nativeScheduled: false,
+            };
+          }
 
-    if (remain <= 0) {
-      return {
-        ...t,
-        phase: 'finished',
-        remainingSec: 0,
-        endAtMs: null,
-        remainingAtPause: 0,
-        nativeScheduled: false,
-      };
-    }
+          return { ...t, remainingSec: remain };
+        });
 
-    return { ...t, remainingSec: remain };
-  });
-
-  return changed ? next : prev;
-});
-
+        return changed ? next : prev;
+      });
     };
 
     id = window.setInterval(tick, 200);
@@ -355,14 +358,16 @@ setTimers((prev: TimerItem[]): TimerItem[] => {
     };
   }, [releaseWakeLock]);
 
-const openTimerUi = useCallback((timerId?: string) => {
-  setUiOpen(true);
-  setActiveTimerId((prev) => {
-    if (typeof timerId === 'string') return timerId;
-    return prev ?? timers[0]?.id ?? null;
-  });
-}, [timers]);
-
+  const openTimerUi = useCallback(
+    (timerId?: string) => {
+      setUiOpen(true);
+      setActiveTimerId((prev) => {
+        if (typeof timerId === 'string') return timerId;
+        return prev ?? timers[0]?.id ?? null;
+      });
+    },
+    [timers]
+  );
 
   const closeTimerUi = useCallback(() => {
     setUiOpen(false);
@@ -440,14 +445,14 @@ const openTimerUi = useCallback((timerId?: string) => {
         return prev.map((t) =>
           t.id === timerId
             ? {
-                ...t,
-                phase: 'running',
-                remainingSec: total,
-                endAtMs: fireAtMs,
-                remainingAtPause: null,
-                alarmFired: false,
-                nativeScheduled: false,
-              }
+              ...t,
+              phase: 'running',
+              remainingSec: total,
+              endAtMs: fireAtMs,
+              remainingAtPause: null,
+              alarmFired: false,
+              nativeScheduled: false,
+            }
             : t
         );
       });
@@ -471,7 +476,9 @@ const openTimerUi = useCallback((timerId?: string) => {
           });
 
           if (ok) {
-            setTimers((prev) => prev.map((t) => (t.id === timerId ? { ...t, nativeScheduled: true } : t)));
+            setTimers((prev) =>
+              prev.map((t) => (t.id === timerId ? { ...t, nativeScheduled: true } : t))
+            );
           }
         }
       } catch {
@@ -550,7 +557,9 @@ const openTimerUi = useCallback((timerId?: string) => {
           });
 
           if (ok) {
-            setTimers((prev) => prev.map((t) => (t.id === timerId ? { ...t, nativeScheduled: true } : t)));
+            setTimers((prev) =>
+              prev.map((t) => (t.id === timerId ? { ...t, nativeScheduled: true } : t))
+            );
           }
         }
       } catch {
@@ -569,14 +578,14 @@ const openTimerUi = useCallback((timerId?: string) => {
         prev.map((t) =>
           t.id === timerId
             ? {
-                ...t,
-                phase: 'idle',
-                remainingSec: 0,
-                endAtMs: null,
-                remainingAtPause: null,
-                alarmFired: false,
-                nativeScheduled: false,
-              }
+              ...t,
+              phase: 'idle',
+              remainingSec: 0,
+              endAtMs: null,
+              remainingAtPause: null,
+              alarmFired: false,
+              nativeScheduled: false,
+            }
             : t
         )
       );
@@ -593,14 +602,14 @@ const openTimerUi = useCallback((timerId?: string) => {
         prev.map((t) =>
           t.id === timerId
             ? {
-                ...t,
-                phase: 'idle',
-                remainingSec: 0,
-                endAtMs: null,
-                remainingAtPause: null,
-                alarmFired: false,
-                nativeScheduled: false,
-              }
+              ...t,
+              phase: 'idle',
+              remainingSec: 0,
+              endAtMs: null,
+              remainingAtPause: null,
+              alarmFired: false,
+              nativeScheduled: false,
+            }
             : t
         )
       );
@@ -646,6 +655,7 @@ const openTimerUi = useCallback((timerId?: string) => {
   return (
     <TimerContext.Provider value={value}>
       {children}
+      <MiniTimerBar />
       <TimerModal />
     </TimerContext.Provider>
   );
@@ -657,9 +667,55 @@ export function useTimers() {
   return ctx;
 }
 
-/* =========================================================
- * タイマー操作は全てここ（モーダル内）で完結
- * =======================================================*/
+function MiniTimerBar() {
+  const { timers, uiOpen, openTimerUi, activeTimerId } = useTimers();
+
+  if (uiOpen) return null;
+
+  const candidates = timers.filter(
+    (t) =>
+      (t.phase === 'running' && typeof t.remainingSec === 'number') ||
+      (t.phase === 'finished' && t.alarmFired)
+  );
+  if (candidates.length === 0) return null;
+
+  const activeCandidate = candidates.find((t) => t.id === activeTimerId);
+  const target =
+    activeCandidate ??
+    candidates
+      .slice()
+      .sort((a, b) => (a.remainingSec ?? 0) - (b.remainingSec ?? 0))[0];
+
+  if (!target) return null;
+
+  const isRinging = target.phase === 'finished' && target.alarmFired;
+
+  return (
+    <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[9998] px-3">
+      <button
+        type="button"
+        onClick={() => openTimerUi(target.id)}
+        className="bg-white/95 backdrop-blur border border-gray-200 shadow-sm rounded-lg px-3 py-2 flex items-center gap-3"
+        aria-label="タイマーを開く"
+      >
+        <div className="text-xs text-gray-600 whitespace-nowrap">タイマー</div>
+
+        {/* ✅ 親は揺らさない（文字が上下に見えないようにする） */}
+        <div className="flex items-center gap-2">
+          <Clock
+            className={['w-4 h-4 text-gray-700', isRinging ? 'timer-jiri-icon' : ''].join(' ')}
+            aria-hidden="true"
+          />
+          <div className="font-mono text-lg text-gray-900 leading-none">
+            {formatSec(target.remainingSec)}
+          </div>
+          {isRinging && <span className="timer-jiri-dots" aria-hidden="true" />}
+        </div>
+      </button>
+    </div>
+  );
+}
+
 function TimerModal() {
   const {
     timers,
@@ -671,6 +727,7 @@ function TimerModal() {
     pauseTimer,
     resumeTimer,
     resetTimer,
+    stopAlarmAndFinish,
     updateTimerFields,
     activeTimerId,
     setActiveTimerId,
@@ -685,11 +742,42 @@ function TimerModal() {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999]">
+      <style jsx global>{`
+        /* ✅ 左右だけ（上下0） + 回転なし：文字が上下に動いて見えないようにする */
+        @keyframes timerJiri {
+          0% { transform: translateX(0px); }
+          20% { transform: translateX(-0.6px); }
+          40% { transform: translateX(0.6px); }
+          60% { transform: translateX(-0.4px); }
+          80% { transform: translateX(0.4px); }
+          100% { transform: translateX(0px); }
+        }
+
+        @keyframes timerDots {
+          0%, 100% { opacity: 0.15; transform: translateY(0px); }
+          50% { opacity: 0.9; transform: translateY(-1px); }
+        }
+
+        .timer-jiri-icon {
+          animation: timerJiri 0.14s linear infinite;
+          will-change: transform;
+        }
+
+        .timer-jiri-dots {
+          display: inline-block;
+          width: 10px;
+          height: 10px;
+          border-radius: 9999px;
+          background: rgba(0, 0, 0, 0.35);
+          animation: timerDots 0.5s ease-in-out infinite;
+          flex: 0 0 auto;
+        }
+      `}</style>
+
       <div className="absolute inset-0 bg-black/40" onClick={closeTimerUi} />
 
-<div className="absolute inset-0 flex items-center justify-center p-4">
-  <div className="w-full max-w-xl bg-white rounded-lg shadow-xl overflow-hidden">
-
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-xl bg-white rounded-lg shadow-xl overflow-hidden">
           <div className="px-4 py-3 border-b flex items-center justify-between">
             <div className="font-semibold text-gray-900">お料理タイマー</div>
             <button
@@ -719,6 +807,9 @@ function TimerModal() {
               {timers.map((t) => {
                 const isActive = activeId === t.id;
 
+                const isRunningMode = t.phase !== 'idle';
+                const isRinging = t.phase === 'finished' && t.alarmFired;
+
                 const displaySec =
                   t.phase === 'running' || t.phase === 'paused' || t.phase === 'finished'
                     ? t.remainingSec
@@ -726,114 +817,172 @@ function TimerModal() {
 
                 const timeText = formatSec(displaySec);
 
+                const canDelete = t.phase === 'idle';
+
+                const handleStop = async () => {
+                  if (t.phase === 'finished') {
+                    await stopAlarmAndFinish(t.id);
+                  } else {
+                    await resetTimer(t.id);
+                  }
+                };
+
                 return (
                   <div
                     key={t.id}
-                    className={`rounded-2xl border bg-white px-4 py-3 ${
-                      isActive ? 'border-emerald-300' : 'border-gray-200'
-                    }`}
+                    className={[
+                      'rounded-2xl border bg-white px-4 py-3',
+                      isActive ? 'border-emerald-300' : 'border-gray-200',
+                      isRunningMode ? 'min-h-[140px] flex' : '',
+                    ].join(' ')}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setActiveTimerId(t.id)}
-                      className="w-full text-left"
-                      aria-label="このタイマーを選択"
-                    >
-                      {/* ここは要件通り：名前/未開始ラベル等は出さず、時間を大きく */}
-                      <div className="text-4xl sm:text-5xl font-mono tracking-tight leading-none text-gray-900">
-                        {timeText}
-                      </div>
-                      {/* <div className="mt-2 text-xs text-gray-500">
-                        {t.phase === 'running' ? '実行中' : t.phase === 'paused' ? '一時停止中' : t.phase === 'finished' ? '完了' : '未開始'}
-                      </div> */}
-                    </button>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {t.phase === 'idle' && (
-                        <button
-                          type="button"
-                          onClick={() => void startTimer(t.id)}
-                          className="h-9 px-3 rounded-full bg-emerald-600 text-white flex items-center gap-2"
-                        >
-                          <Play className="w-4 h-4" />
-                          開始
-                        </button>
-                      )}
-
-                      {t.phase === 'running' && (
-                        <button
-                          type="button"
-                          onClick={() => void pauseTimer(t.id)}
-                          className="h-9 px-3 rounded-full bg-gray-900 text-white flex items-center gap-2"
-                        >
-                          <Pause className="w-4 h-4" />
-                          一時停止
-                        </button>
-                      )}
-
-                      {t.phase === 'paused' && (
-                        <button
-                          type="button"
-                          onClick={() => void resumeTimer(t.id)}
-                          className="h-9 px-3 rounded-full bg-emerald-600 text-white flex items-center gap-2"
-                        >
-                          <Play className="w-4 h-4" />
-                          再開
-                        </button>
-                      )}
-
+                    {isRunningMode ? (
                       <button
                         type="button"
-                        onClick={() => void resetTimer(t.id)}
-                        className="h-9 px-3 rounded-full bg-white border border-gray-200 text-gray-900 flex items-center gap-2"
+                        onClick={() => setActiveTimerId(t.id)}
+                        className="w-full flex-1 text-left"
+                        aria-label="このタイマーを選択"
                       >
-                        <RotateCcw className="w-4 h-4" />
-                        リセット
-                      </button>
 
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const ok = window.confirm('このタイマーを削除しますか？');
-                          if (!ok) return;
-                          await removeTimer(t.id);
-                        }}
-                        className="h-9 w-9 rounded-full bg-white border border-gray-200 flex items-center justify-center"
-                        aria-label="削除"
-                        title="削除"
-                      >
-                        <Trash2 className="w-4 h-4 text-gray-700" />
-                      </button>
-                    </div>
+                        <div className="h-full flex items-stretch gap-3">
+                          <div className="flex-1 flex items-center">
+                            {/* ✅ 親は揺らさない（文字は固定） */}
+                            <div className="w-full flex items-center gap-3">
+                              <Clock
+                                className={[
+                                  'w-7 h-7 text-gray-800',
+                                ].join(' ')}
+                                aria-hidden="true"
+                              />
 
-                    {/* 任意：未開始のときだけ時間設定UI（必要なら） */}
-                    {t.phase === 'idle' && (
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        <TimeField
-                          label="時"
-                          value={t.hours}
-                          onChange={(v) => updateTimerFields(t.id, { hours: clampInt(v, 0, 23) })}
-                        />
-                        <TimeField
-                          label="分"
-                          value={t.minutes}
-                          onChange={(v) => updateTimerFields(t.id, { minutes: clampInt(v, 0, 59) })}
-                        />
-                        <TimeField
-                          label="秒"
-                          value={t.seconds}
-                          onChange={(v) => updateTimerFields(t.id, { seconds: clampInt(v, 0, 59) })}
-                        />
-                      </div>
+                              <div
+                                className="font-mono tracking-tight leading-none text-gray-900"
+                                style={{
+                                  fontSize: 'clamp(44px, 9vh, 92px)',
+                                }}
+                              >
+                                {timeText}
+                              </div>
+
+                              {isRinging && <span className="timer-jiri-dots" aria-hidden="true" />}
+                            </div>
+                          </div>
+
+                          <div className="w-12 flex flex-col items-center justify-center gap-3">
+                            {t.phase === 'running' && (
+                              <IconButton
+                                onClick={() => void pauseTimer(t.id)}
+                                ariaLabel="一時停止"
+                                title="一時停止"
+                              >
+                                <Pause className="w-6 h-6" />
+                              </IconButton>
+                            )}
+
+                            {t.phase === 'paused' && (
+                              <IconButton
+                                onClick={() => void resumeTimer(t.id)}
+                                ariaLabel="再開"
+                                title="再開"
+                              >
+                                <Play className="w-6 h-6" />
+                              </IconButton>
+                            )}
+
+                            <IconButton onClick={() => void handleStop()} ariaLabel="停止" title="停止">
+                              <Square className="w-6 h-6" />
+                            </IconButton>
+                          </div>
+                        </div>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTimerId(t.id)}
+                          className="w-full text-left"
+                          aria-label="このタイマーを選択"
+                        >
+                          {/* ✅ 親は揺らさない（文字は固定） */}
+                          <div className="flex items-center gap-2">
+                            <Clock
+                              className={[
+                                'w-5 h-5 text-gray-700',
+                                isRinging ? 'timer-jiri-icon' : '',
+                              ].join(' ')}
+                              aria-hidden="true"
+                            />
+                            <div className="text-4xl sm:text-5xl font-mono tracking-tight leading-none text-gray-900">
+                              {timeText}
+                            </div>
+                            {isRinging && <span className="timer-jiri-dots" aria-hidden="true" />}
+                          </div>
+                        </button>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void startTimer(t.id)}
+                            className="h-9 px-3 rounded-full bg-emerald-600 text-white flex items-center gap-2"
+                          >
+                            <Play className="w-4 h-4" />
+                            開始
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void resetTimer(t.id)}
+                            className="h-9 px-3 rounded-full bg-white border border-gray-200 text-gray-900 flex items-center gap-2"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            リセット
+                          </button>
+
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const ok = window.confirm('このタイマーを削除しますか？');
+                                if (!ok) return;
+                                await removeTimer(t.id);
+                              }}
+                              className="h-9 w-9 rounded-full bg-white border border-gray-200 flex items-center justify-center"
+                              aria-label="削除"
+                              title="削除"
+                            >
+                              <Trash2 className="w-4 h-4 text-gray-700" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <TimeField
+                            label="時"
+                            value={t.hours}
+                            onChange={(v) => updateTimerFields(t.id, { hours: clampInt(v, 0, 23) })}
+                          />
+                          <TimeField
+                            label="分"
+                            value={t.minutes}
+                            onChange={(v) =>
+                              updateTimerFields(t.id, { minutes: clampInt(v, 0, 59) })
+                            }
+                          />
+                          <TimeField
+                            label="秒"
+                            value={t.seconds}
+                            onChange={(v) =>
+                              updateTimerFields(t.id, { seconds: clampInt(v, 0, 59) })
+                            }
+                          />
+                        </div>
+                      </>
                     )}
                   </div>
                 );
               })}
             </div>
-
-            {/* <div className="text-xs text-gray-500">
-              追加・削除・開始・一時停止などの操作はこのモーダル内で完結します（ホームには表示しません）。
-            </div> */}
           </div>
 
           <div className="px-4 py-3 border-t bg-gray-50">
@@ -849,6 +998,30 @@ function TimerModal() {
       </div>
     </div>,
     document.body
+  );
+}
+
+function IconButton({
+  children,
+  onClick,
+  ariaLabel,
+  title,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  ariaLabel: string;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={title}
+      className="h-11 w-11 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center"
+    >
+      {children}
+    </button>
   );
 }
 
