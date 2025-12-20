@@ -1,6 +1,9 @@
 'use client';
 
 import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
+
+const OPEN_TIMER_ID_KEY = 'pairkaji_open_timer_id_from_notification_v1';
 
 type ScheduleArgs = {
   timerId: string;
@@ -9,69 +12,122 @@ type ScheduleArgs = {
   fireAt: Date;
 };
 
-function isNativeCapacitor() {
-  return Capacitor.isNativePlatform?.() ?? false;
-}
+let listenersInitialized = false;
 
-function hashToInt32(input: string): number {
-  let h = 0;
-  for (let i = 0; i < input.length; i++) {
-    h = (h * 31 + input.charCodeAt(i)) | 0;
+function isNativePlatform(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
   }
-  if (h === 0) h = 1;
-  return Math.abs(h);
 }
 
-async function getLocalNotifications() {
-  const mod = await import('@capacitor/local-notifications');
-  return mod.LocalNotifications;
+/**
+ * 通知タップ時に、開くべき timerId を localStorage に保存するリスナーを登録
+ * （アプリ起動トリガーになった場合でも、起動後に TimerProvider が拾えるようにする）
+ */
+export async function initTimerNotificationListeners(): Promise<void> {
+  if (!isNativePlatform()) return;
+  if (listenersInitialized) return;
+
+  listenersInitialized = true;
+
+  try {
+    await LocalNotifications.addListener('localNotificationActionPerformed', (event) => {
+      try {
+        const timerId =
+          typeof (event as any)?.notification?.extra?.timerId === 'string'
+            ? (event as any).notification.extra.timerId
+            : null;
+
+        if (timerId) {
+          localStorage.setItem(OPEN_TIMER_ID_KEY, timerId);
+        } else {
+          // timerId が取れない場合でも「タイマーを開く」だけはできるように空で保存
+          localStorage.setItem(OPEN_TIMER_ID_KEY, '');
+        }
+      } catch {
+        // noop
+      }
+    });
+  } catch {
+    // noop
+  }
 }
 
-export async function ensureNotificationPermission(): Promise<boolean> {
-  if (!isNativeCapacitor()) return false;
+/**
+ * 通知タップで保存された timerId を一度だけ取り出す
+ */
+export function consumeOpenTimerIdFromNotification(): string | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const v = localStorage.getItem(OPEN_TIMER_ID_KEY);
+    if (v === null) return null;
+    localStorage.removeItem(OPEN_TIMER_ID_KEY);
+    // 空文字の場合は「特定できないがタイマーUIは開く」扱いにする
+    return v;
+  } catch {
+    return null;
+  }
+}
 
-  const LocalNotifications = await getLocalNotifications();
-  const perm = await LocalNotifications.checkPermissions();
-  if (perm.display === 'granted') return true;
+export async function ensureNotificationPermission(): Promise<void> {
+  if (!isNativePlatform()) return;
 
-  const req = await LocalNotifications.requestPermissions();
-  return req.display === 'granted';
+  try {
+    const status = await LocalNotifications.checkPermissions();
+    if (status.display !== 'granted') {
+      await LocalNotifications.requestPermissions();
+    }
+  } catch {
+    // noop
+  }
 }
 
 export async function scheduleTimerNotification(args: ScheduleArgs): Promise<boolean> {
-  if (!isNativeCapacitor()) return false;
-
-  const ok = await ensureNotificationPermission();
-  if (!ok) return false;
-
-  const LocalNotifications = await getLocalNotifications();
-  const id = hashToInt32(args.timerId);
+  if (!isNativePlatform()) return false;
 
   try {
-    await LocalNotifications.cancel({ notifications: [{ id }] });
-  } catch {}
+    // timerId から通知IDを安定生成（数値が必要）
+    // 衝突リスクはゼロではないが、同一timerIdに対する上書きが目的なので十分
+    const id = stableNotificationId(args.timerId);
 
-  await LocalNotifications.schedule({
-    notifications: [
-      {
-        id,
-        title: args.title,
-        body: args.body,
-        schedule: { at: args.fireAt },
-      },
-    ],
-  });
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id,
+          title: args.title,
+          body: args.body,
+          schedule: { at: args.fireAt },
+          // ✅ これが通知タップ時に拾える
+          extra: { timerId: args.timerId },
+        },
+      ],
+    });
 
-  return true;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function cancelTimerNotification(timerId: string): Promise<void> {
-  if (!isNativeCapacitor()) return;
-
-  const LocalNotifications = await getLocalNotifications();
-  const id = hashToInt32(timerId);
+  if (!isNativePlatform()) return;
 
   try {
+    const id = stableNotificationId(timerId);
     await LocalNotifications.cancel({ notifications: [{ id }] });
-  } catch {}
+  } catch {
+    // noop
+  }
+}
+
+function stableNotificationId(timerId: string): number {
+  // 32bitに収める簡易ハッシュ
+  let hash = 0;
+  for (let i = 0; i < timerId.length; i++) {
+    hash = (hash * 31 + timerId.charCodeAt(i)) | 0;
+  }
+  // LocalNotificationsはidが正の数が扱いやすい
+  return Math.abs(hash) || 1;
 }

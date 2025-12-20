@@ -14,7 +14,9 @@ import { X, Plus, Trash2, Play, Pause, RotateCcw, Clock, Square } from 'lucide-r
 import { createAlarmController } from '../../lib/timer/alarm';
 import {
   cancelTimerNotification,
+  consumeOpenTimerIdFromNotification,
   ensureNotificationPermission,
+  initTimerNotificationListeners,
   scheduleTimerNotification,
 } from '@/lib/timer/nativeNotifications';
 
@@ -264,6 +266,36 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [anyRunning, requestWakeLock]);
 
+  // ✅ 通知タップのリスナー登録（ネイティブのみ）
+  useEffect(() => {
+    void initTimerNotificationListeners();
+  }, []);
+
+  // ✅ 通知タップで起動された場合、タイマーUIを自動で開く
+  useEffect(() => {
+    const id = consumeOpenTimerIdFromNotification();
+    if (id === null) return;
+
+    // id が空文字の場合は「とにかくタイマーを開く」
+    if (id === '') {
+      setUiOpen(true);
+      setActiveTimerId((prev) => prev ?? timers[0]?.id ?? null);
+      return;
+    }
+
+    // 該当タイマーが存在するならそれを開く
+    const exists = timers.some((t) => t.id === id);
+    if (exists) {
+      setUiOpen(true);
+      setActiveTimerId(id);
+    } else {
+      // 存在しない場合は通常オープン
+      setUiOpen(true);
+      setActiveTimerId((prev) => prev ?? timers[0]?.id ?? null);
+    }
+    // timers が更新されてから拾いたいので依存に含める
+  }, [timers]);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -445,14 +477,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         return prev.map((t) =>
           t.id === timerId
             ? {
-              ...t,
-              phase: 'running',
-              remainingSec: total,
-              endAtMs: fireAtMs,
-              remainingAtPause: null,
-              alarmFired: false,
-              nativeScheduled: false,
-            }
+                ...t,
+                phase: 'running',
+                remainingSec: total,
+                endAtMs: fireAtMs,
+                remainingAtPause: null,
+                alarmFired: false,
+                nativeScheduled: false,
+              }
             : t
         );
       });
@@ -471,7 +503,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           const ok = await scheduleTimerNotification({
             timerId,
             title: '料理タイマー完了',
-            body: `${timerName} が完了しました`,
+            body: `${timerName} が完了しました（タップして開く）`,
             fireAt: new Date(fireAtMs),
           });
 
@@ -552,7 +584,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           const ok = await scheduleTimerNotification({
             timerId,
             title: '料理タイマー完了',
-            body: `${timerName} が完了しました`,
+            body: `${timerName} が完了しました（タップして開く）`,
             fireAt: new Date(fireAtMs),
           });
 
@@ -578,14 +610,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         prev.map((t) =>
           t.id === timerId
             ? {
-              ...t,
-              phase: 'idle',
-              remainingSec: 0,
-              endAtMs: null,
-              remainingAtPause: null,
-              alarmFired: false,
-              nativeScheduled: false,
-            }
+                ...t,
+                phase: 'idle',
+                remainingSec: 0,
+                endAtMs: null,
+                remainingAtPause: null,
+                alarmFired: false,
+                nativeScheduled: false,
+              }
             : t
         )
       );
@@ -602,14 +634,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         prev.map((t) =>
           t.id === timerId
             ? {
-              ...t,
-              phase: 'idle',
-              remainingSec: 0,
-              endAtMs: null,
-              remainingAtPause: null,
-              alarmFired: false,
-              nativeScheduled: false,
-            }
+                ...t,
+                phase: 'idle',
+                remainingSec: 0,
+                endAtMs: null,
+                remainingAtPause: null,
+                alarmFired: false,
+                nativeScheduled: false,
+              }
             : t
         )
       );
@@ -700,7 +732,6 @@ function MiniTimerBar() {
       >
         <div className="text-xs text-gray-600 whitespace-nowrap">タイマー</div>
 
-        {/* ✅ 親は揺らさない（文字が上下に見えないようにする） */}
         <div className="flex items-center gap-2">
           <Clock
             className={['w-4 h-4 text-gray-700', isRinging ? 'timer-jiri-icon' : ''].join(' ')}
@@ -743,7 +774,6 @@ function TimerModal() {
   return createPortal(
     <div className="fixed inset-0 z-[9999]">
       <style jsx global>{`
-        /* ✅ 左右だけ（上下0） + 回転なし：文字が上下に動いて見えないようにする */
         @keyframes timerJiri {
           0% { transform: translateX(0px); }
           20% { transform: translateX(-0.6px); }
@@ -806,7 +836,6 @@ function TimerModal() {
             <div className="space-y-2">
               {timers.map((t) => {
                 const isActive = activeId === t.id;
-
                 const isRunningMode = t.phase !== 'idle';
                 const isRinging = t.phase === 'finished' && t.alarmFired;
 
@@ -836,7 +865,6 @@ function TimerModal() {
                       isRunningMode ? 'min-h-[140px] flex' : '',
                     ].join(' ')}
                   >
-
                     {isRunningMode ? (
                       <button
                         type="button"
@@ -844,18 +872,16 @@ function TimerModal() {
                         className="w-full flex-1 text-left"
                         aria-label="このタイマーを選択"
                       >
-
                         <div className="h-full flex items-stretch gap-3">
                           <div className="flex-1 flex items-center">
-                            {/* ✅ 親は揺らさない（文字は固定） */}
                             <div className="w-full flex items-center gap-3">
                               <Clock
                                 className={[
                                   'w-7 h-7 text-gray-800',
+                                  isRinging ? 'timer-jiri-icon' : '',
                                 ].join(' ')}
                                 aria-hidden="true"
                               />
-
                               <div
                                 className="font-mono tracking-tight leading-none text-gray-900"
                                 style={{
@@ -864,7 +890,6 @@ function TimerModal() {
                               >
                                 {timeText}
                               </div>
-
                               {isRinging && <span className="timer-jiri-dots" aria-hidden="true" />}
                             </div>
                           </div>
@@ -904,7 +929,6 @@ function TimerModal() {
                           className="w-full text-left"
                           aria-label="このタイマーを選択"
                         >
-                          {/* ✅ 親は揺らさない（文字は固定） */}
                           <div className="flex items-center gap-2">
                             <Clock
                               className={[
