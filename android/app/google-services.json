@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "234090861945",
+    "project_id": "pairkaji-alpha",
+    "storage_bucket": "pairkaji-alpha.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:234090861945:android:de37cd81264c3f18008ba8",
+        "android_client_info": {
+          "package_name": "com.pairkaji.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "234090861945-amc1p6nl8ksvccvr4riud4cif3s07adu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pairkaji.app",
+            "certificate_hash": "1a7546652394adef1bf05f85821c103cbf441932"
+          }
+        },
+        {
+          "client_id": "234090861945-n2heb1rl266sop9lhgmbj7g7gkra670c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSwyjkpcgGLZzTgmy3_H_Z6ZR78ixUpxs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "234090861945-n2heb1rl266sop9lhgmbj7g7gkra670c.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@capacitor-firebase/app": "^7.5.0",
+    "@capacitor-firebase/authentication": "^7.5.0",
     "@capacitor/android": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/haptics": "^7.0.3",

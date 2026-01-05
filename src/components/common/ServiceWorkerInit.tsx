@@ -1,9 +1,8 @@
 // src/components/common/ServiceWorkerInit.tsx
 // 【変更点サマリ】
-// - ★変更: 既存 registration（installing/waiting）でも activated まで待機
-// - ★変更: ready を直接共有せず、タイムアウト＋statechange二重待機の Promise を共有
-// - ★追加: reg.update() を明示的に実行して更新検知を促す
-// - 型安全に addEventListener/removeEventListener を利用（any回避）
+// - ✅ Capacitor（ネイティブ実行）時は Service Worker を完全にスキップ
+// - ✅ さらに、残留している SW を unregister し、Cache Storage も削除して事故を潰す
+// - Web（通常ブラウザ）では既存の SW 安定化ロジックを維持
 
 'use client';
 
@@ -12,26 +11,76 @@ import { useEffect } from 'react';
 declare global {
   interface Window {
     __swReadyPromise?: Promise<ServiceWorkerRegistration>;
+    Capacitor?: {
+      isNativePlatform?: () => boolean;
+      getPlatform?: () => string;
+    };
+  }
+}
+
+function isCapacitorRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  // 1) env フラグ（ビルド時に入れるなら）
+  if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD === 'true') return true;
+
+  // 2) window.Capacitor 判定
+  try {
+    if (window.Capacitor?.isNativePlatform?.()) return true;
+    const p = window.Capacitor?.getPlatform?.();
+    if (p === 'android' || p === 'ios') return true;
+  } catch {
+    // ignore
+  }
+
+  return false;
+}
+
+async function cleanupServiceWorkersForCapacitor(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!('serviceWorker' in navigator)) return;
+
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+  } catch {
+    // ignore
+  }
+
+  // Cache Storage が残っていると、画面真っ白などの原因になることがある
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch {
+    // ignore
   }
 }
 
 export default function ServiceWorkerInit() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // ✅ Capacitor では SW を完全無効化（white screen / update事故 回避）
+    if (isCapacitorRuntime()) {
+      console.log('[ServiceWorkerInit] skipped on Capacitor runtime');
+      void cleanupServiceWorkersForCapacitor();
+      return;
+    }
+
     if (!('serviceWorker' in navigator)) return;
 
-    // ★追加: 無限リロード防止フラグ
+    // ★無限リロード防止フラグ
     const RELOAD_FLAG = 'pk_sw_reloaded_once';
 
     const init = async () => {
       try {
-        // すでに ready を共有済みなら何もしない
         if (window.__swReadyPromise) return;
 
-        // 既存登録の確認（scope は '/' を想定）
+        // scope は '/' を想定
         let reg = await navigator.serviceWorker.getRegistration('/');
 
-        // まだなら明示登録（next-pwa の register:true があっても冪等に動く）
         if (!reg) {
           reg = await navigator.serviceWorker.register('/sw.js', {
             scope: '/',
@@ -40,32 +89,48 @@ export default function ServiceWorkerInit() {
         }
 
         if (reg) {
-          try { reg.update(); } catch { }
-          // ★強化: registration 全体を監視（active/ controller / updatefound）＋ポーリング
+          try {
+            reg.update();
+          } catch {}
+
           await new Promise<void>((resolve, reject) => {
-            const deadline = setTimeout(() => reject(new Error('SW activate wait timeout')), 15_000);
+            const deadline = setTimeout(
+              () => reject(new Error('SW activate wait timeout')),
+              15_000
+            );
             const cleanups: Array<() => void> = [];
-            const done = () => { cleanups.forEach(fn => fn()); clearTimeout(deadline); resolve(); };
+            const done = () => {
+              cleanups.forEach((fn) => fn());
+              clearTimeout(deadline);
+              resolve();
+            };
             const check = () => {
               if (reg.active?.state === 'activated' || navigator.serviceWorker.controller) done();
             };
-            // 現状の worker 群に statechange を貼る
+
             const watch = (w?: ServiceWorker | null) => {
               if (!w) return;
-              const on = () => { if (w.state === 'activated') check(); };
+              const on = () => {
+                if (w.state === 'activated') check();
+              };
               w.addEventListener('statechange', on);
               cleanups.push(() => w.removeEventListener('statechange', on));
             };
-            watch(reg.active); watch(reg.waiting); watch(reg.installing);
-            // 新しく見つかった installing にも追従
-            const onUpdateFound = () => { watch(reg.installing); };
+
+            watch(reg.active);
+            watch(reg.waiting);
+            watch(reg.installing);
+
+            const onUpdateFound = () => watch(reg.installing);
             reg.addEventListener('updatefound', onUpdateFound);
             cleanups.push(() => reg.removeEventListener('updatefound', onUpdateFound));
-            // controller 付与を待つ
+
             const onCtrl = () => check();
             navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
-            cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
-            // ポーリング: setInterval をやめ、指数バックオフの一回タイマー + InvalidStateError で停止
+            cleanups.push(() =>
+              navigator.serviceWorker.removeEventListener('controllerchange', onCtrl)
+            );
+
             let stopped = false;
             const tryUpdate = (delay = 500) => {
               if (stopped) return;
@@ -74,26 +139,26 @@ export default function ServiceWorkerInit() {
                 try {
                   reg.update();
                 } catch (e) {
-                  // 状態遷移中などで "InvalidStateError" が出たら以降の再試行はやめる
                   if ((e as DOMException)?.name === 'InvalidStateError') {
                     stopped = true;
                     return;
                   }
                 }
                 check();
-                // まだ controller も active も付いていなければ、次は少し待って再試行
                 if (!navigator.serviceWorker.controller && reg.active?.state !== 'activated') {
-                  tryUpdate(Math.min(Math.floor(delay * 1.5), 5000)); // 最大5sまで
+                  tryUpdate(Math.min(Math.floor(delay * 1.5), 5000));
                 }
               }, delay);
-              cleanups.push(() => { stopped = true; clearTimeout(t); });
+              cleanups.push(() => {
+                stopped = true;
+                clearTimeout(t);
+              });
             };
-            tryUpdate();
 
-            // 初回判定
+            tryUpdate();
             check();
           });
-          // ★追加: ここまで来て 500ms 待っても controller が無ければ「一度だけ」自動リロード
+
           if (!navigator.serviceWorker.controller) {
             await new Promise((r) => setTimeout(r, 500));
             if (!navigator.serviceWorker.controller) {
@@ -103,44 +168,62 @@ export default function ServiceWorkerInit() {
                   sessionStorage.setItem(RELOAD_FLAG, '1');
                   console.log('[SW] Forcing one-time reload to attach controller');
                   location.reload();
-                  return; // ここで復帰しない（リロードされる）
+                  return;
                 }
-              } catch { /* セッションストレージ使用不可でも無視 */ }
+              } catch {}
             }
           }
         }
 
-
-        // ★変更: ready を直接晒さず、タイムアウト + 二重チェックの Promise を共有
         window.__swReadyPromise = (async () => {
           const readyPromise = navigator.serviceWorker.ready;
           const timeout = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('SW ready timeout')), 15_000)
           );
-          const regReady = await Promise.race([readyPromise, timeout]) as ServiceWorkerRegistration;
+          const regReady = (await Promise.race([
+            readyPromise,
+            timeout,
+          ])) as ServiceWorkerRegistration;
 
-          // ★強化: regReady でも同じく registration 全体で待つ（10s）
           await new Promise<void>((resolve, reject) => {
-            const deadline = setTimeout(() => reject(new Error('SW activate wait timeout (post-ready)')), 10_000);
+            const deadline = setTimeout(
+              () => reject(new Error('SW activate wait timeout (post-ready)')),
+              10_000
+            );
             const cleanups: Array<() => void> = [];
-            const done = () => { cleanups.forEach(fn => fn()); clearTimeout(deadline); resolve(); };
-            const check = () => {
-              if (regReady.active?.state === 'activated' || navigator.serviceWorker.controller) done();
+            const done = () => {
+              cleanups.forEach((fn) => fn());
+              clearTimeout(deadline);
+              resolve();
             };
+            const check = () => {
+              if (regReady.active?.state === 'activated' || navigator.serviceWorker.controller)
+                done();
+            };
+
             const watch = (w?: ServiceWorker | null) => {
               if (!w) return;
-              const on = () => { if (w.state === 'activated') check(); };
+              const on = () => {
+                if (w.state === 'activated') check();
+              };
               w.addEventListener('statechange', on);
               cleanups.push(() => w.removeEventListener('statechange', on));
             };
-            watch(regReady.active); watch(regReady.waiting); watch(regReady.installing);
-            const onUpdateFound = () => { watch(regReady.installing); };
+
+            watch(regReady.active);
+            watch(regReady.waiting);
+            watch(regReady.installing);
+
+            const onUpdateFound = () => watch(regReady.installing);
             regReady.addEventListener('updatefound', onUpdateFound);
             cleanups.push(() => regReady.removeEventListener('updatefound', onUpdateFound));
+
             const onCtrl = () => check();
             navigator.serviceWorker.addEventListener('controllerchange', onCtrl, { once: true });
-            cleanups.push(() => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl));
-            // ポーリング: setInterval ではなく指数バックオフ + InvalidStateError で停止
+            cleanups.push(() =>
+              navigator.serviceWorker.removeEventListener('controllerchange', onCtrl)
+            );
+
             let stopped = false;
             const tryUpdate = (delay = 500) => {
               if (stopped) return;
@@ -159,13 +242,16 @@ export default function ServiceWorkerInit() {
                   tryUpdate(Math.min(Math.floor(delay * 1.5), 5000));
                 }
               }, delay);
-              cleanups.push(() => { stopped = true; clearTimeout(t); });
+              cleanups.push(() => {
+                stopped = true;
+                clearTimeout(t);
+              });
             };
-            tryUpdate();
 
+            tryUpdate();
             check();
           });
-          // ★追いリロード保険（post-ready 時点でも controller が無い場合）
+
           if (!navigator.serviceWorker.controller) {
             await new Promise((r) => setTimeout(r, 500));
             if (!navigator.serviceWorker.controller) {
@@ -176,15 +262,17 @@ export default function ServiceWorkerInit() {
                   console.log('[SW] Forcing one-time reload to attach controller (post-ready)');
                   location.reload();
                 }
-              } catch { }
+              } catch {}
             } else {
-              try { sessionStorage.removeItem(RELOAD_FLAG); } catch { }
+              try {
+                sessionStorage.removeItem(RELOAD_FLAG);
+              } catch {}
             }
           }
+
           return regReady;
         })();
 
-        // （任意）デバッグログ
         window.__swReadyPromise.then((r) => {
           const s = r.active?.state || r.waiting?.state || r.installing?.state;
           console.log('[SW] ready:', r.scope, s);

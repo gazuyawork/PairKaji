@@ -70,12 +70,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // [追加] .env に NEXT_PUBLIC_ADSENSE_CLIENT が無いときは Script を読まないようにする
   const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
 
-  return (
-    <html
-      lang="ja"
-      className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
-    >
-      <body className="font-sans bg-white text-gray-800 h-full antialiased">
+return (
+  <html
+    lang="ja"
+    className={`${zenMaruGothic.variable} ${pacifico.variable} h-full`}
+  >
+    <head>
+      {/* ✅ 静的 manifest を明示 */}
+      <link rel="manifest" href="/manifest.webmanifest" />
+    </head>
+
+    <body className="font-sans bg-white text-gray-800 h-full antialiased">
+
         <TimerProvider>
           {/* 起動直後にローカルキャッシュの未読数でバッジを即時反映 */}
           <AppBadgeInitializer />
