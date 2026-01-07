@@ -1,45 +1,71 @@
-// src/components/AuthGuard.tsx
-
 'use client';
 
-export const dynamic = 'force-dynamic'
-
-/**
- * AuthGuard コンポーネント
- *
- * 認証されていないユーザーがログインページ以外にアクセスするのを防ぐためのガードコンポーネント。
- * Firebase Auth によるユーザー認証状態を確認し、未ログインなら `/login` にリダイレクトする。
- * 認証が確認されるまで `children` を表示しない。
- */
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
+// ★追加
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [checking, setChecking] = useState(true); // ユーザー確認中フラグ
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Firebaseの認証状態が変更されたときのリスナー登録
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        // 🔒 認証されていない場合はログイン画面に遷移させる
-        router.replace('/login');
-      } else {
-        // ✅ 認証されていれば、描画を許可する
+    let cancelled = false;
+
+    let webResolved = false;
+    let webUserExists = false;
+
+    let nativeResolved = false;
+    let nativeUserExists = false;
+
+    const decide = () => {
+      if (cancelled) return;
+      if (!webResolved || !nativeResolved) return;
+
+      // ✅ Web or Native のどちらかでログイン済みなら描画許可
+      if (webUserExists || nativeUserExists) {
         setChecking(false);
+        return;
       }
+
+      // 🔒 両方が「未ログイン」確定なら login
+      router.replace('/login');
+    };
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      webResolved = true;
+      webUserExists = !!user;
+      decide();
     });
 
-    // コンポーネントのアンマウント時にリスナー解除
-    return () => unsubscribe();
+    (async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const nativeUser = await FirebaseAuthentication.getCurrentUser();
+          nativeUserExists = !!nativeUser?.user;
+        } else {
+          nativeUserExists = false;
+        }
+      } catch {
+        nativeUserExists = false;
+      } finally {
+        nativeResolved = true;
+        decide();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [router]);
 
-  // 🔸 ユーザー確認中は何も表示しない（ちらつきを防ぐ）
   if (checking) return null;
-
-  // 認証済みユーザーの場合、子要素（protectedページ）を描画
   return <>{children}</>;
 }
