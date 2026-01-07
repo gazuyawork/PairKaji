@@ -105,7 +105,7 @@ export default function UnitPriceCompareToolCard() {
             <div className="h-10 w-10 rounded-full bg-gray-50 flex items-center justify-center">
               <Calculator className="w-5 h-5 text-gray-700" />
             </div>
-            <div className="text-base font-semibold text-gray-800">どっちが割安？</div>
+            <div className="text-base font-semibold text-gray-800">どっちがお得？</div>
           </div>
 
           <button
@@ -120,7 +120,7 @@ export default function UnitPriceCompareToolCard() {
       </section>
 
       {/* モーダル */}
-      <Modal isOpen={open} title="どっちが割安？" onClose={() => setOpen(false)}>
+      <Modal isOpen={open} title="どっちがお得？" onClose={() => setOpen(false)}>
         <UnitPriceCompareCard variant="modal" />
       </Modal>
     </>

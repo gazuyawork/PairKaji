@@ -32,8 +32,9 @@ type SlideBlock = {
   /** 画像パス（/public 配下, 任意） */
   src?: string;
   /** 説明テキスト（任意） */
-  description?: string;
+  description?: string | React.ReactNode;
 };
+
 
 type SlidePage = {
   /** ページ最上部に表示するタイトル（任意） */
@@ -392,9 +393,10 @@ export default function OnboardingModal(props: Props) {
                       {/* 説明（任意） */}
                       {b.description && (
                         <p className="px-4 py-4 text-sm sm:text-[15px] leading-6 text-gray-700 whitespace-pre-wrap">
-                          {renderRichText(b.description)}
+                          {typeof b.description === 'string' ? renderRichText(b.description) : b.description}
                         </p>
                       )}
+
                     </section>
                   );
                 })}

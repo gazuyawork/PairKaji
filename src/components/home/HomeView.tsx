@@ -834,41 +834,66 @@ const DEFAULT_ORDER = [
                 {
                   subtitle: 'ようこそ、PairKajiへ。',
                   description:
-                    '家事を、ふたりで心地よく分け合うためのアプリです。\nまずは基本の使い方を、かんたんにご紹介します。\n\n※ 説明が不要な場合は右上の × からスキップできます。\n※ ホーム画面の下部の「もう１度説明を見る」をタップで確認することができます。',
+                    '家事を、ふたりで心地よく分け合うためのアプリです。\nまずはこのアプリについて、かんたんにご紹介します。\n\n※ 説明が不要な場合は右上の × からスキップできます。\n※ ホーム画面の下部の「もう１度説明を見る」をタップで確認することができます。',
                 },
               ],
             },
-            {
-              title: 'Home 画面の見方',
+          {
+              title: 'PairKajiの画面構成について',
               blocks: [
                 {
-                  subtitle: '1. 概要',
-                  description:
-                    'Home では「タスク一覧」「週間ポイント」「本日完了タスク」など、日々の進捗をひと目で確認できます。',
-                },
-                {
-                  subtitle: '2. タスク一覧（7日間）',
+                  subtitle: '1. Home 画面',
                   src: '/onboarding/schedule.jpg',
                   description:
-                    '本日から7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
+                    'Home 画面では、日々のタスクの進捗を確認できます。\n表示されているカードは自分好みに並び替えや非表示にすることができます。',
                 },
                 {
-                  subtitle: '3. 本日完了タスク',
+                  subtitle: '2. Task 画面',
+                  src: '/onboarding/schedule.jpg',
+                  description:
+                    'Task 画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。',
+                },
+                {
+                  subtitle: '3. Todo 画面',
                   src: '/onboarding/finish_task.jpg',
                   description:
-                    '本日完了したタスクを一覧表示します。各タスクの右に実行者のアイコンが表示され、誰が完了したか確認できます。',
+                    'Todo 画面では Task 画面で登録したタスクにたして、さらに細かいサブタスクを追加できます。',
                 },
+              ],
+            },
+
+            {
+              title: 'Home 画面について',
+              blocks: [
                 {
-                  subtitle: '4. フラグ付きタスク',
+                  subtitle: '1. フラグ付きタスク',
                   src: '/onboarding/flag.jpg',
                   description:
-                    'フラグを付けたタスクが表示されます。新規で追加した場合は New のバッチが表示され、プッシュ通知が届きます。※プッシュ通知を受け取るためには設定が必要です。',
+                    'フラグを付けたタスクが表示されます。フラグのついたタスクが存在するときのみ表示されます。',
                 },
                 {
-                  subtitle: '5. ポイント',
+                  subtitle: '2. スケジュール',
+                  src: '/onboarding/schedule.jpg',
+                  description:
+                    '本日より直近の7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
+                },
+                {
+                  subtitle: '3. パートナーの完了タスク',
+                  src: '/onboarding/finish_task.jpg',
+                  description:
+                    'パートナーを設定しているときのみ表示されます。\nパートナーが完了したタスクの一覧を表示され、♥ をタップでパートナーに感謝を伝えることができます。。',
+                },
+                {
+                  subtitle: '4. 活動記録',
                   src: '/onboarding/point_check.jpg',
                   description:
-                    '1週間の目標値と進捗状況をひょうじします。タップすることで、目標値を編集することができます。',
+                    '1週間の目標設定、進捗状況、履歴などを確認することができます。',
+                },
+                                {
+                  subtitle: '5. どっちがお得？',
+                  src: '/onboarding/unit_price_compare.jpg',
+                  description:
+                    'お買い物のときに便利な単価比較ツールです。\n商品の価格と内容量を入力すると、どちらがお得かを簡単に比較できます。',
                 },
               ],
             },
@@ -876,20 +901,57 @@ const DEFAULT_ORDER = [
               title: 'Task画面',
               blocks: [
                 {
-                  subtitle: '1. 概要',
-                  description:
-                    'この画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。\n',
-                },
-                {
-                  subtitle: 'Weekly ポイントとは？',
+                  subtitle: '1. タスクの登録',
                   src: '/onboarding/slide2.png',
                   description:
-                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                    <>
+                      <strong>タスク名</strong>
+                      <br/>→ お好きなタスク名を入力
+                      <br/><strong>カテゴリ</strong>
+                      <br/>→ 設定することで、タスクに対応するTodoが設定されます。
+                      <br/><strong>頻度/時間</strong>
+                      <br/>→ タスクの実施するタイミングを設定します。
+                      <br/><strong>ポイント</strong>
+                      <br/>→ タスク完了時に獲得できるポイントを設定します。
+                      <br/><strong>担当者</strong>
+                      <br/>→ タスクを担当するユーザーを設定します。
+                      <br/><strong>プライベート</strong>
+                      <br/>→ パートナーに見せたくないタスクの場合はオンにします。
+                      <br/><strong>Todo表示</strong>
+                      <br/>→ タスクを細分化したい場合にオンにします。
+                      <br/><strong>備考</strong>
+                      <br/>→ タスクに関する補足情報を入力します。'
+                    </>,
                 },
                 {
-                  subtitle: '画像挿入テスト',
+                  subtitle: '2. タスクの編集・削除',
+                  src: '/onboarding/slide2.png',
                   description:
-                    'ホームでは重要なお知らせを上部に表示します。[[img:/onboarding/plus_btn.jpg|alt=タップボタン|h=22]] をタップしてください。',
+                    '対象のタスクをタップすると、タスクの編集・削除ボタンが表示されます。\nフラグのON/OFFもここで設定できます。',
+                },
+                {
+                  subtitle: 'タスクの完了',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '左のチェックボックスをタップすると、その日のタスクを完了できます。',
+                },
+                {
+                  subtitle: 'タスクを検索する',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '本日、プライベート、フラグ付き、ワードでタスクを絞り込むことができます。',
+                },
+                {
+                  subtitle: 'その他の操作①',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    'タスクを右へスワイプすると、対象のTodoに移動できるボタンが表示されます。\nタスクを左へスワイプすると、タスクをスキップできます。スキップしたタスクのポイントは加算されません。',
+                },
+                {
+                  subtitle: 'その他の操作①',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '編集モードボタンをタップで、タスクの並び替えや複数削除が可能です。\nタスクを長押ししてドラッグすることで、順序を変更できます。',
                 },
               ],
             },
@@ -897,17 +959,35 @@ const DEFAULT_ORDER = [
               title: 'Todo画面',
               blocks: [
                 {
-                  subtitle: 'ペア設定が未完了の場合',
-                  description:
-                    'Weekly ポイントの上に案内が表示されます。パートナー設定が完了すると自動で使用可能になります。',
-                },
-                {
-                  subtitle: 'Weekly ポイントとは？',
+                  subtitle: '1. Todo（タスク）の登録',
                   src: '/onboarding/slide2.png',
                   description:
-                    '1週間の達成度を可視化する仕組みです。ペアでの家事分担・達成状況を楽しく振り返れます。',
+                    '対象のタスクをタップし、＋ボタンをタップすると Todoを登録できます。',
                 },
-                { subtitle: '', description: '' },
+                {
+                  subtitle: '2. Todo（タスク）の非表示',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '対象のタスクの👁アイコンをタップで非表示になります。',
+                },
+                {
+                  subtitle: '2. Todo（タスク）の再表示',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '👁ボタンをタップで非表示中の Todo（タスク）一覧が表示されます。\n再表示するTodo（タスク）をタップしてください。',
+                },
+                {
+                  subtitle: 'Todo（タスク）を検索する',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    'カテゴリ別・ワードで Todo（タスク）を絞り込むことができます。',
+                },
+              {
+                  subtitle: 'Todo（タスク）の並び替え',
+                  src: '/onboarding/slide2.png',
+                  description:
+                    '対象のタスクの・・アイコンをドラッグアンドドロップで並び替えできます。',
+                },
               ],
             },
             {
@@ -917,7 +997,7 @@ const DEFAULT_ORDER = [
                   subtitle: 'はじめに',
                   src: '/onboarding/slide1.png',
                   description:
-                    'おつかれさまでした。\nPairKajiは家事を見える科するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n',
+                    'おつかれさまでした。\nPairKajiは家事を見える化するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n使い方がわからなくなったときは、画面右上の「？」マークをタップで画面上にヒントが表示されますので参考にしてみてください。。\n\nそれでは、PairKajiでの生活がより良いものになりますように！',
                 },
               ],
             },

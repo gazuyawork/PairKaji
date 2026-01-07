@@ -538,10 +538,10 @@ export default function EditTaskModal({
       saveDisabled={!!nameError || !!noteError}
     >
       <div className="space-y-6">
-        {/* 🏷 家事名入力 */}
+        {/* 🏷 タスク入力 */}
         <div className="mb-4">
           <div className="flex items-center mb-0">
-            <label className="w-20 text-gray-600 shrink-0">家事名：</label>
+            <label className="w-20 text-gray-600 shrink-0">タスク名：</label>
             <input
               ref={nameInputRef}
               type="text"

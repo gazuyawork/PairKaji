@@ -189,7 +189,7 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
     <section className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-center gap-2">
         <Calculator className="w-5 h-5 text-gray-600" />
-        <h3 className="text-base font-semibold">どっちが割安？</h3>
+        <h3 className="text-base font-semibold">どっちがお得？</h3>
       </div>
       <div className="px-5 py-4">{content}</div>
     </section>
