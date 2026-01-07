@@ -26,7 +26,7 @@ import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
 import { useView } from '@/context/ViewContext';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
-import AdCard from '@/components/home/parts/AdCard';
+// import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import SortableTaskRow from '@/components/todo/parts/SortableTaskRow';
@@ -530,7 +530,7 @@ export default function TodoView() {
             );
           })()}
 
-          {!isLoading && !isChecking && plan === 'free' && <AdCard />}
+          {/* {!isLoading && !isChecking && plan === 'free' && <AdCard />} */}
         </main>
       </div>
 

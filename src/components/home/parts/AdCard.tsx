@@ -195,89 +195,89 @@ export default function AdCard({ plan = 'free' }: { plan?: Plan }) {
     }
   };
 
-  return (
-    <section className="mt-4">
-      <div className="mx-auto w-full max-w-xl px-2">
-        {/* ここは広告の有無に関わらずテキストは残す（必要なら削除可） */}
-        <p className="mb-2 text-center text-[11px] text-gray-500">
-          本セクションにはプロモーションが含まれます。
-        </p>
+  // return (
+  //   <section className="mt-4">
+  //     <div className="mx-auto w-full max-w-xl px-2">
+  //       {/* ここは広告の有無に関わらずテキストは残す（必要なら削除可） */}
+  //       <p className="mb-2 text-center text-[11px] text-gray-500">
+  //         本セクションにはプロモーションが含まれます。
+  //       </p>
 
-        <div className="grid grid-cols-1 items-stretch gap-3 sm:gap-4">
-          {/* ✅ JSX 内で分岐：Hooks は上で既にすべて宣言済み */}
-          {showAds ? (
-            <Card title="おすすめ商品を楽天で探す" badge="PR" onClose={handleClickClose} showClose>
-              {mounted && singleSrcDoc && !/<script/i.test(rakutenSingleHtml) ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
-                    {isLocal && (
-                      <span className="ml-1 inline-block rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                        アフィリエイト有効（単品HTML）
-                      </span>
-                    )}
-                  </p>
-                  <iframe
-                    ref={iframeRef}
-                    className="w-full border-0"
-                    style={{ height: iframeHeight }}
-                    sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
-                    referrerPolicy="no-referrer"
-                    srcDoc={singleSrcDoc}
-                    onLoad={() => {
-                      try {
-                        const doc = iframeRef.current?.contentWindow?.document;
-                        if (!doc) return;
-                        const h = Math.max(
-                          doc.body?.scrollHeight || 0,
-                          doc.documentElement?.scrollHeight || 0,
-                          140
-                        );
-                        setIframeHeight(h);
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
-                    楽天ポイントを貯めたい方はこちら。
-                    {isLocal &&
-                      (rakutenWidgetHtml ? (
-                        <span className="ml-1 inline-block rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                          アフィリエイト有効（ウィジェット）
-                        </span>
-                      ) : (
-                        <span className="ml-1 inline-block rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                          ウィジェット未設定（通常リンク）
-                        </span>
-                      ))}
-                  </p>
-                  {mounted && rakutenWidgetHtml ? (
-                    <div
-                      className="min-h-[60px]"
-                      dangerouslySetInnerHTML={{ __html: rakutenWidgetHtml }}
-                    />
-                  ) : (
-                    <>
-                      <a
-                        href={rakutenFallbackUrl}
-                        target="_blank"
-                        rel="noopener sponsored nofollow"
-                        className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                      >
-                        楽天で探す
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </>
-                  )}
-                </div>
-              )}
-            </Card>
-          ) : null}
-        </div>
-      </div>
-    </section>
-  );
+  //       <div className="grid grid-cols-1 items-stretch gap-3 sm:gap-4">
+  //         {/* ✅ JSX 内で分岐：Hooks は上で既にすべて宣言済み */}
+  //         {showAds ? (
+  //           <Card title="おすすめ商品を楽天で探す" badge="PR" onClose={handleClickClose} showClose>
+  //             {mounted && singleSrcDoc && !/<script/i.test(rakutenSingleHtml) ? (
+  //               <div className="space-y-3">
+  //                 <p className="text-sm text-gray-600">
+  //                   {isLocal && (
+  //                     <span className="ml-1 inline-block rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+  //                       アフィリエイト有効（単品HTML）
+  //                     </span>
+  //                   )}
+  //                 </p>
+  //                 <iframe
+  //                   ref={iframeRef}
+  //                   className="w-full border-0"
+  //                   style={{ height: iframeHeight }}
+  //                   sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
+  //                   referrerPolicy="no-referrer"
+  //                   srcDoc={singleSrcDoc}
+  //                   onLoad={() => {
+  //                     try {
+  //                       const doc = iframeRef.current?.contentWindow?.document;
+  //                       if (!doc) return;
+  //                       const h = Math.max(
+  //                         doc.body?.scrollHeight || 0,
+  //                         doc.documentElement?.scrollHeight || 0,
+  //                         140
+  //                       );
+  //                       setIframeHeight(h);
+  //                     } catch {
+  //                       // ignore
+  //                     }
+  //                   }}
+  //                 />
+  //               </div>
+  //             ) : (
+  //               <div className="space-y-3">
+  //                 <p className="text-sm text-gray-600">
+  //                   楽天ポイントを貯めたい方はこちら。
+  //                   {isLocal &&
+  //                     (rakutenWidgetHtml ? (
+  //                       <span className="ml-1 inline-block rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+  //                         アフィリエイト有効（ウィジェット）
+  //                       </span>
+  //                     ) : (
+  //                       <span className="ml-1 inline-block rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+  //                         ウィジェット未設定（通常リンク）
+  //                       </span>
+  //                     ))}
+  //                 </p>
+  //                 {mounted && rakutenWidgetHtml ? (
+  //                   <div
+  //                     className="min-h-[60px]"
+  //                     dangerouslySetInnerHTML={{ __html: rakutenWidgetHtml }}
+  //                   />
+  //                 ) : (
+  //                   <>
+  //                     <a
+  //                       href={rakutenFallbackUrl}
+  //                       target="_blank"
+  //                       rel="noopener sponsored nofollow"
+  //                       className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+  //                     >
+  //                       楽天で探す
+  //                       <ExternalLink className="h-4 w-4" />
+  //                     </a>
+  //                   </>
+  //                 )}
+  //               </div>
+  //             )}
+  //           </Card>
+  //         ) : null}
+  //       </div>
+  //     </div>
+  //   </section>
+  // );
 }

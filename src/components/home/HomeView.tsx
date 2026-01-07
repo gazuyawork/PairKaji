@@ -12,7 +12,7 @@ import { ChevronDown, GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
-import AdCard from '@/components/home/parts/AdCard';
+// import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import OnboardingModal from '@/components/common/OnboardingModal';
@@ -552,8 +552,8 @@ const DEFAULT_ORDER = [
         );
       }
 
-      case 'ad':
-        return !isChecking && plan === 'free' ? <AdCard /> : null;
+      // case 'ad':
+      //   return !isChecking && plan === 'free' ? <AdCard /> : null;
 
       case 'cookingTimer':
         return <CookingTimerCard />;

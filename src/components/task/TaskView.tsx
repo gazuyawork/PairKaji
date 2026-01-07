@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
-import AdCard from '@/components/home/parts/AdCard';
+// import AdCard from '@/components/home/parts/AdCard';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
@@ -1414,7 +1414,7 @@ const toggleSelectionMode = useCallback(() => {
             })()}
           </motion.div>
         )}
-        {!isLoading && !isChecking && plan === 'free' && <AdCard />}
+        {/* {!isLoading && !isChecking && plan === 'free' && <AdCard />} */}
 
         {/* 左下のフローティング列（虫眼鏡は右端） */}
         {!editTargetTask &&

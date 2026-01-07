@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Calculator } from 'lucide-react';
 
 type Variant = 'card' | 'modal';
@@ -30,6 +30,16 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
 
   const [bPrice, setBPrice] = useState('');
   const [bQty, setBQty] = useState('');
+
+  const aPriceInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (variant === 'modal') {
+      requestAnimationFrame(() => {
+        aPriceInputRef.current?.focus();
+      });
+    }
+  }, [variant]);
 
   const calc = useMemo(() => {
     const ap = parsePositiveNumber(aPrice);
@@ -67,20 +77,21 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
     <div className="space-y-4">
       {/* A */}
       <div className="">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-semibold text-gray-800">A</span>
+        {/* <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-semibold text-gray-800">A</span>
           <span className="text-[11px] text-gray-500">
             単価：
             <span className="ml-1 font-semibold">
               {calc.aUnit === null ? '—' : `${round2(calc.aUnit)} 円 / 単位`}
             </span>
           </span>
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1">
             <div className="text-[11px] text-gray-600">価格（円）</div>
             <input
+              ref={aPriceInputRef}
               inputMode="decimal"
               value={aPrice}
               onChange={(e) => setAPrice(e.target.value)}
@@ -104,19 +115,19 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
 
       {/* B */}
       <div className="">
-        <div className="flex items-center justify-between mb-2">
+        {/* <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-gray-800">B</span>
-          <span className="text-[11px] text-gray-500">
+          <span className="text-xs text-gray-500">
             単価：
             <span className="ml-1 font-semibold">
               {calc.bUnit === null ? '—' : `${round2(calc.bUnit)} 円 / 単位`}
             </span>
           </span>
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1">
-            <div className="text-[11px] text-gray-600">価格（円）</div>
+            <div className="text-xs text-gray-600">価格（円）</div>
             <input
               inputMode="decimal"
               value={bPrice}
@@ -127,13 +138,13 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
           </label>
 
           <label className="space-y-1">
-            <div className="text-[11px] text-gray-600">内容量（ g / ml / 個 / etc...）</div>
+            <div className="text-xs text-gray-600">内容量（ g / ml / etc...）</div>
             <input
               inputMode="decimal"
               value={bQty}
               onChange={(e) => setBQty(e.target.value)}
               placeholder="500"
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-200"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-gray-200"
             />
           </label>
         </div>
