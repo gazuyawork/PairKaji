@@ -16,7 +16,7 @@ import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
 import OnboardingModal from '@/components/common/OnboardingModal';
-import CookingTimerCard from '@/components/home/parts/CookingTimerCard';
+// import CookingTimerCard from '@/components/home/parts/CookingTimerCard';
 
 // 活動サマリー
 import HomeDashboardCard from '@/components/home/parts/HomeDashboardCard';
@@ -426,8 +426,8 @@ const DEFAULT_ORDER = [
   'pairInviteNone',
   'todoShortcuts',
   'unitPriceCompare',
-  'cookingTimer',   // ★ これを必ず追加
-  'expandableInfo',
+  'cookingTimer',
+  // 'expandableInfo',
   'hearts',
   'calendar',
   'todayDone',
@@ -498,21 +498,21 @@ const DEFAULT_ORDER = [
       case 'unitPriceCompare':
         return <UnitPriceCompareToolCard />;
 
-      case 'expandableInfo':
-        return (
-          <div
-            onClick={() => setIsExpanded((prev) => !prev)}
-            className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-              }`}
-          >
-            <div className="absolute top-5 right-6 pointer-events-none z-10">
-              <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-                  }`}
-              />
-            </div>
-          </div>
-        );
+      // case 'expandableInfo':
+      //   return (
+      //     <div
+      //       onClick={() => setIsExpanded((prev) => !prev)}
+      //       className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
+      //         }`}
+      //     >
+      //       <div className="absolute top-5 right-6 pointer-events-none z-10">
+      //         <ChevronDown
+      //           className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
+      //             }`}
+      //         />
+      //       </div>
+      //     </div>
+      //   );
 
       case 'hearts': {
         const node = <HomeDashboardCard />;
@@ -555,8 +555,8 @@ const DEFAULT_ORDER = [
       // case 'ad':
       //   return !isChecking && plan === 'free' ? <AdCard /> : null;
 
-      case 'cookingTimer':
-        return <CookingTimerCard />;
+      // case 'cookingTimer':
+      //   return <CookingTimerCard />;
 
       default:
         return null;
@@ -666,7 +666,7 @@ const DEFAULT_ORDER = [
               candidateSet.add('todoShortcuts');
               candidateSet.add('unitPriceCompare');
               candidateSet.add('cookingTimer');
-              candidateSet.add('expandableInfo');
+              // candidateSet.add('expandableInfo');
               candidateSet.add('hearts');
               candidateSet.add('calendar');
               // candidateSet.add('weeklyPoints');
