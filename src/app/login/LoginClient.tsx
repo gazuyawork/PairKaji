@@ -99,11 +99,11 @@ export default function LoginClient() {
   };
 
   const handleForgotPassword = () => {
-    router.push('/forgot_password');
+    router.push('/forgot-password');
   };
 
   const handleGoSignup = () => {
-    router.push('/signup');
+    router.push('/register');
   };
 
   return (
