@@ -920,7 +920,7 @@ const DEFAULT_ORDER = [
                       <br/><strong>Todo表示</strong>
                       <br/>→ タスクを細分化したい場合にオンにします。
                       <br/><strong>備考</strong>
-                      <br/>→ タスクに関する補足情報を入力します。'
+                      <br/>→ タスクに関する補足情報を入力します。
                     </>,
                 },
                 {
