@@ -12,10 +12,62 @@ type PurchaseArgs = {
   productType?: ProductType;
 };
 
+type BillingPurchaseArgs = {
+  productId: string;
+  productType: ProductType;
+};
+
+type BillingPurchaseResult = unknown;
+
+type BillingListenerHandle = { remove: () => void };
+
+type PurchaseCompletedEvent = {
+  purchaseToken: string;
+  orderId?: string;
+};
+
+type PurchaseFailedEvent = {
+  code?: number;
+  [key: string]: unknown;
+};
+
+type BillingPlugin = {
+  purchase?: (args: BillingPurchaseArgs) => Promise<BillingPurchaseResult>;
+  addListener?: (eventName: string, listener: (event: unknown) => void) => BillingListenerHandle;
+};
+
+type CapacitorPluginsContainer = {
+  Billing?: BillingPlugin;
+  [key: string]: unknown;
+};
+
+type CapacitorWindowLike = {
+  Plugins?: CapacitorPluginsContainer;
+  [key: string]: unknown;
+};
+
+declare global {
+  interface Window {
+    Capacitor?: CapacitorWindowLike;
+  }
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function hasStringProp(obj: Record<string, unknown>, key: string): obj is Record<string, unknown> & Record<typeof key, string> {
+  return typeof obj[key] === 'string';
+}
+
+function hasOptionalStringProp(obj: Record<string, unknown>, key: string): boolean {
+  const v = obj[key];
+  return v === undefined || typeof v === 'string';
+}
+
 // ★共通: Billing プラグイン取得用ヘルパー
-function getBillingPlugin() {
-  const w = window as any;
-  const cap = w.Capacitor;
+function getBillingPlugin(): BillingPlugin | undefined {
+  const cap = window.Capacitor;
   console.log('[billing] window.Capacitor =', cap);
 
   if (!cap || !cap.Plugins) {
@@ -62,7 +114,9 @@ export async function purchase({ productId, productType = 'subs' }: PurchaseArgs
   }
 }
 
-export function onPurchaseCompleted(cb: (p: { purchaseToken: string; orderId?: string }) => void) {
+export function onPurchaseCompleted(
+  cb: (p: { purchaseToken: string; orderId?: string }) => void
+) {
   const Billing = getBillingPlugin();
   if (!Billing || typeof Billing.addListener !== 'function') {
     console.warn('[billing] onPurchaseCompleted: Billing.addListener が利用できません');
@@ -70,9 +124,19 @@ export function onPurchaseCompleted(cb: (p: { purchaseToken: string; orderId?: s
   }
 
   console.log('[billing] onPurchaseCompleted: リスナーを登録します');
-  return Billing.addListener('purchaseCompleted', (e: any) => {
+  return Billing.addListener('purchaseCompleted', (e: unknown) => {
     console.log('[billing] purchaseCompleted event =', e);
-    cb({ purchaseToken: e.purchaseToken, orderId: e.orderId });
+
+    if (!isRecord(e)) return;
+    if (!hasStringProp(e, 'purchaseToken')) return;
+    if (!hasOptionalStringProp(e, 'orderId')) return;
+
+    const payload: PurchaseCompletedEvent = {
+      purchaseToken: e.purchaseToken,
+      orderId: typeof e.orderId === 'string' ? e.orderId : undefined,
+    };
+
+    cb(payload);
   });
 }
 
@@ -84,9 +148,19 @@ export function onPurchaseFailed(cb: (e: { code?: number }) => void) {
   }
 
   console.log('[billing] onPurchaseFailed: リスナーを登録します');
-  return Billing.addListener('purchaseFailed', (e: any) => {
+  return Billing.addListener('purchaseFailed', (e: unknown) => {
     console.log('[billing] purchaseFailed event =', e);
-    cb(e);
+
+    if (!isRecord(e)) {
+      cb({});
+      return;
+    }
+
+    const codeRaw = e.code;
+    const payload: PurchaseFailedEvent =
+      typeof codeRaw === 'number' ? { ...e, code: codeRaw } : { ...e };
+
+    cb(payload);
   });
 }
 

@@ -7,16 +7,15 @@
 'use client';
 
 import { useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+
 
 declare global {
   interface Window {
     __swReadyPromise?: Promise<ServiceWorkerRegistration>;
-    Capacitor?: {
-      isNativePlatform?: () => boolean;
-      getPlatform?: () => string;
-    };
   }
 }
+
 
 function isCapacitorRuntime(): boolean {
   if (typeof window === 'undefined') return false;
@@ -24,10 +23,10 @@ function isCapacitorRuntime(): boolean {
   // 1) env フラグ（ビルド時に入れるなら）
   if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD === 'true') return true;
 
-  // 2) window.Capacitor 判定
+  // 2) @capacitor/core 判定（Window.Capacitor を触らない）
   try {
-    if (window.Capacitor?.isNativePlatform?.()) return true;
-    const p = window.Capacitor?.getPlatform?.();
+    if (Capacitor.isNativePlatform()) return true;
+    const p = Capacitor.getPlatform?.();
     if (p === 'android' || p === 'ios') return true;
   } catch {
     // ignore
@@ -35,6 +34,7 @@ function isCapacitorRuntime(): boolean {
 
   return false;
 }
+
 
 async function cleanupServiceWorkersForCapacitor(): Promise<void> {
   if (typeof window === 'undefined') return;

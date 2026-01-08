@@ -60,7 +60,9 @@ export default function SubscribeConfirm({ plan }: Props) {
         'このアプリは個人で開発・運営しています。役に立っていると感じたら、開発継続を応援してもらえると嬉しいです。',
     };
     // plan は将来的に分岐する可能性を残すため引数として保持
-  }, [plan]);
+  // }, [plan]);
+  }, []);
+  
 
   const handleCheckout = async () => {
     setErr(null);

@@ -8,7 +8,7 @@ import TaskCalendar from '@/components/home/parts/TaskCalendar';
 import type { Task } from '@/types/Task';
 import { auth, db } from '@/lib/firebase';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-import { ChevronDown, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
@@ -227,7 +227,6 @@ export default function HomeView() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [hasPairInvite, setHasPairInvite] = useState(false);
   const [hasSentInvite, setHasSentInvite] = useState(false);
   const [hasPairConfirmed, setHasPairConfirmed] = useState(false);

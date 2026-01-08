@@ -7,38 +7,49 @@ export type PlaySkuDetail = {
   title: string;
   description: string;
   price: {
-    value: string;   // "300" など
+    value: string; // "300" など
     currency: string; // "JPY" など
   };
 };
+
+type DigitalGoodsService = {
+  getDetails: (itemIds: string[]) => Promise<PlaySkuDetail[]>;
+};
+
+declare global {
+  interface Window {
+    getDigitalGoodsService?: (paymentMethod: string) => Promise<DigitalGoodsService>;
+  }
+}
+
+async function getDigitalGoodsServiceSafe(): Promise<DigitalGoodsService | null> {
+  if (typeof window === 'undefined') return null;
+
+  const getter = window.getDigitalGoodsService;
+  if (typeof getter !== 'function') return null;
+
+  try {
+    const service = await getter(PLAY_BILLING_BACKEND);
+    return service ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * この環境で Google Play Billing (Digital Goods API) が使えるかどうか
  */
 export async function isPlayBillingAvailable(): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
-
-  const anyWindow = window as any;
-  if (typeof anyWindow.getDigitalGoodsService !== 'function') {
-    return false;
-  }
-
-  try {
-    const service = await anyWindow.getDigitalGoodsService(PLAY_BILLING_BACKEND);
-    return !!service;
-  } catch {
-    return false;
-  }
+  const service = await getDigitalGoodsServiceSafe();
+  return service !== null;
 }
 
 /**
  * 指定した SKU の詳細情報を取得
  */
 export async function getSkuDetails(sku: string): Promise<PlaySkuDetail | null> {
-  if (!await isPlayBillingAvailable()) return null;
-
-  const anyWindow = window as any;
-  const service = await anyWindow.getDigitalGoodsService(PLAY_BILLING_BACKEND);
+  const service = await getDigitalGoodsServiceSafe();
+  if (!service) return null;
 
   const details: PlaySkuDetail[] = await service.getDetails([sku]);
   if (!details || details.length === 0) return null;

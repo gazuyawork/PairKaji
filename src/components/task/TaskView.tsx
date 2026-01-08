@@ -307,7 +307,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const searchInputRef = useRef<HTMLInputElement>(null);
   const keyboardSummonerRef = useRef<HTMLInputElement>(null);
   const { profileImage, partnerImage } = useProfileImages();
-  const { plan, isChecking } = useUserPlan();
+  const { isChecking } = useUserPlan();
   const params = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);

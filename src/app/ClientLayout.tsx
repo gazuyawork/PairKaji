@@ -52,12 +52,13 @@ function usePWAStandaloneScrollFix() {
     setTimeout(forceUnlockBody, 0);
 
     // PWA standalone 判定
-    const isStandalone =
+    const nav = window.navigator as Navigator & { standalone?: boolean };
+    const standalone =
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
       // iOS 古め対策（Android でも true を返す環境あり、害はない）
-      (window.navigator as any).standalone === true;
+      nav.standalone === true;
 
-    if (!isStandalone) return;
+    if (!standalone) return;
 
     const onVisible = () => forceUnlockBody();
     const onPageShow = () => forceUnlockBody();
@@ -66,8 +67,8 @@ function usePWAStandaloneScrollFix() {
     window.addEventListener('pageshow', onPageShow, { passive: true });
 
     return () => {
-      document.removeEventListener('visibilitychange', onVisible as any);
-      window.removeEventListener('pageshow', onPageShow as any);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 }

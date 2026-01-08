@@ -1,7 +1,10 @@
 'use client';
 
 import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from '@capacitor/local-notifications';
+import {
+  LocalNotifications,
+  type LocalNotificationActionPerformed,
+} from '@capacitor/local-notifications';
 
 const OPEN_TIMER_ID_KEY = 'pairkaji_open_timer_id_from_notification_v1';
 
@@ -33,23 +36,30 @@ export async function initTimerNotificationListeners(): Promise<void> {
   listenersInitialized = true;
 
   try {
-    await LocalNotifications.addListener('localNotificationActionPerformed', (event) => {
-      try {
-        const timerId =
-          typeof (event as any)?.notification?.extra?.timerId === 'string'
-            ? (event as any).notification.extra.timerId
-            : null;
+    await LocalNotifications.addListener(
+      'localNotificationActionPerformed',
+      (event: LocalNotificationActionPerformed) => {
+        try {
+          const extra = event.notification?.extra as unknown;
 
-        if (timerId) {
-          localStorage.setItem(OPEN_TIMER_ID_KEY, timerId);
-        } else {
-          // timerId が取れない場合でも「タイマーを開く」だけはできるように空で保存
-          localStorage.setItem(OPEN_TIMER_ID_KEY, '');
+          const timerId =
+            typeof extra === 'object' && extra !== null
+              ? typeof (extra as { timerId?: unknown }).timerId === 'string'
+                ? (extra as { timerId?: string }).timerId
+                : null
+              : null;
+
+          if (timerId) {
+            localStorage.setItem(OPEN_TIMER_ID_KEY, timerId);
+          } else {
+            // timerId が取れない場合でも「タイマーを開く」だけはできるように空で保存
+            localStorage.setItem(OPEN_TIMER_ID_KEY, '');
+          }
+        } catch {
+          // noop
         }
-      } catch {
-        // noop
       }
-    });
+    );
   } catch {
     // noop
   }

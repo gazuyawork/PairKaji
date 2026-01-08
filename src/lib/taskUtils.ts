@@ -608,12 +608,16 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
 /* =========================================================
  * ToDo 部分更新（旅行の時間帯保存に対応）
  *  + チェックリスト保存を追加
+ *  + ★ todo text（名称）保存を追加（今回の修正点）
  *  ※ 料理の材料/手順(recipe)はバグ多発のため保存対象から除外
  * =======================================================*/
 export const updateTodoInTask = async (
   taskId: string,
   todoId: string,
   updates: {
+    // ★ 追加：Todo名
+    text?: string;
+
     memo?: string;
     price?: number | null;
     quantity?: number | null;
@@ -627,6 +631,9 @@ export const updateTodoInTask = async (
 
     // ▼ 追加：チェックリスト（空配列可・全置換）
     checklist?: ChecklistItem[];
+
+    // ※必要なら将来的に done なども追加可能
+    // done?: boolean;
   }
 ) => {
   const taskRef = doc(db, 'tasks', taskId);
@@ -644,6 +651,11 @@ export const updateTodoInTask = async (
 
   // ベースは現在値
   let next: TodoDoc = { ...current };
+
+  // ★★★ 追加：text（Todo名）を保存できるようにする
+  if (typeof updates.text !== 'undefined') {
+    next = { ...next, text: updates.text };
+  }
 
   // --- memo（指定時のみ反映） ---
   if (typeof updates.memo !== 'undefined') {

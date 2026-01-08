@@ -3,13 +3,13 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { db } from '@/lib/firebase';
 import {
   addDoc,
   collection,
   doc,
-  DocumentData,
+  type DocumentData,
   getDoc,
   onSnapshot,
   query,
@@ -69,7 +69,10 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 function hasToDate(v: unknown): v is { toDate: () => Date } {
-  return isRecord(v) && typeof (v as any).toDate === 'function';
+  return (
+    isRecord(v) &&
+    typeof (v as { toDate?: unknown }).toDate === 'function'
+  );
 }
 function toMillis(v: unknown): number | null {
   try {
@@ -106,16 +109,27 @@ export default function PointsMiniCard() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
   // EditPointModal に渡す最低限の props
-  const [rouletteOptions, setRouletteOptions] = useState<string[]>(['ご褒美A', 'ご褒美B', 'ご褒美C']);
+  const [rouletteOptions, setRouletteOptions] = useState<string[]>([
+    'ご褒美A',
+    'ご褒美B',
+    'ご褒美C',
+  ]);
   const [rouletteEnabled, setRouletteEnabled] = useState<boolean>(true);
   const [users] = useState<UserInfo[]>([]);
 
-  // （履歴は非表示運用）型は残す
-  const [historyEntries] = useState<any[]>([]);
+  type EditPointModalProps = ComponentProps<typeof EditPointModal>;
+  type EditPointModalHistoryEntry =
+    EditPointModalProps['historyEntries'] extends Array<infer U> ? U : never;
+
+  // （履歴は非表示運用）EditPointModal が期待する型に合わせる
+  const [historyEntries] = useState<EditPointModalHistoryEntry[]>([]);
 
   // 前回の points 値（差分検知用）
   const prevPointsMapRef = useRef<
-    Map<string, { weeklyTargetPoint: number | null; selfPoint: number | null; lastChangedBy: string | null }>
+    Map<
+      string,
+      { weeklyTargetPoint: number | null; selfPoint: number | null; lastChangedBy: string | null }
+    >
   >(new Map());
 
   // 自分の保存直後のスナップショットを一度だけ無視
@@ -163,8 +177,25 @@ export default function PointsMiniCard() {
   // 今週の合計ポイント（完了ログ）
   useEffect(() => {
     if (!uid || targetIds.length === 0) return;
-    const weekStartMs = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 0).getTime();
-    const weekEndMs = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59, 999).getTime();
+
+    const weekStartMs = new Date(
+      weekStart.getFullYear(),
+      weekStart.getMonth(),
+      weekStart.getDate(),
+      0,
+      0,
+      0,
+      0
+    ).getTime();
+    const weekEndMs = new Date(
+      weekEnd.getFullYear(),
+      weekEnd.getMonth(),
+      weekEnd.getDate(),
+      23,
+      59,
+      59,
+      999
+    ).getTime();
 
     const withinWeek = (d: TaskCompletion) => {
       if (d.completedAt != null) {
@@ -208,22 +239,34 @@ export default function PointsMiniCard() {
     const unsubs: Array<() => void> = [];
     if (targetIds.length <= 10) {
       const qA = query(col, where('userId', 'in', targetIds));
-      unsubs.push(onSnapshot(qA, (snap) => {
-        snap.docChanges().forEach((ch) => {
-          if (ch.type === 'removed') acc.delete(ch.doc.id);
-          else acc.set(ch.doc.id, { id: ch.doc.id, ...(ch.doc.data() as DocumentData as TaskCompletion) });
-        });
-        recompute();
-      }));
+      unsubs.push(
+        onSnapshot(qA, (snap) => {
+          snap.docChanges().forEach((ch) => {
+            if (ch.type === 'removed') acc.delete(ch.doc.id);
+            else {
+              const data = ch.doc.data() as DocumentData;
+              acc.set(ch.doc.id, { id: ch.doc.id, ...(data as TaskCompletion) });
+            }
+          });
+          recompute();
+        })
+      );
+
       const qB = query(col, where('userIds', 'array-contains-any', targetIds));
-      unsubs.push(onSnapshot(qB, (snap) => {
-        snap.docChanges().forEach((ch) => {
-          if (ch.type === 'removed') acc.delete(ch.doc.id);
-          else acc.set(ch.doc.id, { id: ch.doc.id, ...(ch.doc.data() as DocumentData as TaskCompletion) });
-        });
-        recompute();
-      }));
+      unsubs.push(
+        onSnapshot(qB, (snap) => {
+          snap.docChanges().forEach((ch) => {
+            if (ch.type === 'removed') acc.delete(ch.doc.id);
+            else {
+              const data = ch.doc.data() as DocumentData;
+              acc.set(ch.doc.id, { id: ch.doc.id, ...(data as TaskCompletion) });
+            }
+          });
+          recompute();
+        })
+      );
     }
+
     return () => unsubs.forEach((u) => u && u());
   }, [uid, targetIds, weekStart, weekEnd]);
 
@@ -243,18 +286,18 @@ export default function PointsMiniCard() {
       const ref = doc(db, 'points', ownerUid);
       const unsub = onSnapshot(ref, (snap) => {
         const prev =
-          prevPointsMapRef.current.get(ownerUid) ??
-          { weeklyTargetPoint: null, selfPoint: null, lastChangedBy: null };
+          prevPointsMapRef.current.get(ownerUid) ?? {
+            weeklyTargetPoint: null,
+            selfPoint: null,
+            lastChangedBy: null,
+          };
 
         const data: PointsDoc = snap.exists() ? (snap.data() as PointsDoc) : {};
 
         const curr = {
-          weeklyTargetPoint:
-            typeof data.weeklyTargetPoint === 'number' ? data.weeklyTargetPoint : null,
-          selfPoint:
-            typeof data.selfPoint === 'number' ? data.selfPoint : null,
-          lastChangedBy:
-            typeof data.lastChangedBy === 'string' ? data.lastChangedBy : null,
+          weeklyTargetPoint: typeof data.weeklyTargetPoint === 'number' ? data.weeklyTargetPoint : null,
+          selfPoint: typeof data.selfPoint === 'number' ? data.selfPoint : null,
+          lastChangedBy: typeof data.lastChangedBy === 'string' ? data.lastChangedBy : null,
         };
 
         // 自分の保存直後の更新は一度だけ無視（誤点灯防止）
@@ -373,7 +416,8 @@ export default function PointsMiniCard() {
 
   const total = selfPoints + partnerPoints;
   const selfWidthPct = maxPoints > 0 ? Math.min(100, (selfPoints / maxPoints) * 100) : 0;
-  const partnerWidthPct = maxPoints > 0 ? Math.min(100 - selfWidthPct, (partnerPoints / maxPoints) * 100) : 0;
+  const partnerWidthPct =
+    maxPoints > 0 ? Math.min(100 - selfWidthPct, (partnerPoints / maxPoints) * 100) : 0;
 
   return (
     <>
@@ -416,7 +460,9 @@ export default function PointsMiniCard() {
                   <div className="space-y-2 text-sm">
                     <p>ここでは「合計目標（weeklyTargetPoint）」と「あなたの内訳（selfPoint）」を設定します。</p>
                     <ul className="list-disc pl-5 space-y-1">
-                      <li>Update バッジは<strong>パートナーが更新した</strong>ときだけ表示されます（自分が更新しても表示されません）。</li>
+                      <li>
+                        Update バッジは<strong>パートナーが更新した</strong>ときだけ表示されます（自分が更新しても表示されません）。
+                      </li>
                       <li>モーダルを開くと既読になり、Update バッジは消えます。</li>
                     </ul>
                   </div>

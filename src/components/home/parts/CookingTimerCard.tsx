@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+// import React, { useMemo } from 'react';
 import { ExternalLink, Timer } from 'lucide-react';
 import { useTimers } from '@/components/timer/TimerProvider';
 
 export default function CookingTimerCard() {
-  const { timers, openTimerUi } = useTimers();
+  const { openTimerUi } = useTimers();
 
 //   const runningCount = useMemo(() => timers.filter((t) => t.phase === 'running').length, [timers]);
 

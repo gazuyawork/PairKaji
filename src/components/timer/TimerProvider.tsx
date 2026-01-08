@@ -307,7 +307,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // noop
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -376,8 +375,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   }, [ensureAlarm, timers]);
 
   useEffect(() => {
+    const map = alarmMapRef.current;
+
     return () => {
-      const map = alarmMapRef.current;
       for (const [, c] of map) {
         try {
           c.dispose();
@@ -389,6 +389,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       void releaseWakeLock();
     };
   }, [releaseWakeLock]);
+
 
   const openTimerUi = useCallback(
     (timerId?: string) => {

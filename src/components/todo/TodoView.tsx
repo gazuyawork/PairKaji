@@ -166,12 +166,12 @@ export default function TodoView() {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
-  const { plan, isChecking } = useUserPlan();
+  useUserPlan();
   const uid = useUserUid();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [, setIsLoading] = useState<boolean>(true);
 
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [addQuery, setAddQuery] = useState('');
@@ -247,7 +247,7 @@ export default function TodoView() {
               id: d.id,
               ...data,
               // ★ ここで name を安全化
-              name: normalizeName((data as any).name),
+              name: normalizeName((data as { name?: unknown }).name),
               todos: Array.isArray(data.todos) ? data.todos : [],
             };
           });

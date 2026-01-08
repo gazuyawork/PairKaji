@@ -13,7 +13,7 @@ import {
   Tag,
   Plane,
   ListTodo, // ★ 追加：アイコンリンク用
-  Loader2,   // ★ 追加：ローディング用アイコン
+  Loader2, // ★ 追加：ローディング用アイコン
 } from 'lucide-react';
 import {
   doc,
@@ -73,6 +73,10 @@ const safeText = (v: unknown): string => {
   return '[invalid]';
 };
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
 /* =========================
    カテゴリメタ（参考コード準拠）
    ========================= */
@@ -80,7 +84,7 @@ function getCategoryMeta(raw?: unknown) {
   const normalized = String(raw ?? '').normalize('NFKC').trim();
   const category =
     normalized === '' ||
-      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
+    !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
       ? '未分類'
       : normalized;
 
@@ -249,9 +253,14 @@ function SlotButton(props: {
 /* =========================
    本体
    ========================= */
+type ViewLike = {
+  setIndex?: (index: number) => void;
+  setSelectedTaskName?: (taskId: string) => void;
+};
+
 export default function TodoShortcutsCard({ uid, className = '' }: Props) {
-  // setIndex が型に無い環境でも安全に呼べるよう any 経由
-  const view = useView() as any;
+  // setIndex が型に無い環境でも安全に呼べるよう any 経由（★any禁止のため unknown 経由に変更）
+  const view = useView() as unknown as ViewLike;
 
   // ショートカット（taskIdの配列）
   const [shortcuts, setShortcuts] = useState<string[]>([]);
@@ -265,17 +274,22 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
 
   // モーダル内フィルタUI
   const [modalQuery, setModalQuery] = useState('');
-  const [modalSelectedCategoryId, setModalSelectedCategoryId] = useState<string | null>(null);
+  const [modalSelectedCategoryId, setModalSelectedCategoryId] = useState<string | null>(
+    null
+  );
 
   /* user_settings 監視（ショートカット） */
   useEffect(() => {
     if (!uid) return;
     const ref = doc(db, 'user_settings', uid);
     const unsub = onSnapshot(ref, (snap) => {
-      const data = snap.data() || {};
-      const arr = Array.isArray((data as any).todoShortcuts)
-        ? ((data as any).todoShortcuts as string[])
-        : [];
+      const raw = snap.data();
+      const data: Record<string, unknown> = isRecord(raw) ? raw : {};
+
+      const v = data.todoShortcuts;
+      const arr =
+        Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+
       setShortcuts(arr.slice(0, MAX_SLOTS));
     });
     return () => unsub();
@@ -300,8 +314,8 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
         query(
           collection(db, 'pairs'),
           where('userIds', 'array-contains', uid),
-          where('status', '==', 'confirmed'),
-        ),
+          where('status', '==', 'confirmed')
+        )
       );
 
       const userIds = new Set<string>([uid]);
@@ -326,18 +340,28 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
           const list: TodoOnlyTask[] = [];
           qs.forEach((d) => {
             const raw = d.data() as Record<string, unknown>;
+
+            const categoryName =
+              typeof raw.categoryName === 'string' ? raw.categoryName : null;
+            const categoryLabel =
+              typeof raw.categoryLabel === 'string' ? raw.categoryLabel : null;
+
+            const todos = Array.isArray(raw.todos) ? (raw.todos as unknown[]) : [];
+
             const task: TodoOnlyTask = {
               id: d.id,
               name: normalizeName(raw.name),
               userId: typeof raw.userId === 'string' ? (raw.userId as string) : undefined,
-              visible: typeof raw.visible === 'boolean' ? (raw.visible as boolean) : undefined,
-              private: typeof raw.private === 'boolean' ? (raw.private as boolean) : undefined,
-              isTodo: (raw.isTodo as boolean) ?? undefined,
+              visible:
+                typeof raw.visible === 'boolean' ? (raw.visible as boolean) : undefined,
+              private:
+                typeof raw.private === 'boolean' ? (raw.private as boolean) : undefined,
+              isTodo: typeof raw.isTodo === 'boolean' ? raw.isTodo : undefined,
               type: (raw.type as string | null) ?? null,
               category: (raw.category as string | null) ?? null,
-              categoryName: (raw as any).categoryName ?? null,
-              categoryLabel: (raw as any).categoryLabel ?? null,
-              todos: Array.isArray(raw.todos) ? (raw.todos as any[]) : [],
+              categoryName,
+              categoryLabel,
+              todos,
             };
 
             // 表示対象条件（参考実装に準拠）
@@ -357,7 +381,7 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
           console.warn('[TodoShortcutsCard] tasks snapshot error:', err);
           setCandidateTodos([]);
           setCandidateLoading(false);
-        },
+        }
       );
     })().catch((e) => {
       console.error('[TodoShortcutsCard] init error:', e);
@@ -411,7 +435,8 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
 
       const c = t as TaskCategoryShape;
       const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
-      const catOk = modalSelectedCategoryId === null ? true : catId === modalSelectedCategoryId;
+      const catOk =
+        modalSelectedCategoryId === null ? true : catId === modalSelectedCategoryId;
 
       return textOk && catOk;
     });
@@ -485,14 +510,14 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
     (taskId?: string) => {
       if (taskId) {
         try {
-          (view?.setSelectedTaskName)?.(taskId);
-        } catch { }
+          view?.setSelectedTaskName?.(taskId);
+        } catch {}
       }
       try {
-        (view?.setIndex)?.(2); // 仕様：index=2 が TODO
-      } catch { }
+        view?.setIndex?.(2); // 仕様：index=2 が TODO
+      } catch {}
     },
-    [view],
+    [view]
   );
 
   // 3スロット配列へ整形
@@ -577,13 +602,15 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
               <Loader2 className="h-4 w-4 animate-spin" aria-label="読み込み中" />
               {/* <span className="sr-only">読み込み中</span> */}
             </span>
-          ) : (() => {
-            const all = availableCandidates.length;
-            const shown = filteredCandidates.length;
-            return modalQuery || modalSelectedCategoryId !== null
-              ? `一致: ${shown}件`
-              : `候補: ${all}件`;
-          })()
+          ) : (
+            (() => {
+              const all = availableCandidates.length;
+              const shown = filteredCandidates.length;
+              return modalQuery || modalSelectedCategoryId !== null
+                ? `一致: ${shown}件`
+                : `候補: ${all}件`;
+            })()
+          )
         }
       >
         {/* 検索ボックス */}
@@ -621,11 +648,13 @@ export default function TodoShortcutsCard({ uid, className = '' }: Props) {
               type="button"
               onClick={() => setModalSelectedCategoryId(null)}
               className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-                ${modalSelectedCategoryId === null
-                  ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-                  : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'
+                ${
+                  modalSelectedCategoryId === null
+                    ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
+                    : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'
                 }
-                active:translate-y-[1px] ${candidateLoading ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''
+                active:translate-y-[1px] ${
+                  candidateLoading ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''
                 }`} // ★追加
               aria-pressed={modalSelectedCategoryId === null}
               title="すべて"
