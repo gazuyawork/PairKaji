@@ -116,7 +116,7 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-semibold">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-700 text-white text-xs font-semibold">
               B
             </span>
             <span className="text-sm font-semibold text-gray-800">
