@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import type React from 'react';
 import {
   useEffect,
   useState,
@@ -10,7 +11,7 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import { ChevronDown, ChevronUp, Eye, Pencil, Plus, GripVertical } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, GripVertical, X } from 'lucide-react';
 import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
@@ -87,7 +88,7 @@ type TodoDoc = {
     steps?: string[];
   };
   timeStart?: string; // "HH:mm"
-  timeEnd?: string;   // "HH:mm"
+  timeEnd?: string; // "HH:mm"
   // 追加：チェックリスト
   checklist?: ChecklistItem[];
 };
@@ -135,7 +136,7 @@ const addMinutesToHHmm = (hhmm: string, deltaMin: number): string => {
   const next = clampToDayMinutes(base + Math.trunc(deltaMin));
   const h = Math.floor(next / 60);
   const m = next % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` as string;
 };
 const minutesBetweenHHmm = (start: string, end: string): number | null => {
   if (!isHHmm(start) || !isHHmm(end)) return null;
@@ -217,8 +218,10 @@ async function compressImage(
     }
   })();
 
-  const width = 'naturalWidth' in bitmapOrImg ? bitmapOrImg.naturalWidth : (bitmapOrImg as ImageBitmap).width;
-  const height = 'naturalHeight' in bitmapOrImg ? bitmapOrImg.naturalHeight : (bitmapOrImg as ImageBitmap).height;
+  const width =
+    'naturalWidth' in bitmapOrImg ? bitmapOrImg.naturalWidth : (bitmapOrImg as ImageBitmap).width;
+  const height =
+    'naturalHeight' in bitmapOrImg ? bitmapOrImg.naturalHeight : (bitmapOrImg as ImageBitmap).height;
 
   let targetW = width;
   let targetH = height;
@@ -245,7 +248,9 @@ async function compressImage(
     toBlob('image/jpeg', quality),
   ]);
 
-  if (!webpBlob && !jpegBlob) return { blob: file, mime: 'image/jpeg' } as { blob: Blob; mime: 'image/webp' | 'image/jpeg' };
+  if (!webpBlob && !jpegBlob) {
+    return { blob: file, mime: 'image/jpeg' } as { blob: Blob; mime: 'image/webp' | 'image/jpeg' };
+  }
   if (webpBlob && jpegBlob) {
     return webpBlob.size <= jpegBlob.size
       ? { blob: webpBlob, mime: 'image/webp' }
@@ -303,6 +308,10 @@ export default function TodoNoteModal({
     /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
 
   const [mounted, setMounted] = useState(false);
+
+  // ★追加：Todo名（todo.text）を編集できるようにする
+  const [todoTitle, setTodoTitle] = useState(todoText);
+
   const [memo, setMemo] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -314,7 +323,11 @@ export default function TodoNoteModal({
   const [saveLabel, setSaveLabel] = useState('保存');
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
+
+  // ★ 編集/プレビュー
   const [isPreview, setIsPreview] = useState(false);
+  const [modeInitialized, setModeInitialized] = useState(false);
+
   const [category, setCategory] = useState<Category | null>(null);
 
   // ▼▼ バリデーション制御 ▼▼
@@ -392,13 +405,16 @@ export default function TodoNoteModal({
     return v === '' || v === '未設定' || v === '未分類' || v === '未選択';
   }, [category]);
 
-  const hasContent =
-    hasMemo ||
-    hasImage ||
-    hasShopping ||
-    hasReference ||
-    (!!timeStart && !!timeEnd) ||
-    (isUncategorized && hasChecklist);
+  const hasContent = useMemo(() => {
+    return (
+      hasMemo ||
+      hasImage ||
+      hasShopping ||
+      hasReference ||
+      (!!timeStart && !!timeEnd) ||
+      (isUncategorized && hasChecklist)
+    );
+  }, [hasMemo, hasImage, hasShopping, hasReference, timeStart, timeEnd, isUncategorized, hasChecklist]);
 
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -442,7 +458,107 @@ export default function TodoNoteModal({
     return diff != null ? diff : null;
   }, [timeStart, timeEnd]);
 
+  // ★ プレビュー時の「買い物」表示（完全に静的：編集不可）
+  const shoppingPreview = useMemo(() => {
+    if (category !== '買い物') return null;
+
+    const p = Number.parseFloat(price);
+    const q = Number.parseFloat(quantity);
+
+    const hasP = Number.isFinite(p) && p > 0;
+    const hasQ = Number.isFinite(q) && q > 0;
+    const unitTxt = (unit ?? '').trim() || 'g';
+
+    const unitPrice =
+      hasP && hasQ && q > 0 ? Math.round((p / q) * 100) / 100 : null;
+
+    const cmpP = Number.parseFloat(comparePrice);
+    const cmpQ = Number.parseFloat(compareQuantity);
+    const hasCmpP = Number.isFinite(cmpP) && cmpP > 0;
+    const hasCmpQ = Number.isFinite(cmpQ) && cmpQ > 0;
+
+    const cmpUnitPrice =
+      hasCmpP && hasCmpQ && cmpQ > 0 ? Math.round((cmpP / cmpQ) * 100) / 100 : null;
+
+    const diff =
+      unitPrice != null && cmpUnitPrice != null ? Math.round((cmpUnitPrice - unitPrice) * 100) / 100 : null;
+
+    return (
+      <div className="mt-4 ml-2 space-y-3">
+        <h3 className="font-medium">買い物</h3>
+
+        <div className="grid grid-cols-12 gap-2 items-end">
+          <div className="col-span-5">
+            <div className="text-xs text-gray-500 mb-1">価格</div>
+            <div className="border-b border-gray-200 pb-1 tabular-nums">
+              {hasP ? `${p}` : '—'}
+            </div>
+          </div>
+          <div className="col-span-5">
+            <div className="text-xs text-gray-500 mb-1">数量</div>
+            <div className="border-b border-gray-200 pb-1 tabular-nums">
+              {hasQ ? `${q}` : '—'} {hasQ ? unitTxt : ''}
+            </div>
+          </div>
+          <div className="col-span-2">
+            <div className="text-xs text-gray-500 mb-1">単価</div>
+            <div className="border-b border-gray-200 pb-1 tabular-nums text-right">
+              {unitPrice != null ? `${unitPrice}` : '—'}
+            </div>
+          </div>
+        </div>
+
+        {(Number.parseFloat(comparePrice) > 0 || Number.parseFloat(compareQuantity) > 0) && (
+          <div className="pt-2 border-t border-gray-100">
+            <div className="text-xs text-gray-500 mb-2">比較</div>
+
+            <div className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-5">
+                <div className="text-xs text-gray-500 mb-1">比較価格</div>
+                <div className="border-b border-gray-200 pb-1 tabular-nums">
+                  {hasCmpP ? `${cmpP}` : '—'}
+                </div>
+              </div>
+              <div className="col-span-5">
+                <div className="text-xs text-gray-500 mb-1">比較数量</div>
+                <div className="border-b border-gray-200 pb-1 tabular-nums">
+                  {hasCmpQ ? `${cmpQ}` : '—'} {hasCmpQ ? unitTxt : ''}
+                </div>
+              </div>
+              <div className="col-span-2">
+                <div className="text-xs text-gray-500 mb-1">比較単価</div>
+                <div className="border-b border-gray-200 pb-1 tabular-nums text-right">
+                  {cmpUnitPrice != null ? `${cmpUnitPrice}` : '—'}
+                </div>
+              </div>
+            </div>
+
+            {diff != null && (
+              <p className="mt-2 text-sm text-gray-700">
+                差額（単価）: <span className="tabular-nums">{diff}</span>
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }, [category, price, quantity, unit, comparePrice, compareQuantity]);
+
   useEffect(() => setMounted(true), []);
+
+  // ★ モーダルを開くたびに、モード初期化フラグをリセット（初期データ取得後に決める）
+  useEffect(() => {
+    if (isOpen) {
+      setModeInitialized(false);
+      setErrorsShown(false);
+    }
+  }, [isOpen]);
+
+  // ★追加：props の todoText が変わったらタイトルも追従（必要なら）
+  useEffect(() => {
+    setTodoTitle(todoText);
+  }, [todoText]);
+
   useEffect(() => {
     const parsed = Number.parseFloat(comparePrice);
     setSaveLabel(!Number.isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
@@ -464,6 +580,9 @@ export default function TodoNoteModal({
         const todo = todos.find((t) => t.id === todoId);
         if (!todo) return;
 
+        // ★修正：Firestore の todo.text を優先してタイトルに反映
+        setTodoTitle(todo.text ?? todoText);
+
         setMemo(todo.memo ?? '');
         setPrice(isNumber(todo.price) ? String(todo.price) : '');
         setQuantity(isNumber(todo.quantity) ? String(todo.quantity) : '');
@@ -472,9 +591,6 @@ export default function TodoNoteModal({
         if ((!compareQuantityRef.current || compareQuantityRef.current === '') && isNumber(todo.quantity)) {
           setCompareQuantity(String(todo.quantity));
         }
-
-        // ✅ 料理カテゴリの「材料/手順 UI」は一旦撤去するため、
-        //    ここでは recipe を state に取り込んだり、保存時に上書きしません。
 
         const existingImageUrl = isString(todo.imageUrl) ? todo.imageUrl : null;
         setImageUrl(existingImageUrl);
@@ -504,10 +620,10 @@ export default function TodoNoteModal({
         // チェックリスト（必須ではないが、編集モードで最低1行は表示）
         const existingChecklist = Array.isArray((todo as TodoDoc).checklist)
           ? (todo as TodoDoc).checklist!.map((c, idx) => ({
-            id: typeof c?.id === 'string' ? c.id : `cl_${idx}`,
-            text: typeof c?.text === 'string' ? c.text : '',
-            done: typeof c?.done === 'boolean' ? c.done : false,
-          }))
+              id: typeof c?.id === 'string' ? c.id : `cl_${idx}`,
+              text: typeof c?.text === 'string' ? c.text : '',
+              done: typeof c?.done === 'boolean' ? c.done : false,
+            }))
           : [];
         const safeChecklist =
           existingChecklist.length > 0
@@ -530,8 +646,22 @@ export default function TodoNoteModal({
         setTimeout(updateHints, 0);
       }
     };
-    fetchTodoData();
-  }, [taskId, todoId, updateHints]);
+
+    if (isOpen) {
+      setInitialLoad(true);
+      void fetchTodoData();
+    }
+  }, [isOpen, taskId, todoId, todoText, updateHints]);
+
+  // ★ 初期ロード完了後、内容があるならプレビュー / なければ編集 をデフォルトにする
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialLoad) return;
+    if (modeInitialized) return;
+
+    setIsPreview(hasContent); // 内容がある => プレビュー, ない => 編集
+    setModeInitialized(true);
+  }, [isOpen, initialLoad, modeInitialized, hasContent]);
 
   // 参考URL：編集モードでは最低1行を保証
   useEffect(() => {
@@ -662,7 +792,7 @@ export default function TodoNoteModal({
     return () => window.removeEventListener('resize', onResize);
   }, [resizeTextarea]);
 
-  // 画像選択
+  // 画像選択（編集時のみ）
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const user = auth.currentUser;
     if (!user) {
@@ -766,14 +896,10 @@ export default function TodoNoteModal({
 
   // URL変更時：ラベル未設定なら候補補完
   const changeUrl = (idx: number, val: string) => {
-    // URLを「前の値」を参照しつつ更新
     setReferenceUrls((prevUrls) => {
       const prevUrl = prevUrls[idx] ?? '';
       const nextUrls = prevUrls.map((u, i) => (i === idx ? val : u));
 
-      // ラベル更新方針：
-      //  - いまのラベルが「空」または「前回URLからの自動ラベル」と一致 ⇒ 自動追従させる
-      //  - それ以外（ユーザーが手で編集したとみなせる） ⇒ ラベルは触らない
       setReferenceLabels((prevLabels) => {
         const current = (prevLabels[idx] ?? '').trim();
         const prevAuto = suggestLabelFromUrl(prevUrl).trim();
@@ -791,7 +917,6 @@ export default function TodoNoteModal({
   };
 
   const onUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
-    // ★ IME変換中（全角確定Enter）は無視
     if ((e.nativeEvent as any).isComposing) return;
     if ((e.nativeEvent as any).keyCode === 229) return;
 
@@ -799,7 +924,6 @@ export default function TodoNoteModal({
     e.preventDefault();
     addUrlAt(idx);
   };
-
 
   /* =========================
    *  バリデーション（保存時）
@@ -836,15 +960,13 @@ export default function TodoNoteModal({
     return !(hasUrlError || hasShopError || hasTimeError);
   }, [referenceUrls, category, price, quantity, unit, comparePrice, timeStart, timeEnd]);
 
-  // 保存
+  // 保存（編集時のみ使う想定）
   const handleSave = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    setErrorsShown(true); // 保存押下で初めてエラー表示
+    setErrorsShown(true);
     const okCommon = runValidation();
-
-    // ✅ 料理カテゴリのレシピUI/バリデーション呼び出しは一旦撤去
     if (!okCommon) return;
 
     setIsSaving(true);
@@ -897,9 +1019,11 @@ export default function TodoNoteModal({
         memo,
         price: Number.isFinite(appliedPrice) && appliedPrice! > 0 ? appliedPrice : null,
         quantity: validQuantity,
-        referenceUrls: urlsForSave,           // URL
-        referenceUrlLabels: labelsForSave,    // ラベル
+        referenceUrls: urlsForSave,
+        referenceUrlLabels: labelsForSave,
       };
+
+      (payload as TodoUpdates & { text?: string }).text = todoTitle.trim();
 
       if (appliedUnit) (payload as { unit?: string }).unit = appliedUnit;
 
@@ -909,13 +1033,11 @@ export default function TodoNoteModal({
         (payload as { imageUrl?: string | null }).imageUrl = nextImage;
       }
 
-      // ✅ 料理カテゴリの recipe 保存は一旦触らない（既存データを上書きしない）
       if (category === '旅行') {
         (payload as { timeStart?: string | null }).timeStart = timeStart || null;
         (payload as { timeEnd?: string | null }).timeEnd = timeEnd || null;
       }
 
-      // ▼▼ チェックリストを保存（空行は除外） ▼▼ ※必須ではない
       (payload as { checklist?: ChecklistItem[] }).checklist = checklist
         .filter((c) => (c.text ?? '').trim() !== '')
         .map((c) => ({ id: c.id, text: c.text.trim(), done: !!c.done }));
@@ -977,18 +1099,6 @@ export default function TodoNoteModal({
     }
   };
 
-  const previewInitRef = useRef(false);
-
-  useEffect(() => {
-    if (!isOpen || initialLoad || previewInitRef.current) return;
-    if (hasMemo || hasContent) {
-      setIsPreview(true);
-    } else {
-      setIsPreview(false);
-    }
-    previewInitRef.current = true;
-  }, [isOpen, initialLoad, hasMemo, hasContent]);
-
   useEffect(() => {
     if (!isOpen) {
       if (previewUrl) {
@@ -997,8 +1107,7 @@ export default function TodoNoteModal({
       }
       setPendingUpload(null);
       setIsImageRemoved(false);
-      previewInitRef.current = false;
-      setErrorsShown(false); // 閉じるたびにエラー表示をリセット
+      setErrorsShown(false);
     }
   }, [isOpen, previewUrl]);
 
@@ -1068,20 +1177,21 @@ export default function TodoNoteModal({
   // --- 描画（SSR ガード） ---
   if (!mounted) return null;
 
-  // ★追加: ローディングフラグをモーダル内表示に切り替え
   const isLoading = initialLoad;
+
+  // ★ BaseModal のフッターは「編集時のみ」表示（プレビュー時は保存ボタン非表示）
+  const hideActions = isLoading || isPreview;
 
   return (
     <BaseModal
       isOpen={isOpen}
-      isSaving={isSaving || isLoading}   // ★追加: 読み込み中は操作不可
+      isSaving={isSaving || isLoading}
       saveComplete={saveComplete}
       onClose={onClose}
       onSaveClick={handleSave}
       saveLabel={saveLabel}
-      hideActions={isLoading}            // ★追加: 読み込み中はアクション非表示
+      hideActions={hideActions}
     >
-      {/* ★追加: 同一モーダル内でオーバーレイ＋本文フェード */}
       <div className="relative">
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
@@ -1099,24 +1209,65 @@ export default function TodoNoteModal({
           className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
           style={{ minHeight: 240 }}
         >
-          {/* ヘッダー */}
-          <div className="flex items-start justify-between mr-1">
-            <h1 className="text-2xl font-bold text-gray-800 mr-3 break-words">{todoText}</h1>
-            {(hasContent) && (
+          {/* ヘッダー（閉じる + 編集/プレビュー切替は「非活性ではなく非表示で切替」） */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              {isPreview ? (
+                <h2 className="text-2xl font-bold text-gray-800 break-words">
+                  {todoTitle.trim() ? todoTitle : '（未入力）'}
+                </h2>
+              ) : (
+                <input
+                  value={todoTitle}
+                  onChange={(e) => setTodoTitle(e.target.value)}
+                  placeholder="TODO名を入力"
+                  className="w-full text-2xl font-bold text-gray-800 bg-transparent border-b border-gray-200 focus:outline-none focus:border-blue-500 pb-1"
+                  aria-label="TODO名"
+                />
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isPreview ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPreview(false);
+                    setErrorsShown(false);
+                  }}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                  aria-label="編集に切り替える"
+                >
+                  編集
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPreview(true);
+                    setErrorsShown(false);
+                  }}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                  aria-label="プレビューに切り替える"
+                >
+                  プレビュー
+                </button>
+              )}
+
+              {/* ★ 重要：プレビュー時でも必ず閉じられるよう、独自の閉じるボタンを常時表示 */}
               <button
                 type="button"
-                onClick={() => setIsPreview((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 active:scale-[0.98] transition flex-shrink-0"
-                aria-pressed={isPreview}
-                aria-label={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
-                title={isPreview ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
+                onClick={onClose}
+                className="w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100"
+                aria-label="閉じる"
+                title="閉じる"
               >
-                {isPreview ? (<><Pencil size={16} /><span>編集</span></>) : (<><Eye size={16} /><span>プレビュー</span></>)}
+                <X size={18} />
               </button>
-            )}
+            </div>
           </div>
 
-          {/* 画像挿入UI */}
+          {/* 画像挿入UI（編集時のみ操作可能） */}
           <div className="mb-3">
             {!isPreview && (
               <div className="flex items-center gap-3">
@@ -1237,7 +1388,6 @@ export default function TodoNoteModal({
                           <SortableUrlRow key={urlIds[idx] ?? `url_k_${idx}`} id={urlIds[idx] ?? `url_id_${idx}`}>
                             {({ attributes, listeners }) => (
                               <>
-                                {/* ドラッグハンドル */}
                                 <button
                                   type="button"
                                   className="col-span-1 flex items-center justify-center pt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
@@ -1248,12 +1398,10 @@ export default function TodoNoteModal({
                                   <GripVertical size={16} />
                                 </button>
 
-                                {/* 行番号 */}
                                 <div className="col-span-1 pt-1 text-sm text-gray-500 select-none text-center">
                                   {idx + 1}.
                                 </div>
 
-                                {/* 入力（URL） */}
                                 <div className="col-span-9 flex items-center gap-2 min-w-0">
                                   <input
                                     ref={(el) => { urlRefs.current[idx] = el; }}
@@ -1268,7 +1416,6 @@ export default function TodoNoteModal({
                                   />
                                 </div>
 
-                                {/* 削除 */}
                                 {referenceUrls.length >= 2 && (
                                   <button
                                     type="button"
@@ -1280,7 +1427,6 @@ export default function TodoNoteModal({
                                   </button>
                                 )}
 
-                                {/* URL エラー（対象入力直下） */}
                                 {errorsShown && urlErrors[idx] && (
                                   <div className="col-span-12">
                                     <p id={`url-err-${idx}`} className="mt-1 text-xs text-red-500">
@@ -1303,6 +1449,7 @@ export default function TodoNoteModal({
                     .filter((p) => p.url !== '')
                     .map((p, i) => (
                       <li key={`pv_url_${i}`} className="mb-1 ml-2">
+                        {/* ★ プレビュー時もリンククリック可能 */}
                         <a href={p.url} target="_blank" rel="noreferrer" className="underline break-all">
                           {p.url}
                         </a>
@@ -1395,7 +1542,6 @@ export default function TodoNoteModal({
                                   );
                                 }}
                                 onKeyDown={(e) => {
-                                  // ★ IME変換中は Enter を無視
                                   if ((e.nativeEvent as any).isComposing) return;
                                   if ((e.nativeEvent as any).keyCode === 229) return;
 
@@ -1417,7 +1563,6 @@ export default function TodoNoteModal({
                                     setPendingCheckFocusIndex(newIndex);
                                   }
                                 }}
-
                                 placeholder="項目を入力（Enterで下に追加）"
                                 className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-md focus:outline-none focus:border-blue-500"
                               />
@@ -1453,14 +1598,15 @@ export default function TodoNoteModal({
                   {checklist
                     .filter((c) => (c.text ?? '').trim() !== '')
                     .map((c) => {
-                      const isSaving = !!savingById[c.id];
+                      const isSavingOne = !!savingById[c.id];
                       return (
                         <li key={`pv_cl_${c.id}`} className="flex items-center gap-3 text-md ml-1">
+                          {/* ★ プレビュー時もチェック切替可能 */}
                           <input
                             type="checkbox"
                             className="scale-130 accent-blue-500 cursor-pointer"
                             checked={!!c.done}
-                            disabled={isSaving}
+                            disabled={isSavingOne}
                             onChange={(e) => {
                               const next = e.currentTarget.checked;
                               void handlePreviewToggleChecklist(c.id, next);
@@ -1469,10 +1615,10 @@ export default function TodoNoteModal({
                           />
                           <button
                             type="button"
-                            className={`text-left break-words ${c.done ? 'line-through text-gray-400' : 'text-gray-800'} ${isSaving ? 'opacity-60' : 'hover:opacity-80'} transition`}
+                            className={`text-left break-words ${c.done ? 'line-through text-gray-400' : 'text-gray-800'} ${isSavingOne ? 'opacity-60' : 'hover:opacity-80'} transition`}
                             onClick={() => void handlePreviewToggleChecklist(c.id, !c.done)}
-                            disabled={isSaving}
-                            aria-disabled={isSaving}
+                            disabled={isSavingOne}
+                            aria-disabled={isSavingOne}
                             title="クリックでチェックを切り替え"
                           >
                             {c.text}
@@ -1586,30 +1732,37 @@ export default function TodoNoteModal({
           {/* 買い物カテゴリ */}
           {category === '買い物' && (
             <>
-              <ShoppingDetailsEditor
-                price={price}
-                quantity={quantity}
-                unit={unit}
-                compareMode={compareMode}
-                comparePrice={comparePrice}
-                compareQuantity={compareQuantity}
-                onChangePrice={setPrice}
-                onChangeQuantity={setQuantity}
-                onChangeUnit={setUnit}
-                onToggleCompareMode={(next) => setCompareMode(next)}
-                onChangeComparePrice={setComparePrice}
-                onChangeCompareQuantity={setCompareQuantity}
-                animatedDifference={animatedDifference}
-                animationComplete={diffAnimationComplete}
-                isPreview={isPreview}
-                onRequestEditMode={() => setIsPreview(false)}
-              />
-              {errorsShown && (shoppingErrors.price || shoppingErrors.quantity || shoppingErrors.unit) && (
-                <ul className="mt-2 text-xs text-red-500 list-disc list-inside">
-                  {shoppingErrors.price && <li>{shoppingErrors.price}</li>}
-                  {shoppingErrors.quantity && <li>{shoppingErrors.quantity}</li>}
-                  {shoppingErrors.unit && <li>{shoppingErrors.unit}</li>}
-                </ul>
+              {isPreview ? (
+                // ★重要：プレビュー時は ShoppingDetailsEditor を使わず、完全に静的表示（価格/数量編集不可）
+                shoppingPreview
+              ) : (
+                <>
+                  <ShoppingDetailsEditor
+                    price={price}
+                    quantity={quantity}
+                    unit={unit}
+                    compareMode={compareMode}
+                    comparePrice={comparePrice}
+                    compareQuantity={compareQuantity}
+                    onChangePrice={setPrice}
+                    onChangeQuantity={setQuantity}
+                    onChangeUnit={setUnit}
+                    onToggleCompareMode={(next) => setCompareMode(next)}
+                    onChangeComparePrice={setComparePrice}
+                    onChangeCompareQuantity={setCompareQuantity}
+                    animatedDifference={animatedDifference}
+                    animationComplete={diffAnimationComplete}
+                    isPreview={false}
+                    onRequestEditMode={() => setIsPreview(false)}
+                  />
+                  {errorsShown && (shoppingErrors.price || shoppingErrors.quantity || shoppingErrors.unit) && (
+                    <ul className="mt-2 text-xs text-red-500 list-disc list-inside">
+                      {shoppingErrors.price && <li>{shoppingErrors.price}</li>}
+                      {shoppingErrors.quantity && <li>{shoppingErrors.quantity}</li>}
+                      {shoppingErrors.unit && <li>{shoppingErrors.unit}</li>}
+                    </ul>
+                  )}
+                </>
               )}
             </>
           )}
