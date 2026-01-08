@@ -19,10 +19,10 @@ function parsePositiveNumber(raw: string): number | null {
 }
 
 /**
- * 小数第2位まで丸め
+ * 四捨五入（整数）
  */
-function round2(n: number) {
-  return Math.round(n * 100) / 100;
+function roundInt(n: number) {
+  return Math.round(n);
 }
 
 export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: Variant }) {
@@ -79,7 +79,7 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
             <span className="text-sm font-semibold text-gray-800">
               {calc.aUnit === null
                 ? '—'
-                : `${round2(calc.aUnit).toLocaleString()} 円 / 1単位`}
+                : `${roundInt(calc.aUnit).toLocaleString()} 円 / 1単位`}
             </span>
           </div>
         </div>
@@ -116,13 +116,13 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-700 text-white text-xs font-semibold">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white text-xs font-semibold">
               B
             </span>
             <span className="text-sm font-semibold text-gray-800">
               {calc.bUnit === null
                 ? '—'
-                : `${round2(calc.bUnit).toLocaleString()} 円 / 1単位`}
+                : `${roundInt(calc.bUnit).toLocaleString()} 円 / 1単位`}
             </span>
           </div>
         </div>
@@ -141,7 +141,7 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
 
           <label className="space-y-1">
             <div className="text-[11px] text-gray-600">
-              内容量（ g / ml / etc...）
+              内容量（ g / ml / 個 / etc...）
             </div>
             <input
               inputMode="decimal"
@@ -160,13 +160,12 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
         calc.winner !== null && (
           <div className="text-center text-base text-gray-800">
             {calc.winner === 'same' ? (
-              // 単価が同じ場合（アニメーションなし）
+              // 単価が同じ場合
               <div className="flex flex-col items-center gap-1 mt-5 mb-8 text-gray-600">
                 <div className="font-semibold">単価は同じです</div>
-                {/* <div className="text-sm">
-                  （どちらも{' '}
-                  {round2(calc.aUnit!).toLocaleString()} 円 / 1単位）
-                </div> */}
+                <div className="text-sm">
+                  （どちらも {roundInt(calc.aUnit).toLocaleString()} 円 / 1単位）
+                </div>
               </div>
             ) : (
               // お得表示（アニメーションあり）
@@ -182,12 +181,12 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
                     className={`w-5 h-5 ${
                       calc.winner === 'A'
                         ? 'text-blue-500'
-                        : 'text-green-500'
+                        : 'text-red-500'
                     }`}
                   />
                   {calc.winner === 'A' ? 'Aのほうが' : 'Bのほうが'}
                   <span className="text-2xl">
-                    {round2(calc.diffPerUnit).toLocaleString()}
+                    {roundInt(calc.diffPerUnit).toLocaleString()}
                   </span>
                   円 / 1単位 お得です！
                 </motion.div>
