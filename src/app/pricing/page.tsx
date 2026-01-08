@@ -7,6 +7,7 @@ import Header from '@/components/common/Header';
 import { isPlayBillingAvailable, purchaseSubscription } from '@/lib/playBilling';
 import { activatePremiumWithGooglePlay, getUserProfile } from '@/lib/firebaseUtils';
 import { auth } from '@/lib/firebase';
+import { Capacitor } from '@capacitor/core';
 
 export default function PricingPage() {
   // Google Play Console で作成したサブスク用 Product ID
@@ -76,7 +77,9 @@ export default function PricingPage() {
 
     // ★追加：同意チェック（まずここで止める）
     if (!agree) {
-      setMessage('利用規約およびプライバシーポリシーへの同意が必要です。チェックをオンにしてください。');
+      setMessage(
+        '利用規約およびプライバシーポリシーへの同意が必要です。チェックをオンにしてください。'
+      );
       return;
     }
 
@@ -87,11 +90,27 @@ export default function PricingPage() {
       return;
     }
 
-    // Play Billing が使えない環境（ブラウザ / iOS など）は既存の Web 課金画面へ遷移
-    // ※ この遷移先側でも同意を求める場合は、subscribe側にも同意UIを残してください。
-    if (!playSupported) {
-      window.location.href = '/subscribe/premium';
-      return;
+    const isNative = Capacitor.isNativePlatform();
+
+    // ✅ ネイティブ（Androidアプリ）では Web課金へリダイレクトしない
+    if (isNative) {
+      if (!playSupported) {
+        setMessage(
+          'この端末では Google Play の課金が利用できません。\n' +
+            '・Play ストアからインストールしたアプリであること\n' +
+            '・内部テスト/クローズドテストの対象アカウントであること\n' +
+            '・端末に Google Play が入っていること\n' +
+            'をご確認ください。'
+        );
+        return;
+      }
+    } else {
+      // Play Billing が使えない環境（ブラウザ / iOS など）は既存の Web 課金画面へ遷移
+      // ※ この遷移先側でも同意を求める場合は、subscribe側にも同意UIを残してください。
+      if (!playSupported) {
+        window.location.href = '/subscribe/premium';
+        return;
+      }
     }
 
     setProcessingPremium(true);
