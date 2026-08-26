@@ -23,7 +23,7 @@ export const getUserProfile = async (uid: string) => {
  */
 export const createUserProfile = async (uid: string, name: string) => {
   const ref = doc(db, 'users', uid);
-  await setDoc(ref, { name, plan: 'free', createdAt: serverTimestamp() });
+  await setDoc(ref, { name, createdAt: serverTimestamp() });
 };
 
 /**

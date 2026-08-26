@@ -100,6 +100,7 @@ yaml
 
 1. Play Console に Android Publisher 権限のサービスアカウントをリンクする
 2. `firebase functions:secrets:set PLAY_DEVELOPER_SERVICE_ACCOUNT` に JSON を設定する
-3. `firebase deploy --only functions` で `verifyPlayPurchase` / `refreshPlaySubscription` / `syncPlaySubscriptionsDaily` をデプロイする
+3. `firebase deploy --only functions,firestore:rules` で Functions と Firestore ルールをデプロイする
+4. Storage ルール（`storage.rules`）はコンソールの現行ルールと差分を確認してから `firebase deploy --only storage` する
 
 ---
