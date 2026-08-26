@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
-// import AdCard from '@/components/home/parts/AdCard';
+import PremiumPromoCard from '@/components/ads/PremiumPromoCard';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { useUserUid } from '@/hooks/useUserUid';
@@ -307,7 +307,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const searchInputRef = useRef<HTMLInputElement>(null);
   const keyboardSummonerRef = useRef<HTMLInputElement>(null);
   const { profileImage, partnerImage } = useProfileImages();
-  const { isChecking } = useUserPlan();
+  const { plan, isChecking } = useUserPlan();
   const params = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -1414,7 +1414,7 @@ const toggleSelectionMode = useCallback(() => {
             })()}
           </motion.div>
         )}
-        {/* {!isLoading && !isChecking && plan === 'free' && <AdCard />} */}
+        {!isLoading && !isChecking && plan === 'free' && <PremiumPromoCard />}
 
         {/* 左下のフローティング列（虫眼鏡は右端） */}
         {!editTargetTask &&

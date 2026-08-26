@@ -45,7 +45,10 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
         {(pathname === '/profile' ||
           pathname === '/contact' ||
           pathname === '/task_manage' ||
-          pathname === '/delete-account') && (
+          pathname === '/delete-account' ||
+          pathname === '/pricing' ||
+          pathname === '/terms' ||
+          pathname === '/privacy') && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => {
@@ -103,6 +106,16 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
               >
                 <Mail size={16} />
                 お問い合わせ
+              </li>
+              <li
+                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                onClick={() => {
+                  setShowMenu(false);
+                  router.push('/pricing');
+                }}
+              >
+                <CheckCircle size={16} />
+                応援プラン
               </li>
               <li
                 className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"

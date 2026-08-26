@@ -41,3 +41,5 @@ export const resetTasksFallbackAt0545JST = onSchedule(
 );
 
 export { sendUpcomingTaskReminderPush } from './sendUpcomingTaskReminderPush';
+export { verifyPlayPurchase, refreshPlaySubscription } from './verifyPlayPurchase';
+export { syncPlaySubscriptionsDaily } from './syncPlaySubscriptions';

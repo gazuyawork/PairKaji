@@ -38,7 +38,17 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 /** 認証不要ページと同一（RequireAuth と揃える） */
-const PUBLIC_PATHS = new Set<string>(['/login', '/signup', '/verify', '/terms', '/privacy']);
+const PUBLIC_PATHS = new Set<string>([
+  '/login',
+  '/signup',
+  '/register',
+  '/verify',
+  '/terms',
+  '/privacy',
+  '/landing',
+  '/contact',
+  '/pricing',
+]);
 
 /* --------------------------- IndexedDB クリーナー --------------------------- */
 /** 破損時に Firebase 関連の IndexedDB を可能な範囲で削除（非同期・失敗しても続行）

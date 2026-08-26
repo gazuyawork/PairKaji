@@ -23,7 +23,7 @@ export const getUserProfile = async (uid: string) => {
  */
 export const createUserProfile = async (uid: string, name: string) => {
   const ref = doc(db, 'users', uid);
-  await setDoc(ref, { name, createdAt: serverTimestamp() });
+  await setDoc(ref, { name, plan: 'free', createdAt: serverTimestamp() });
 };
 
 /**
@@ -38,35 +38,4 @@ export const saveUserNameToFirestore = async (uid: string, name: string) => {
   });
 };
 
-/**
- * Google Play サブスク購入完了時に、ユーザーを Premium 状態として保存する。
- * - plan / subscriptionStatus / premiumType は共通のサブスク状態として利用
- * - googlePlay 系フィールドで、どのプロダクト・トークンかを保持
- *
- * @param params.uid FirestoreのドキュメントIDに対応するユーザーID（= Firebase Auth の uid）
- * @param params.productId Google Play 上の Product ID（例: "pairkaji_premium_monthly"）
- * @param params.purchaseToken Google Play の購入トークン（今は未使用なので省略可）
- */
-export const activatePremiumWithGooglePlay = async (params: {
-  uid: string;
-  productId: string;
-  purchaseToken?: string;
-}) => {
-  const { uid, productId, purchaseToken } = params;
-  const ref = doc(db, 'users', uid);
-
-  await setDoc(
-    ref,
-    {
-      plan: 'premium',
-      premiumType: 'google_play', // Stripe と区別するための種別
-      subscriptionStatus: 'active',
-      subscriptionId: purchaseToken ?? null, // 共通のサブスクIDとして流用（将来トークンを入れる想定）
-      googlePlayProductId: productId,
-      googlePlayPurchaseToken: purchaseToken ?? null,
-      googlePlayLinkedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-};
+// plan / 購読状態は Cloud Functions（verifyPlayPurchase）のみが更新する

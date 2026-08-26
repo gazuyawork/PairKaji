@@ -21,9 +21,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  updateDoc,
   type Query,
   type QuerySnapshot,
-  updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
 import type { Pair } from '@/types/Pair';
@@ -74,9 +74,6 @@ export default function ProfilePage() {
   const [pairDocId, setPairDocId] = useState<string | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
-  const [plan, setPlan] = useState<string>(''); // プラン
-  const [, setStripeCustomerId] = useState<string | null>(null);
-  const [isPortalOpening,] = useState(false);
 
   const uid = useUserUid();
 
@@ -173,20 +170,11 @@ export default function ProfilePage() {
 
           setName(data.name || (email ? email.split('@')[0] : '') || '');
 
-          if (data.plan) setPlan(data.plan);
-
           if (data.imageUrl) {
             setProfileImage(data.imageUrl);
             if (typeof window !== 'undefined') {
               localStorage.setItem('profileImage', data.imageUrl);
             }
-          }
-
-          // Stripe
-          if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
-            setStripeCustomerId(data.stripeCustomerId);
-          } else {
-            setStripeCustomerId(null);
           }
         } else {
           // プロフィールが無ければ作成
@@ -314,19 +302,11 @@ export default function ProfilePage() {
         const data = snap.data();
         if (!data) return;
 
-        if (typeof data.plan === 'string') setPlan(data.plan);
-
         if (typeof data.imageUrl === 'string') {
           setProfileImage(data.imageUrl);
           if (typeof window !== 'undefined') {
             localStorage.setItem('profileImage', data.imageUrl);
           }
-        }
-
-        if (typeof data.stripeCustomerId === 'string' && data.stripeCustomerId.trim() !== '') {
-          setStripeCustomerId(data.stripeCustomerId);
-        } else {
-          setStripeCustomerId(null);
         }
       },
       (error) => {
@@ -475,34 +455,6 @@ export default function ProfilePage() {
     });
   };
 
-  // ★★★ 修正（ConfirmModal化）: プラン解約（Freeへ戻す）の確認 → モーダル表示
-  const requestCancelPlan = async () => {
-    openConfirm({
-      title: 'プラン変更の確認',
-      message: '本当に Free プランに戻しますか？',
-      confirmLabel: 'Freeに戻す',
-      onConfirm: async () => {
-        const user = auth.currentUser;
-        if (!user) {
-          toast.error('ユーザー情報が取得できません');
-          return;
-        }
-
-        try {
-          await updateDoc(doc(db, 'users', user.uid), {
-            plan: 'free',
-          });
-          toast.success('プランをFreeに戻しました');
-          setPlan('free');
-        } catch (err) {
-          console.error('[プラン解約エラー]', err);
-          toast.error('プラン変更に失敗しました');
-        }
-      },
-    });
-  };
-
-  // ===== Render =====
   return (
     <div className="flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
       <Header title="Setting" />
@@ -537,7 +489,6 @@ export default function ProfilePage() {
               inviteCode={inviteCode}
               pairDocId={pairDocId}
               onApprovePair={handleApprovePair}
-              // ★★★ 変更：confirm() を使わず ConfirmModal を起動する関数を渡す
               onRejectPair={requestRejectPair}
               onCancelInvite={requestCancelInvite}
               onSendInvite={handleSendInvite}
@@ -546,33 +497,17 @@ export default function ProfilePage() {
               isRemoving={isRemoving}
             />
 
-            {uid && (
-                <SubscriptionButton userId={uid} />
-            )}
+            {uid && <SubscriptionButton userId={uid} />}
 
             <section className="">
               {uid && <PushToggle uid={uid} />}
             </section>
 
-            {plan !== 'free' && (
-              <div className="flex flex-col items-center gap-2">
-                <button
-                  onClick={handleOpenStripePortal}
-                  disabled={isPortalOpening}
-                  className="mt-4 text-indigo-600 py-2 px-4 rounded transition text-xs underline decoration-indigo-600 disabled:opacity-60"
-                >
-                  {isPortalOpening ? '開いています…' : 'サブスクリプションを管理（ポータル）'}
-                </button>
-
-                {/* ★★★ 変更：confirm() を使わず ConfirmModal を起動する */}
-                <button
-                  onClick={requestCancelPlan}
-                  className="text-gray-400 py-2 px-4 rounded transition text-[11px] underline decoration-gray-400"
-                >
-                  （開発用）強制的にFreeに戻す
-                </button>
-              </div>
-            )}
+            <div className="text-center">
+              <Link href="/pricing" className="text-xs text-indigo-600 underline">
+                応援プランの説明
+              </Link>
+            </div>
 
             <div className="text-center mt-auto">
               <Link
@@ -587,11 +522,9 @@ export default function ProfilePage() {
 
       </main>
 
-      {/* 既存の編集モーダル */}
       <EmailEditModal open={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} />
       <PasswordEditModal open={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} />
 
-      {/* ★★★ 追加：共通 ConfirmModal（キャンセルボタンを有効にしてUX向上） */}
       <ConfirmModal
         isOpen={confirmOpen}
         title={confirmTitle}
@@ -602,18 +535,7 @@ export default function ProfilePage() {
         cancelLabel="キャンセル"
         isProcessing={confirmProcessing}
       />
-
-
-
-
-
-
     </div>
   );
 }
 
-// ★★★ 既存：Stripeカスタマーポータル
-async function handleOpenStripePortal(this: void) {
-  // NOTE: 関数式をコンポーネント外に置く構造を維持（既存構造を壊さない）
-  // 実運用ではコンポーネント内の状態に依存するため、上位の onClick 内で実装されています。
-}

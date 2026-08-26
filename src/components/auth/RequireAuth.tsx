@@ -12,7 +12,17 @@ import { auth } from '@/lib/firebase';
 type Props = { children: React.ReactNode };
 
 /** 認証不要ページ（必要に応じて追加してください） */
-const PUBLIC_PATHS = new Set<string>(['/login', '/signup', '/verify', '/terms', '/privacy']);
+const PUBLIC_PATHS = new Set<string>([
+  '/login',
+  '/signup',
+  '/register',
+  '/verify',
+  '/terms',
+  '/privacy',
+  '/landing',
+  '/contact',
+  '/pricing',
+]);
 
 export default function RequireAuth({ children }: Props) {
   const pathname = usePathname();

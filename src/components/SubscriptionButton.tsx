@@ -1,66 +1,184 @@
 'use client';
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'react-hot-toast';
-import { motion } from 'framer-motion';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { auth } from '@/lib/firebase';
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import {
+  fetchSubscriptionProduct,
+  isNativeMobile,
+  openManageSubscriptions,
+  purchaseSubscription,
+  restore,
+  extractPurchaseToken,
+  getNativePurchases,
+  findPurchaseTokenFromList,
+  verifyPurchaseOnServer,
+  syncEntitlementWithServer,
+} from '@/lib/iap/nativePurchases';
 
 type Props = {
   userId: string;
-  productType?: 'inapp' | 'subs';
 };
 
-/**
- * Web 版専用のサブスクリプションボタン。
- *
- * - 既存の Props 形（userId, productType）はそのまま維持しています。
- * - クリック時に一旦トーストを表示し、料金プラン画面（例: /pricing）へ遷移します。
- *   ※ ルート名はプロジェクトの構成に合わせて変更してください。
- */
-export default function SubscriptionButton({
-  userId,
-  productType = 'subs',
-}: Props) {
-  const router = useRouter();
+export default function SubscriptionButton({ userId }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [supported, setSupported] = useState(true);
+  const [priceText, setPriceText] = useState('');
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [consentProcessing, setConsentProcessing] = useState(false);
+  const { plan } = useUserPlan();
+  const active = plan === 'premium';
 
-  const handleClick = async () => {
-    console.log('[SubscriptionButton] clicked (Web)', {
-      userId,
-      productType,
-    });
+  const canRender = useMemo(() => isNativeMobile(), []);
+  void userId;
 
-    // ここで Stripe 決済など Web 用の購読処理に接続する想定
-    toast('プラン選択画面に移動します。');
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const product = await fetchSubscriptionProduct();
+      const price = String(product?.priceString ?? '');
+      setPriceText(price);
+      await syncEntitlementWithServer();
+    } catch (e: unknown) {
+      console.error(e);
+      setSupported(false);
+      const message = e instanceof Error ? e.message : '課金情報の取得に失敗しました';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    // TODO: 必要に応じて遷移先を変更してください
-    router.push('/pricing');
-  };
+  useEffect(() => {
+    if (!canRender) return;
+    void refresh();
+  }, [canRender, refresh]);
+
+  const onBuy = useCallback(() => {
+    if (!auth.currentUser) {
+      toast.error('ログイン情報が取得できません');
+      return;
+    }
+    setConsentOpen(true);
+  }, []);
+
+  const doPurchaseWithConsent = useCallback(async () => {
+    setConsentProcessing(true);
+    setLoading(true);
+    try {
+      const tx = await purchaseSubscription();
+      const token = extractPurchaseToken(tx) ?? findPurchaseTokenFromList(await getNativePurchases());
+      if (!token) {
+        throw new Error('購入は完了しましたが、検証用トークンを取得できませんでした。復元をお試しください。');
+      }
+      const { entitled } = await verifyPurchaseOnServer(token);
+      toast.success(entitled ? '応援プランが有効になりました' : '購入状態を確認できませんでした');
+    } catch (e: unknown) {
+      console.error(e);
+      const message = e instanceof Error ? e.message : '購入に失敗しました';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+      setConsentProcessing(false);
+      setConsentOpen(false);
+    }
+  }, []);
+
+  const onRestore = useCallback(async () => {
+    setLoading(true);
+    try {
+      await restore();
+      const { entitled } = await syncEntitlementWithServer();
+      toast.success(entitled ? '購入を復元しました' : '復元できる購入が見つかりませんでした');
+    } catch (e: unknown) {
+      console.error(e);
+      const message = e instanceof Error ? e.message : '復元に失敗しました';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const onManage = useCallback(async () => {
+    try {
+      await openManageSubscriptions();
+    } catch (e: unknown) {
+      console.error(e);
+      const message = e instanceof Error ? e.message : '管理画面を開けませんでした';
+      toast.error(message);
+    }
+  }, []);
+
+  if (!canRender) return null;
 
   return (
-    <motion.div
-      className="min-h-[180px] bg-white shadow rounded-2xl px-8 py-6 space-y-4 mx-auto w-full max-w-xl"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
-    >
-      <p className="text-[#5E5E5E] font-semibold">応援プラン</p>
-
-      <p className="text-sm text-gray-600 leading-relaxed">
-        PairKajiは、すべての機能を無料でご利用いただけます。<br />
-        もし役に立っていると感じたら、月100円から開発継続を応援してもらえると嬉しいです。
+    <section className="rounded-xl bg-white/70 border border-black/10 p-4 space-y-3">
+      <div className="text-sm font-semibold">応援プラン（月額）</div>
+      <p className="text-xs text-gray-600">
+        開発継続の応援と、アプリ内の案内表示の非表示に使われます。解約は Google Play から行えます。
       </p>
 
-      <button
-        onClick={handleClick}
-        className="w-full rounded-md bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-2 rounded shadow text-sm transition hover:shadow-xl text-center disabled:opacity-50"
-      >
-        💚 応援する（¥100 / 月）
-      </button>
+      {!supported ? (
+        <div className="text-sm text-red-600">この端末では Google Play の課金が利用できません。</div>
+      ) : (
+        <>
+          <div className="text-sm">
+            状態：<span className="font-semibold">{active ? '加入中' : '未加入'}</span>
+            {priceText ? <span className="text-gray-600">（{priceText}）</span> : null}
+          </div>
 
-      <p className="text-xs text-gray-500 text-center">
-        ※ 応援しなくても、機能制限はありません
-      </p>
-    </motion.div>
+          <div className="flex flex-wrap gap-2">
+            {!active && (
+              <button
+                type="button"
+                onClick={onBuy}
+                disabled={loading}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-60"
+              >
+                応援する
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onRestore}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm disabled:opacity-60"
+            >
+              購入を復元
+            </button>
+            <button
+              type="button"
+              onClick={onManage}
+              className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm"
+            >
+              定期購入を管理
+            </button>
+          </div>
+        </>
+      )}
+
+      <ConfirmModal
+        isOpen={consentOpen}
+        title="定期購入の同意"
+        message={
+          <div className="text-left space-y-2">
+            <p className="font-semibold">定期購入の確認</p>
+            <p className="text-sm">
+              Google Play の定期購入（自動更新）です。購入後は次回更新日まで利用できます。
+            </p>
+            <p className="text-sm">
+              解約は Google Play の「定期購入」から行えます。解約しても有効期限までは利用可能です。
+            </p>
+          </div>
+        }
+        onConfirm={doPurchaseWithConsent}
+        onCancel={() => setConsentOpen(false)}
+        confirmLabel="同意して購入する"
+        cancelLabel="キャンセル"
+        isProcessing={consentProcessing}
+      />
+    </section>
   );
-
 }

@@ -13,7 +13,8 @@ dependencies {
     implementation project(':capacitor-firebase-authentication')
     implementation project(':capacitor-haptics')
     implementation project(':capacitor-local-notifications')
-
+    implementation project(':capgo-native-purchases')
+    implementation "com.android.billingclient:billing:7.1.1"
 }
 
 

@@ -26,8 +26,8 @@ import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
 import { useView } from '@/context/ViewContext';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
-// import AdCard from '@/components/home/parts/AdCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
+import PremiumPromoCard from '@/components/ads/PremiumPromoCard';
 import { useUserUid } from '@/hooks/useUserUid';
 import SortableTaskRow from '@/components/todo/parts/SortableTaskRow';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
@@ -166,7 +166,7 @@ export default function TodoView() {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
-  useUserPlan();
+  const { plan, isChecking } = useUserPlan();
   const uid = useUserUid();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -530,7 +530,7 @@ export default function TodoView() {
             );
           })()}
 
-          {/* {!isLoading && !isChecking && plan === 'free' && <AdCard />} */}
+          {!isChecking && plan === 'free' && <PremiumPromoCard />}
         </main>
       </div>
 

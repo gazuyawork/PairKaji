@@ -94,4 +94,12 @@ yaml
 - セキュリティルールは Firestore の `userId`, `userIds` に基づいて制御
 - 開発中の未使用コンポーネントは `/src/components/common` または別途 `_archive` に整理予定
 
+### Android 課金（Google Play）
+
+購入の有効化はクライアントから `plan` を書かず、Cloud Functions が Play Developer API で検証します。
+
+1. Play Console に Android Publisher 権限のサービスアカウントをリンクする
+2. `firebase functions:secrets:set PLAY_DEVELOPER_SERVICE_ACCOUNT` に JSON を設定する
+3. `firebase deploy --only functions` で `verifyPlayPurchase` / `refreshPlaySubscription` / `syncPlaySubscriptionsDaily` をデプロイする
+
 ---
