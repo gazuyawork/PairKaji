@@ -104,6 +104,11 @@ export function findPurchaseTokenFromList(purchases: unknown[]): string | null {
 
 export async function openManageSubscriptions(): Promise<void> {
   await NativePurchases.manageSubscriptions();
+  try {
+    await syncEntitlementWithServer();
+  } catch {
+    /* 管理画面から戻ったあとの再確認。失敗しても画面は Firestore 購読で後から追いつく */
+  }
 }
 
 export async function verifyPurchaseOnServer(purchaseToken: string): Promise<{ entitled: boolean }> {

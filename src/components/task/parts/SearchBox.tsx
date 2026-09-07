@@ -15,7 +15,7 @@ type Props = {
 const SearchBox = forwardRef<HTMLInputElement, Props>(({ value, onChange }, ref) => {
   return (
     <div
-      className="flex items-center gap-2 rounded-xl px-3 py-2
+        className="flex min-h-12 flex-1 items-center gap-2 rounded-xl px-3
 bg-gradient-to-b from-white to-gray-50
 border border-gray-200
 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
@@ -27,7 +27,7 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
         placeholder="キーワードを入力"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
+        className="min-h-12 flex-1 bg-transparent text-base outline-none text-[#5E5E5E] placeholder:text-gray-400"
         inputMode="search"
         autoCapitalize="none"
         autoCorrect="off"

@@ -101,23 +101,10 @@ export const resetCompletedTasks = async (): Promise<number> => {
     const skipped = raw.skipped === true;
 
     const completedAtDate = toDateSafe(raw.completedAt, 'completedAt');
-    const skippedAtDate = toDateSafe(raw.skippedAt, 'skippedAt');
-    const updatedAtDate = toDateSafe(raw.updatedAt, 'updatedAt');
 
     const taskRef = doc(db, 'tasks', docSnap.id);
 
     const isDoneToday = !!(completedAtDate && isToday(completedAtDate));
-
-    let isSkippedToday = false;
-    if (skipped) {
-      if (skippedAtDate) {
-        isSkippedToday = isToday(skippedAtDate);
-      } else if (updatedAtDate) {
-        isSkippedToday = isToday(updatedAtDate);
-      } else {
-        isSkippedToday = true;
-      }
-    }
 
     let isScheduledToday = false;
     if (period === '毎日') {
@@ -130,7 +117,7 @@ export const resetCompletedTasks = async (): Promise<number> => {
     let shouldReset = false;
     if (period === '毎日' || period === '週次') {
       if (isScheduledToday) {
-        if ((completedAtDate && !isDoneToday) || (skipped && !isSkippedToday)) {
+        if ((completedAtDate && !isDoneToday) || skipped) {
           shouldReset = true;
         }
       }

@@ -62,9 +62,13 @@ export default function ServiceWorkerInit() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // ✅ Capacitor では SW を完全無効化（white screen / update事故 回避）
-    if (isCapacitorRuntime()) {
-      console.log('[ServiceWorkerInit] skipped on Capacitor runtime');
+    const isLocalDev =
+      process.env.NODE_ENV !== 'production' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    // 開発中の SW は古いキャッシュでリダイレクトループを起こす
+    if (isCapacitorRuntime() || isLocalDev) {
       void cleanupServiceWorkersForCapacitor();
       return;
     }

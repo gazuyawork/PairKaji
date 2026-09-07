@@ -4,14 +4,15 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { resolveAuthUser } from '@/lib/authSession';
 
 type Props = { children: React.ReactNode };
 
-/** 認証不要ページ（必要に応じて追加してください） */
+/** 認証不要ページ */
 const PUBLIC_PATHS = new Set<string>([
   '/login',
   '/signup',
@@ -26,45 +27,39 @@ const PUBLIC_PATHS = new Set<string>([
 
 export default function RequireAuth({ children }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
+  const settledRef = useRef(false);
 
-  const [, setReady] = useState(false);
-  const [, setAuthed] = useState<boolean>(false);
-
-  // アンマウント後の setState 防止
-  const mountedRef = useRef(true);
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
+    const isPublic = PUBLIC_PATHS.has(pathname || '');
+    let cancelled = false;
+    let unsub: (() => void) | undefined;
+
+    const goLogin = () => {
+      if (isPublic) return;
+      const next = encodeURIComponent(pathname || '/main');
+      router.replace(`/login?next=${next}`);
     };
-  }, []);
 
-  // onAuthStateChanged でログイン状態を監視
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      const isPublic = PUBLIC_PATHS.has(pathname || '');
-
+    void (async () => {
+      const user = await resolveAuthUser();
+      if (cancelled) return;
+      settledRef.current = true;
       if (!user) {
-        if (!isPublic) {
-          // 未ログインならログイン画面へ
-          // ★変更: reauth=1 を付けない
-          window.location.replace(`/login?next=${encodeURIComponent(pathname || '/')}`);
-          return;
-        }
-        if (mountedRef.current) {
-          setAuthed(false);
-          setReady(true);
-        }
-      } else {
-        if (mountedRef.current) {
-          setAuthed(true);
-          setReady(true);
-        }
+        goLogin();
+        return;
       }
-    });
-    return () => unsubscribe();
-  }, [pathname]);
+      unsub = onAuthStateChanged(auth, (nextUser) => {
+        if (!settledRef.current || cancelled) return;
+        if (!nextUser) goLogin();
+      });
+    })();
 
-  // （従来通り）認証確認中でも children を描画
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [pathname, router]);
+
   return <>{children}</>;
 }

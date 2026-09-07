@@ -3,38 +3,39 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { resolveAuthUser } from '@/lib/authSession';
 import Image from 'next/image';
 
-// 全体の演出時間（必要に応じて調整）
-const DURATION_MS = 900; // 回転→拡大→フェードアウトの総時間
+const DURATION_MS = 450;
 
 export default function QuickSplash() {
   const router = useRouter();
-  const destRef = useRef<string>('/login');
 
   useEffect(() => {
-    // ヘッダー/フッターのチラ見え防止 & スクロール抑止
     const html = document.documentElement;
     html.setAttribute('data-splash', '1');
     html.style.overflow = 'hidden';
     if (document.body) document.body.style.overflow = 'hidden';
 
-    // 行き先だけ先に決めておく（認証がまだなら後で上書きされる）
-    const unsub = onAuthStateChanged(auth, (user) => {
-      destRef.current = user ? '/main?skipQuickSplash=true' : '/login';
-      document.cookie = `pk_last_dest=${encodeURIComponent(destRef.current)}; Path=/; Max-Age=604800; SameSite=Lax`;
-    });
+    let cancelled = false;
+    const started = Date.now();
 
-    // アニメ終了直後に遷移
-    const t = setTimeout(() => router.replace(destRef.current), DURATION_MS + 30);
+    void (async () => {
+      const user = await resolveAuthUser();
+      const dest = user ? '/main?skipQuickSplash=true' : '/login';
+      document.cookie = `pk_last_dest=${encodeURIComponent(dest)}; Path=/; Max-Age=604800; SameSite=Lax`;
+
+      const remain = DURATION_MS + 30 - (Date.now() - started);
+      if (remain > 0) {
+        await new Promise((r) => setTimeout(r, remain));
+      }
+      if (!cancelled) router.replace(dest);
+    })();
 
     return () => {
-      unsub();
-      clearTimeout(t);
+      cancelled = true;
       html.removeAttribute('data-splash');
       html.style.overflow = '';
       if (document.body) document.body.style.overflow = '';
@@ -60,22 +61,30 @@ export default function QuickSplash() {
         />
       </div>
 
-<style jsx>{`
-  @keyframes pk-spin-zoom-fade {
-    /* 前半：ゆっくり回転しながら少し拡大 */
-    0%   { transform: rotate(0deg)   scale(1);    opacity: 1;   filter: blur(0px); }
-    80%  { transform: rotate(360deg) scale(1.25); opacity: 0.98; filter: blur(0.2px); }
-
-    /* 中盤：静止して一拍置く */
-    90%  { transform: rotate(360deg) scale(1.3);  opacity: 0.9;  filter: blur(0.4px); }
-
-    /* 後半：ゆっくりふわっと消えていく（余韻） */
-    100% { transform: rotate(360deg) scale(1.9);  opacity: 0;    filter: blur(3px); }
-  }
-`}</style>
-
-
-
+      <style jsx>{`
+        @keyframes pk-spin-zoom-fade {
+          0% {
+            transform: rotate(0deg) scale(1);
+            opacity: 1;
+            filter: blur(0px);
+          }
+          80% {
+            transform: rotate(360deg) scale(1.25);
+            opacity: 0.98;
+            filter: blur(0.2px);
+          }
+          90% {
+            transform: rotate(360deg) scale(1.3);
+            opacity: 0.9;
+            filter: blur(0.4px);
+          }
+          100% {
+            transform: rotate(360deg) scale(1.9);
+            opacity: 0;
+            filter: blur(3px);
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -17,12 +17,71 @@ type ScheduleArgs = {
 
 let listenersInitialized = false;
 
+const NATIVE_NOTIFY_PREF_KEY = 'pairkaji_native_notify_enabled_v1';
+const NATIVE_TEST_NOTIFICATION_ID = 900001;
+
 function isNativePlatform(): boolean {
   try {
     return Capacitor.isNativePlatform();
   } catch {
     return false;
   }
+}
+
+export function isNativeAppPlatform(): boolean {
+  return isNativePlatform();
+}
+
+export function readNativeNotifyPref(): boolean {
+  try {
+    return localStorage.getItem(NATIVE_NOTIFY_PREF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeNativeNotifyPref(enabled: boolean): void {
+  try {
+    localStorage.setItem(NATIVE_NOTIFY_PREF_KEY, enabled ? '1' : '0');
+  } catch {
+    // noop
+  }
+}
+
+export async function isNativeNotificationGranted(): Promise<boolean> {
+  if (!isNativePlatform()) return false;
+  try {
+    const status = await LocalNotifications.checkPermissions();
+    return status.display === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+export async function requestNativeNotificationPermission(): Promise<boolean> {
+  if (!isNativePlatform()) return false;
+  try {
+    const current = await LocalNotifications.checkPermissions();
+    if (current.display === 'granted') return true;
+    const next = await LocalNotifications.requestPermissions();
+    return next.display === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+export async function scheduleNativeTestNotification(): Promise<void> {
+  if (!isNativePlatform()) return;
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: NATIVE_TEST_NOTIFICATION_ID,
+        title: 'PairKaji',
+        body: '通知を受け取ります',
+        schedule: { at: new Date(Date.now() + 1500) },
+      },
+    ],
+  });
 }
 
 /**

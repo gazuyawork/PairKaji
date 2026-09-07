@@ -3,37 +3,19 @@
 export const dynamic = 'force-dynamic';
 
 import type React from 'react';
-import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react'; // ★★★ 変更：useCallback を追加
+import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
 import TaskCalendar from '@/components/home/parts/TaskCalendar';
-import type { Task } from '@/types/Task';
-import { auth, db } from '@/lib/firebase';
-import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PairInviteCard from '@/components/home/parts/PairInviteCard';
 import FlaggedTaskAlertCard from '@/components/home/parts/FlaggedTaskAlertCard';
+import FirstSharedTaskCard from '@/components/home/parts/FirstSharedTaskCard';
 import { useUserPlan } from '@/hooks/useUserPlan';
-import { useUserUid } from '@/hooks/useUserUid';
-import OnboardingModal from '@/components/common/OnboardingModal';
+import { isNativeMobile } from '@/lib/iap/nativePurchases';
+import { useHousehold } from '@/context/HouseholdContext';
+import { taskShowsOnTodoTab } from '@/lib/checklistTask';
 import PremiumPromoCard from '@/components/ads/PremiumPromoCard';
-// import CookingTimerCard from '@/components/home/parts/CookingTimerCard';
-
-// 活動サマリー
-import HomeDashboardCard from '@/components/home/parts/HomeDashboardCard';
-import PartnerCompletedTasksCard from '@/components/home/parts/PartnerCompletedTasksCard';
-
-import { startOfWeek, endOfWeek, parseISO, isWithinInterval } from 'date-fns';
-
-import type { FirestoreTask } from '@/types/Task';
-
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from 'firebase/firestore';
+import Link from 'next/link';
 
 import { toast } from 'sonner';
 
@@ -54,11 +36,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// ★★★ 追加インポート：TODO ショートカットカード ★★★
-import TodoShortcutsCard from '@/components/home/parts/TodoShortcutsCard';
-
-// ★★★ 追加：単価比較カード ★★★
 import UnitPriceCompareToolCard from '@/components/home/parts/UnitPriceCompareToolCard';
+import PartnerCompletedTasksCard from '@/components/home/parts/PartnerCompletedTasksCard';
 
 /* =========================================================
  * SortableCard（編集モードON時のみ使用）
@@ -140,20 +119,18 @@ function StaticCard({
   );
 }
 
-/** ペア未確定時にカード内を非活性化するラッパー（DnDハンドルは有効のまま） */
-function DisabledCardWrapper({
-  children,
-  message = 'ペア設定完了後に利用できます。',
-}: {
-  children: ReactNode;
-  message?: string;
-}) {
+/** ペア未確定時は中身を重ねず、設定への案内だけ出す */
+function PairNeededCard({ title }: { title: string }) {
   return (
-    <div className="relative">
-      <div className="pointer-events-none opacity-60 grayscale">{children}</div>
-      <div className="absolute inset-0 rounded-lg bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-0">
-        <span className="text-sm text-gray-700">{message}</span>
-      </div>
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 max-w-xl mx-auto text-center">
+      <p className="text-sm font-semibold text-gray-800">{title}</p>
+      <p className="text-xs text-gray-600 mt-1">ペアを設定すると利用できます。</p>
+      <Link
+        href="/profile"
+        className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-emerald-700 underline"
+      >
+        ペアを設定する
+      </Link>
     </div>
   );
 }
@@ -225,100 +202,30 @@ export default function HomeView() {
     setIsMounted(true);
   }, []);
 
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasPairInvite, setHasPairInvite] = useState(false);
-  const [hasSentInvite, setHasSentInvite] = useState(false);
-  const [hasPairConfirmed, setHasPairConfirmed] = useState(false);
-  const [flaggedCount, setFlaggedCount] = useState(0);
+  const { plan, isChecking } = useUserPlan();
+  const {
+    uid,
+    tasks: householdTasks,
+    hasPairConfirmed,
+    tasksReady,
+  } = useHousehold();
+  const isLoading = !tasksReady;
+  const tasks = useMemo(
+    () => (uid ? householdTasks.filter((t) => t.userId === uid || (t.userIds ?? []).includes(uid)) : householdTasks),
+    [householdTasks, uid]
+  );
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [, setIsWeeklyPointsHidden] = useState(false);
   const WEEKLY_POINTS_HIDE_KEY = 'hideWeeklyPointsOverlay';
-  const { plan, isChecking } = useUserPlan();
-  const uid = useUserUid();
-
-  // オンボーディング
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
-
-  // パートナーID
-  const [partnerId, setPartnerId] = useState<string | null>(null);
-
-  // 今週「パートナーから自分がもらった」ありがとう（ハート）の件数
-  const [, setWeeklyThanksCount] = useState(0);
 
   // DnD（編集モードON時のみ実際に利用）
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
   useEffect(() => {
-    const seen = localStorage.getItem(ONBOARDING_SEEN_KEY);
-    if (!seen) setShowOnboarding(true);
-  }, []);
-
-  const handleCloseOnboarding = () => {
-    localStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
-    setShowOnboarding(false);
-  };
-
-  useEffect(() => {
     const stored = localStorage.getItem(WEEKLY_POINTS_HIDE_KEY);
     setIsWeeklyPointsHidden(stored === 'true');
   }, []);
-
-  // 招待・ペア確定の購読（partnerId 抽出もここで）
-  useEffect(() => {
-    if (!uid) return;
-
-    // 自分が送った pending 招待
-    const sentQuery = query(collection(db, 'pairs'), where('userAId', '==', uid));
-    const unsubscribeSent = onSnapshot(
-      sentQuery,
-      (snapshot) => {
-        const hasPending = snapshot.docs.some((d) => {
-          const s = (d.data() as Record<string, unknown>).status;
-          return s === 'pending';
-        });
-        setHasSentInvite(hasPending);
-      },
-      (err) => console.warn('[HomeView] pairs(sent) onSnapshot error:', err),
-    );
-
-    // 自分が含まれるレコードのうち confirmed を抽出
-    const confirmedQuery = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
-    const unsubscribeConfirmed = onSnapshot(
-      confirmedQuery,
-      (snapshot) => {
-        const docConfirmed = snapshot.docs.find(
-          (d) => (d.data() as Record<string, unknown>).status === 'confirmed',
-        );
-        const confirmed = Boolean(docConfirmed);
-        setHasPairConfirmed(confirmed);
-
-        if (confirmed && docConfirmed) {
-          const d0 = docConfirmed.data() as DocumentData;
-          const ids = Array.isArray(d0.userIds) ? (d0.userIds as unknown[]) : [];
-          let other =
-            (ids.find((x) => typeof x === 'string' && x !== uid) as string | undefined) ??
-            undefined;
-          if (!other) {
-            const a = typeof d0.userAId === 'string' ? (d0.userAId as string) : undefined;
-            const b = typeof d0.userBId === 'string' ? (d0.userBId as string) : undefined;
-            other = a && a !== uid ? a : b && b !== uid ? b : undefined;
-          }
-          setPartnerId(other ?? null);
-        } else {
-          setPartnerId(null);
-        }
-      },
-      (err) => console.warn('[HomeView] pairs(confirmed) onSnapshot error:', err),
-    );
-
-    return () => {
-      unsubscribeSent();
-      unsubscribeConfirmed();
-    };
-  }, [uid]);
 
   // ペア確定でWeeklyPointsのブロック解除
   useEffect(() => {
@@ -328,111 +235,31 @@ export default function HomeView() {
     }
   }, [hasPairConfirmed]);
 
-  // 自分宛の招待受信の購読（pending をクライアント側で抽出）
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user?.email) return;
-
-    const qPairs = query(collection(db, 'pairs'), where('emailB', '==', user.email));
-    const unsubscribe = onSnapshot(
-      qPairs,
-      (snapshot) => {
-        const hasPending = snapshot.docs.some(
-          (d) => (d.data() as Record<string, unknown>).status === 'pending',
-        );
-        setHasPairInvite(hasPending);
-      },
-      (err) => console.warn('[HomeView] pairs(invite-received) onSnapshot error:', err),
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  // 自分が関与する tasks の購読
-  useEffect(() => {
-    if (!uid) return;
-
-    const qTasks = query(collection(db, 'tasks'), where('userIds', 'array-contains', uid));
-    const unsubscribe = onSnapshot(
-      qTasks,
-      (snapshot) => {
-        const taskList = snapshot.docs.map((d) =>
-          mapFirestoreDocToTask(d as QueryDocumentSnapshot<FirestoreTask>),
-        );
-        setTasks(taskList);
-        setTimeout(() => setIsLoading(false), 50);
-      },
-      (err) => console.warn('[HomeView] tasks onSnapshot error:', err),
-    );
-
-    return () => unsubscribe();
-  }, [uid]);
-
   // flagged の件数は tasks から導出
   const flaggedTasks = useMemo(() => tasks.filter((t) => t.flagged === true), [tasks]);
-  useEffect(() => {
-    setFlaggedCount(flaggedTasks.length);
-  }, [flaggedTasks.length]);
-
-  // 今週の“ありがとう”集計（ownerId 単一 where のみ）
-  useEffect(() => {
-    if (!uid) return;
-
-    const q = query(collection(db, 'taskLikes'), where('ownerId', '==', uid));
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-        const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
-
-        let count = 0;
-
-        snap.forEach((d) => {
-          const data = d.data() as Record<string, unknown>;
-          const dateStr = typeof data.date === 'string' ? data.date : '';
-          const likedBy = Array.isArray(data.likedBy)
-            ? (data.likedBy.filter((x) => typeof x === 'string') as string[])
-            : [];
-
-          if (!dateStr) return;
-
-          const dateObj = parseISO(dateStr);
-          const inThisWeek = isWithinInterval(dateObj, { start: weekStart, end: weekEnd });
-          if (!inThisWeek) return;
-
-          if (partnerId) {
-            if (likedBy.includes(partnerId)) count += 1;
-          } else if (likedBy.some((u) => u && u !== uid)) {
-            count += 1;
-          }
-        });
-
-        setWeeklyThanksCount(count);
-      },
-      (err) => console.warn('[HomeView] taskLikes onSnapshot error:', err),
-    );
-
-    return () => unsub();
-  }, [uid, partnerId]);
+  const flaggedCount = flaggedTasks.length;
 
   /* ---------------------------------------
    * カード順序 永続化 & DnD センサー
    * -------------------------------------*/
-  const HOME_CARD_ORDER_KEY = 'homeCardOrderV1';
-const DEFAULT_ORDER = [
-  'pairInvite',
-  'pairInviteNone',
-  'todoShortcuts',
-  'unitPriceCompare',
-  'cookingTimer',
-  // 'expandableInfo',
-  'hearts',
-  'calendar',
-  'todayDone',
-  'ad',
-] as const;
+  const HOME_CARD_ORDER_KEY = 'homeCardOrderV3';
+  const DEFAULT_ORDER = [
+    'ad',
+    'pairInvite',
+    'pairInviteNone',
+    'calendar',
+    'todayDone',
+    'unitPriceCompare',
+  ] as const;
   type CardId = (typeof DEFAULT_ORDER)[number];
+  const DEFAULT_HIDDEN: CardId[] = ['unitPriceCompare'];
+  const PINNED_HOME_CARDS: ReadonlySet<CardId> = new Set(['ad']);
+
+  /** 応援プラン案内は加入までホーム最上段に固定する */
+  const pinFixedHomeCards = (order: CardId[]): CardId[] => {
+    const movable = order.filter((id) => !PINNED_HOME_CARDS.has(id));
+    return ['ad', ...movable];
+  };
 
   // ✅ SSR安全：初期値は固定、マウント後に localStorage を読む
   const [cardOrder, setCardOrder] = useState<CardId[]>([...DEFAULT_ORDER]);
@@ -446,7 +273,7 @@ const DEFAULT_ORDER = [
       const knownSet = new Set(DEFAULT_ORDER);
       const filtered = parsed.filter((x) => knownSet.has(x as CardId)) as CardId[];
       const missing = DEFAULT_ORDER.filter((d) => !filtered.includes(d));
-      setCardOrder([...filtered, ...missing]);
+      setCardOrder(pinFixedHomeCards([...filtered, ...missing]));
     } catch {
       // 失敗時は DEFAULT_ORDER のまま
     }
@@ -468,59 +295,28 @@ const DEFAULT_ORDER = [
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
+    if (PINNED_HOME_CARDS.has(active.id as CardId) || PINNED_HOME_CARDS.has(over.id as CardId)) return;
 
     const oldIndex = cardOrder.indexOf(active.id as CardId);
     const newIndex = cardOrder.indexOf(over.id as CardId);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    setCardOrder((prev) => arrayMove(prev, oldIndex, newIndex));
+    setCardOrder((prev) => pinFixedHomeCards(arrayMove(prev, oldIndex, newIndex)));
   };
 
-  /** ペア未確定かどうかの共通フラグ */
   const isPairInactive = !hasPairConfirmed;
 
   // ▼ ID → 実体
   const renderCardContent = (id: CardId): ReactNode => {
     switch (id) {
       case 'pairInvite':
-        return <PairInviteCard mode="invite-received" />;
+        return <PairInviteCard />;
       case 'pairInviteNone':
-        return <PairInviteCard mode="no-partner" />;
-
-      // ★★★ 修正：uid が未取得の間は null を返し、取得後のみ描画 ★★★
-      case 'todoShortcuts': {
-        if (!uid) return null;
-        return <TodoShortcutsCard uid={uid} />;
-      }
+        return <PairInviteCard />;
 
       // ★★★ 追加：単価比較カード ★★★
       case 'unitPriceCompare':
         return <UnitPriceCompareToolCard />;
-
-      // case 'expandableInfo':
-      //   return (
-      //     <div
-      //       onClick={() => setIsExpanded((prev) => !prev)}
-      //       className={`relative overflow-hidden bg-white rounded-lg shadow-md cursor-pointer transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[320px] overflow-y-auto' : 'max-h-[180px]'
-      //         }`}
-      //     >
-      //       <div className="absolute top-5 right-6 pointer-events-none z-10">
-      //         <ChevronDown
-      //           className={`w-5 h-5 text-gray-500 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''
-      //             }`}
-      //         />
-      //       </div>
-      //     </div>
-      //   );
-
-      case 'hearts': {
-        const node = <HomeDashboardCard />;
-        return isPairInactive ? (
-          <DisabledCardWrapper message="ペア設定完了後に利用できます。">{node}</DisabledCardWrapper>
-        ) : (
-          node
-        );
-      }
 
       case 'calendar': {
         return isLoading ? (
@@ -530,32 +326,28 @@ const DEFAULT_ORDER = [
           </div>
         ) : (
           <TaskCalendar
-            tasks={tasks.map(({ id, name, period, dates, daysOfWeek, done }) => ({
-              id,
-              name,
-              period: period ?? '毎日',
-              dates,
-              daysOfWeek,
-              done: !!done,
+            tasks={tasks.map((task) => ({
+              id: task.id,
+              name: task.name,
+              period: task.period ?? '毎日',
+              dates: task.dates,
+              daysOfWeek: task.daysOfWeek,
+              done: !!task.done,
+              opensTodo: taskShowsOnTodoTab(task),
             }))}
           />
         );
       }
 
-      case 'todayDone': {
-        const node = <PartnerCompletedTasksCard />;
+      case 'todayDone':
         return isPairInactive ? (
-          <DisabledCardWrapper message="ペア設定完了後に利用できます。">{node}</DisabledCardWrapper>
+          <PairNeededCard title="パートナーの完了" />
         ) : (
-          node
+          <PartnerCompletedTasksCard />
         );
-      }
 
       case 'ad':
         return !isChecking && plan === 'free' ? <PremiumPromoCard /> : null;
-
-      // case 'cookingTimer':
-      //   return <CookingTimerCard />;
 
       default:
         return null;
@@ -568,20 +360,22 @@ const DEFAULT_ORDER = [
   const [editMode, setEditMode] = useState(false);
   const [hiddenCards, setHiddenCards] = useState<Set<CardId>>(new Set());
 
-  const hiddenStorageKey = useMemo(() => (uid ? `homeCardHiddenV1:${uid}` : undefined), [uid]);
+  const hiddenStorageKey = useMemo(() => (uid ? `homeCardHiddenV3:${uid}` : undefined), [uid]);
 
   useEffect(() => {
     if (!hiddenStorageKey) return;
     try {
       const raw = localStorage.getItem(hiddenStorageKey);
       if (raw) {
-        const arr = JSON.parse(raw) as CardId[];
+        const arr = (JSON.parse(raw) as CardId[]).filter((id) => !PINNED_HOME_CARDS.has(id));
         setHiddenCards(new Set(arr));
       } else {
-        setHiddenCards(new Set());
+        const next = new Set(DEFAULT_HIDDEN);
+        setHiddenCards(next);
+        localStorage.setItem(hiddenStorageKey, JSON.stringify(DEFAULT_HIDDEN));
       }
     } catch {
-      setHiddenCards(new Set());
+      setHiddenCards(new Set(DEFAULT_HIDDEN));
     }
   }, [hiddenStorageKey]);
 
@@ -597,6 +391,7 @@ const DEFAULT_ORDER = [
 
   const hideCard = useCallback(
     (id: CardId) => {
+      if (PINNED_HOME_CARDS.has(id)) return;
       setHiddenCards((prev) => {
         const next = new Set(prev);
         next.add(id);
@@ -644,42 +439,37 @@ const DEFAULT_ORDER = [
           }
         }}
       >
-        <main className="px-4 py-5">
+        <main className={`px-4 py-5 ${!isChecking && plan === 'free' && isNativeMobile() ? 'pb-20' : ''}`}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: isLoading ? 0 : 1 }}
             transition={{ duration: 0.4 }}
             className="space-y-1.5"
           >
+            {!isLoading && !isChecking && plan === 'free' && (
+              <StaticCard boundClass="mx-auto w-full max-w-xl">
+                <PremiumPromoCard />
+              </StaticCard>
+            )}
             {!isLoading && flaggedCount > 0 && <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />}
+            {!isLoading && <FirstSharedTaskCard />}
 
             {/* ★★★ 変更：編集モードONのときだけ DnD を有効化。OFFのときは静的描画 */}
             {(() => {
               const candidateSet = new Set<CardId>();
-              if (!isLoading && hasPairInvite) {
+              if (!isLoading && !hasPairConfirmed) {
                 candidateSet.add('pairInvite');
-              } else if (!isLoading && !hasPairInvite && !hasSentInvite && !hasPairConfirmed) {
-                candidateSet.add('pairInviteNone');
               }
 
-              candidateSet.add('todoShortcuts');
-              candidateSet.add('unitPriceCompare');
-              candidateSet.add('cookingTimer');
-              // candidateSet.add('expandableInfo');
-              candidateSet.add('hearts');
               candidateSet.add('calendar');
-              // candidateSet.add('weeklyPoints');
               candidateSet.add('todayDone');
-
-              if (!isLoading && !isChecking && plan === 'free') {
-                candidateSet.add('ad');
-              }
+              candidateSet.add('unitPriceCompare');
 
               const allCards = cardOrder.filter((id) => candidateSet.has(id));
               const items = allCards
                 .map((id) => {
                   const node = renderCardContent(id);
-                  const isHidden = hiddenCards.has(id);
+                  const isHidden = PINNED_HOME_CARDS.has(id) ? false : hiddenCards.has(id);
                   // 編集OFFは非表示カードを描画から除外
                   if (!editMode && isHidden) return null;
                   return { id, node, isHidden };
@@ -703,8 +493,9 @@ const DEFAULT_ORDER = [
               }
 
               // ---- 編集モードON：DnD有効、カード機能無効化、非表示カードもグレーで表示＋再表示ボタン
-              const dndIds = items.map((v) => v.id);
+              const dndIds = items.filter((v) => !PINNED_HOME_CARDS.has(v.id)).map((v) => v.id);
               return (
+                <div className="no-tab-swipe">
                 <DndContext
                   sensors={sensors}
                   onDragStart={(e) => {
@@ -734,14 +525,18 @@ const DEFAULT_ORDER = [
                     <div className="space-y-1.5">
                       {items.map(({ id, node, isHidden }) => (
                         <div key={id} className="relative">
-                          <SortableCard id={id} showGrip={true} boundClass="mx-auto w-full max-w-xl">
-                            <EditMask isHidden={isHidden}>{node}</EditMask>
-                            <CardEditToolbar
-                              isHidden={isHidden}
-                              onHide={() => hideCard(id)}
-                              onShow={() => showCard(id)}
-                            />
-                          </SortableCard>
+                          {PINNED_HOME_CARDS.has(id) ? (
+                            <StaticCard boundClass="mx-auto w-full max-w-xl">{node}</StaticCard>
+                          ) : (
+                            <SortableCard id={id} showGrip={true} boundClass="mx-auto w-full max-w-xl">
+                              <EditMask isHidden={isHidden}>{node}</EditMask>
+                              <CardEditToolbar
+                                isHidden={isHidden}
+                                onHide={() => hideCard(id)}
+                                onShow={() => showCard(id)}
+                              />
+                            </SortableCard>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -755,11 +550,17 @@ const DEFAULT_ORDER = [
                     ) : null}
                   </DragOverlay>
                 </DndContext>
+                </div>
               );
             })()}
 
             {/* ★★★ 改修：編集モードトグル＆全再表示（非表示カードがあるときのみ活性）★★★ */}
             <div className="mt-5 mb-4 flex flex-col items-center gap-3">
+              {editMode && (
+                <p className="text-xs text-gray-500 text-center px-4">
+                  応援プランの案内は加入まで一番上に固定です。単価比較などは、ここから再表示できます。
+                </p>
+              )}
               <div className="flex items-center gap-3">
                 {/* スイッチ風トグル */}
                 <button
@@ -809,199 +610,9 @@ const DEFAULT_ORDER = [
                 </motion.button>
               )}
             </div>
-
-            <div className="mt-6 flex justify-center relative z-0">
-              <button
-                onClick={() => setShowOnboarding(true)}
-                className="px-4 py- text-sm text-gray-500 underline hover:text-blue-800"
-              >
-                もう一度説明を見る
-              </button>
-            </div>
           </motion.div>
         </main>
       </div>
-
-      {showOnboarding && (
-        <OnboardingModal
-          slides={[
-            {
-              blocks: [
-                { src: '/onboarding/welcome.png' },
-
-                // メインコピー：短く・間を作る
-                {
-                  subtitle: 'ようこそ、PairKajiへ。',
-                  description:
-                    '家事を、ふたりで心地よく分け合うためのアプリです。\nまずはこのアプリについて、かんたんにご紹介します。\n\n※ 説明が不要な場合は右上の × からスキップできます。\n※ ホーム画面の下部の「もう１度説明を見る」をタップで確認することができます。',
-                },
-              ],
-            },
-          {
-              title: 'PairKajiの画面構成について',
-              blocks: [
-                {
-                  subtitle: '1. Home 画面',
-                  src: '/onboarding/schedule.jpg',
-                  description:
-                    'Home 画面では、日々のタスクの進捗を確認できます。\n表示されているカードは自分好みに並び替えや非表示にすることができます。',
-                },
-                {
-                  subtitle: '2. Task 画面',
-                  src: '/onboarding/schedule.jpg',
-                  description:
-                    'Task 画面では日々のタスクの管理をおこないます。\nタスクは大きく「毎日」「週次」「不定期」の３つにわけられます。',
-                },
-                {
-                  subtitle: '3. Todo 画面',
-                  src: '/onboarding/finish_task.jpg',
-                  description:
-                    'Todo 画面では Task 画面で登録したタスクにたして、さらに細かいサブタスクを追加できます。',
-                },
-              ],
-            },
-
-            {
-              title: 'Home 画面について',
-              blocks: [
-                {
-                  subtitle: '1. フラグ付きタスク',
-                  src: '/onboarding/flag.jpg',
-                  description:
-                    'フラグを付けたタスクが表示されます。フラグのついたタスクが存在するときのみ表示されます。',
-                },
-                {
-                  subtitle: '2. スケジュール',
-                  src: '/onboarding/schedule.jpg',
-                  description:
-                    '本日より直近の7日間のタスク一覧を表示します。タスク量が多い場合はタップで全体を展開できます。',
-                },
-                {
-                  subtitle: '3. パートナーの完了タスク',
-                  src: '/onboarding/finish_task.jpg',
-                  description:
-                    'パートナーを設定しているときのみ表示されます。\nパートナーが完了したタスクの一覧を表示され、♥ をタップでパートナーに感謝を伝えることができます。。',
-                },
-                {
-                  subtitle: '4. 活動記録',
-                  src: '/onboarding/point_check.jpg',
-                  description:
-                    '1週間の目標設定、進捗状況、履歴などを確認することができます。',
-                },
-                                {
-                  subtitle: '5. どっちがお得？',
-                  src: '/onboarding/unit_price_compare.jpg',
-                  description:
-                    'お買い物のときに便利な単価比較ツールです。\n商品の価格と内容量を入力すると、どちらがお得かを簡単に比較できます。',
-                },
-              ],
-            },
-            {
-              title: 'Task画面',
-              blocks: [
-                {
-                  subtitle: '1. タスクの登録',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    <>
-                      <strong>タスク名</strong>
-                      <br/>→ お好きなタスク名を入力
-                      <br/><strong>カテゴリ</strong>
-                      <br/>→ 設定することで、タスクに対応するTodoが設定されます。
-                      <br/><strong>頻度/時間</strong>
-                      <br/>→ タスクの実施するタイミングを設定します。
-                      <br/><strong>ポイント</strong>
-                      <br/>→ タスク完了時に獲得できるポイントを設定します。
-                      <br/><strong>担当者</strong>
-                      <br/>→ タスクを担当するユーザーを設定します。
-                      <br/><strong>プライベート</strong>
-                      <br/>→ パートナーに見せたくないタスクの場合はオンにします。
-                      <br/><strong>Todo表示</strong>
-                      <br/>→ タスクを細分化したい場合にオンにします。
-                      <br/><strong>備考</strong>
-                      <br/>→ タスクに関する補足情報を入力します。
-                    </>,
-                },
-                {
-                  subtitle: '2. タスクの編集・削除',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '対象のタスクをタップすると、タスクの編集・削除ボタンが表示されます。\nフラグのON/OFFもここで設定できます。',
-                },
-                {
-                  subtitle: 'タスクの完了',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '左のチェックボックスをタップすると、その日のタスクを完了できます。',
-                },
-                {
-                  subtitle: 'タスクを検索する',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '本日、プライベート、フラグ付き、ワードでタスクを絞り込むことができます。',
-                },
-                {
-                  subtitle: 'その他の操作①',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    'タスクを右へスワイプすると、対象のTodoに移動できるボタンが表示されます。\nタスクを左へスワイプすると、タスクをスキップできます。スキップしたタスクのポイントは加算されません。',
-                },
-                {
-                  subtitle: 'その他の操作①',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '編集モードボタンをタップで、タスクの並び替えや複数削除が可能です。\nタスクを長押ししてドラッグすることで、順序を変更できます。',
-                },
-              ],
-            },
-            {
-              title: 'Todo画面',
-              blocks: [
-                {
-                  subtitle: '1. Todo（タスク）の登録',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '対象のタスクをタップし、＋ボタンをタップすると Todoを登録できます。',
-                },
-                {
-                  subtitle: '2. Todo（タスク）の非表示',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '対象のタスクの👁アイコンをタップで非表示になります。',
-                },
-                {
-                  subtitle: '2. Todo（タスク）の再表示',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '👁ボタンをタップで非表示中の Todo（タスク）一覧が表示されます。\n再表示するTodo（タスク）をタップしてください。',
-                },
-                {
-                  subtitle: 'Todo（タスク）を検索する',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    'カテゴリ別・ワードで Todo（タスク）を絞り込むことができます。',
-                },
-              {
-                  subtitle: 'Todo（タスク）の並び替え',
-                  src: '/onboarding/slide2.png',
-                  description:
-                    '対象のタスクの・・アイコンをドラッグアンドドロップで並び替えできます。',
-                },
-              ],
-            },
-            {
-              title: 'おつかれさまでした。',
-              blocks: [
-                {
-                  description:
-                    'PairKajiは家事を見える化するアプリです。\n家事の分担方法は人それそれ。お互い相談しながら役割を分担してみてください。\n使い方がわからなくなったときは、画面右上の「？」マークをタップで画面上にヒントが表示されますので参考にしてみてください。\nまた、この説明もホーム画面の最下部から何度でもご確認いただけます。\n\nそれでは、PairKajiでの生活がより良いものになりますように！',
-                },
-              ],
-            },
-          ]}
-          onClose={handleCloseOnboarding}
-        />
-      )}
     </>
   );
 }

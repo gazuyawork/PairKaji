@@ -1,52 +1,37 @@
-import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { useAuth } from '@/context/AuthContext';
+
+export function formatPlayExpiry(expiryTime: string | null | undefined): string | null {
+  if (!expiryTime) return null;
+  const ms = Date.parse(expiryTime);
+  if (!Number.isFinite(ms)) return null;
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(ms));
+}
 
 /**
- * Firestore の plan を購読する。
- * 未ログイン / 未設定は free。Premium 判定はサーバー検証後の値のみを信じる。
+ * Firestore の plan。未ログイン / 未設定は free。
+ * 購読は AuthProvider が1本だけ持つ。
  */
-export function useUserPlan(): { plan: string | undefined; isChecking: boolean } {
-  const [plan, setPlan] = useState<string | undefined>(undefined);
-  const [isChecking, setIsChecking] = useState(true);
-
-  useEffect(() => {
-    let unsubDoc: (() => void) | undefined;
-
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      unsubDoc?.();
-      unsubDoc = undefined;
-
-      if (!user) {
-        setPlan('free');
-        setIsChecking(false);
-        return;
-      }
-
-      setIsChecking(true);
-      unsubDoc = onSnapshot(
-        doc(db, 'users', user.uid),
-        (snap) => {
-          const raw = snap.exists() ? (snap.data()?.plan as string | undefined) : undefined;
-          const normalized =
-            typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : 'free';
-          setPlan(normalized);
-          setIsChecking(false);
-        },
-        (err) => {
-          console.error('プラン判定失敗:', err);
-          setPlan(undefined);
-          setIsChecking(false);
-        }
-      );
-    });
-
-    return () => {
-      unsubAuth();
-      unsubDoc?.();
-    };
-  }, []);
-
-  return { plan, isChecking };
+export function useUserPlan(): {
+  plan: string | undefined;
+  isChecking: boolean;
+  isCancelPending: boolean;
+  expiryLabel: string | null;
+} {
+  const { plan, isCheckingPlan, loading, playSubscriptionState, playExpiryTime, subscriptionStatus } = useAuth();
+  const isCancelPending =
+    plan === 'premium' &&
+    (playSubscriptionState === 'SUBSCRIPTION_STATE_CANCELED' || subscriptionStatus === 'canceled');
+  return {
+    plan,
+    isChecking: loading || isCheckingPlan,
+    isCancelPending,
+    expiryLabel: formatPlayExpiry(playExpiryTime),
+  };
 }

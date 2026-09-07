@@ -6,6 +6,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
+import { usePauseNativeBanner } from '@/hooks/usePauseNativeBanner';
 
 /* ----------------------------------------------------------------
    型定義
@@ -270,6 +271,7 @@ export default function OnboardingModal(props: Props) {
   const [current, setCurrent] = useState(0);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  usePauseNativeBanner(true);
 
   // 初期フォーカス（アクセシビリティ）
   useEffect(() => {

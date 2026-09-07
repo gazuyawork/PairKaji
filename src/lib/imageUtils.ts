@@ -10,6 +10,22 @@ import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/fire
 import { db, storage } from '@/lib/firebase';
 import { auth } from '@/lib/firebase'; // ★ 追加
 
+const DEFAULT_PROFILE_IMAGE = '/images/default.png';
+
+/** Firestore の imageUrl（https / 相対 / gs:// / Storage パス）を表示用 URL にする */
+export async function resolveProfileImageUrl(rawUrl?: string): Promise<string> {
+  if (!rawUrl || rawUrl.trim() === '') return DEFAULT_PROFILE_IMAGE;
+  if (rawUrl.startsWith('gs://') || (!rawUrl.startsWith('http') && !rawUrl.startsWith('/'))) {
+    try {
+      return await getDownloadURL(ref(storage, rawUrl));
+    } catch (e) {
+      console.warn('getDownloadURL失敗', rawUrl, e);
+      return DEFAULT_PROFILE_IMAGE;
+    }
+  }
+  return rawUrl;
+}
+
 /**
  * プロフィール画像を Firebase Storage にアップロードし、Firestore にダウンロードURLを保存する。
  *

@@ -8,7 +8,6 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Variants } from 'framer-motion';
 import { toast } from 'sonner';
-import TravelTimeBar from './TravelTimeBar';
 import type { SimpleTodo } from './hooks/useTodoSearchAndSort';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
@@ -42,7 +41,6 @@ type Props = {
   onOpenNote: (text: string) => void;
   onDeleteTodo: (id: string) => void;
   hasContentForIcon: boolean;
-  category: string | null | undefined;
 };
 
 export default function SortableTodoRow({
@@ -59,7 +57,6 @@ export default function SortableTodoRow({
   onOpenNote,
   onDeleteTodo,
   hasContentForIcon,
-  category,
 }: Props) {
   const [isEditingRow, setIsEditingRow] = useState(false);
   const [text, setText] = useState<string>(todo.text ?? '');
@@ -213,7 +210,7 @@ export default function SortableTodoRow({
             'cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none',
             !dndEnabled && 'opacity-40 cursor-not-allowed hover:text-gray-300'
           )}
-          title={dndEnabled ? 'ドラッグで並び替え' : '旅行は開始時間順で自動並び替え'}
+          title={dndEnabled ? 'ドラッグで並び替え' : '並び替えできません'}
           aria-disabled={!dndEnabled}
           {...(attributes as React.HTMLAttributes<HTMLSpanElement>)}
           {...(listeners as unknown as React.DOMAttributes<HTMLSpanElement>)}
@@ -325,8 +322,6 @@ export default function SortableTodoRow({
           <Trash2 size={22} className="text-gray-400 hover:text-red-500 transition-colors" />
         </motion.button>
       </div>
-
-      {category === '旅行' && <TravelTimeBar start={todo.timeStart} end={todo.timeEnd} />}
 
       {editingErrors[todo.id] && (
         <div className="bg-red-400 text-white text-xs ml-8 px-2 py-1 rounded-md">

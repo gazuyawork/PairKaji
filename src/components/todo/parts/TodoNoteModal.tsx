@@ -51,20 +51,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import { parseCategoryForUI } from '@/lib/taskCategory';
 // ▲▲ dnd-kit ▲▲
 
 /* ---------------- Types & guards ---------------- */
 
-type Category = '料理' | '買い物' | '旅行';
+type Category = '買い物';
 
-type Ingredient = {
-  id: string;
-  name: string;
-  amount: number | null;
-  unit: string;
-};
-
-// 追加：チェックリスト項目
 type ChecklistItem = { id: string; text: string; done: boolean };
 
 type TaskDoc = {
@@ -83,12 +76,6 @@ type TodoDoc = {
   referenceUrls?: string[];
   /** 追加: URLの表示用ラベル（referenceUrls と同じ長さ・順序） */
   referenceUrlLabels?: string[];
-  recipe?: {
-    ingredients?: Partial<Ingredient>[];
-    steps?: string[];
-  };
-  timeStart?: string; // "HH:mm"
-  timeEnd?: string; // "HH:mm"
   // 追加：チェックリスト
   checklist?: ChecklistItem[];
 };
@@ -109,42 +96,6 @@ function isTodoArray(v: unknown): v is TodoDoc[] {
 /* ---------------- Constants ---------------- */
 
 const MAX_TEXTAREA_VH = 50;
-
-/* ---------------- Helpers (time validation) ---------------- */
-
-const isHHmm = (s: string) => /^\d{1,2}:\d{2}$/.test(s);
-const toMinutes = (s: string) => {
-  if (!isHHmm(s)) return null;
-  const [h, m] = s.split(':').map(Number);
-  if (h > 23 || m > 59) return null;
-  return h * 60 + m;
-};
-const validateTimeRange = (start: string, end: string): string => {
-  if (!start && !end) return '';
-  if (!isHHmm(start) || !isHHmm(end)) return '時間は HH:MM 形式で入力してください。';
-  const s = toMinutes(start);
-  const e = toMinutes(end);
-  if (s == null || e == null) return '存在しない時刻です。';
-  if (s >= e) return '開始は終了より前にしてください。';
-  return '';
-};
-
-const clampToDayMinutes = (mins: number) => Math.max(0, Math.min(23 * 60 + 59, mins));
-const addMinutesToHHmm = (hhmm: string, deltaMin: number): string => {
-  const base = toMinutes(hhmm);
-  if (base == null || !Number.isFinite(deltaMin)) return '';
-  const next = clampToDayMinutes(base + Math.trunc(deltaMin));
-  const h = Math.floor(next / 60);
-  const m = next % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` as string;
-};
-const minutesBetweenHHmm = (start: string, end: string): number | null => {
-  if (!isHHmm(start) || !isHHmm(end)) return null;
-  const s = toMinutes(start);
-  const e = toMinutes(end);
-  if (s == null || e == null || e <= s) return null;
-  return e - s;
-};
 
 /* ---------------- URL helper（ラベル候補 & favicon用） ---------------- */
 
@@ -334,15 +285,9 @@ export default function TodoNoteModal({
   const [errorsShown, setErrorsShown] = useState(false);
   const [urlErrors, setUrlErrors] = useState<string[]>([]);
   const [shoppingErrors, setShoppingErrors] = useState<{ price?: string; quantity?: string; unit?: string }>({});
-  const [timeError, setTimeError] = useState<string>('');
 
   const compareQuantityRef = useRef<string>('');
   useEffect(() => { compareQuantityRef.current = compareQuantity; }, [compareQuantity]);
-
-  // 旅行
-  const [timeStart, setTimeStart] = useState<string>('');
-  const [timeEnd, setTimeEnd] = useState<string>('');
-  const [durationMin, setDurationMin] = useState<string>('');
 
   // 画像
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -411,10 +356,9 @@ export default function TodoNoteModal({
       hasImage ||
       hasShopping ||
       hasReference ||
-      (!!timeStart && !!timeEnd) ||
       (isUncategorized && hasChecklist)
     );
-  }, [hasMemo, hasImage, hasShopping, hasReference, timeStart, timeEnd, isUncategorized, hasChecklist]);
+  }, [hasMemo, hasImage, hasShopping, hasReference, isUncategorized, hasChecklist]);
 
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -452,11 +396,6 @@ export default function TodoNoteModal({
 
   const { animatedDifference, animationComplete: diffAnimationComplete } =
     useUnitPriceDifferenceAnimation(totalDifference);
-
-  const previewDurationMin = useMemo(() => {
-    const diff = minutesBetweenHHmm(timeStart, timeEnd);
-    return diff != null ? diff : null;
-  }, [timeStart, timeEnd]);
 
   // ★ プレビュー時の「買い物」表示（完全に静的：編集不可）
   const shoppingPreview = useMemo(() => {
@@ -574,7 +513,7 @@ export default function TodoNoteModal({
         if (!tSnap.exists()) return;
 
         const taskData = tSnap.data() as TaskDoc;
-        setCategory(taskData?.category ?? null);
+        setCategory(parseCategoryForUI(taskData?.category));
 
         const todos = isTodoArray(taskData.todos) ? taskData.todos : [];
         const todo = todos.find((t) => t.id === todoId);
@@ -631,14 +570,6 @@ export default function TodoNoteModal({
             : [{ id: `cl_${Math.random().toString(16).slice(2)}`, text: '', done: false }];
         setChecklist(safeChecklist);
         setCheckIds(safeChecklist.map((c) => c.id));
-
-        const loadedStart = isString((todo as TodoDoc).timeStart) ? (todo as TodoDoc).timeStart! : '';
-        const loadedEnd = isString((todo as TodoDoc).timeEnd) ? (todo as TodoDoc).timeEnd! : '';
-        setTimeStart(loadedStart);
-        setTimeEnd(loadedEnd);
-        setTimeError('');
-        const diffMin = minutesBetweenHHmm(loadedStart, loadedEnd);
-        setDurationMin(diffMin != null ? String(diffMin) : '');
       } catch (e) {
         console.error('初期データの取得に失敗:', e);
       } finally {
@@ -947,18 +878,14 @@ export default function TodoNoteModal({
       if (hasQ && !unit.trim()) shopErr.unit = '単位を選択してください。';
     }
 
-    const timeErr = category === '旅行' ? validateTimeRange(timeStart, timeEnd) : '';
-
     setUrlErrors(nextUrlErrors);
     setShoppingErrors(shopErr);
-    setTimeError(timeErr);
 
     const hasUrlError = nextUrlErrors.some((e) => !!e);
     const hasShopError = Object.keys(shopErr).length > 0;
-    const hasTimeError = !!timeErr;
 
-    return !(hasUrlError || hasShopError || hasTimeError);
-  }, [referenceUrls, category, price, quantity, unit, comparePrice, timeStart, timeEnd]);
+    return !(hasUrlError || hasShopError);
+  }, [referenceUrls, category, price, quantity, unit, comparePrice]);
 
   // 保存（編集時のみ使う想定）
   const handleSave = async () => {
@@ -1029,13 +956,8 @@ export default function TodoNoteModal({
 
       if (isImageRemoved) {
         (payload as { imageUrl?: string | null }).imageUrl = null;
-      } else if (nextImage) {
+      } else       if (nextImage) {
         (payload as { imageUrl?: string | null }).imageUrl = nextImage;
-      }
-
-      if (category === '旅行') {
-        (payload as { timeStart?: string | null }).timeStart = timeStart || null;
-        (payload as { timeEnd?: string | null }).timeEnd = timeEnd || null;
       }
 
       (payload as { checklist?: ChecklistItem[] }).checklist = checklist
@@ -1461,8 +1383,8 @@ export default function TodoNoteModal({
           )}
           {/* ▲▲ 参考URLここまで ▲▲ */}
 
-          {/* ▼▼ チェックリスト（カテゴリ未選択と料理のときだけ表示・必須ではない） ▼▼ */}
-          {(isUncategorized || category === '料理') && (!isPreview || hasChecklist) && (
+          {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
+          {(isUncategorized) && (!isPreview || hasChecklist) && (
             <div className="pt-2 pb-3 mt-2">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-medium">チェックリスト</h3>
@@ -1632,103 +1554,6 @@ export default function TodoNoteModal({
           )}
           {/* ▲▲ チェックリストここまで ▲▲ */}
 
-          {/* 旅行カテゴリ */}
-          {category === '旅行' && (
-            <div className="mt-4 ml-2">
-              <h3 className="font-medium">時間帯</h3>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="relative">
-                  {isPreview ? (
-                    <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                      {timeStart || '— —'}
-                    </span>
-                  ) : (
-                    <input
-                      type="time"
-                      value={timeStart}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setTimeStart(v);
-                        const n = Number.parseInt(durationMin, 10);
-                        if (Number.isFinite(n) && n > 0) {
-                          const autoEnd = addMinutesToHHmm(v, n);
-                          setTimeEnd(autoEnd);
-                          const err = validateTimeRange(v, autoEnd);
-                          setTimeError(err);
-                        } else {
-                          setTimeError(validateTimeRange(v, timeEnd));
-                        }
-                        const diff2 = minutesBetweenHHmm(v, timeEnd);
-                        if (diff2 != null) setDurationMin(String(diff2));
-                      }}
-                      className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
-                      aria-label="開始時刻"
-                    />
-                  )}
-                </div>
-
-                <span className="text-gray-500">~</span>
-
-                <div className="relative">
-                  {isPreview ? (
-                    <>
-                      <span className="inline-block min-w-[5.5ch] border-b border-gray-300 pb-1 tabular-nums text-center">
-                        {timeEnd || '— —'}
-                      </span>
-                      {previewDurationMin !== null && !(errorsShown && timeError) && (
-                        <span className="ml-2 text-gray-700">（所要時間：{previewDurationMin}分）</span>
-                      )}
-                    </>
-                  ) : (
-                    <input
-                      type="time"
-                      value={timeEnd}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setTimeEnd(v);
-                        setTimeError(validateTimeRange(timeStart, v));
-                        const diff = minutesBetweenHHmm(timeStart, v);
-                        if (diff != null) setDurationMin(String(diff));
-                      }}
-                      className="border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 tabular-nums text-center"
-                      aria-label="終了時刻"
-                    />
-                  )}
-                </div>
-
-                {!isPreview && (
-                  <div className="flex items-center gap-1 ml-2">
-                    <span className="text-gray-500 text-sm">所要</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      step={1}
-                      value={durationMin}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^\d]/g, '');
-                        setDurationMin(v);
-                        const n = Number.parseInt(v, 10);
-                        if (isHHmm(timeStart) && Number.isFinite(n) && n > 0) {
-                          const autoEnd = addMinutesToHHmm(timeStart, n);
-                          setTimeEnd(autoEnd);
-                          setTimeError(validateTimeRange(timeStart, autoEnd));
-                        } else {
-                          setTimeError(validateTimeRange(timeStart, timeEnd));
-                        }
-                      }}
-                      placeholder="分"
-                      className="w-20 border-b border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent pb-1 text-right"
-                      aria-label="所要時間（分）"
-                    />
-                    <span className="text-gray-500 text-sm">分</span>
-                  </div>
-                )}
-              </div>
-              {errorsShown && timeError && <p className="text-xs text-red-500 mt-1">{timeError}</p>}
-            </div>
-          )}
-
           {/* 買い物カテゴリ */}
           {category === '買い物' && (
             <>
@@ -1766,8 +1591,6 @@ export default function TodoNoteModal({
               )}
             </>
           )}
-
-          {/* ✅ 料理カテゴリの RecipeEditor は一旦表示も呼び出しも撤去 */}
         </div>
       </div>
     </BaseModal>

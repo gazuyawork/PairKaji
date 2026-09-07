@@ -2,9 +2,9 @@
 import './globals.css';
 import { Zen_Maru_Gothic, Pacifico } from 'next/font/google';
 import ClientLayout from './ClientLayout';
-import Script from 'next/script';
 import type { Metadata, Viewport } from 'next';
 import { TimerProvider } from '@/components/timer/TimerProvider';
+import AdsenseWebLoader from '@/components/ads/AdsenseWebLoader';
 
 // ▼ 追加：起動直後にキャッシュ値でバッジ反映する初期化コンポーネント
 import AppBadgeInitializer from '@/components/system/AppBadgeInitializer';
@@ -12,8 +12,7 @@ import AppBadgeInitializer from '@/components/system/AppBadgeInitializer';
 import { AuthProvider } from '@/context/AuthContext';
 
 // [追加] すべての「？」(HelpPopover) をグローバルにON/OFFするためのProviderとトグル
-import { HelpHintsProvider } from '@/context/HelpHintsContext'; // [追加]
-import HelpHintsToggle from '@/components/common/HelpHintsToggle'; // [追加]
+import { HelpHintsProvider } from '@/context/HelpHintsContext';
 
 const zenMaruGothic = Zen_Maru_Gothic({
   subsets: ['latin'],
@@ -67,9 +66,6 @@ export const viewport: Viewport = {
 // 変更箇所のみ抜粋（前後文脈つき）
 // [変更] HelpHintsProvider で全体をラップし、右上に固定トグルを配置
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // [追加] .env に NEXT_PUBLIC_ADSENSE_CLIENT が無いときは Script を読まないようにする
-  const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
-
 return (
   <html
     lang="ja"
@@ -86,23 +82,10 @@ return (
           {/* 起動直後にローカルキャッシュの未読数でバッジを即時反映 */}
           <AppBadgeInitializer />
 
-          {/* AdSenseローダーはアプリ全体で1回だけ読み込む */}
-          {/* [変更] クライアントIDが存在するときだけ Script を読み込むことで 404 を防止 */}
-          {adsenseClient && (
-            <Script
-              id="adsbygoogle-loader"
-              strategy="afterInteractive"
-              crossOrigin="anonymous"
-              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
-            />
-          )}
+          <AdsenseWebLoader />
 
           {/* ▼▼▼ 追加：全画面のHelpPopover表示ON/OFFのグローバルProviderでラップ ▼▼▼ */}
           <HelpHintsProvider>
-            {/* 右上固定ON/OFFスイッチ（全画面共通）。OFF時は全ての「？」が非表示になります */}
-            <HelpHintsToggle />
-
-            {/* ▼ 既存：アプリの認証プロバイダ＆クライアントレイアウト */}
             <AuthProvider>
               <ClientLayout>{children}</ClientLayout>
             </AuthProvider>

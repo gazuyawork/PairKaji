@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
   - ★重要追加: PWA初回/復帰/可視化で body スクロールロックを強制解除するフックを追加
   - ★重要追加: ルート遷移時（pathname 変更）にも毎回 body ロックを解除
   - ★既存維持: <Toaster /> を key 付きラッパーの「外」に配置し、visualViewport に応じた offset(px) を適用
-  - 既存: SetViewportHeight / PreventBounce / PairInit / TaskSplitMonitor はそのまま
+  - 既存: SetViewportHeight / PreventBounce / PairInit はそのまま
 */
 
 import { useEffect, useState } from 'react';
@@ -15,9 +15,11 @@ import { Toaster } from 'sonner';
 import PairInit from '@/components/common/PairInit';
 import PreventBounce from '@/components/common/PreventBounce';
 import SetViewportHeight from '@/components/common/SetViewportHeight';
-import TaskSplitMonitor from '@/components/common/TaskSplitMonitor';
 import { usePathname } from 'next/navigation';
 import ServiceWorkerInit from '@/components/common/ServiceWorkerInit';
+import FcmInit from '@/components/common/FcmInit';
+import { hideFreeHomeBanner } from '@/lib/ads/admob';
+import { useSyncPlayEntitlement } from '@/hooks/useSyncPlayEntitlement';
 
 /* 既存: body ロック解除のクリーンアップ（アンマウント時） */
 function useUnlockBodyOnUnmount() {
@@ -76,6 +78,7 @@ function usePWAStandaloneScrollFix() {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLanding = pathname?.startsWith('/landing') ?? false;
+  useSyncPlayEntitlement();
 
   // ★追加: PWA 初回/復帰スクロール不具合への恒久対策
   usePWAStandaloneScrollFix();
@@ -97,6 +100,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   // ★追加: ルート遷移のたびに body ロックを初期化（初回取りこぼし/残存対策）
   useEffect(() => {
     forceUnlockBody();
+    if (!pathname?.startsWith('/main')) {
+      void hideFreeHomeBanner();
+    }
   }, [pathname]);
 
   /* ★重要: SP のソフトキーボードに隠れないよう、visualViewport に応じた
@@ -144,6 +150,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <>
       {/* 既存: SW 初期化を最優先で1回だけマウント（keyの外） */}
       <ServiceWorkerInit />
+      <FcmInit />
 
       {/* 既存: ViewportHeight の補正は常時マウント */}
       <SetViewportHeight />
@@ -176,7 +183,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }`}
       >
         <PairInit />
-        <TaskSplitMonitor />
         {children}
       </div>
     </>

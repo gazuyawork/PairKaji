@@ -2,6 +2,7 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import { admin } from './lib/firebaseAdmin';
+import { sendFcmToUser } from './lib/sendFcm';
 import webpush, { PushSubscription, WebPushError } from 'web-push';
 
 const db = admin.firestore();
@@ -385,14 +386,22 @@ export const sendUpcomingTaskReminderPush = onSchedule(
 
         // 1通に集約した payload（ユーザーの時刻で）
         const payload = buildNotificationPayload(fresh.map((p) => ({ id: p.id, name: p.name, time: p.time })));
+        const parsed = JSON.parse(payload) as { title?: string; body?: string; url?: string };
+
+        const fcmSent = await sendFcmToUser(
+          uid,
+          String(parsed.title ?? '🔔 リマインド'),
+          String(parsed.body ?? ''),
+          { url: parsed.url ?? '/main', type: 'reminder' }
+        );
 
         const subs = await fetchSubscriptions(uid);
-        if (subs.length === 0) {
+        if (subs.length === 0 && fcmSent === 0) {
           console.info(`[USER ${uid}] no subscriptions`);
           continue;
         }
 
-        let sentCount = 0;
+        let sentCount = fcmSent;
         for (const row of subs) {
           try {
             await sendWithAutoVapid(row.sub, payload, keys);

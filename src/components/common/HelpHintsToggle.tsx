@@ -1,54 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useHelpHints } from '@/context/HelpHintsContext';
 import { HelpCircle } from 'lucide-react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 
-type Props = {
-  className?: string;
-};
-
-export default function HelpHintsToggle({ className = '' }: Props) {
+/** 設定画面用。操作のヒント（？）表示の ON/OFF */
+export default function HelpHintsToggle() {
   const { enabled, toggle } = useHelpHints();
 
-  // 🔹 ログイン状態を監視
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthResolved, setIsAuthResolved] = useState(false);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setIsAuthResolved(true);
-    });
-    return () => unsub();
-  }, []);
-
-  // 🔹 認証状態が未確定の間は何も表示しない
-  if (!isAuthResolved) return null;
-
-  // 🔹 未ログイン時はボタンを非表示にする
-  if (!user) return null;
-
-  // 🔹 ログイン済みのときのみ表示
   return (
-    <button
-      type="button"
-      aria-label="ヘルプ表示の切替"
-      aria-pressed={enabled}
-      onClick={toggle}
-      className={[
-        'fixed right-14 top-3 z-[1000]',
-        'rounded-full border p-2 shadow-sm transition-all backdrop-blur-md',
-        'hover:scale-105 active:scale-95',
-        enabled
-          ? 'bg-orange-300 border-orange-400 text-white hover:bg-orange-500'
-          : 'bg-transparent border-gray-400 text-gray-500 hover:bg-gray-100',
-        className,
-      ].join(' ')}
-    >
-      <HelpCircle size={18} />
-    </button>
+    <div className="w-full">
+      <button
+        type="button"
+        aria-label="操作のヒント表示の切替"
+        aria-pressed={enabled}
+        onClick={toggle}
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border-0 bg-white px-4 py-3 shadow"
+      >
+        <span className="flex items-center gap-2 text-sm text-gray-800">
+          <HelpCircle size={18} className={enabled ? 'text-orange-400' : 'text-gray-400'} />
+          操作のヒント（？）を表示
+        </span>
+        <span
+          className={`text-xs font-semibold px-2 py-1 rounded ${
+            enabled ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'
+          }`}
+        >
+          {enabled ? 'ON' : 'OFF'}
+        </span>
+      </button>
+      <p className="mt-1.5 px-1 text-xs text-gray-500">
+        画面の「？」を押すと、その場の説明が出ます。
+      </p>
+    </div>
   );
 }

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
+import { usePauseNativeBanner } from '@/hooks/usePauseNativeBanner';
 
 type ConfirmModalProps = {
   isOpen: boolean;
@@ -28,44 +29,51 @@ export default function ConfirmModal({
   cancelLabel,
   isProcessing = false,
 }: ConfirmModalProps) {
+  usePauseNativeBanner(isOpen);
+
   if (!isOpen) return null;
 
-  // ✅ OK押下ですぐに実行（遅延削除）
-  const handleConfirm = () => {
-    onConfirm();
+  const handleCancel = () => {
+    onCancel?.();
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex justify-center items-center px-4">
-      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-[9999] flex flex-col">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        onClick={() => {
+          if (!isProcessing) handleCancel();
+        }}
+      />
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="relative z-10 bg-white min-w-[350px] max-w-[380px] p-6 pt-8 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-y-auto"
+        initial={{ y: 48, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+        className="relative z-10 mt-auto w-full rounded-t-2xl border border-gray-200 bg-white p-5 pb-[max(env(safe-area-inset-bottom),20px)] shadow-[0_20px_40px_rgba(0,0,0,0.18)] sm:mx-auto sm:mb-6 sm:max-w-md sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
+        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-gray-200" />
         {title && (
-          <h2 className="text-lg font-bold mb-4 text-center text-gray-700">{title}</h2>
+          <h2 className="mb-3 text-center text-lg font-bold text-gray-700">{title}</h2>
         )}
-        <div className="text-sm text-gray-700 text-center">{message}</div>
+        <div className="text-center text-sm leading-relaxed text-gray-700">{message}</div>
 
-        <div className="mt-6 flex flex-col gap-3">
+        <div className="mt-5 flex flex-col gap-2">
           <button
-            onClick={handleConfirm}
+            onClick={onConfirm}
             disabled={isProcessing}
-            className={`w-full px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
-              ${isProcessing ? 'bg-gray-300 text-white cursor-not-allowed' : 'bg-[#FFCB7D] text-white'}
+            className={`inline-flex min-h-12 w-full items-center justify-center rounded-xl text-base font-bold active:opacity-90
+              ${isProcessing ? 'cursor-not-allowed bg-gray-300 text-white' : 'bg-[#FFCB7D] text-white'}
             `}
           >
             {confirmLabel}
           </button>
 
-          {/* キャンセルは props 指定時のみ表示（今回は未指定） */}
           {cancelLabel && onCancel && (
             <button
               onClick={onCancel}
               disabled={isProcessing}
-              className="w-full px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-gray-200 text-base font-semibold text-gray-700 active:bg-gray-300"
             >
               {cancelLabel}
             </button>

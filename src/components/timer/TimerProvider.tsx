@@ -19,6 +19,7 @@ import {
   initTimerNotificationListeners,
   scheduleTimerNotification,
 } from '@/lib/timer/nativeNotifications';
+import { usePauseNativeBanner } from '@/hooks/usePauseNativeBanner';
 
 type Phase = 'idle' | 'running' | 'paused' | 'finished';
 
@@ -317,8 +318,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [timers]);
 
+  const hasRunningTimer = timers.some((t) => t.phase === 'running' && Boolean(t.endAtMs));
+
   useEffect(() => {
-    let id: number | null = null;
+    if (!hasRunningTimer) return;
 
     const tick = () => {
       setTimers((prev: TimerItem[]): TimerItem[] => {
@@ -351,13 +354,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    id = window.setInterval(tick, 200);
+    const id = window.setInterval(tick, 200);
     tick();
 
-    return () => {
-      if (id !== null) window.clearInterval(id);
-    };
-  }, []);
+    return () => window.clearInterval(id);
+  }, [hasRunningTimer]);
 
   useEffect(() => {
     const targets = timers.filter((t) => t.phase === 'finished' && !t.alarmFired);
@@ -503,7 +504,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         if (fireAtMs) {
           const ok = await scheduleTimerNotification({
             timerId,
-            title: '料理タイマー完了',
+            title: 'タイマー完了',
             body: `${timerName} が完了しました（タップして開く）`,
             fireAt: new Date(fireAtMs),
           });
@@ -584,7 +585,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         if (fireAtMs) {
           const ok = await scheduleTimerNotification({
             timerId,
-            title: '料理タイマー完了',
+            title: 'タイマー完了',
             body: `${timerName} が完了しました（タップして開く）`,
             fireAt: new Date(fireAtMs),
           });
@@ -767,6 +768,7 @@ function TimerModal() {
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  usePauseNativeBanner(Boolean(mounted && uiOpen));
   if (!mounted) return null;
   if (!uiOpen) return null;
 
@@ -805,29 +807,29 @@ function TimerModal() {
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-black/40" onClick={closeTimerUi} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={closeTimerUi} />
 
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-xl bg-white rounded-lg shadow-xl overflow-hidden">
-          <div className="px-4 py-3 border-b flex items-center justify-between">
-            <div className="font-semibold text-gray-900">お料理タイマー</div>
+      <div className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)] sm:bottom-6 sm:max-w-xl sm:rounded-2xl">
+          <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-gray-200" />
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
+            <div className="font-semibold text-gray-900">タイマー</div>
             <button
               type="button"
               onClick={closeTimerUi}
-              className="h-9 w-9 rounded-full hover:bg-gray-100 flex items-center justify-center"
+              className="flex h-11 w-11 items-center justify-center rounded-full active:bg-gray-100"
               aria-label="閉じる"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="px-4 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+          <div className="max-h-[70vh] space-y-3 overflow-y-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">タイマー一覧</div>
               <button
                 type="button"
                 onClick={addTimer}
-                className="h-9 px-3 rounded-full bg-gray-900 text-white flex items-center gap-2"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-gray-900 px-4 text-white active:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 追加
@@ -1010,17 +1012,16 @@ function TimerModal() {
             </div>
           </div>
 
-          <div className="px-4 py-3 border-t bg-gray-50">
+          <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
             <button
               type="button"
               onClick={closeTimerUi}
-              className="w-full h-10 rounded-full bg-white border border-gray-200 text-gray-900"
+              className="h-12 w-full rounded-xl border border-gray-200 bg-white text-base font-semibold text-gray-900 active:bg-gray-100"
             >
               閉じる
             </button>
           </div>
         </div>
-      </div>
     </div>,
     document.body
   );
@@ -1066,7 +1067,7 @@ function TimeField({
         inputMode="numeric"
         value={String(value)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm"
+        className="h-12 w-full rounded-xl border border-gray-200 px-3 text-base tabular-nums"
       />
     </label>
   );

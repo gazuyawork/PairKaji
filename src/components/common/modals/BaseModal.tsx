@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { usePauseNativeBanner } from '@/hooks/usePauseNativeBanner';
 
 type BaseModalProps = {
   isOpen: boolean;
@@ -18,9 +19,9 @@ type BaseModalProps = {
   disableCloseAnimation?: boolean;
   onCompleteAnimation?: () => void;
   saveDisabled?: boolean;
-  onSaveClick?: () => void;   // 既存: オプショナル
+  onSaveClick?: () => void;
   saveLabel?: string;
-  hideActions?: boolean;      // 既存: プレビュー時にフッターを隠す
+  hideActions?: boolean;
 };
 
 export default function BaseModal({
@@ -33,16 +34,15 @@ export default function BaseModal({
   saveLabel = '保存',
   onCompleteAnimation,
   saveDisabled,
-  hideActions = false,        // デフォルト false にして参照
+  hideActions = false,
 }: BaseModalProps) {
   const [mounted, setMounted] = useState(false);
+  usePauseNativeBanner(isOpen);
 
-  // iOS判定（iPadOS含む）
   const isIOS =
     typeof navigator !== 'undefined' &&
     /iP(hone|od|ad)|Macintosh;.*Mobile/.test(navigator.userAgent);
 
-  // 完了マーク後のコールバック
   useEffect(() => {
     if (saveComplete) {
       const t = setTimeout(() => onCompleteAnimation?.(), 1500);
@@ -50,7 +50,6 @@ export default function BaseModal({
     }
   }, [saveComplete, onCompleteAnimation]);
 
-  // 背景スクロール制御
   useEffect(() => {
     if (!isOpen) {
       document.body.style.overflow = '';
@@ -72,7 +71,6 @@ export default function BaseModal({
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  // iOS: overlay はタッチスクロール不可。ただし data-scrollable="true" は許可
   useEffect(() => {
     if (!isOpen || !overlayRef.current) return;
     const el = overlayRef.current;
@@ -87,11 +85,12 @@ export default function BaseModal({
 
   if (!mounted || !isOpen) return null;
 
+  const busy = isSaving || saveComplete;
+
   return createPortal(
-    <div className="fixed inset-0 h-dvh z-[9999] flex justify-center items-center px-2">
-      {/* ★ 保存/完了オーバーレイ：全画面を覆う（スクロール領域も含めて遮断） */}
-      {(isSaving || saveComplete) && (
-        <div className="fixed inset-0 z-[10000] bg-white/80 flex items-center justify-center">
+    <div className="fixed inset-0 z-[9999] flex h-dvh flex-col">
+      {busy && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-white/80">
           <motion.div
             key={saveComplete ? 'check' : 'spinner'}
             initial={{ opacity: 0 }}
@@ -104,67 +103,67 @@ export default function BaseModal({
                 animate={{ scale: [0.8, 1.5, 1.2], rotate: [0, 360] }}
                 transition={{ duration: 0.5, ease: 'easeOut' }}
               >
-                <CheckCircle className="text-green-500 w-12 h-12" />
+                <CheckCircle className="h-12 w-12 text-green-500" />
               </motion.div>
             ) : (
-              // ★ 共通スピナー（グレー）に統一。w-8(=32px) 相当なので size={32}
               <LoadingSpinner size={48} />
             )}
           </motion.div>
         </div>
       )}
-      {/* 背景オーバーレイ */}
+
       <div
         ref={overlayRef}
-        className="fixed inset-0 bg-white/80"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        onClick={() => {
+          if (!busy) onClose();
+        }}
       />
 
-      {/* モーダル本体：ここでは縦スクロールさせない */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.25, ease: 'easeOut' }}
+        initial={{ y: 48, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 22 }}
         role="dialog"
         aria-modal="true"
-        className={`relative z-10 bg-white w-full max-w-xl px-5 pt-10 pb-5 rounded-xl shadow-lg border border-gray-300 max-h-[95vh] overflow-x-hidden ${(isSaving || saveComplete) ? 'overflow-hidden' : ''}`}
-        onWheel={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
-        onTouchMove={(isSaving || saveComplete) ? (e) => e.preventDefault() : undefined}
-        style={{ transform: 'none' }}
+        className={`relative z-10 mt-auto flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)] sm:mx-auto sm:mb-6 sm:max-w-xl sm:rounded-2xl ${busy ? 'overflow-hidden' : ''}`}
+        onWheel={busy ? (e) => e.preventDefault() : undefined}
+        onTouchMove={busy ? (e) => e.preventDefault() : undefined}
+        onClick={(e) => e.stopPropagation()}
       >
+        <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-gray-200" />
 
-        {/* 子がそのまま入る。スクロールは子（textarea）側のみで発生 */}
-        <div className="space-y-6">
+        <div
+          data-scrollable="true"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-3 pt-3 [-webkit-overflow-scrolling:touch]"
+        >
           {children}
+        </div>
 
-          {/* hideActions が true のとき、フッター（保存/キャンセル）を描画しない */}
-          {!hideActions && (
-            <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-              {/* 保存ボタン：onSaveClick が指定されているときだけ表示（保険） */}
-              {onSaveClick && (
-                <button
-                  onClick={onSaveClick}
-                  className={`w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-lg font-bold hover:shadow-md
-                    ${saveDisabled || isSaving || saveComplete
-                      ? 'bg-gray-300 text-white cursor-not-allowed'
+        {!hideActions && (
+          <div className="shrink-0 space-y-2 border-t border-gray-100 px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
+            {onSaveClick && (
+              <button
+                onClick={onSaveClick}
+                className={`inline-flex min-h-12 w-full items-center justify-center rounded-xl text-base font-bold active:opacity-90
+                    ${saveDisabled || busy
+                      ? 'cursor-not-allowed bg-gray-300 text-white'
                       : 'bg-[#FFCB7D] text-white'}
                   `}
-                  disabled={isSaving || saveComplete || !!saveDisabled}
-                >
-                  {saveLabel}
-                </button>
-              )}
-
-              {/* キャンセルボタン */}
-              <button
-                onClick={onClose}
-                className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
-                disabled={isSaving || saveComplete}
+                disabled={busy || !!saveDisabled}
               >
-                閉じる
+                {saveLabel}
               </button>
-            </div>
-          )}
-        </div>
+            )}
+            <button
+              onClick={onClose}
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-gray-200 text-base font-semibold text-gray-700 active:bg-gray-300"
+              disabled={busy}
+            >
+              閉じる
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>,
     document.body

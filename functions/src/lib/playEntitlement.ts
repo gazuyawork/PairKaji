@@ -36,12 +36,13 @@ export async function applyPlayEntitlement(params: {
     }
 
     if (entitled) {
+      const canceled = subscriptionState === 'SUBSCRIPTION_STATE_CANCELED';
       tx.set(
         userRef,
         {
           plan: 'premium',
           premiumType: 'google_play',
-          subscriptionStatus: 'active',
+          subscriptionStatus: canceled ? 'canceled' : 'active',
           googlePlayProductId: productId ?? PLAY_PRODUCT_ID,
           googlePlayPurchaseToken: purchaseToken,
           googlePlayExpiryTime: expiryTime,

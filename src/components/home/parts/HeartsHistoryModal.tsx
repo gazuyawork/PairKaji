@@ -28,10 +28,17 @@ import StageImage from './StageImage';
 import PreloadHeartGardenImages from './PreloadHeartGardenImages';
 import HeartNutrientFlow from './HeartNutrientFlow';
 
-type Props = { isOpen: boolean; onClose: () => void };
+type Props = {
+  isOpen?: boolean;
+  onClose?: () => void;
+  variant?: 'modal' | 'page';
+  weekOffset?: number;
+  onWeekOffsetChange?: (next: number) => void;
+  hideWeekNav?: boolean;
+};
 
 // --- debug helpers ---
-const DEBUG_HEARTS = true;
+const DEBUG_HEARTS = false;
 const dbg = (...args: unknown[]) => {
   if (DEBUG_HEARTS) console.debug('[HeartsHistoryModal]', ...args);
 };
@@ -258,8 +265,17 @@ function FloatingHearts({
   );
 }
 
-export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
+export default function HeartsHistoryModal({
+  isOpen = true,
+  onClose,
+  variant = 'modal',
+  weekOffset: weekOffsetProp,
+  onWeekOffsetChange,
+  hideWeekNav = false,
+}: Props) {
   const uid = useUserUid();
+  const isPage = variant === 'page';
+  const active = isPage || isOpen;
 
   const [isSaving] = useState(false);
   const [saveComplete] = useState(false);
@@ -267,11 +283,17 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [rawLikesReceived, setRawLikesReceived] = useState<LikeDoc[]>([]);
   const [rawLikesGiven, setRawLikesGiven] = useState<LikeDoc[]>([]);
-  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [weekOffsetInternal, setWeekOffsetInternal] = useState<number>(0);
+  const weekOffset = weekOffsetProp ?? weekOffsetInternal;
+  const setWeekOffset = (updater: number | ((w: number) => number)) => {
+    const next = typeof updater === 'function' ? updater(weekOffset) : updater;
+    if (onWeekOffsetChange) onWeekOffsetChange(next);
+    else setWeekOffsetInternal(next);
+  };
 
   // partner
   useEffect(() => {
-    if (!uid || !isOpen) return;
+    if (!uid || !active) return;
     const qConfirmed = query(
       collection(db, 'pairs'),
       where('status', '==', 'confirmed'),
@@ -305,11 +327,11 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       (err) => console.warn('[HeartsHistoryModal] pairs onSnapshot error:', err)
     );
     return () => unsub();
-  }, [uid, isOpen]);
+  }, [uid, active]);
 
   // received (= 自分が受信者)
   useEffect(() => {
-    if (!uid || !isOpen) return;
+    if (!uid || !active) return;
     const qLikes = query(collection(db, 'taskLikes'), where('participants', 'array-contains', uid));
     dbg('subscribe taskLikes(received) participants contains', uid);
 
@@ -342,11 +364,11 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       (err) => console.warn('[HeartsHistoryModal] received onSnapshot error:', err)
     );
     return () => unsub();
-  }, [uid, isOpen]);
+  }, [uid, active]);
 
   // given (= 自分が送信者)
   useEffect(() => {
-    if (!uid || !isOpen) return;
+    if (!uid || !active) return;
     const qLikes = query(collection(db, 'taskLikes'), where('participants', 'array-contains', uid));
     dbg('subscribe taskLikes(given) participants contains', uid);
 
@@ -379,7 +401,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
       (err) => console.warn('[HeartsHistoryModal] given onSnapshot error:', err)
     );
     return () => unsub();
-  }, [uid, isOpen]);
+  }, [uid, active]);
 
   // ← ここを useCallback でメモ化（uid / partnerId に依存）
   const isReceivedFromPartner = useCallback((senderId?: string | null) => {
@@ -497,7 +519,7 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
   const [driftKey, setDriftKey] = useState(0);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!active) return;
     group('open effect');
     dbg('isOpen=', isOpen, 'weekOffset=', weekOffset, 'totalReceived=', totalReceived);
 
@@ -545,55 +567,65 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
     setDriftKey((k) => k + 1);
     dbg('no new received -> just driftKey++');
     groupEnd();
-  }, [isOpen, weekOffset, totalReceived, lastSeenKey]);
+  }, [active, weekOffset, totalReceived, lastSeenKey]);
 
   const showDrift = totalReceived > 0 || totalGiven > 0;
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!active) return;
     group('open summary');
     dbg('uid=', uid, 'partnerId=', partnerId, 'weekOffset=', weekOffset);
     dbg('weekRangeLabel=', weekRangeLabel);
     dbg('counts:', { totalReceived, totalGiven, totalThisWeek, stage });
     groupEnd();
-  }, [isOpen, uid, partnerId, weekOffset, weekRangeLabel, totalReceived, totalGiven, totalThisWeek, stage]);
+  }, [active, uid, partnerId, weekOffset, weekRangeLabel, totalReceived, totalGiven, totalThisWeek, stage]);
 
-  return (
-    <BaseModal isOpen={isOpen} isSaving={isSaving} saveComplete={saveComplete} onClose={onClose} hideActions>
+  const body = (
+    <>
       <PreloadHeartGardenImages hrefs={[...HEART_GARDEN_IMAGES]} />
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setWeekOffset((w) => w - 1)}
-            className="p-1 rounded hover:bg-gray-100"
-            aria-label="前の週へ"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
+          {!hideWeekNav && (
+            <button
+              type="button"
+              onClick={() => setWeekOffset((w) => w - 1)}
+              className="min-h-11 min-w-11 p-1 rounded hover:bg-gray-100"
+              aria-label="前の週へ"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+          )}
           <h2 className="text-lg font-semibold text-gray-800">
             ありがとう
-            <span className="ml-2 text-sm font-normal text-gray-500">（ {weekRangeLabel} ）</span>
+            {!hideWeekNav && (
+              <span className="ml-2 text-sm font-normal text-gray-500">（ {weekRangeLabel} ）</span>
+            )}
           </h2>
-          <button
-            type="button"
-            onClick={() => setWeekOffset((w) => Math.min(w + 1, 0))}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
-            aria-label="次の週へ"
-            disabled={weekOffset >= 0}
-          >
-            <ChevronRight className="w-5 h-5 text-gray-600" />
-          </button>
+          {!hideWeekNav && (
+            <button
+              type="button"
+              onClick={() => setWeekOffset((w) => Math.min(w + 1, 0))}
+              className="min-h-11 min-w-11 p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+              aria-label="次の週へ"
+              disabled={weekOffset >= 0}
+            >
+              <ChevronRight className="w-5 h-5 text-gray-600" />
+            </button>
+          )}
         </div>
-        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="閉じる">
-          <X className="w-5 h-5 text-gray-500" />
-        </button>
+        {!isPage && (
+          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="閉じる">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        )}
       </div>
 
-      <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden">
+      <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden shadow-sm">
+        <p className="text-xs text-gray-500 z-10">
+          受け取ったハート（ピンク）と贈ったハート（青）で、庭が育ちます。
+        </p>
         <div className="relative z-0" style={{ width: 144, height: 144 }}>
-          {/* ▼▼▼ 根本固定の“ゆらゆら”ラッパ */}
           <div
             className={`garden-sway-container ${feedActive ? 'paused' : ''}`}
             data-stage={resolveStage(totalThisWeek)}
@@ -611,29 +643,29 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
 
         {showDrift && (
           <div className="absolute inset-0 z-10">
-            {/* ★ ここでピンク＝受取数、青＝贈った数 を数量分飛ばす */}
             <FloatingHearts pinkCount={totalReceived} blueCount={totalGiven} fadeInKey={driftKey} />
           </div>
         )}
 
-        <div className="flex items-center gap-6 text-base">
+        <div className="flex items-center gap-6 text-base z-20">
           <span className="inline-flex items-center gap-2">
             <Heart className="w-4 h-4 text-rose-500" />
+            <span className="text-xs text-gray-500">もらった</span>
             <span className="font-semibold tabular-nums">{totalReceived}</span>
           </span>
           <span className="inline-flex items-center gap-2">
             <Heart className="w-4 h-4 text-sky-500" />
+            <span className="text-xs text-gray-500">贈った</span>
             <span className="font-semibold tabular-nums">{totalGiven}</span>
           </span>
         </div>
       </div>
 
-      {/* ▼▼▼ styled-jsx で“根本固定ゆらぎ” */}
       <style jsx>{`
         .garden-sway-container {
           width: 144px;
           height: 144px;
-          transform-origin: 50% 100%; /* 根本（下中央）を支点に回転 */
+          transform-origin: 50% 100%;
           animation-name: garden-sway;
           animation-duration: 5.8s;
           animation-timing-function: ease-in-out;
@@ -644,19 +676,26 @@ export default function HeartsHistoryModal({ isOpen, onClose }: Props) {
         .garden-sway-container.paused {
           animation-play-state: paused;
         }
-
-        /* 段階に応じて速度を微調整（お好みで調整可） */
         .garden-sway-container[data-stage="0"] { animation-duration: 6.2s; }
         .garden-sway-container[data-stage="1"] { animation-duration: 5.8s; }
         .garden-sway-container[data-stage="2"] { animation-duration: 5.2s; }
         .garden-sway-container[data-stage="3"] { animation-duration: 4.8s; }
-
         @keyframes garden-sway {
           0%   { transform: rotate(-1.1deg); }
           50%  { transform: rotate( 1.1deg); }
           100% { transform: rotate(-1.1deg); }
         }
       `}</style>
+    </>
+  );
+
+  if (isPage) {
+    return <div className="max-w-xl mx-auto">{body}</div>;
+  }
+
+  return (
+    <BaseModal isOpen={!!isOpen} isSaving={isSaving} saveComplete={saveComplete} onClose={onClose ?? (() => undefined)} hideActions>
+      {body}
     </BaseModal>
   );
 }

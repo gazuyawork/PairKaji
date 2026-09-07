@@ -43,19 +43,6 @@ function isSimpleTodos(arr: unknown): arr is SimpleTodo[] {
   });
 }
 
-/** 'HH:mm' → minutes, invalid => Infinity */
-function hhmmToMinutes(hhmm?: string): number {
-  const s = (hhmm ?? '').trim();
-  if (!s) return Infinity;
-  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
-  if (!m) return Infinity;
-  const h = Number(m[1]);
-  const mm = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(mm)) return Infinity;
-  if (h < 0 || h > 23 || mm < 0 || mm > 59) return Infinity;
-  return h * 60 + mm;
-}
-
 /* -------------------------------- props -------------------------------- */
 
 interface Props {
@@ -74,12 +61,8 @@ interface Props {
   onReorderTodos: (orderedIds: string[]) => void;
   /** モーダルを閉じるためのコールバック（×ボタン専用） */
   onClose?: () => void;
-  groupDnd?: {
-    setNodeRef: (el: HTMLDivElement | null) => void;
-    style?: React.CSSProperties;
-    handleProps?: React.HTMLAttributes<HTMLButtonElement>;
-    isDragging?: boolean;
-  };
+  /** シート内表示（下から出るモーダル） */
+  inSheet?: boolean;
 }
 
 /* ------------------------------- component ------------------------------ */
@@ -99,7 +82,7 @@ export default function TodoTaskCard({
   onOpenNote,
   onReorderTodos,
   onClose,
-  groupDnd,
+  inSheet = false,
 }: Props) {
   // ルーター & 現在のURL/クエリ、ビュー切替
   const router = useRouter();
@@ -119,7 +102,7 @@ export default function TodoTaskCard({
   const normalizedCategory = String(rawCategory ?? '').normalize('NFKC').trim();
   const categoryLabel =
     normalizedCategory === '' ||
-      !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalizedCategory)
+      !['買い物', '仕事', '家事', '未分類'].includes(normalizedCategory)
       ? '未分類'
       : normalizedCategory;
 
@@ -128,21 +111,19 @@ export default function TodoTaskCard({
   const CatIcon = MaybeIcon ?? Tag; // ← 必ず描画できるコンポーネントに
 
   // ★ ここで実際に使うカテゴリ値を作成（未分類フォールバック）
-  type Category = '買い物' | '料理' | '旅行' | '仕事' | '家事' | '未分類';
+  type Category = '買い物' | '仕事' | '家事' | '未分類';
   const category: Category =
-    (['買い物', '料理', '旅行', '仕事', '家事', '未分類'] as const).includes(categoryLabel as Category)
+    (['買い物', '仕事', '家事', '未分類'] as const).includes(categoryLabel as Category)
       ? (categoryLabel as Category)
       : '未分類';
 
   const [searchQuery, setSearchQuery] = useState('');
-  // 表示（保存順＝表示順にするため preferTimeSort は false）
-  const { canAdd, isCookingCategory, undoneCount, doneCount, finalFilteredTodos, doneMatchesCount } =
+  const { canAdd, undoneCount, doneCount, finalFilteredTodos, doneMatchesCount } =
     useTodoSearchAndSort({
       todos,
       tab,
-      category,             // ← 未定義を解消
+      category,
       searchQuery,
-      preferTimeSort: false,
     });
 
   // 追加用入力
@@ -316,65 +297,25 @@ export default function TodoTaskCard({
     requestAnimationFrame(() => inputRef.current?.focus?.());
   };
 
-  /* -------------------- 自動並び替え（旅行カテゴリ用） -------------------- */
+  /* -------------------- 新規追加は先頭へ -------------------- */
   useEffect(() => {
-    if (category !== '旅行') {
-      // 旅行以外は自動並べ替えなし（新規時のみ先頭固定を行う）
-      const newId = pendingNewIdRef.current;
-      if (!newId) return;
-
-      const ids = todos.map((t) => t.id);
-      if (!ids.includes(newId)) return;
-
-      const rest = todos
-        .filter((t) => t.id !== newId)
-        .map((t, idx) => ({ id: t.id, idx }));
-      const nextIds = [newId, ...rest.sort((a, b) => a.idx - b.idx).map((r) => r.id)];
-
-      const same = ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
-      if (!same) onReorderTodos(nextIds);
-
-      // 並べ替え後も先頭へ寄せる
-      requestAnimationFrame(() => scrollListToTop('smooth'));
-
-      pendingNewIdRef.current = null;
-      return;
-    }
-
-    // === 旅行カテゴリ ===
-    const ids = todos.map((t) => t.id);
     const newId = pendingNewIdRef.current;
-    const hasNew = newId ? ids.includes(newId) : false;
+    if (!newId) return;
 
-    // 元の順を保持するため idx を持たせる
-    const list = todos.map((t, idx) => ({
-      id: t.id,
-      idx,
-      minutes: hhmmToMinutes((t as unknown as { timeStart?: string }).timeStart),
-    }));
+    const ids = todos.map((t) => t.id);
+    if (!ids.includes(newId)) return;
 
-    // 新規は必ず先頭に固定
-    const listWithoutNew = hasNew ? list.filter((x) => x.id !== newId) : list;
+    const rest = todos
+      .filter((t) => t.id !== newId)
+      .map((t, idx) => ({ id: t.id, idx }));
+    const nextIds = [newId, ...rest.sort((a, b) => a.idx - b.idx).map((r) => r.id)];
 
-    // 未入力（minutes === Infinity）→ 元順
-    const withoutTime = listWithoutNew.filter((x) => x.minutes === Infinity).sort((a, b) => a.idx - b.idx);
-    // 時間あり → minutes昇順、同値は元順
-    const withTime = listWithoutNew
-      .filter((x) => x.minutes !== Infinity)
-      .sort((a, b) => (a.minutes !== b.minutes ? a.minutes - b.minutes : a.idx - b.idx));
+    const same = ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
+    if (!same) onReorderTodos(nextIds);
 
-    const targetIds = hasNew
-      ? [newId!, ...withoutTime.map((x) => x.id), ...withTime.map((x) => x.id)]
-      : [...withoutTime.map((x) => x.id), ...withTime.map((x) => x.id)];
-
-    const same = ids.length === targetIds.length && ids.every((v, i) => v === targetIds[i]);
-    if (!same) onReorderTodos(targetIds);
-
-    if (hasNew) {
-      requestAnimationFrame(() => scrollListToTop('smooth'));
-      pendingNewIdRef.current = null;
-    }
-  }, [todos, category, onReorderTodos, scrollListToTop]);
+    requestAnimationFrame(() => scrollListToTop('smooth'));
+    pendingNewIdRef.current = null;
+  }, [todos, onReorderTodos, scrollListToTop]);
 
   /* ------------------------------ 閉じる（×） ------------------------------ */
 
@@ -446,26 +387,14 @@ export default function TodoTaskCard({
 
   return (
     <div
-      ref={groupDnd?.setNodeRef}
-      // 器は 100dvh（動的ビューポート）で統一し、外側スクロールの介入を防ぐ
-      style={{
-        ...(groupDnd?.style ?? {}),
-        minHeight: '100dvh',
-        overscrollBehaviorY: 'contain', // ページ全体のスクロール連鎖を断つ
-      }}
-      className={clsx('relative scroll-mt-4', groupDnd?.isDragging && 'opacity-70')}
+      className="relative flex h-full min-h-0 flex-col"
     >
-      {/* カード全体（ヘッダー＋本文） */}
-      <div className="flex h-full min-h-0 flex-col bg-white overflow-hidden">
-        {/* ===== 固定ヘッダー（タイトル・カテゴリ・タブ・×ボタン・追加入力/FAB） ===== */}
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
         <div
           ref={headerRef}
-          className={clsx(
-            'fixed left-0 right-0 z-50 border-b border-gray-300 bg-gray-100/95 backdrop-blur',
-          )}
-          style={{ top: 'env(safe-area-inset-top, 0px)' }}
+          className="shrink-0 border-b border-gray-300 bg-gray-100/95 backdrop-blur"
         >
-          {/* ▼ タスク名行の白背景を画面幅いっぱいに */}
+          {!inSheet && (
           <div className="bg-white">
             <div className="mx-auto w-full max-w-xl px-2">
               <div className="flex justify-between items-center py-2">
@@ -503,6 +432,7 @@ export default function TodoTaskCard({
               </div>
             </div>
           </div>
+          )}
 
           {/* ▼ 2段目：タブ（左 or 非表示）＋ 入力/FAB（右→全幅） */}
           <div className="mx-auto w-full max-w-xl px-2">
@@ -674,10 +604,7 @@ export default function TodoTaskCard({
           />
           {/* ▲ ダミー入力ここまで */}
         </div>
-        {/* ===== 固定ヘッダー ここまで ===== */}
-
-        {/* ヘッダー分のスペーサー */}
-        <div aria-hidden style={{ height: headerH }} />
+        {!inSheet && <div aria-hidden style={{ height: headerH }} />}
 
         {/* body（スクロール領域） */}
         <div className="relative flex-1 min-h-0 flex flex-col">
@@ -751,12 +678,6 @@ export default function TodoTaskCard({
                           Number.isFinite(todo.quantity) &&
                           (todo.quantity ?? 0) > 0));
                     const hasImage = typeof todo.imageUrl === 'string' && todo.imageUrl.trim() !== '';
-                    const hasRecipe =
-                      category === '料理' &&
-                      ((Array.isArray(todo.recipe?.ingredients) &&
-                        todo.recipe?.ingredients?.some((i) => typeof i?.name === 'string' && i.name.trim() !== '')) ||
-                        (Array.isArray(todo.recipe?.steps) &&
-                          todo.recipe?.steps?.some((s) => typeof s === 'string' && s.trim() !== '')));
 
                     const hasReferenceUrls =
                       Array.isArray(todo.referenceUrls) &&
@@ -781,18 +702,11 @@ export default function TodoTaskCard({
                         return false;
                       });
 
-                    const hasTravelTime =
-                      category === '旅行' &&
-                      (String(todo.timeStart ?? '').trim() !== '' || String(todo.timeEnd ?? '').trim() !== '');
-
-                    // ★ 統合
                     const hasContentForIcon =
                       hasMemo ||
                       hasShopping ||
                       hasImage ||
-                      hasRecipe ||
                       hasReferenceUrls ||
-                      hasTravelTime ||
                       hasChecklist;
 
                     return (
@@ -811,7 +725,6 @@ export default function TodoTaskCard({
                           onOpenNote={onOpenNote}
                           onDeleteTodo={(id) => onDeleteTodo(id)}
                           hasContentForIcon={hasContentForIcon}
-                          category={category}
                         />
                       </div>
                     );
@@ -831,7 +744,7 @@ export default function TodoTaskCard({
               </div>
             )}
 
-            {isCookingCategory && tab === 'undone' && searchQuery.trim() !== '' && doneMatchesCount > 0 && (
+            {tab === 'undone' && searchQuery.trim() !== '' && doneMatchesCount > 0 && (
               <div className="px-1 pr-5 mt-2 text-xs text-gray-600 border-t border-gray-200 pt-2">済に{doneMatchesCount}件見つかりました。</div>
             )}
           </div>

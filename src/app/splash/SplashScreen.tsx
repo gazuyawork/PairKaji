@@ -6,8 +6,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { resolveAuthUser } from '@/lib/authSession';
 import clsx from 'clsx';
 import { markSplashAsShown } from '@/lib/storageUtils';
 
@@ -17,7 +16,7 @@ const container = {
   hidden: { opacity: 1 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.8 },
+    transition: { staggerChildren: 0.08, delayChildren: 0.2 },
   },
 };
 
@@ -53,26 +52,31 @@ export default function SplashScreen() {
     };
   }, []);
 
-  // 認証状態の確認
+  // 認証状態の確認（永続セッションの復元待ち）
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    let cancelled = false;
+    void (async () => {
+      const user = await resolveAuthUser();
+      if (cancelled) return;
       setIsAuthenticated(!!user);
       setAuthChecked(true);
-    });
-    return () => unsubscribe();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // テキスト演出のみ → すぐ遷移（スピナーは出さない）
   useEffect(() => {
     if (!authChecked || isAuthenticated === null) return;
 
-    const t1 = setTimeout(() => setFadeOutText(true), 2000); // テキスト2秒表示
+    const t1 = setTimeout(() => setFadeOutText(true), 900);
     const t2 = setTimeout(() => {
       const dest = isAuthenticated ? '/main?skipQuickSplash=true' : '/login';
       // 次回の遷移先ヒント（任意）
       document.cookie = `pk_last_dest=${encodeURIComponent(dest)}; Path=/; Max-Age=604800; SameSite=Lax`;
       router.replace(dest);
-    }, 2400); // 少しフェードアウトして遷移
+    }, 1200);
 
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [authChecked, isAuthenticated, router]);

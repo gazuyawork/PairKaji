@@ -18,3 +18,6 @@ export const dayNameToNumber: Record<string, string> = {
   '金': '5',
   '土': '6',
 };
+
+export const SUPPORT_EMAIL = 'gazuyawork@gmail.com';
+export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;

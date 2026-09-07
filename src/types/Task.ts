@@ -15,7 +15,6 @@ export type FirestoreTask = {
   dates?: string[];
   isTodo?: boolean;
   done?: boolean;
-  skipped?: boolean;
   completedAt?: string | Timestamp | null;
   completedBy?: string;
   visible?: boolean;
@@ -28,7 +27,7 @@ export type FirestoreTask = {
   time?: string;
 };
 
-export type TaskCategory = '料理' | '買い物' | '旅行' | '未設定';
+export type TaskCategory = '買い物' | '未設定';
 
 // アプリ共通で使うTask型（画面表示用ベース型）
 export type Task = {
@@ -41,7 +40,6 @@ export type Task = {
   dates: string[];
   isTodo: boolean;
   done?: boolean;
-  skipped?: boolean;
   person?: string;
   image?: string;
   groupId?: string | null;

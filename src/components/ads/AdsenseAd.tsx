@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { isNativeMobile } from '@/lib/iap/nativePurchases';
 
 declare global {
   interface Window {
@@ -22,8 +23,9 @@ export default function AdsenseAd({
   format = 'auto',
   testMode = false,
 }: Props) {
+  const native = isNativeMobile();
   const client = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
-  const isReady = Boolean(client && slot);
+  const isReady = Boolean(client && slot) && !native;
 
   // ref で対象の <ins> を特定
   const insRef = useRef<HTMLModElement | null>(null);
@@ -55,6 +57,8 @@ export default function AdsenseAd({
       console.debug('AdSense push error (non-fatal):', e);
     }
   }, [isReady]);
+
+  if (native) return null;
 
   if (!isReady) {
     return (

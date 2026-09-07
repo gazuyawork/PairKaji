@@ -51,13 +51,13 @@ export default function ProfileCard({
 
   return (
     <motion.div
-      className="relative min-h-[260px] bg-white shadow rounded-2xl px-4 py-4 space-y-4 mx-auto w-full max-w-xl"
+      className="relative bg-white shadow rounded-2xl px-4 py-4 space-y-4 mx-auto w-full max-w-xl"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      <p className="ml-4 mb-6">
-        <label className="text-[#5E5E5E] font-semibold">プロフィール</label>
+      <p className="mb-2">
+        <span className="text-sm font-semibold text-[#5E5E5E]">プロフィール</span>
       </p>
 
       <div className="flex flex-row flex-nowrap items-center gap-6 overflow-x-auto">
@@ -141,12 +141,12 @@ export default function ProfileCard({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="min-w-0 flex-grow text-[#5E5E5E] border-b border-gray-300 py-1 focus:outline-none"
+                className="min-w-0 flex-grow min-h-12 text-base text-[#5E5E5E] border-b border-gray-300 py-2 focus:outline-none"
               />
               <button
                 onClick={onEditName}
                 disabled={nameUpdateStatus === 'loading'}
-                className="w-12 h-8 rounded-sm text-sm bg-[#FFCB7D] text-white shadow flex items-center justify-center"
+                className="min-h-11 min-w-14 shrink-0 rounded-lg px-3 text-sm font-semibold bg-[#FFCB7D] text-white shadow active:opacity-90 disabled:opacity-60"
               >
                 {renderEditButtonContent()}
               </button>
@@ -173,7 +173,7 @@ export default function ProfileCard({
               {!isGoogleUser && (
                 <button
                   onClick={onEditEmail}
-                  className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
+                  className="min-h-11 min-w-14 shrink-0 rounded-lg bg-gray-500 px-3 text-sm font-semibold text-white active:opacity-90"
                 >
                   変更
                 </button>
@@ -204,7 +204,7 @@ export default function ProfileCard({
               {!isGoogleUser && (
                 <button
                   onClick={onEditPassword}
-                  className="w-12 h-8 rounded-sm text-sm bg-gray-500 text-white"
+                  className="min-h-11 min-w-14 shrink-0 rounded-lg bg-gray-500 px-3 text-sm font-semibold text-white active:opacity-90"
                 >
                   変更
                 </button>

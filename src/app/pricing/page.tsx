@@ -21,6 +21,20 @@ import {
 } from '@/lib/iap/nativePurchases';
 import { toast } from 'sonner';
 
+function LegalLinks() {
+  return (
+    <p className="text-xs text-gray-500">
+      <Link href="/terms" className="text-blue-600 hover:underline font-medium">
+        利用規約
+      </Link>
+      {' / '}
+      <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+        プライバシーポリシー
+      </Link>
+    </p>
+  );
+}
+
 export default function PricingPage() {
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -28,8 +42,9 @@ export default function PricingPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const native = isNativeMobile();
-  const { plan, isChecking } = useUserPlan();
+  const { plan, isChecking, isCancelPending, expiryLabel } = useUserPlan();
   const isPremium = plan === 'premium';
+  const showPurchaseUi = native && !isChecking && !isPremium;
 
   const isErrorMessage = useMemo(() => {
     if (!message) return false;
@@ -102,74 +117,94 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-12 overflow-y-auto">
-      <Header title="Subscription" />
+      <Header title="応援プラン" />
 
       <div className="mx-auto max-w-3xl text-center mb-6">
         <p className="text-gray-600 text-sm">
-          PairKaji の基本機能は無料です。応援プランは開発継続の支援と、アプリ内案内の非表示のための任意プランです。
+          {isCancelPending
+            ? `解約済みです。${expiryLabel ? `${expiryLabel}まで` : '期限まで'}は案内と広告が非表示のままです。`
+            : isPremium
+              ? '応援プランに加入中です。アプリ内の案内と広告は非表示になっています。'
+              : 'PairKaji の基本機能は無料です。応援プランは開発継続の支援と、アプリ内案内および広告の非表示のための任意プランです。'}
         </p>
       </div>
 
       <div className="max-w-2xl mx-auto">
         <div className="rounded-2xl border border-emerald-300 bg-white p-6 shadow-md flex flex-col">
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
             <h2 className="text-xl font-semibold text-gray-800">応援プラン</h2>
-            <p className="text-md text-gray-500">{priceText || 'Google Play 表示価格'} / 月</p>
+            {isPremium ? (
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                  isCancelPending ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-800'
+                }`}
+              >
+                {isCancelPending ? '解約済み' : '加入中'}
+              </span>
+            ) : (
+              <p className="text-md text-gray-500">{priceText || 'Google Play 表示価格'} / 月</p>
+            )}
           </div>
 
-          <ul className="space-y-2 text-sm text-gray-700 mb-4 mt-3">
-            <li className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              家事・TODO・ペア共有などの基本機能は無料のまま使えます
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              加入中はアプリ内の応援案内を非表示にします
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              Google Play からいつでも解約できます
-            </li>
-          </ul>
+          {!isPremium && (
+            <ul className="space-y-2 text-sm text-gray-700 mb-4 mt-3">
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                家事・TODO・ペア共有などの基本機能は無料のまま使えます
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                加入中はアプリ内の応援案内と広告を非表示にします
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                Google Play からいつでも解約できます
+              </li>
+            </ul>
+          )}
 
-          <label className="flex items-start gap-3 text-sm text-gray-700 mb-4">
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4"
-              checked={agree}
-              onChange={(e) => setAgree(e.target.checked)}
-            />
-            <span>
-              <Link href="/terms" className="text-blue-600 hover:underline font-medium">
-                利用規約
-              </Link>
-              および
-              <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
-                プライバシーポリシー
-              </Link>
-              に同意します。
-            </span>
-          </label>
-
-          {!native ? (
-            <p className="text-sm text-gray-600">
-              定期購入は Google Play からインストールした Android アプリ内でのみ行えます。
-            </p>
-          ) : isChecking ? (
-            <p className="text-sm text-gray-500">状態を確認しています…</p>
+          {isChecking ? (
+            <p className="text-sm text-gray-500 mt-3">状態を確認しています…</p>
           ) : isPremium ? (
             <>
-              <p className="text-sm text-emerald-700 mb-3">応援ありがとうございます。プランは有効です。</p>
-              <button
-                type="button"
-                onClick={() => void openManageSubscriptions()}
-                className="w-full rounded-md border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700"
-              >
-                定期購入を管理する（解約含む）
-              </button>
+              <p className="text-sm text-emerald-800 mt-3 mb-4">
+                {isCancelPending
+                  ? '更新は停止しています。期限後は無料プランに戻ります。'
+                  : '応援ありがとうございます。'}
+              </p>
+              {native && (
+                <button
+                  type="button"
+                  onClick={() => void openManageSubscriptions()}
+                  className="w-full rounded-md border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700"
+                >
+                  定期購入を管理する（解約含む）
+                </button>
+              )}
+              <div className="mt-4">
+                <LegalLinks />
+              </div>
             </>
-          ) : (
+          ) : showPurchaseUi ? (
             <>
+              <label className="flex items-start gap-3 text-sm text-gray-700 mb-4">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={agree}
+                  onChange={(e) => setAgree(e.target.checked)}
+                />
+                <span>
+                  <Link href="/terms" className="text-blue-600 hover:underline font-medium">
+                    利用規約
+                  </Link>
+                  および
+                  <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+                    プライバシーポリシー
+                  </Link>
+                  に同意します。
+                </span>
+              </label>
               <button
                 type="button"
                 onClick={startPurchase}
@@ -187,6 +222,13 @@ export default function PricingPage() {
                 購入を復元
               </button>
             </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600 mb-3">
+                定期購入は Google Play からインストールした Android アプリ内でのみ行えます。
+              </p>
+              <LegalLinks />
+            </>
           )}
         </div>
       </div>
@@ -197,19 +239,13 @@ export default function PricingPage() {
         </div>
       )}
 
-      <div className="mt-6 text-center">
-        <Link href="/main" className="text-sm text-gray-600 hover:underline">
-          ← ホームに戻る
-        </Link>
-      </div>
-
       <ConfirmModal
         isOpen={consentOpen}
-        title="定期購入の同意"
-        message="Google Play の定期購入（自動更新）に進みます。よろしいですか？"
+        title="定期購入の確認"
+        message="Google Play の購入画面に進みます。定期購入は自動更新されます。"
         onConfirm={doPurchase}
         onCancel={() => setConsentOpen(false)}
-        confirmLabel="同意して購入する"
+        confirmLabel="購入画面へ進む"
         cancelLabel="キャンセル"
         isProcessing={loading}
       />

@@ -13,7 +13,17 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '@/lib/firebase';
+import { disableFcmForUser, enableFcmForUser } from '@/lib/native/fcmPush';
+import {
+  isNativeAppPlatform,
+  isNativeNotificationGranted,
+  readNativeNotifyPref,
+  requestNativeNotificationPermission,
+  writeNativeNotifyPref,
+} from '@/lib/timer/nativeNotifications';
 
 type Props = {
   uid: string;
@@ -103,6 +113,8 @@ export default function PushToggle({ uid }: Props) {
         return '通信状況が不安定です。ネットワークをご確認ください。';
       case 'TIMEOUT':
         return '処理がタイムアウトしました。再度お試しください。';
+      case 'FCM_TIMEOUT':
+        return '端末への通知登録に時間がかかっています。通信状況を確認してもう一度お試しください。';
       case 'HTTP_400':
       case 'HTTP_401':
       case 'HTTP_403':
@@ -449,9 +461,28 @@ export default function PushToggle({ uid }: Props) {
     return reg;
   };
 
+  const persistNativeNotifyEnabled = async (enabled: boolean) => {
+    writeNativeNotifyPref(enabled);
+    try {
+      await setDoc(
+        doc(db, 'users', uid),
+        { nativeNotifyEnabled: enabled, fcmEnabled: enabled, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+    } catch {
+      // 端末の許可は通ったので、Firestore 失敗は致命にしない
+    }
+  };
+
   /** 状態再取得（待ちすぎず UI を必ず更新） */
   const refreshSubscribedState = async (): Promise<void> => {
     try {
+      if (isNativeAppPlatform()) {
+        const granted = await isNativeNotificationGranted();
+        setIsSubscribed(granted && readNativeNotifyPref());
+        return;
+      }
+
       const isSecure =
         window.location.protocol === 'https:' ||
         window.location.hostname === 'localhost' ||
@@ -551,6 +582,45 @@ export default function PushToggle({ uid }: Props) {
   // --------------- actions ---------------
   const subscribe = async (): Promise<void> => {
     try {
+      if (isNativeAppPlatform()) {
+        setPhase('sending');
+        const granted = await requestNativeNotificationPermission();
+        if (!granted) {
+          reportError(
+            'SUBSCRIBE',
+            withCode(new Error('Native notification permission not granted'), 'PERMISSION_NOT_GRANTED')
+          );
+          setIsSubscribed(false);
+          setPhase('error');
+          return;
+        }
+        await persistNativeNotifyEnabled(true);
+        try {
+          const fcmOk = await enableFcmForUser(uid);
+          if (!fcmOk) {
+            await persistNativeNotifyEnabled(false);
+            reportError(
+              'SUBSCRIBE',
+              withCode(new Error('FCM permission not granted'), 'PERMISSION_NOT_GRANTED')
+            );
+            setIsSubscribed(false);
+            setPhase('error');
+            return;
+          }
+        } catch (e) {
+          await persistNativeNotifyEnabled(false);
+          const msg = e instanceof Error ? e.message : 'FCM register failed';
+          reportError('SUBSCRIBE', withCode(new Error(msg), msg === 'FCM_TIMEOUT' ? 'FCM_TIMEOUT' : 'NETWORK'));
+          setIsSubscribed(false);
+          setPhase('error');
+          return;
+        }
+        setIsSubscribed(true);
+        setPhase('idle');
+        toast.success('通知を許可しました。アプリを閉じていても届きます。');
+        return;
+      }
+
       if (!('Notification' in window)) {
         reportError('SUBSCRIBE', withCode(new Error('Notifications API not supported'), 'NOT_SUPPORTED'));
         return;
@@ -689,6 +759,18 @@ export default function PushToggle({ uid }: Props) {
   const unsubscribe = async (): Promise<void> => {
     try {
       setPhase('sending');
+      if (isNativeAppPlatform()) {
+        await persistNativeNotifyEnabled(false);
+        try {
+          await disableFcmForUser(uid);
+        } catch {
+          /* 端末側の解除フラグは維持 */
+        }
+        setIsSubscribed(false);
+        setPhase('idle');
+        toast.success('通知を解除しました');
+        return;
+      }
       // 全 registration の購読を解除
       const regs = await getAllRegistrations();
       let any = false;
@@ -718,6 +800,14 @@ export default function PushToggle({ uid }: Props) {
   const sendTest = async (): Promise<void> => {
     try {
       setPhase('sending');
+      if (isNativeAppPlatform()) {
+        const sendTestPush = httpsCallable(functions, 'sendTestPush');
+        await sendTestPush({});
+        setPhase('sent');
+        toast.success('テスト通知を送信しました。アプリを閉じた状態でも届きます。');
+        setTimeout(() => setPhase('idle'), 2500);
+        return;
+      }
       await fetchWithDiagnostics(
         '/api/push/test-send',
         {
@@ -770,15 +860,20 @@ export default function PushToggle({ uid }: Props) {
 
   return (
     <motion.div
-      className="min-h-[160px] bg-white shadow rounded-2xl px-8 py-6 space-y-3 mx-auto w-full max-w-xl"
+      className="min-h-0 bg-white shadow rounded-2xl px-4 py-4 space-y-3 mx-auto w-full max-w-xl"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      <label className="text-[#5E5E5E] font-semibold">通知設定</label>
+      <label className="text-sm font-semibold text-[#5E5E5E]">通知</label>
       <p className="text-sm text-gray-700 mt-4">{statusText}</p>
+      {isNativeAppPlatform() && (
+        <p className="text-xs text-gray-500">
+          許可すると、アプリを閉じていても家事リマインドが届きます。
+        </p>
+      )}
 
-      {phase === 'error' && lastError && (
+      {isDev && phase === 'error' && lastError && (
         <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-700">
           <div className="font-semibold mb-1">エラー詳細</div>
           <div className="space-y-0.5">
@@ -807,7 +902,7 @@ export default function PushToggle({ uid }: Props) {
           <button
             onClick={subscribe}
             disabled={phase === 'sending'}
-            className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-orange-400 to-pink-400 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gradient-to-r from-orange-400 to-pink-400 px-4 text-sm font-semibold text-white shadow active:opacity-90 disabled:opacity-60"
           >
             プッシュ通知を受け取る
           </button>
@@ -818,14 +913,14 @@ export default function PushToggle({ uid }: Props) {
             <button
               onClick={unsubscribe}
               disabled={phase === 'sending'}
-              className="w-full px-4 py-2 rounded-lg bg-gray-300 text-gray-800 text-sm shadow hover:bg-gray-400 disabled:opacity-60"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gray-200 px-4 text-sm font-semibold text-gray-800 active:bg-gray-300 disabled:opacity-60"
             >
               プッシュ通知を解除する
             </button>
             <button
               onClick={sendTest}
               disabled={phase === 'sending'}
-              className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm shadow hover:opacity-90 disabled:opacity-60"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 px-4 text-sm font-semibold text-white active:opacity-90 disabled:opacity-60"
             >
               テスト通知を送信
             </button>
@@ -835,7 +930,7 @@ export default function PushToggle({ uid }: Props) {
         {isSubscribed === null && (
           <button
             onClick={refreshSubscribedState}
-            className="w-full px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm shadow hover:bg-gray-300"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gray-200 px-4 text-sm font-semibold text-gray-700 active:bg-gray-300"
           >
             状態を再取得
           </button>

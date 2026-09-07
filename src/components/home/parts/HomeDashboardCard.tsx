@@ -19,6 +19,7 @@ import {
 import { getThisWeekRangeJST } from '@/lib/weeklyRange';
 import PointsMiniCard from './parts_internal/PointsMiniCard';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
+import { useHousehold } from '@/context/HouseholdContext';
 
 export default function HomeDashboardCard() {
   const today = new Date();
@@ -37,6 +38,7 @@ export default function HomeDashboardCard() {
   // ハート鼓動アニメーションON/OFF
   const [isHeartAnimating, setIsHeartAnimating] = useState(false);
 
+  const { uid, tasks } = useHousehold();
   const loading = useMemo(
     () => heartCount === null || taskCount === null,
     [heartCount, taskCount],
@@ -76,28 +78,38 @@ export default function HomeDashboardCard() {
       }
     );
 
-    // タスク（tasks）リアルタイム購読
-    const tasksQ = query(
-      collection(db, 'tasks'),
-      where('done', '==', true),
-      where('completedAt', '>=', weekStartTs),
-      where('completedAt', '<',  weekEndTs),
-      where('userIds', 'array-contains', user.uid),
-    );
-    const unsubTasks = onSnapshot(
-      tasksQ,
-      (snap) => setTaskCount(snap.size),
-      (e) => {
-        console.error('tasks onSnapshot error:', e);
-        setTaskCount(0);
-      }
-    );
-
     return () => {
       unsubHearts();
-      unsubTasks();
     };
   }, [weekStartTs, weekEndTs]);
+
+  useEffect(() => {
+    if (!uid) {
+      setTaskCount(0);
+      return;
+    }
+    const startMs = weekStartJst.getTime();
+    const endMs = weekEndJst.getTime();
+    const toMs = (v: unknown): number | null => {
+      if (!v) return null;
+      if (v instanceof Timestamp) return v.toDate().getTime();
+      if (typeof v === 'object' && v && 'toDate' in v && typeof (v as { toDate: () => Date }).toDate === 'function') {
+        return (v as { toDate: () => Date }).toDate().getTime();
+      }
+      if (typeof v === 'string') {
+        const t = Date.parse(v);
+        return Number.isFinite(t) ? t : null;
+      }
+      return null;
+    };
+    const count = tasks.filter((t) => {
+      if (!t.done) return false;
+      if (!(t.userId === uid || (t.userIds ?? []).includes(uid))) return false;
+      const ms = toMs(t.completedAt);
+      return ms != null && ms >= startMs && ms < endMs;
+    }).length;
+    setTaskCount(count);
+  }, [tasks, uid, weekStartJst, weekEndJst]);
 
   // モーダルを開いたら鼓動を止める
   useEffect(() => {

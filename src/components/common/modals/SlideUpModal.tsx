@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { usePauseNativeBanner } from '@/hooks/usePauseNativeBanner';
 
 type Props = {
   isOpen: boolean;
@@ -47,6 +48,8 @@ export default function SlideUpModal({
   closeOnEsc = true,
   lockScroll = true,
 }: Props) {
+  usePauseNativeBanner(isOpen);
+
   // Escape で閉じる
   useEffect(() => {
     if (!isOpen || !closeOnEsc) return;
@@ -117,14 +120,14 @@ export default function SlideUpModal({
             >
               <button
                 type="button"
-                className="p-2 rounded-full hover:bg-gray-100"
+                className="p-2 rounded-full min-h-11 min-w-11 active:bg-gray-100"
                 onClick={onClose}
                 aria-label="閉じる"
               >
                 <X className="w-5 h-5 text-red-600" />
               </button>
               {title ? (
-                <h2 className="text-base font-semibold text-[#5E5E5E]">{title}</h2>
+                <div className="min-w-0 flex-1 text-base font-semibold text-[#5E5E5E]">{title}</div>
               ) : (
                 <span className="sr-only">モーダル</span>
               )}

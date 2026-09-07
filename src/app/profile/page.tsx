@@ -9,7 +9,6 @@ import { auth, db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import EmailEditModal from '@/components/profile/EmailEditModal';
 import PasswordEditModal from '@/components/profile/PasswordEditModal';
-import Link from 'next/link';
 import type { PendingApproval } from '@/types/Pair';
 import ProfileCard from '@/components/profile/ProfileCard';
 import PartnerSettings from '@/components/profile/PartnerSettings';
@@ -21,7 +20,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  updateDoc,
   type Query,
   type QuerySnapshot,
   type Unsubscribe,
@@ -30,17 +28,23 @@ import type { Pair } from '@/types/Pair';
 import {
   getUserProfile,
   createUserProfile,
-  createPairInvite,
   removePair,
-  deletePair,
   handleFirestoreError,
-  generateInviteCode,
   saveUserNameToFirestore,
-  approvePair,
   getPendingPairByEmail,
 } from '@/lib/firebaseUtils';
+import {
+  acceptIncomingPairInvite,
+  cancelOutgoingPairInvite,
+  issuePairInvite,
+  joinPairByCode,
+  pairInviteErrorMessage,
+  rejectIncomingPairInvite,
+} from '@/lib/pairInviteApi';
 
 import PushToggle from '@/components/settings/PushToggle';
+import SettingsSection from '@/components/settings/SettingsSection';
+import SettingsNavRow from '@/components/settings/SettingsNavRow';
 import { useUserUid } from '@/hooks/useUserUid';
 import { onAuthStateChanged } from 'firebase/auth';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -49,7 +53,8 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
 // android ネイティブ課金ボタン
-import SubscriptionButton from '@/components/SubscriptionButton';
+import HelpHintsToggle from '@/components/common/HelpHintsToggle';
+import { useUserPlan } from '@/hooks/useUserPlan';
 
 
 export default function ProfilePage() {
@@ -69,6 +74,8 @@ export default function ProfilePage() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [pairBusy, setPairBusy] = useState(false);
   const [isPairConfirmed, setIsPairConfirmed] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pairDocId, setPairDocId] = useState<string | null>(null);
@@ -76,6 +83,14 @@ export default function ProfilePage() {
   const [nameUpdateStatus, setNameUpdateStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
   const uid = useUserUid();
+  const { plan, isChecking: isPlanChecking, isCancelPending } = useUserPlan();
+  const planRowValue = isPlanChecking
+    ? undefined
+    : plan === 'premium'
+      ? isCancelPending
+        ? '解約済み'
+        : '加入中'
+      : '未加入';
 
   // ★★★ 追加：ConfirmModal の制御用 state（共通で使い回し）
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -321,50 +336,50 @@ export default function ProfilePage() {
   }, [uid, email]);
 
   const handleSendInvite = async () => {
-    const user = auth.currentUser;
-    if (!user || !partnerEmail.trim()) {
-      toast.error('メールアドレスを入力してください');
-      return;
-    }
-
-    const generatedCode = generateInviteCode();
-    setInviteCode(generatedCode);
-
+    setPairBusy(true);
     try {
-      const docRef = await createPairInvite(user.uid, partnerEmail.trim(), generatedCode);
-      setPairDocId(docRef.id);
+      const created = await issuePairInvite();
+      setInviteCode(created.inviteCode);
+      setPairDocId(created.pairId);
       toast.success('招待コードを発行しました');
-    } catch (_err: unknown) {
-      handleFirestoreError(_err);
+    } catch (err) {
+      toast.error(pairInviteErrorMessage(err, '招待コードを発行できませんでした'));
+    } finally {
+      setPairBusy(false);
     }
   };
 
-  // パートナー承認時の処理（変更なし）
-  const handleApprovePair = async () => {
-    const user = auth.currentUser;
-    if (!user || !pendingApproval) return;
-
+  const handleJoinByCode = async () => {
+    setPairBusy(true);
     try {
-      if (!pendingApproval?.inviterUid) {
-        console.error('[ERROR] inviterUid が undefined です。処理をスキップします。');
-        toast.error('ペア情報が不完全なため、承認できません。');
-        return;
-      }
-
-      await approvePair(pendingApproval.pairId, pendingApproval.inviterUid, user.uid);
-
-      const userRef = doc(db, 'users', user.uid);
-      const partnerRef = doc(db, 'users', pendingApproval.inviterUid);
-      await Promise.all([
-        updateDoc(userRef, { sharedTasksCleaned: false }),
-        updateDoc(partnerRef, { sharedTasksCleaned: false }),
-      ]);
-
-      toast.success('ペア設定を承認しました');
+      await joinPairByCode(joinCode);
+      toast.success('パートナーとつながりました', {
+        description: 'ホームから、最初の家事を追加できます。',
+      });
+      setJoinCode('');
       setIsPairConfirmed(true);
       setPendingApproval(null);
-    } catch (_err: unknown) {
-      handleFirestoreError(_err);
+    } catch (err) {
+      toast.error(pairInviteErrorMessage(err, '参加できませんでした'));
+    } finally {
+      setPairBusy(false);
+    }
+  };
+
+  const handleApprovePair = async () => {
+    if (!pendingApproval) return;
+    setPairBusy(true);
+    try {
+      await acceptIncomingPairInvite(pendingApproval.pairId);
+      toast.success('ペア設定を承認しました', {
+        description: 'ホームから、最初の家事を追加できます。',
+      });
+      setIsPairConfirmed(true);
+      setPendingApproval(null);
+    } catch (err) {
+      toast.error(pairInviteErrorMessage(err, '承認できませんでした'));
+    } finally {
+      setPairBusy(false);
     }
   };
 
@@ -424,13 +439,13 @@ export default function ProfilePage() {
       confirmLabel: '取り消す',
       onConfirm: async () => {
         try {
-          await deletePair(pairDocId);
+          await cancelOutgoingPairInvite();
           toast.success('招待を取り消しました');
           setInviteCode('');
           setPartnerEmail('');
           setPairDocId(null);
-        } catch (_err: unknown) {
-          handleFirestoreError(_err);
+        } catch (err) {
+          toast.error(pairInviteErrorMessage(err, '取り消しに失敗しました'));
         }
       },
     });
@@ -445,11 +460,11 @@ export default function ProfilePage() {
       confirmLabel: '拒否する',
       onConfirm: async () => {
         try {
-          await deletePair(pendingApproval.pairId);
+          await rejectIncomingPairInvite(pendingApproval.pairId);
           toast.success('招待を拒否しました');
           setPendingApproval(null);
-        } catch (_err: unknown) {
-          handleFirestoreError(_err);
+        } catch (err) {
+          toast.error(pairInviteErrorMessage(err, '拒否できませんでした'));
         }
       },
     });
@@ -457,66 +472,69 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col min-h-screen w-screen bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] mt-16">
-      <Header title="Setting" />
-      <main className="flex-1 px-4 py-6 space-y-3 overflow-y-auto">
+      <Header title="設定" />
+      <main className="flex-1 space-y-6 overflow-y-auto px-4 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center w-full h-[60vh]">
             <LoadingSpinner size={48} />
           </div>
         ) : (
           <>
-            <ProfileCard
-              profileImage={profileImage}
-              setProfileImage={setProfileImage}
-              name={name}
-              setName={setName}
-              isGoogleUser={isGoogleUser}
-              onEditName={onEditNameHandler}
-              onEditEmail={onEditEmailHandler}
-              onEditPassword={onEditPasswordHandler}
-              email={email}
-              isLoading={isLoading}
-              nameUpdateStatus={nameUpdateStatus}
-            />
+            <SettingsSection title="アカウント">
+              <ProfileCard
+                profileImage={profileImage}
+                setProfileImage={setProfileImage}
+                name={name}
+                setName={setName}
+                isGoogleUser={isGoogleUser}
+                onEditName={onEditNameHandler}
+                onEditEmail={onEditEmailHandler}
+                onEditPassword={onEditPasswordHandler}
+                email={email}
+                isLoading={isLoading}
+                nameUpdateStatus={nameUpdateStatus}
+              />
+            </SettingsSection>
 
-            <PartnerSettings
-              isLoading={isLoading}
-              isPairLoading={isPairLoading}
-              pendingApproval={pendingApproval}
-              isPairConfirmed={isPairConfirmed}
-              partnerEmail={partnerEmail}
-              partnerImage={partnerImage ?? '/images/default.png'}
-              inviteCode={inviteCode}
-              pairDocId={pairDocId}
-              onApprovePair={handleApprovePair}
-              onRejectPair={requestRejectPair}
-              onCancelInvite={requestCancelInvite}
-              onSendInvite={handleSendInvite}
-              onRemovePair={requestRemovePair}
-              onChangePartnerEmail={setPartnerEmail}
-              isRemoving={isRemoving}
-            />
+            <SettingsSection title="ペア">
+              <PartnerSettings
+                isLoading={isLoading}
+                isPairLoading={isPairLoading}
+                pendingApproval={pendingApproval}
+                isPairConfirmed={isPairConfirmed}
+                partnerEmail={partnerEmail}
+                partnerImage={partnerImage ?? '/images/default.png'}
+                inviteCode={inviteCode}
+                pairDocId={pairDocId}
+                joinCode={joinCode}
+                onChangeJoinCode={setJoinCode}
+                onApprovePair={handleApprovePair}
+                onRejectPair={requestRejectPair}
+                onCancelInvite={requestCancelInvite}
+                onSendInvite={handleSendInvite}
+                onJoinByCode={handleJoinByCode}
+                onRemovePair={requestRemovePair}
+                isRemoving={isRemoving}
+                busy={pairBusy}
+              />
+            </SettingsSection>
 
-            {uid && <SubscriptionButton userId={uid} />}
-
-            <section className="">
+            <SettingsSection title="プラン / 通知">
+              <div className="overflow-hidden rounded-2xl bg-white shadow">
+                <SettingsNavRow href="/pricing" label="応援プラン" value={planRowValue} />
+              </div>
               {uid && <PushToggle uid={uid} />}
-            </section>
+            </SettingsSection>
 
-            <div className="text-center">
-              <Link href="/pricing" className="text-xs text-indigo-600 underline">
-                応援プランの説明
-              </Link>
-            </div>
-
-            <div className="text-center mt-auto">
-              <Link
-                href="/delete-account"
-                className="text-xs text-gray-400 hover:underline underline decoration-gray-400"
-              >
-                アカウントを削除する
-              </Link>
-            </div>
+            <SettingsSection title="その他">
+              <HelpHintsToggle />
+              <div className="overflow-hidden divide-y divide-gray-100 rounded-2xl bg-white shadow">
+                <SettingsNavRow href="/contact" label="お問い合わせ" />
+                <SettingsNavRow href="/terms" label="利用規約" />
+                <SettingsNavRow href="/privacy" label="プライバシー" />
+                <SettingsNavRow href="/delete-account" label="アカウントを削除する" danger />
+              </div>
+            </SettingsSection>
           </>
         )}
 

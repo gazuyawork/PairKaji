@@ -2,6 +2,7 @@
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { defineSecret } from 'firebase-functions/params';
 import { admin } from './lib/firebaseAdmin';
+import { sendFcmToUser } from './lib/sendFcm';
 import webpush, { PushSubscription, WebPushError } from 'web-push';
 
 const db = admin.firestore();
@@ -240,17 +241,23 @@ export const notifyOnTaskFlag = onDocumentUpdated(
         // メッセージ作成失敗でも Push は続行
       }
 
-      // 2) Web Push 送信
-      const subs = await fetchSubscriptions(uid);
-      console.info('[notifyOnTaskFlag] subscriptions', { uid, count: subs.length });
+      // 2) FCM（アプリ終了中）＋ Web Push
+      const flagUrl = `/main?task=${encodeURIComponent(taskId)}&from=flag`;
+      const fcmSent = await sendFcmToUser(uid, messageTitle, messageBody, {
+        url: flagUrl,
+        type: 'flag',
+        taskId,
+      });
 
-      if (subs.length === 0) {
-        // 購読が無い場合も「処理済み」にしてリトライ抑止
+      const subs = await fetchSubscriptions(uid);
+      console.info('[notifyOnTaskFlag] destinations', { uid, web: subs.length, fcm: fcmSent });
+
+      if (subs.length === 0 && fcmSent === 0) {
         await markHandled(uid, eventId);
         continue;
       }
 
-      let sent = 0;
+      let sent = fcmSent;
       for (const row of subs) {
         try {
           await sendWithAutoVapid(row.sub, pushPayload, keys);

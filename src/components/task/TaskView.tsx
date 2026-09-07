@@ -7,55 +7,48 @@ import EditTaskModal from '@/components/task/parts/EditTaskModal';
 import SearchBox from '@/components/task/parts/SearchBox';
 import {
   collection,
-  onSnapshot,
-  query,
-  where,
   updateDoc,
   deleteDoc,
   doc,
   getDocs,
   serverTimestamp,
-  Timestamp,
   getDoc,
-  DocumentData,
-  QueryDocumentSnapshot,
   writeBatch,
-  setDoc, // ★★★ 追加：CB(Cloud側別領域)への順序保存で使用
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { isToday, parseISO } from 'date-fns';
 import {
   toggleTaskDoneStatus,
   saveSingleTask,
   removeOrphanSharedTasksIfPairMissing,
 } from '@/lib/firebaseUtils';
-import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { toast } from 'sonner';
+import { canCompleteTodoTask, taskShowsOnTodoTab } from '@/lib/checklistTask';
 import { useProfileImages } from '@/hooks/useProfileImages';
-import { motion } from 'framer-motion';
 import {
   Lightbulb,
   LightbulbOff,
   SquareUser,
   Calendar,
+  Clock,
   Flag,
   Search,
   CheckCircle,
+  Circle,
   Trash2,
   ToggleLeft,
   ToggleRight,
   Copy,
   GripVertical,
+  ListTodo,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
-import PremiumPromoCard from '@/components/ads/PremiumPromoCard';
 import type { Task, Period, TaskManageTask } from '@/types/Task';
-import { useUserPlan } from '@/hooks/useUserPlan';
-import { useUserUid } from '@/hooks/useUserUid';
+import { useHousehold } from '@/context/HouseholdContext';
+import { normalizeCategoryForSave } from '@/lib/taskCategory';
 import { createPortal } from 'react-dom';
 import { useView } from '@/context/ViewContext';
-import { skipTaskWithoutPoints } from '@/lib/taskUtils';
 
 /* ========= dnd-kit（タッチ対応のドラッグ＆ドロップ） ========= */
 import {
@@ -74,6 +67,7 @@ import {
 } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
+import clsx from 'clsx';
 
 /* =========================================================
  * 任意プロパティを型安全に読むための補助
@@ -85,7 +79,6 @@ type TaskOptionalFields = {
   isTodo?: boolean;
   completedAt?: unknown;
   completedBy?: string;
-  skipped?: boolean;
   scheduledAt?: unknown;
   datetime?: unknown;
   dates?: string[];
@@ -218,6 +211,43 @@ function generateCopyName(base: string, existingNames: Set<string>) {
   return `${stem} (コピー ${i})`;
 }
 
+const COPY_OMIT_KEYS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'person',
+  'image',
+  'scheduledDate',
+  'categoryName',
+  'categoryLabel',
+  'categoryId',
+  'type',
+  'skipped',
+]);
+
+function isPlainRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype;
+}
+
+function sanitizeForFirestore(input: unknown): unknown {
+  if (input === undefined) return undefined;
+  if (input === null || typeof input !== 'object') return input;
+  if (Array.isArray(input)) {
+    return input
+      .map((item) => sanitizeForFirestore(item))
+      .filter((item) => item !== undefined);
+  }
+  if (!isPlainRecord(input)) return input;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined) continue;
+    if (key === 'recipe' || key === 'timeStart' || key === 'timeEnd') continue;
+    const next = sanitizeForFirestore(value);
+    if (next !== undefined) out[key] = next;
+  }
+  return out;
+}
+
 type Props = {
   initialSearch?: string;
   onModalOpenChange?: (isOpen: boolean) => void;
@@ -245,57 +275,93 @@ function SelectModeRow({
     transition,
   };
 
+  const dateStr = task.dates?.[0] ? task.dates[0].replace(/-/g, '/').slice(5) : '';
+  const timeStr = task.time || '';
+  const order = ['0', '1', '2', '3', '4', '5', '6'];
+  const dayKanjiToNumber: Record<string, string> = {
+    日: '0', 月: '1', 火: '2', 水: '3', 木: '4', 金: '5', 土: '6',
+  };
+  const sortedDays = [...(task.daysOfWeek ?? [])].sort(
+    (a, b) => order.indexOf(dayKanjiToNumber[a] ?? '') - order.indexOf(dayKanjiToNumber[b] ?? '')
+  );
+
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className={[
-        'relative transition-all duration-200 rounded-xl border',
-        'bg-white shadow-sm',
-        'min-h-[58px]',
-        'px-2 py-2',
-        selected ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200',
-        isDragging ? 'shadow-lg' : '',
-      ].join(' ')}
-    >
-      <div className="flex items-center gap-3 px-2 py-1">
-        {/* チェック */}
+    <li ref={setNodeRef} style={style} className="relative transition-all duration-200">
+      <div
+        className={clsx(
+          'w-full relative flex items-center gap-1 overflow-hidden px-2 py-2 [touch-action:pan-y] min-h-[58px]',
+          'text-[#5E5E5E]',
+          'rounded-xl border border-gray-200',
+          'bg-gradient-to-b from-white to-gray-50',
+          'shadow-[0_2px_1px_rgba(0,0,0,0.08)]',
+          selected && 'ring-2 ring-emerald-200 border-emerald-400',
+          isDragging && 'opacity-70',
+          task.done && 'opacity-50 scale-[0.99]'
+        )}
+      >
         <button
           type="button"
           onClick={() => onToggleSelect(task.id)}
-          className={[
-            'inline-flex items-center justify-center ',
-            'w-7 h-7 rounded-full',
-            selected
-              ? 'bg-emerald-500 text-white ring-2 ring-white shadow-md'
-              : 'bg-white text-gray-400 border border-gray-300 shadow-sm',
-          ].join(' ')}
+          className="flex h-10 w-10 shrink-0 items-center justify-center"
           aria-pressed={selected}
           title={selected ? '選択中' : '選択'}
         >
-          <CheckCircle className="w-5 h-5" />
+          {selected ? (
+            <CheckCircle className="h-6 w-6 text-emerald-500" />
+          ) : (
+            <Circle className="h-6 w-6 text-gray-400" />
+          )}
         </button>
 
-        {/* タスク名（タップで選択） */}
         <button
           type="button"
           onClick={() => onToggleSelect(task.id)}
-          className="flex-1 text-left text-[#5E5E5E] font-bold py-1 font-sans truncate"
+          className="min-w-0 flex-1 text-left"
           title={task.name}
         >
-          {task.name || '(無題)'}
+          <div className="flex min-w-0 items-center gap-1">
+            {task.flagged && <Flag className="h-4 w-4 shrink-0 text-red-500" />}
+            <span className="truncate font-sans font-bold text-[#5E5E5E]">{task.name || '(無題)'}</span>
+          </div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1">
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[11px] text-gray-600">
+              {dateStr ? (
+                <span className="inline-flex shrink-0 items-center gap-1 leading-none">
+                  <Calendar size={12} />
+                  <span>{dateStr}</span>
+                </span>
+              ) : null}
+              {sortedDays.length > 0 ? (
+                <div className="flex min-w-0 items-center gap-[2px] overflow-hidden">
+                  {sortedDays.map((d) => (
+                    <div
+                      key={d}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-gray-300 bg-gray-600 text-[10px] leading-none text-white"
+                    >
+                      {d}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {timeStr ? (
+                <span className="inline-flex shrink-0 items-center gap-1 leading-none">
+                  <Clock size={12} />
+                  <span>{timeStr}</span>
+                </span>
+              ) : null}
+            </div>
+          </div>
         </button>
 
-        {/* ドラッグハンドル */}
         <button
           type="button"
-          className="px-1 py-1 cursor-grab active:cursor-grabbing select-none touch-none"
+          className="flex h-10 w-10 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing touch-none select-none"
           aria-label="ドラッグして並び替え"
           title="ドラッグして並び替え"
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="w-5 h-5 text-gray-400" />
+          <GripVertical className="h-5 w-5 text-gray-400" />
         </button>
       </div>
     </li>
@@ -303,39 +369,47 @@ function SelectModeRow({
 }
 
 export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
-  const uid = useUserUid();
+  const {
+    uid,
+    tasks: householdTasks,
+    hasPairConfirmed,
+    partnerId,
+    pairsReady,
+    tasksReady,
+  } = useHousehold();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const keyboardSummonerRef = useRef<HTMLInputElement>(null);
   const { profileImage, partnerImage } = useProfileImages();
-  const { plan, isChecking } = useUserPlan();
   const params = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(INITIAL_TASK_GROUPS);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
-  const [pairStatus, setPairStatus] = useState<'confirmed' | 'none'>('none');
-  const [partnerUserId, setPartnerUserId] = useState<string | null>(null);
+  const pairStatus: 'confirmed' | 'none' = hasPairConfirmed ? 'confirmed' : 'none';
+  const partnerUserId = partnerId;
   const [privateFilter, setPrivateFilter] = useState(false);
   const [flaggedFilter, setFlaggedFilter] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingConfirmResolver = useRef<((value: boolean) => void) | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const pendingDeleteResolver = useRef<((value: boolean) => void) | null>(null);
-  const [showCompletedMap, setShowCompletedMap] = useState<Record<Period, boolean>>({
-    毎日: false,
-    週次: false,
-    不定期: false,
-  });
+  const [showCompleted, setShowCompleted] = useState(false);
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const orphanPromptDismissedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(true);
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
   const todayDate = useMemo(() => new Date().getDate(), []);
-  const { index } = useView();
+  const { index, selectedTaskName, setSelectedTaskName, openTaskList, listOpen } = useView();
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
+  const hasAnyCompleted = useMemo(
+    () => periods.some((p) => (tasksState[p] ?? []).some((t) => t.done)),
+    [tasksState]
+  );
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  const taskRowRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   // 選択モードと選択ID
   const [selectionMode, setSelectionMode] = useState(false);
@@ -404,61 +478,49 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   // 「パートナー解除後の孤児データ削除」案内の判定
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !pairsReady) return;
+    if (hasPairConfirmed) return;
+    if (orphanPromptDismissedRef.current) return;
 
     const userRef = doc(db, 'users', uid);
-    const pairQ = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
-
-    const unsubscribe = onSnapshot(pairQ, async (snapshot) => {
-      const confirmedPairs = snapshot.docs.filter((d) => {
-        const data = d.data() as { status?: string } | undefined;
-        return data?.status === 'confirmed';
-      });
-      if (confirmedPairs.length > 0) {
-        return;
-      }
-
+    (async () => {
       try {
         const userSnap = await getDoc(userRef);
         if (!userSnap.exists()) return;
-
         const data = userSnap.data() as { sharedTasksCleaned?: boolean } | undefined;
-        const cleaned = data?.sharedTasksCleaned;
-
-        if (cleaned === false) {
+        if (data?.sharedTasksCleaned === false && !orphanPromptDismissedRef.current) {
           setShowOrphanConfirm(true);
         }
       } catch (error) {
         console.error('[OrphanCheck] Firestore 読み込み中エラー:', error);
       }
-    });
-
-    return () => unsubscribe();
-  }, [uid]);
+    })();
+  }, [uid, pairsReady, hasPairConfirmed]);
 
   // 空タスクの生成
   const createEmptyTask = useCallback((): Task => {
+    const members = [uid, partnerUserId].filter((id): id is string => Boolean(id));
+    const assignees = hasPairConfirmed && members.length > 1 ? members : uid ? [uid] : [];
     return {
       id: '',
       name: '',
       title: '',
-      point: 5,
+      point: 0,
       period: '毎日',
       dates: [],
       daysOfWeek: [],
       isTodo: false,
       userId: uid ?? '',
-      users: [uid ?? ''],
-      userIds: [],
+      users: assignees,
+      userIds: assignees,
       done: false,
-      skipped: false,
-      visible: true,
+      visible: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       todos: [],
       category: '未設定',
     } as unknown as Task;
-  }, [uid]);
+  }, [uid, partnerUserId, hasPairConfirmed]);
 
   useEffect(() => {
     const handleOpenModal = () => {
@@ -468,37 +530,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     window.addEventListener('open-new-task-modal', handleOpenModal);
     return () => window.removeEventListener('open-new-task-modal', handleOpenModal);
   }, [createEmptyTask]);
-
-  // ペア状態の取得
-  useEffect(() => {
-    const fetchPairStatus = async () => {
-      if (!uid) return;
-      try {
-        const pairsSnap = await getDocs(
-          query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
-        );
-
-        let foundConfirmed = false;
-        let partnerId: string | null = null;
-
-        pairsSnap.forEach((d) => {
-          const data = d.data() as { status?: string; userIds?: string[] };
-          if (data.status === 'confirmed') {
-            foundConfirmed = true;
-            partnerId = data.userIds?.find((id) => id !== uid) ?? null;
-          }
-        });
-
-        setPairStatus(foundConfirmed ? 'confirmed' : 'none');
-        setPartnerUserId(partnerId);
-      } catch (error) {
-        console.error('ペアステータスの取得に失敗:', error);
-        setPairStatus('none');
-        setPartnerUserId(null);
-      }
-    };
-    fetchPairStatus();
-  }, [uid]);
 
   // 今日対象かどうか（期日すぎも含む）
   const isTodayTask = useCallback((task: Task): boolean => {
@@ -537,6 +568,56 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     return false;
   }, []);
 
+  useEffect(() => {
+    if (index !== 1 || listOpen || !selectedTaskName) return;
+    const all = periods.flatMap((p) => tasksState[p] ?? []);
+    const matched =
+      all.find((t) => t.id === selectedTaskName) ?? all.find((t) => t.name === selectedTaskName);
+    if (!matched) {
+      if (isLoading) return;
+      const hasAny = periods.some((p) => (tasksState[p] ?? []).length > 0);
+      if (!hasAny) return;
+      setSelectedTaskName('');
+      return;
+    }
+
+    setSearchTerm('');
+    setShowSearchBox(false);
+    setFlaggedFilter(false);
+    setPrivateFilter(false);
+    if (!isTodayTask(matched)) setTodayFilter(false);
+    if (matched.done) {
+      setShowCompleted(true);
+    }
+    setFocusTaskId(matched.id);
+    setSelectedTaskName('');
+  }, [index, listOpen, selectedTaskName, setSelectedTaskName, tasksState, isLoading, isTodayTask]);
+
+  useEffect(() => {
+    if (index !== 1 || listOpen || !focusTaskId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const tryScroll = () => {
+      if (cancelled) return;
+      const el = taskRowRefs.current[focusTaskId];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      attempts += 1;
+      if (attempts < 24) window.requestAnimationFrame(tryScroll);
+    };
+    const start = window.setTimeout(tryScroll, 80);
+    const clearHighlight = window.setTimeout(() => {
+      if (!cancelled) setFocusTaskId(null);
+    }, 2800);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(start);
+      window.clearTimeout(clearHighlight);
+    };
+  }, [index, listOpen, focusTaskId, todayFilter, showCompleted, searchTerm, flaggedFilter, privateFilter]);
+
   // Done トグル時のロジック
   const toggleDone = async (period: Period, taskId: string) => {
     const target = tasksState[period].find((t) => t.id === taskId);
@@ -555,6 +636,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         setConfirmOpen(true);
       });
       if (!proceed) return;
+    } else {
+      const gate = canCompleteTodoTask(target);
+      if (!gate.ok) {
+        toast.error(gate.reason);
+        openTaskList(target.id);
+        return;
+      }
     }
 
     await toggleTaskDoneStatus(
@@ -567,25 +655,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     );
   };
 
-  // スキップ（ポイント加算なし）
-  const handleSkip = useCallback(
-    async (taskId: string) => {
-      try {
-        if (!uid) {
-          toast.error('ログインしていません');
-          return;
-        }
-        await skipTaskWithoutPoints(taskId, uid);
-        toast.success('タスクをスキップしました（ポイント加算なし）');
-      } catch (e) {
-        console.error('[handleSkip] スキップ失敗:', e);
-        toast.error('スキップに失敗しました');
-      }
-    },
-    [uid]
-  );
-
-  // タスク削除
   const deleteTask = async (_period: Period, id: string) => {
     try {
       await deleteDoc(doc(db, 'tasks', id));
@@ -606,7 +675,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       setEditTargetTask(null);
     } catch (error) {
       console.error('タスク更新に失敗しました:', error);
-      toast.error('タスクの保存に失敗しました');
+      toast.error(error instanceof Error ? error.message : 'タスクの保存に失敗しました');
     }
   };
 
@@ -653,174 +722,100 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     [localOrderMap]
   );
 
-  // タスク購読
+  // 世帯タスクを画面用に整形（日付越えの未完了化は Household の表示補正。Firestore へは書かない）
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    if (!uid) {
+      setIsLoading(false);
+      return;
+    }
+    if (!tasksReady) {
+      setIsLoading(true);
+      return;
+    }
+
+    let cancelled = false;
+    const rawTasks = householdTasks.map((t) => ({ ...t }));
+
+    const grouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
+    for (const t of rawTasks) {
+      if (t.period === '毎日' || t.period === '週次' || t.period === '不定期') {
+        grouped[t.period].push(t);
+      } else {
+        console.warn('無効な period 値:', t.period, t);
+      }
+    }
+
+    const nextOrderMap: Record<string, number> = {};
+    for (const p of periods) {
+      const list = grouped[p];
+      const isPending = pendingOrderPeriods.current.has(p);
+      list.forEach((t, idx) => {
+        const ord = getOpt(t, 'order');
+        const prevLocal = localOrderRef.current[t.id];
+        if (isPending) {
+          nextOrderMap[t.id] =
+            typeof prevLocal === 'number'
+              ? prevLocal
+              : (typeof ord === 'number' ? ord : idx);
+        } else {
+          nextOrderMap[t.id] = (typeof ord === 'number' ? ord : idx);
+        }
+      });
+    }
+
+    const applyOrderAndPaint = (orderMap: Record<string, number>) => {
+      if (cancelled) return;
+      const sortedGrouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
+      for (const p of periods) {
+        const list = grouped[p];
+        const sorted = list
+          .slice()
+          .sort((a, b) => (orderMap[a.id] ?? 0) - (orderMap[b.id] ?? 0));
+        sortedGrouped[p] = sorted;
+      }
+      setLocalOrderMap(orderMap);
+      setTasksState(sortedGrouped);
+      setIsLoading(false);
+    };
+
+    applyOrderAndPaint(nextOrderMap);
 
     (async () => {
-      if (uid === undefined) return;
-      if (!uid) {
-        setIsLoading(false);
-        return;
-      }
+      try {
+        const cbMaps = periods.map(async (p) => {
+          const cbRef = doc(collection(doc(db, 'user_configs', uid), 'task_orders'), p);
+          const snap = await getDoc(cbRef);
+          if (!snap.exists()) return { period: p, ids: null as string[] | null };
+          const data = snap.data() as { ids?: unknown };
+          const orderIds = Array.isArray(data?.ids) ? (data!.ids as string[]) : null;
+          return { period: p, ids: orderIds };
+        });
 
-      const pairsSnap = await getDocs(
-        query(collection(db, 'pairs'), where('userIds', 'array-contains', uid), where('status', '==', 'confirmed'))
-      );
+        const results = await Promise.all(cbMaps);
+        if (cancelled) return;
 
-      const partnerUids = new Set<string>([uid]);
-      pairsSnap.forEach((d) => {
-        const data = d.data() as { userIds?: string[] } | undefined;
-        if (Array.isArray(data?.userIds)) {
-          (data!.userIds!).forEach((id) => partnerUids.add(id));
-        }
-      });
-      const ids = Array.from(partnerUids);
-
-      if (ids.length === 0) {
-        console.warn('userIds が空のため、Firestore クエリをスキップします');
-        setIsLoading(false);
-        return;
-      }
-
-      const qTasks = query(collection(db, 'tasks'), where('userIds', 'array-contains-any', ids));
-
-      unsubscribe = onSnapshot(qTasks, async (snapshot) => {
-        const rawTasks = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => mapFirestoreDocToTask(d));
-
-        // completedAt の日付越え戻し（不定期以外）
-        const updates: Promise<void>[] = [];
-        for (const task of rawTasks) {
-          const completedAt = getOpt(task, 'completedAt');
-
-          if (completedAt != null) {
-            let completedDate: Date | null = null;
-
-            if (typeof completedAt === 'string') {
-              try {
-                completedDate = parseISO(completedAt);
-              } catch {
-                console.warn('parseISO失敗:', completedAt);
-              }
-            } else if (completedAt instanceof Timestamp) {
-              completedDate = completedAt.toDate();
-            } else if (hasToDate(completedAt)) {
-              completedDate = completedAt.toDate();
-            } else {
-              console.warn('不明な completedAt の型:', completedAt);
-            }
-
-            if (completedDate !== null && !isToday(completedDate) && task.period !== '不定期') {
-              const taskRef = doc(db, 'tasks', task.id);
-
-              const taskSnap = await getDoc(taskRef);
-              if (!taskSnap.exists()) {
-                console.warn(`スキップ: タスクが存在しません（${task.id}）`);
-                continue;
-              }
-
-              updates.push(
-                updateDoc(taskRef, {
-                  done: false,
-                  skipped: false,
-                  completedAt: null,
-                  completedBy: '',
-                })
-              );
-
-              (task as unknown as TaskOptionalFields).completedAt = null;
-              (task as unknown as TaskOptionalFields).completedBy = '';
-              task.done = false;
-              task.skipped = false;
-            }
-          }
-        }
-
-        await Promise.all(updates);
-
-        const grouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
-        for (const t of rawTasks) {
-          if (t.period === '毎日' || t.period === '週次' || t.period === '不定期') {
-            grouped[t.period].push(t);
-          } else {
-            console.warn('無効な period 値:', t.period, t);
-          }
-        }
-
-        // ==== 並び順のローカルマップ生成 ====
-        const nextOrderMap: Record<string, number> = {};
-        for (const p of periods) {
-          const list = grouped[p];
-          const isPending = pendingOrderPeriods.current.has(p);
-          list.forEach((t, idx) => {
-            const ord = getOpt(t, 'order');
-
-            // pending 中は "直前にユーザーが確定した localOrder" を最優先し、なければ Firestore の order、最後に idx
-            const prevLocal = localOrderRef.current[t.id];
-            if (isPending) {
-              nextOrderMap[t.id] =
-                typeof prevLocal === 'number'
-                  ? prevLocal
-                  : (typeof ord === 'number' ? ord : idx);
-            } else {
-              nextOrderMap[t.id] = (typeof ord === 'number' ? ord : idx);
-            }
-
+        const mergedMap = { ...nextOrderMap };
+        for (const { period: p, ids: orderIds } of results) {
+          if (!orderIds || pendingOrderPeriods.current.has(p)) continue;
+          const periodTasks = (grouped[p] ?? []).map((t) => t.id);
+          const idSet = new Set(periodTasks);
+          const ordered = orderIds.filter((id) => idSet.has(id));
+          const remain = periodTasks.filter((id) => !idSet.has(id) || !ordered.includes(id));
+          const merged = [...ordered, ...remain];
+          merged.forEach((id, idx) => {
+            mergedMap[id] = idx;
           });
         }
-
-        // ==== CB（Cloud Backup）に保存された順序を適用 ====
-        try {
-          if (uid) {
-            const cbMaps: Array<Promise<{ period: Period; ids: string[] | null }>> = periods.map(async (p) => {
-              const cbRef = doc(collection(doc(db, 'user_configs', uid), 'task_orders'), p);
-              const snap = await getDoc(cbRef);
-              if (!snap.exists()) return { period: p, ids: null };
-              const data = snap.data() as { ids?: unknown };
-              const ids = Array.isArray(data?.ids) ? (data!.ids as string[]) : null;
-              return { period: p, ids };
-            });
-
-            const results = await Promise.all(cbMaps);
-            for (const { period: p, ids } of results) {
-              if (!ids || pendingOrderPeriods.current.has(p)) continue; // pending中はCBで上書きしない
-              const periodTasks = (grouped[p] ?? []).map((t) => t.id);
-              const idSet = new Set(periodTasks);
-              const ordered = ids.filter((id) => idSet.has(id));
-              const remain = periodTasks.filter((id) => !idSet.has(id) || !ordered.includes(id));
-              const merged = [...ordered, ...remain];
-              merged.forEach((id, idx) => {
-                nextOrderMap[id] = idx;
-              });
-            }
-          }
-        } catch (e) {
-          console.warn('[CB load] 並び順の読込に失敗しました（処理は継続します）:', e);
-        }
-
-        // ==== 並び替え済みデータを初期描画に反映 ====
-        const sortedGrouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
-        for (const p of periods) {
-          const list = grouped[p];
-          const sorted = list
-            .slice()
-            .sort((a, b) => (nextOrderMap[a.id] ?? 0) - (nextOrderMap[b.id] ?? 0));
-          sortedGrouped[p] = sorted;
-        }
-
-        setLocalOrderMap(nextOrderMap);
-        setTasksState(sortedGrouped);
-
-        // ==== すべて更新後にローディング解除 ====
-        requestAnimationFrame(() => setIsLoading(false));
-      });
-
-    })().catch(console.error);
+        applyOrderAndPaint(mergedMap);
+      } catch (e) {
+        console.warn('[CB load] 並び順の読込に失敗しました（処理は継続します）:', e);
+      }
+    })();
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      cancelled = true;
     };
-  }, [uid]);
+  }, [uid, householdTasks, tasksReady]);
 
   // 初期検索語の反映
   useEffect(() => {
@@ -926,49 +921,57 @@ const toggleSelectionMode = useCallback(() => {
       const batch = writeBatch(db);
       const idMap: Array<{ origId: string; newId: string }> = [];
 
-      targets.forEach((original) => {
+      for (const original of targets) {
+        const origSnap = await getDoc(doc(db, 'tasks', original.id));
+        if (!origSnap.exists()) {
+          throw new Error(`元タスクが見つかりません: ${original.id}`);
+        }
+        const origData = origSnap.data() as Record<string, unknown>;
+        const rest: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(origData)) {
+          if (COPY_OMIT_KEYS.has(key)) continue;
+          rest[key] = value;
+        }
+
         const newRef = doc(collection(db, 'tasks'));
-        const copiedName = generateCopyName(original.name ?? '無題', existingNames);
+        const copiedName = generateCopyName(
+          (typeof rest.name === 'string' && rest.name) || original.name || '無題',
+          existingNames
+        );
         existingNames.add(copiedName);
 
-        const rest: Record<string, unknown> = { ...(original as unknown as Record<string, unknown>) };
-        delete rest.id;
-        delete (rest as Record<string, unknown>).createdAt;
-        delete (rest as Record<string, unknown>).updatedAt;
-
-        const originalCategory = (original as unknown as { category?: unknown })?.category;
-        const normalizedCategory =
-          typeof originalCategory === 'string' && originalCategory.trim() !== ''
-            ? originalCategory
-            : '未設定';
-
-        const newTask: Record<string, unknown> = {
+        const newTask = sanitizeForFirestore({
           ...rest,
-          id: newRef.id,
           name: copiedName,
-          title: (original as { title?: string }).title ?? copiedName,
+          title: typeof rest.title === 'string' && rest.title.trim() !== '' ? rest.title : copiedName,
           done: false,
-          skipped: false,
           completedAt: null,
           completedBy: '',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          category: normalizedCategory,
-        };
+          category: normalizeCategoryForSave(rest.category),
+        });
 
-        batch.set(newRef, newTask);
+        batch.set(newRef, newTask as Record<string, unknown>);
         idMap.push({ origId: original.id, newId: newRef.id });
-      });
+      }
+
+      if (idMap.length === 0) {
+        toast.error('コピーできるタスクがありませんでした');
+        return;
+      }
 
       await batch.commit();
 
-      // サブコレクション複製・todos 配列差し替え
+      toast.success(`${idMap.length}件のタスクをコピーしました`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+
       for (const { origId, newId } of idMap) {
-        const todosSnap = await getDocs(collection(db, 'tasks', origId, 'todos'));
+        try {
+          const todosSnap = await getDocs(collection(db, 'tasks', origId, 'todos'));
+          if (todosSnap.empty) continue;
 
-        const todoIdMap = new Map<string, string>();
-
-        if (!todosSnap.empty) {
           let subBatch = writeBatch(db);
           let ops = 0;
           const COMMIT_THRESHOLD = 400;
@@ -976,22 +979,16 @@ const toggleSelectionMode = useCallback(() => {
           for (const todoDoc of todosSnap.docs) {
             const data = todoDoc.data() as Record<string, unknown>;
             const newTodoRef = doc(collection(db, 'tasks', newId, 'todos'));
-
-            const payload: Record<string, unknown> = {
+            const payload = sanitizeForFirestore({
               ...data,
               id: newTodoRef.id,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
-            };
-
-            todoIdMap.set(todoDoc.id, newTodoRef.id);
-
-            if ('taskId' in data) {
-              (payload as Record<string, unknown>)['taskId'] = newId;
-            }
+              ...('taskId' in data ? { taskId: newId } : {}),
+            }) as Record<string, unknown>;
 
             subBatch.set(newTodoRef, payload);
-            ops++;
+            ops += 1;
 
             if (ops >= COMMIT_THRESHOLD) {
               await subBatch.commit();
@@ -1003,37 +1000,10 @@ const toggleSelectionMode = useCallback(() => {
           if (ops > 0) {
             await subBatch.commit();
           }
-        }
-
-        const origTaskRef = doc(db, 'tasks', origId);
-        const newTaskRef = doc(db, 'tasks', newId);
-
-        const origSnap = await getDoc(origTaskRef);
-        const origData = origSnap.exists() ? (origSnap.data() as Record<string, unknown>) : null;
-        const origTodos = Array.isArray(origData?.todos) ? (origData!.todos as unknown[]) : null;
-
-        if (origTodos) {
-          const remapped = origTodos.map((item) => {
-            if (item === null || typeof item !== 'object') return item;
-
-            const cloned: Record<string, unknown> = { ...(item as Record<string, unknown>) };
-            const oldId = typeof cloned.id === 'string' ? (cloned.id as string) : null;
-            if (oldId && todoIdMap.has(oldId)) {
-              cloned.id = todoIdMap.get(oldId);
-            }
-            return cloned;
-          });
-
-          await updateDoc(newTaskRef, {
-            todos: remapped,
-            updatedAt: serverTimestamp(),
-          });
+        } catch (subErr) {
+          console.warn('[BulkCopy] サブタスク複製をスキップ:', origId, subErr);
         }
       }
-
-      toast.success(`${selectedIds.size}件のタスクをコピーしました（サブタスクと配列todosを含む）`);
-      setSelectedIds(new Set());
-      setSelectionMode(false);
     } catch (e) {
       console.error('[BulkCopy] 失敗:', e);
       toast.error('タスクのコピーに失敗しました');
@@ -1224,7 +1194,7 @@ const toggleSelectionMode = useCallback(() => {
         <ConfirmModal
           isOpen={showOrphanConfirm}
           title=""
-          message={<div className="text-base font-semibold">パートナーを解消したため、不要なデータを削除します。</div>}
+          message={<div className="text-base font-semibold">パートナーを解消したため、共有タスクなど不要なデータを削除します。</div>}
           onConfirm={async () => {
             if (!uid) return;
             await removeOrphanSharedTasksIfPairMissing();
@@ -1233,31 +1203,28 @@ const toggleSelectionMode = useCallback(() => {
             } catch (err) {
               console.error('[OrphanCheck] フラグ保存に失敗:', err);
             }
+            orphanPromptDismissedRef.current = true;
             setShowOrphanConfirm(false);
           }}
-          confirmLabel="OK"
+          onCancel={() => {
+            orphanPromptDismissedRef.current = true;
+            setShowOrphanConfirm(false);
+          }}
+          confirmLabel="削除する"
+          cancelLabel="後で"
         />
 
-        {isLoading ? (
-          <div className="flex items-center justify-center text-gray-400 text-sm h-200">
-            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-            {!isChecking && (
-              <>
-                <div className="sticky top-0 bg-transparent z-999">
-                  <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
-                    {isSearchVisible && (
-                      <div className="mb-3">
-                        <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">{/* フィルタ群は必要に応じて復活 */}</div>
+        <div>
+            <div className="sticky top-0 bg-transparent z-999">
+              <div className="w-full max-w-xl m-auto pt-2 px-1 rounded-lg">
+                {isSearchVisible && (
+                  <div className="mb-3">
+                    <SearchBox ref={searchInputRef} value={searchTerm} onChange={setSearchTerm} />
                   </div>
-                </div>
-              </>
-            )}
+                )}
+                <div className="flex items-center gap-2">{/* フィルタ群は必要に応じて復活 */}</div>
+              </div>
+            </div>
 
             {(() => {
               const allFilteredTasks = periods
@@ -1265,23 +1232,90 @@ const toggleSelectionMode = useCallback(() => {
                 .filter(
                   (task) =>
                     uid &&
-                    task.userIds?.includes(uid) &&
+                    (task.userId === uid || (task.userIds ?? []).includes(uid)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
                     (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
                     (!flaggedFilter || getOpt(task, 'flagged') === true)
                 );
 
+              const listTasks = allFilteredTasks.filter((task) => taskShowsOnTodoTab(task));
+
               if (allFilteredTasks.length === 0) {
-                return <p className="text-center text-gray-500 mt-6">表示するタスクはありません。</p>;
+                if (isLoading) {
+                  return (
+                    <div className="flex items-center justify-center text-gray-400 text-sm py-16">
+                      <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  );
+                }
+                const hasAnyTask = periods.some((period) =>
+                  (tasksState[period] ?? []).some(
+                    (task) => uid && (task.userId === uid || (task.userIds ?? []).includes(uid))
+                  )
+                );
+                const showPairStart = hasPairConfirmed && !hasAnyTask;
+                return (
+                  <div className="text-center mt-6 px-4">
+                    <p className="text-gray-500 text-sm">
+                      {hasAnyTask
+                        ? '表示するタスクはありません。'
+                        : showPairStart
+                          ? 'つながった相手と、最初の家事を追加しましょう。'
+                          : '右下の＋からタスクを追加できます。'}
+                    </p>
+                    {showPairStart && (
+                      <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new Event('open-new-task-modal'))}
+                        className="mt-4 min-h-11 px-5 rounded-lg bg-[#FFCB7D] text-white text-sm font-semibold"
+                      >
+                        家事を追加する
+                      </button>
+                    )}
+                  </div>
+                );
               }
 
-              return periods.map((period, i) => {
+              return (
+                <>
+                  {!selectionMode && listTasks.length > 0 && (
+                    <div className="mx-auto w-full max-w-xl mb-4">
+                      <div className="flex items-center justify-between mt-0 mb-2 px-2">
+                        <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
+                          <span className="inline-block rounded-full px-3 py-1 text-sm text-white bg-gradient-to-b from-[#7eb6ff] to-[#4d8fe8] shadow-md shadow-black/20 shadow-inner">
+                            リストがある家事
+                          </span>
+                          <span className="text-sm text-gray-600">{listTasks.length} 件</span>
+                        </h2>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {listTasks.map((task) => (
+                          <li key={`list-entry-${task.id}`}>
+                            <button
+                              type="button"
+                              onClick={() => openTaskList(task.id)}
+                              className="flex w-full min-h-[58px] items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-sm active:scale-[0.99]"
+                            >
+                              <ListTodo className="w-5 h-5 shrink-0 text-blue-600" />
+                              <span className="min-w-0 flex-1 truncate font-semibold text-[#5E5E5E]">
+                                {task.name}
+                              </span>
+                              <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                                リスト
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {periods.map((period, i) => {
                 const periodAll = tasksState[period] ?? []; // === [Fix2] 未フィルタの period 全体
                 const baseList = periodAll.filter(
                   (task) =>
                     uid &&
-                    task.userIds?.includes(uid) &&
+                    (task.userId === uid || (task.userIds ?? []).includes(uid)) &&
                     (!searchTerm || task.name.includes(searchTerm)) &&
                     (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
@@ -1321,35 +1355,13 @@ const toggleSelectionMode = useCallback(() => {
                           {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
                         </span>
                       </h2>
-
-                      {baseList.some((t) => t.done) && (
-                        <button
-                          onClick={() => setShowCompletedMap((prev) => ({ ...prev, [period]: !prev[period] }))}
-                          title={
-                            showCompletedMap[period]
-                              ? '完了タスクを表示中（クリックで非表示）'
-                              : '完了タスクを非表示中（クリックで表示）'
-                          }
-                          className={`p-1 mr-3 rounded-full border transition-all duration-300
-                              ${showCompletedMap[period]
-                              ? 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-400 text-yellow-800 shadow-md hover:brightness-105'
-                              : 'bg-gradient-to-b from-gray-100 to-gray-200 border-gray-400 text-gray-600 shadow-inner'
-                            }`}
-                        >
-                          {showCompletedMap[period] ? (
-                            <Lightbulb size={20} className="fill-yellow-500" />
-                          ) : (
-                            <LightbulbOff size={20} className="fill-gray-100" />
-                          )}
-                        </button>
-                      )}
                     </div>
 
                     {/* ====== リスト表示 ====== */}
                     <ul className="space-y-1.5 [touch-action:pan-y]">
                       {(() => {
                         const visibleList = orderedAllForPeriod.filter(
-                          (t) => showCompletedMap[period] || !t.done || searchActive
+                          (t) => showCompleted || !t.done || searchActive
                         );
 
                         if (selectionMode) {
@@ -1357,6 +1369,7 @@ const toggleSelectionMode = useCallback(() => {
                           const visibleIds = visibleList.map((t) => t.id); // === [Fix2] 可視IDを handleDragEnd へ
 
                           return (
+                            <div className="no-tab-swipe space-y-1.5">
                             <DndContext
                               sensors={sensors}
                               collisionDetection={closestCenter}
@@ -1375,16 +1388,24 @@ const toggleSelectionMode = useCallback(() => {
                                 ))}
                               </SortableContext>
                             </DndContext>
+                            </div>
                           );
                         }
 
                         // === 通常モード（TaskCard 表示） ===
                         return visibleList.map((task, idx) => (
-                          <li key={task.id} className="relative transition-all duration-200">
+                          <li
+                            key={task.id}
+                            ref={(el) => {
+                              taskRowRefs.current[task.id] = el;
+                            }}
+                            className="relative transition-all duration-200"
+                          >
                             <TaskCard
                               task={task}
                               period={period}
                               index={idx}
+                              highlighted={focusTaskId === task.id}
                               onToggleDone={toggleDone}
                               onDelete={deleteTask}
                               onEdit={() =>
@@ -1400,9 +1421,6 @@ const toggleSelectionMode = useCallback(() => {
                               isPairConfirmed={pairStatus === 'confirmed'}
                               isPrivate={getOpt(task, 'private') === true}
                               onLongPress={(x, y) => setLongPressPosition({ x, y })}
-                              deletingTaskId={deletingTaskId}
-                              onSwipeLeft={(taskId) => setDeletingTaskId(taskId)}
-                              onSkip={handleSkip}
                             />
                           </li>
                         ));
@@ -1410,15 +1428,16 @@ const toggleSelectionMode = useCallback(() => {
                     </ul>
                   </div>
                 );
-              });
+              })}
+                </>
+              );
             })()}
-          </motion.div>
-        )}
-        {!isLoading && !isChecking && plan === 'free' && <PremiumPromoCard />}
+        </div>
 
         {/* 左下のフローティング列（虫眼鏡は右端） */}
         {!editTargetTask &&
           index === 1 &&
+          !listOpen &&
           typeof window !== 'undefined' &&
           createPortal(
             <div className="w-full pointer-events-none">
@@ -1435,7 +1454,7 @@ const toggleSelectionMode = useCallback(() => {
                 <div className="rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-2 py-2">
                   {/* 横スクロール行 */}
                   <div
-                    className="flex items-center gap-1 overflow-x-auto no-scrollbar pr-1 pl-1 whitespace-nowrap"
+                    className="flex items-center gap-1 overflow-x-auto no-scrollbar horizontal-scroll pr-1 pl-1 whitespace-nowrap"
                     style={{ WebkitOverflowScrolling: 'touch' }}
                   >
                     {/* ==== 選択モードトグル ==== */}
@@ -1453,6 +1472,31 @@ const toggleSelectionMode = useCallback(() => {
                     >
                       {selectionMode ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
                     </button>
+
+                    {hasAnyCompleted && (
+                      <button
+                        onClick={() => setShowCompleted((prev) => !prev)}
+                        aria-pressed={showCompleted}
+                        title={
+                          showCompleted
+                            ? '完了タスクを表示中（クリックで非表示）'
+                            : '完了タスクを非表示中（クリックで表示）'
+                        }
+                        className={[
+                          'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                          'shrink-0',
+                          showCompleted
+                            ? 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-400 text-yellow-800 shadow-md'
+                            : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)]',
+                        ].join(' ')}
+                      >
+                        {showCompleted ? (
+                          <Lightbulb size={20} className="fill-yellow-500" />
+                        ) : (
+                          <LightbulbOff size={20} className="fill-gray-100" />
+                        )}
+                      </button>
+                    )}
 
                     {/* 一括コピー（選択中のみ表示） */}
                     <>

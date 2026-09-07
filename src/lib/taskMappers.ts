@@ -1,7 +1,8 @@
 // src/lib/taskMappers.ts
-import type { Task, FirestoreTask, TaskCategory } from '@/types/Task';
+import type { Task, FirestoreTask } from '@/types/Task';
 import { dayNumberToName } from '@/lib/constants';
 import { QueryDocumentSnapshot } from 'firebase/firestore';
+import { parseCategoryForUI } from '@/lib/taskCategory';
 
 /* ---------- type guards / helpers ---------- */
 
@@ -9,30 +10,6 @@ type WithToDate = { toDate: () => Date };
 function hasToDate(v: unknown): v is WithToDate {
   return !!v && typeof v === 'object' && typeof (v as { toDate?: unknown }).toDate === 'function';
 }
-
-/* =========================================================
- * カテゴリ正規化（UI表示用）
- *  - Firestore の '未設定' / 空文字 / 未定義 → UIでは未選択(null)
- *  - '料理' | '買い物' | '旅行' の揺らぎも吸収して正規化
- * =======================================================*/
-const parseCategoryForUI = (
-  v: unknown
-): TaskCategory | null => {
-  if (typeof v !== 'string') return null;
-  const s = v.normalize('NFKC').trim().toLowerCase();
-
-  // 「未設定」や未選択を表す表記は UI では null にする
-  if (s === '' || s === '未設定' || s === 'みせってい' || s === 'unset' || s === 'unselected') {
-    return null;
-  }
-
-  if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
-  if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
-  if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
-
-  // それ以外（未知の値）は UI 上は未選択扱い
-  return null;
-};
 
 export const mapFirestoreDocToTask = (
   doc: QueryDocumentSnapshot<FirestoreTask>
@@ -60,7 +37,6 @@ export const mapFirestoreDocToTask = (
     period: data.period ?? '毎日',
     point: data.point ?? 0,
     done: data.done ?? false,
-    skipped: data.skipped ?? false,
     completedAt: data.completedAt ?? null,
     completedBy: data.completedBy ?? '',
     person: user,
@@ -90,5 +66,8 @@ export const mapFirestoreDocToTask = (
 
     // カテゴリ：Firestoreの '未設定' は UIでは null（未選択）に変換
     category: parseCategoryForUI((data as { category?: unknown }).category) as Task['category'],
+    todos: Array.isArray((data as { todos?: unknown }).todos)
+      ? ((data as { todos: unknown[] }).todos)
+      : [],
   };
 };

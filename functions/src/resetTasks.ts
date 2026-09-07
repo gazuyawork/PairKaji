@@ -100,7 +100,7 @@ export async function runDailyTaskReset(label: '05:30' | '05:45'): Promise<{ pro
 
   const todayIdx = getJstDayIndex(now);
 
-  // 対象取得：（done=true）と（skipped=true）を OR 的に集約
+  // 対象取得：完了済み。skipped は旧データの復帰用
   const tasksCol = db.collection('tasks');
   const [doneSnap, skippedSnap] = await Promise.all([
     tasksCol.where('done', '==', true).get(),
@@ -142,27 +142,12 @@ export async function runDailyTaskReset(label: '05:30' | '05:45'): Promise<{ pro
     if (!isScheduledToday) continue;
 
     const completedAtDate = toDateSafe(raw?.completedAt);
-    const skippedAtDate   = toDateSafe(raw?.skippedAt);
-    const updatedAtDate   = toDateSafe(raw?.updatedAt);
 
     const isDoneToday = !!(completedAtDate && isSameJstDate(completedAtDate, now));
 
-    let isSkippedToday = false;
-    if (raw?.skipped === true) {
-      if (skippedAtDate) {
-        isSkippedToday = isSameJstDate(skippedAtDate, now);
-      } else if (updatedAtDate) {
-        // skippedAt 無い旧データは updatedAt をフォールバック
-        isSkippedToday = isSameJstDate(updatedAtDate, now);
-      } else {
-        // 最低限の安全策：即日の即時リセットを避ける
-        isSkippedToday = true;
-      }
-    }
-
     let shouldReset = false;
     if (period === '毎日' || period === '週次') {
-      if ((completedAtDate && !isDoneToday) || (raw?.skipped && !isSkippedToday)) {
+      if ((completedAtDate && !isDoneToday) || raw?.skipped === true) {
         shouldReset = true;
       }
     }

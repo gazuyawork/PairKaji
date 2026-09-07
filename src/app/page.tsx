@@ -44,6 +44,9 @@ export default function Home() {
   useEffect(() => {
     const seen = readSplashCookieOnClient();
     setHasSeenSplash(seen);
+    if (process.env.NODE_ENV !== 'production') {
+      window.location.replace('/login');
+    }
   }, []);
 
   // Cookie 読み込み前は何も出さない（必要ならローディング表示に変更可）

@@ -52,6 +52,12 @@ declare global {
   }
 }
 
+function billingLog(...args: unknown[]) {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(...args);
+  }
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
@@ -68,7 +74,7 @@ function hasOptionalStringProp(obj: Record<string, unknown>, key: string): boole
 // ★共通: Billing プラグイン取得用ヘルパー
 function getBillingPlugin(): BillingPlugin | undefined {
   const cap = window.Capacitor;
-  console.log('[billing] window.Capacitor =', cap);
+  billingLog('[billing] window.Capacitor =', cap);
 
   if (!cap || !cap.Plugins) {
     console.warn('[billing] Capacitor または Plugins が見つかりません');
@@ -76,17 +82,17 @@ function getBillingPlugin(): BillingPlugin | undefined {
   }
 
   const plugins = cap.Plugins;
-  console.log('[billing] Capacitor.Plugins keys =', Object.keys(plugins || {}));
+  billingLog('[billing] Capacitor.Plugins keys =', Object.keys(plugins || {}));
 
   const Billing = plugins.Billing;
-  console.log('[billing] Capacitor.Plugins.Billing =', Billing);
+  billingLog('[billing] Capacitor.Plugins.Billing =', Billing);
 
   return Billing;
 }
 
 export async function purchase({ productId, productType = 'subs' }: PurchaseArgs) {
   const native = isNative();
-  console.log('[billing] purchase called, isNative =', native, 'args =', {
+  billingLog('[billing] purchase called, isNative =', native, 'args =', {
     productId,
     productType,
   });
@@ -106,7 +112,7 @@ export async function purchase({ productId, productType = 'subs' }: PurchaseArgs
 
   try {
     const result = await Billing.purchase({ productId, productType });
-    console.log('[billing] Billing.purchase result =', result);
+    billingLog('[billing] Billing.purchase result =', result);
     return result;
   } catch (e) {
     console.error('[billing] Billing.purchase でエラー発生', e);
@@ -123,9 +129,9 @@ export function onPurchaseCompleted(
     return { remove: () => {} };
   }
 
-  console.log('[billing] onPurchaseCompleted: リスナーを登録します');
+  billingLog('[billing] onPurchaseCompleted: リスナーを登録します');
   return Billing.addListener('purchaseCompleted', (e: unknown) => {
-    console.log('[billing] purchaseCompleted event =', e);
+    billingLog('[billing] purchaseCompleted event =', e);
 
     if (!isRecord(e)) return;
     if (!hasStringProp(e, 'purchaseToken')) return;
@@ -147,9 +153,9 @@ export function onPurchaseFailed(cb: (e: { code?: number }) => void) {
     return { remove: () => {} };
   }
 
-  console.log('[billing] onPurchaseFailed: リスナーを登録します');
+  billingLog('[billing] onPurchaseFailed: リスナーを登録します');
   return Billing.addListener('purchaseFailed', (e: unknown) => {
-    console.log('[billing] purchaseFailed event =', e);
+    billingLog('[billing] purchaseFailed event =', e);
 
     if (!isRecord(e)) {
       cb({});
@@ -171,9 +177,9 @@ export function onPurchaseCanceled(cb: () => void) {
     return { remove: () => {} };
   }
 
-  console.log('[billing] onPurchaseCanceled: リスナーを登録します');
+  billingLog('[billing] onPurchaseCanceled: リスナーを登録します');
   return Billing.addListener('purchaseCanceled', () => {
-    console.log('[billing] purchaseCanceled event');
+    billingLog('[billing] purchaseCanceled event');
     cb();
   });
 }

@@ -21,6 +21,7 @@ import {
 
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { auth } from '@/lib/firebase';
+import { clearManualSignOut, resolveAuthUser } from '@/lib/authSession';
 
 export default function LoginClient() {
   const router = useRouter();
@@ -33,11 +34,40 @@ export default function LoginClient() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const reauth = useMemo(() => {
     const v = searchParams?.get('reauth');
     return v === '1';
   }, [searchParams]);
+
+  const nextPath = useMemo(() => {
+    const raw = searchParams?.get('next');
+    if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/main';
+    if (raw.startsWith('/login')) return '/main';
+    return raw;
+  }, [searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const user = await resolveAuthUser();
+        if (cancelled) return;
+        // 開発時は自動で /main に飛ばさない（別アカウントで招待テストするため）
+        if (user && !reauth && process.env.NODE_ENV === 'production') {
+          router.replace(nextPath);
+          return;
+        }
+      } catch {
+        /* セッション確認に失敗してもログイン画面は出す */
+      }
+      if (!cancelled) setCheckingSession(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reauth, nextPath, router]);
 
   useEffect(() => {
     setError(null);
@@ -49,11 +79,12 @@ export default function LoginClient() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      clearManualSignOut();
 
       if (reauth) {
         router.replace('/profile');
       } else {
-        router.replace('/main');
+        router.replace(nextPath);
       }
     } catch (e) {
       const err = e as AuthError;
@@ -84,11 +115,12 @@ export default function LoginClient() {
         const provider = new GoogleAuthProvider();
         await signInWithPopup(auth, provider);
       }
+      clearManualSignOut();
 
       if (reauth) {
         router.replace('/profile');
       } else {
-        router.replace('/main');
+        router.replace(nextPath);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -105,6 +137,17 @@ export default function LoginClient() {
   const handleGoSignup = () => {
     router.push('/register');
   };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen w-full bg-[#F5EADB] flex items-center justify-center px-4">
+        <div className="inline-flex items-center gap-2 text-neutral-700">
+          <LoadingSpinner size={18} />
+          <span>確認中...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-[#F5EADB] flex items-center justify-center px-4">

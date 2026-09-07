@@ -19,14 +19,14 @@ import {
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask, TaskCategory } from '@/types/Task';
+import { normalizeCategoryForSave } from '@/lib/taskCategory';
 import { db, auth } from '@/lib/firebase';
 import { handleFirestoreError } from './errorUtils';
+import { canCompleteTodoTask } from '@/lib/checklistTask';
 
 /* =========================================================
  * 型・型ガード
  * =======================================================*/
-// type Category = '料理' | '買い物';
-
 type PairDoc = {
   userIds?: string[];
   status?: 'pending' | 'confirmed' | 'rejected';
@@ -44,7 +44,6 @@ type TaskDocMinimal = {
   time?: string;
   isTodo?: boolean;
   done?: boolean;
-  skipped?: boolean;
   groupId?: string | null;
   completedAt?: unknown;
   completedBy?: string;
@@ -70,10 +69,6 @@ type TodoDoc = {
   imageUrl?: string | null;
   referenceUrls?: string[];
   referenceUrlLabels?: string[];
-  /** 旅行時の時間帯（"HH:mm"）。存在しない場合は未定義 */
-  timeStart?: string;
-  timeEnd?: string;
-
   // ▼ 追加：チェックリスト
   checklist?: ChecklistItem[];
 };
@@ -131,7 +126,7 @@ const stripUndefinedDeep = <T>(input: T): T => {
 /* =========================================================
  * 保存用正規化
  *  - Firestore は undefined を保存しないので削除
- *  - category は必ず '未設定' | '料理' | '買い物' | '旅行' のいずれかに統一
+ *  - category は必ず '未設定' | '買い物' のいずれかに統一
  * =======================================================*/
 type NormalizedTaskPayload = {
   userId: string;
@@ -147,18 +142,7 @@ type NormalizedTaskPayload = {
   time: string;
   note: string;
   private: boolean;
-};
-
-// ★ 保存用カテゴリ正規化：''/null/undefined/未設定系 → '未設定'
-const normalizeCategoryForSave = (v: unknown): TaskCategory => {
-  const s = typeof v === 'string' ? v.normalize('NFKC').trim().toLowerCase() : '';
-  if (s === '' || s === '未設定' || s === 'みせってい' || s === 'unset' || s === 'unselected') {
-    return '未設定';
-  }
-  if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
-  if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
-  if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
-  return '未設定';
+  isTodo: boolean;
 };
 
 const normalizeTaskPayload = (
@@ -197,6 +181,7 @@ const normalizeTaskPayload = (
     time: isString(r.time) ? r.time : '',
     note: isString(r.note) ? r.note : r.note == null ? '' : String(r.note),
     private: r.private === true,
+    isTodo: r.isTodo === true,
   };
 
   // 念のため undefined 除去
@@ -215,14 +200,12 @@ const normalizeTaskPayload = (
 /** 指定 uid を含む confirmed ペアの userIds を取得 */
 export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
   try {
-    const qy = query(
-      collection(db, 'pairs'),
-      where('userIds', 'array-contains', uid),
-      where('status', '==', 'confirmed')
+    const snapshot = await getDocs(
+      query(collection(db, 'pairs'), where('userIds', 'array-contains', uid))
     );
-    const snapshot = await getDocs(qy);
-    if (snapshot.empty) return [];
-    const data = snapshot.docs[0].data() as PairDoc;
+    const confirmed = snapshot.docs.find((d) => (d.data() as PairDoc).status === 'confirmed');
+    if (!confirmed) return [];
+    const data = confirmed.data() as PairDoc;
     return Array.isArray(data.userIds) ? data.userIds : [];
   } catch (e) {
     console.error('ペア情報の取得に失敗:', e);
@@ -277,7 +260,6 @@ export const buildFirestoreTaskData = (
     time: task.time ?? '',
     isTodo: t.isTodo ?? false,
     done: t.done ?? false,
-    skipped: t.skipped ?? false,
     groupId: t.groupId ?? null,
     completedAt: t.completedAt ?? null,
     completedBy: t.completedBy ?? '',
@@ -311,16 +293,18 @@ const checkDuplicateSharedTaskName = async (
   const pairUserIds = await fetchPairUserIds(uid);
   if (pairUserIds.length === 0) return false;
 
-  const qy = query(
-    collection(db, 'tasks'),
-    where('name', '==', name),
-    where('private', '==', false),
-    where('userIds', 'array-contains-any', pairUserIds)
+  const snapshot = await getDocs(
+    query(collection(db, 'tasks'), where('userIds', 'array-contains', uid))
   );
-
-  const snapshot = await getDocs(qy);
-  const filtered = snapshot.docs.filter((d) => d.id !== excludeTaskId);
-  return filtered.length > 0;
+  const target = name.trim();
+  return snapshot.docs.some((d) => {
+    if (excludeTaskId && d.id === excludeTaskId) return false;
+    const data = d.data() as { name?: unknown; private?: unknown; userIds?: unknown };
+    if (data.private === true) return false;
+    if (String(data.name ?? '').trim() !== target) return false;
+    const ids = Array.isArray(data.userIds) ? data.userIds : [];
+    return pairUserIds.some((id) => ids.includes(id));
+  });
 };
 
 /* =========================================================
@@ -357,19 +341,8 @@ export const addTaskCompletion = async (
 export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
   try {
     // ペア userIds
-    let userIds: string[] | null = null;
-    const pairsSnap = await getDocs(
-      query(
-        collection(db, 'pairs'),
-        where('userIds', 'array-contains', uid),
-        where('status', '==', 'confirmed')
-      )
-    );
-    pairsSnap.forEach((d) => {
-      const data = d.data() as PairDoc;
-      if (Array.isArray(data.userIds)) userIds = data.userIds;
-    });
-    const resolvedUserIds = userIds ?? [uid];
+    const resolvedUserIds = (await fetchPairUserIds(uid));
+    const householdIds = resolvedUserIds.length > 0 ? resolvedUserIds : [uid];
 
     // private → shared へ変更する場合のみ重複名チェック
     const isPrivate = task.private ?? false;
@@ -392,11 +365,12 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
         time: task.time,
         note: (task as unknown as TaskDocMinimal).note,
         visible: (task as unknown as TaskDocMinimal).visible,
+        isTodo: (task as unknown as TaskDocMinimal).isTodo === true,
         users: (task as unknown as TaskDocMinimal).users,
         category: (task as unknown as TaskDocMinimal).category,
       },
       uid,
-      resolvedUserIds
+      householdIds
     );
 
     await saveTaskToFirestore(task.id, taskData);
@@ -554,7 +528,7 @@ export const saveTaskToFirestore = async (
       await addDoc(collection(db, 'tasks'), createPayload);
     }
   } catch (err) {
-    handleFirestoreError(err);
+    throw err;
   }
 };
 
@@ -606,10 +580,9 @@ export const removePartnerFromUserTasks = async (partnerUid: string) => {
 };
 
 /* =========================================================
- * ToDo 部分更新（旅行の時間帯保存に対応）
+ * ToDo 部分更新
  *  + チェックリスト保存を追加
  *  + ★ todo text（名称）保存を追加（今回の修正点）
- *  ※ 料理の材料/手順(recipe)はバグ多発のため保存対象から除外
  * =======================================================*/
 export const updateTodoInTask = async (
   taskId: string,
@@ -625,9 +598,6 @@ export const updateTodoInTask = async (
     imageUrl?: string | null;
     referenceUrls?: string[];
     referenceUrlLabels?: string[];
-    /** 旅行時の時間帯。null指定でフィールド削除 */
-    timeStart?: string | null;
-    timeEnd?: string | null;
 
     // ▼ 追加：チェックリスト（空配列可・全置換）
     checklist?: ChecklistItem[];
@@ -719,28 +689,6 @@ export const updateTodoInTask = async (
     next = { ...next, checklist: normalized };
   }
 
-  // --- 旅行の時間帯 timeStart/timeEnd の扱い ---
-  if (Object.prototype.hasOwnProperty.call(updates, 'timeStart')) {
-    if (updates.timeStart === null) {
-      // フィールド削除
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { timeStart: _omit, ...rest } = next;
-      next = rest as TodoDoc;
-    } else if (typeof updates.timeStart === 'string') {
-      next = { ...next, timeStart: updates.timeStart };
-    }
-  }
-  if (Object.prototype.hasOwnProperty.call(updates, 'timeEnd')) {
-    if (updates.timeEnd === null) {
-      // フィールド削除
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { timeEnd: _omit, ...rest } = next;
-      next = rest as TodoDoc;
-    } else if (typeof updates.timeEnd === 'string') {
-      next = { ...next, timeEnd: updates.timeEnd };
-    }
-  }
-
   // 置換して保存
   const newTodos = todos.slice();
   newTodos[index] = next;
@@ -813,6 +761,17 @@ export const toggleTaskDoneStatus = async (
     }
 
     if (done) {
+      const currentSnap = await getDoc(taskRef);
+      const currentData = (currentSnap.data() || {}) as TaskDocMinimal;
+      const gate = canCompleteTodoTask({
+        isTodo: currentData.isTodo,
+        visible: currentData.visible,
+        todos: currentData.todos,
+      });
+      if (!gate.ok) {
+        throw new Error(gate.reason);
+      }
+
       // 完了
       await updateDoc(taskRef, {
         done: true,
@@ -853,25 +812,6 @@ export const toggleTaskDoneStatus = async (
       const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref));
       await Promise.all(deletePromises);
     }
-  } catch (error) {
-    handleFirestoreError(error);
-  }
-};
-
-/* =========================================================
- * スキップ（履歴/ポイントなしで done=true）
- * =======================================================*/
-export const skipTaskWithoutPoints = async (taskId: string, userId: string): Promise<void> => {
-  try {
-    const taskRef = doc(db, 'tasks', taskId);
-    await updateDoc(taskRef, {
-      done: true,
-      skipped: true,
-      completedAt: null,
-      completedBy: userId,
-      flagged: false,
-      updatedAt: serverTimestamp(),
-    });
   } catch (error) {
     handleFirestoreError(error);
   }
@@ -975,10 +915,7 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
   const copiedName = baseName.endsWith('_コピー') ? baseName : `${baseName}_コピー`;
 
   // ★ カテゴリを '未設定' 含む正規化に
-  const normalizedCategory: TaskCategory =
-    src.category === '料理' || src.category === '買い物' || src.category === '旅行' || src.category === '未設定'
-      ? (src.category as TaskCategory)
-      : '未設定';
+  const normalizedCategory: TaskCategory = normalizeCategoryForSave(src.category);
 
   // 新しい自分専用タスクの作成データ（undefined は後で除去）
   const newTaskPayload: Record<string, unknown> = {
@@ -1017,7 +954,6 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
 
     // 履歴リセット
     done: false,
-    skipped: false,
     completedAt: null,
     completedBy: '',
 

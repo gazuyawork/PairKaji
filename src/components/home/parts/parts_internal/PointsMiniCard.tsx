@@ -20,8 +20,7 @@ import {
 } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import EditPointModal from '@/components/home/parts/EditPointModal';
-import { fetchPairUserIds } from '@/lib/firebaseUtils';
-import { useUserUid } from '@/hooks/useUserUid';
+import { useHousehold } from '@/context/HouseholdContext';
 import HelpPopover from '@/components/common/HelpPopover';
 
 /* =========================
@@ -93,19 +92,22 @@ function getBadgeStorageKey(uid: string, start: Date, end: Date) {
    本体
 ========================= */
 export default function PointsMiniCard() {
-  const uid = useUserUid();
+  const { uid, householdUids, hasPairConfirmed } = useHousehold();
+  const hasPartner = hasPairConfirmed;
+  const targetIds = useMemo(
+    () => (householdUids.length > 0 ? householdUids : uid ? [uid] : []),
+    [householdUids, uid]
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [selfPoints, setSelfPoints] = useState(0);
   const [partnerPoints, setPartnerPoints] = useState(0);
   const [maxPoints, setMaxPoints] = useState(500);
-  const [hasPartner, setHasPartner] = useState(false);
 
   const [selfTargetPoint, setSelfTargetPoint] = useState<number | null>(null);
   const [partnerTargetPoint, setPartnerTargetPoint] = useState<number | null>(null);
 
-  const [targetIds, setTargetIds] = useState<string[]>([]);
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
   // EditPointModal に渡す最低限の props
@@ -151,28 +153,6 @@ export default function PointsMiniCard() {
       setNeedsRefresh(localStorage.getItem(key) === '1');
     } catch {}
   }, [uid, weekStart, weekEnd]);
-
-  // ペア検出
-  useEffect(() => {
-    if (!uid) return;
-    const qPairs = query(collection(db, 'pairs'), where('userIds', 'array-contains', uid));
-    const unsub = onSnapshot(qPairs, (snap) => {
-      if (snap.empty) {
-        setHasPartner(false);
-        setTargetIds([uid]);
-        return;
-      }
-      const raw = snap.docs[0].data() as DocumentData;
-      const userIds = (raw?.userIds ?? []) as unknown[];
-      const arr = Array.isArray(userIds)
-        ? userIds.filter((x): x is string => typeof x === 'string')
-        : [uid];
-      const unique = Array.from(new Set(arr));
-      setHasPartner(unique.length > 1);
-      setTargetIds(unique);
-    });
-    return () => unsub();
-  }, [uid]);
 
   // 今週の合計ポイント（完了ログ）
   useEffect(() => {
@@ -374,7 +354,7 @@ export default function PointsMiniCard() {
     // 自分の保存直後の onSnapshot を無視
     suppressNextSelfChangeRef.current = true;
 
-    const pairIds = await fetchPairUserIds(uid);
+    const pairIds = householdUids.length > 0 ? householdUids : [uid];
     await setDoc(
       ref,
       {

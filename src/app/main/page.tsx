@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react';
 import { ViewProvider } from '@/context/ViewContext';
+import { HouseholdProvider } from '@/context/HouseholdContext';
 import MainContent from './MainContent';
 import RequireAuth from '@/components/auth/RequireAuth';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -22,7 +23,9 @@ export default function MainPage() {
       <RequireAuth>
         {/* ViewProviderの初期化ロジックは MainContent 側でやる */}
         <ViewProvider>
-          <MainContent />
+          <HouseholdProvider>
+            <MainContent />
+          </HouseholdProvider>
         </ViewProvider>
       </RequireAuth>
     </Suspense>

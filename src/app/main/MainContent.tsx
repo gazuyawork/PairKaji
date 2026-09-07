@@ -5,17 +5,19 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import FooterNav from '@/components/common/FooterNav';
 import HomeView from '@/components/home/HomeView';
 import TaskView from '@/components/task/TaskView';
 import TodoView from '@/components/todo/TodoView';
+import HistoryView from '@/components/history/HistoryView';
 import QuickSplash from '@/components/common/QuickSplash';
 import Header from '@/components/common/Header';
 import { useView } from '@/context/ViewContext';
+import { useFreeHomeBannerAd } from '@/hooks/useFreeHomeBannerAd';
 import clsx from 'clsx';
 import { Plus } from 'lucide-react';
+import PairPremiumHint from '@/components/home/parts/PairPremiumHint';
 
 /**
  * 認証ガードは親 (page.tsx) の <RequireAuth> で実施。
@@ -24,7 +26,7 @@ import { Plus } from 'lucide-react';
 export default function MainContent() {
   const params = useSearchParams(); // ReadonlyURLSearchParams | null でも安全に扱う
   const searchKeyword = params?.get('search') ?? '';
-  const { index, setIndex } = useView();
+  const { index, setIndex, listOpen } = useView();
 
   const [showQuickSplash, setShowQuickSplash] = useState(false);
   const [contentVisible, setContentVisible] = useState(false);
@@ -34,7 +36,8 @@ export default function MainContent() {
     const view = params?.get('view');
     if (view === 'task') setIndex(1);
     else if (view === 'home') setIndex(0);
-    else if (view === 'todo') setIndex(2);
+    else if (view === 'todo') setIndex(1);
+    else if (view === 'history') setIndex(2);
   }, [params, setIndex]);
 
   // QuickSplash の制御
@@ -62,7 +65,7 @@ export default function MainContent() {
 
   // タイトルは index から算出（メモ化）
   const currentTitle = useMemo(() => {
-    const titles = ['Home', 'Task', 'Todo'];
+    const titles = ['ホーム', '家事', '履歴'];
     return titles[index] ?? 'タイトル未設定';
   }, [index]);
 
@@ -75,6 +78,7 @@ export default function MainContent() {
     <AuthedMainContent
       index={index}
       setIndex={setIndex}
+      listOpen={listOpen}
       contentVisible={contentVisible}
       searchKeyword={searchKeyword}
       currentTitle={currentTitle}
@@ -82,38 +86,88 @@ export default function MainContent() {
   );
 }
 
+/** 離れたタブをすぐ破棄すると再購読でスピナーが出るため、短時間だけ温存する */
+const TAB_WARM_MS = 30_000;
+
+function useMountedTabs(index: number) {
+  const [mounted, setMounted] = useState(() => new Set<number>([index]));
+
+  useEffect(() => {
+    setMounted((prev) => {
+      if (prev.has(index)) return prev;
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
+
+    const timer = window.setTimeout(() => {
+      setMounted((prev) => {
+        if (prev.size === 1 && prev.has(index)) return prev;
+        return new Set([index]);
+      });
+    }, TAB_WARM_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [index]);
+
+  return mounted;
+}
+
+function tabPanelClass(active: boolean, touchList: boolean) {
+  return clsx(
+    'h-full overflow-y-auto',
+    touchList && '[-webkit-overflow-scrolling:touch] [touch-action:pan-y]',
+    // WebView では visibility:hidden の重ね合わせが残像になるため、非表示は描画から外す
+    !active && 'hidden'
+  );
+}
+
+function shouldIgnoreTabSwipe(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], .horizontal-scroll, .no-tab-swipe, [data-no-tab-swipe]'
+    )
+  );
+}
+
 /** ログイン後だけ必要な UI/Hook（useSwipeable 等）はこの子に集約 */
 function AuthedMainContent(props: {
   index: number;
   setIndex: (n: number) => void;
+  listOpen: boolean;
   contentVisible: boolean;
   searchKeyword: string;
   currentTitle: string;
 }) {
-  const { index, setIndex, contentVisible, searchKeyword, currentTitle } = props;
+  const { index, setIndex, listOpen, contentVisible, searchKeyword, currentTitle } = props;
+  const mountedTabs = useMountedTabs(index);
+  useFreeHomeBannerAd(index === 0);
 
   const handleSwipe = (direction: 'left' | 'right') => {
+    if (listOpen) return;
     if (direction === 'left' && index < 2) setIndex(index + 1);
     else if (direction === 'right' && index > 0) setIndex(index - 1);
   };
 
   const swipeHandlers = useSwipeable({
     onSwiped: (e) => {
-      if (e.event && e.event.target instanceof HTMLElement) {
-        const targetElement = e.event.target as HTMLElement;
-        if (!targetElement.closest('.swipe-area')) return;
-      }
+      if (e.dir !== 'Left' && e.dir !== 'Right') return;
+      if (e.absY >= e.absX * 0.65) return;
+      if (shouldIgnoreTabSwipe(e.event?.target ?? null)) return;
       if (e.dir === 'Left') handleSwipe('left');
-      else if (e.dir === 'Right') handleSwipe('right');
+      else handleSwipe('right');
     },
-    delta: 50,
+    delta: 80,
     trackTouch: true,
-    trackMouse: true,
+    trackMouse: false,
+    preventScrollOnSwipe: false,
     touchEventOptions: { passive: true },
   });
 
   return (
-    <div className="h-[calc(100dvh-150px)]">
+    <div className="h-[calc(100dvh-150px)]" {...swipeHandlers}>
+      <PairPremiumHint />
       <Header title={currentTitle} />
       <main
         className={clsx(
@@ -121,30 +175,26 @@ function AuthedMainContent(props: {
           contentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
-        <div className="w-full h-full overflow-hidden">
-          <motion.div
-            className="relative flex w-[300vw] h-full"
-            initial={false}
-            animate={{ left: `-${index * 100}vw` }}
-            transition={{
-              type: 'tween',
-              ease: [0.25, 0.1, 0.25, 1],
-              duration: 0.35,
-            }}
-          >
-            <div className="w-screen h-full flex-shrink-0 overflow-y-auto">
+        <div className="relative w-full h-full overflow-hidden">
+          {mountedTabs.has(0) && (
+            <div className={tabPanelClass(index === 0, false)} aria-hidden={index !== 0}>
               <HomeView />
             </div>
-            <div className="w-screen h-full flex-shrink-0 overflow-y-auto [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
+          )}
+          {mountedTabs.has(1) && (
+            <div className={tabPanelClass(index === 1, true)} aria-hidden={index !== 1}>
               <TaskView initialSearch={searchKeyword} />
             </div>
-            <div className="w-screen h-full flex-shrink-0 overflow-y-auto [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-              <TodoView />
+          )}
+          {mountedTabs.has(2) && (
+            <div className={tabPanelClass(index === 2, true)} aria-hidden={index !== 2}>
+              <HistoryView />
             </div>
-          </motion.div>
+          )}
+          {listOpen && <TodoView />}
         </div>
 
-        {index === 1 && (
+        {index === 1 && !listOpen && (
           <div className="fixed inset-x-0 bottom-26 z-[1000] pointer-events-none">
             <div className="mx-auto max-w-xl relative px-24 mb-12">
               <button
@@ -162,7 +212,7 @@ function AuthedMainContent(props: {
           </div>
         )}
 
-        <div className="border-t border-gray-200 swipe-area" {...swipeHandlers}>
+        <div className="border-t border-gray-200">
           <FooterNav currentIndex={index} setIndex={setIndex} />
         </div>
       </main>

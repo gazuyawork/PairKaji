@@ -12,13 +12,12 @@ import {
   Search,
   LayoutGrid,
   ShoppingCart,
-  Utensils,
-  MapPin,
   Briefcase,
   Home,
   Tag,
 } from 'lucide-react';
 import { useUserUid } from '@/hooks/useUserUid';
+import { usePauseNativeBanner } from '@/hooks/usePauseNativeBanner';
 
 /* =========================
    カテゴリ取得ヘルパー
@@ -55,22 +54,6 @@ function getCategoryMeta(raw?: string | null) {
         label: '買い物',
         chipActiveClass:
           'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
-      };
-    case '料理':
-      return {
-        Icon: Utensils,
-        colorClass: 'text-orange-500',
-        label: '料理',
-        chipActiveClass:
-          'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
-      };
-    case '旅行':
-      return {
-        Icon: MapPin,
-        colorClass: 'text-sky-500',
-        label: '旅行',
-        chipActiveClass:
-          'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
       };
     case '仕事':
       return {
@@ -118,6 +101,7 @@ const GroupSelector = forwardRef<GroupSelectorHandle, Props>(
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [mounted, setMounted] = useState(false); // Portal用（SSR対策）
     const uid = useUserUid();
+    usePauseNativeBanner(isSheetOpen);
 
     // モバイル判定（SPではautoFocus無効にする）
     const [isMobile, setIsMobile] = useState(false);
@@ -356,7 +340,7 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
 
                       {/* カテゴリチップ */}
                       <div className="mt-3">
-                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar horizontal-scroll py-1 -mx-1 px-1">
                           {/* すべて */}
                           <button
                             type="button"

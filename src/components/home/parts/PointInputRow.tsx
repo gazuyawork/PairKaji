@@ -14,9 +14,9 @@ interface Props {
 
 export default function PointInputRow({ point, onChange, onAuto }: Props) {
   return (
-    <div className="flex items-center pt-4 gap-4">
+    <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center">
       {/* [変更] ラベル行を flex 化して右に ? を追加 */}
-      <label className="w-20 flex items-center text-gray-600 font-bold">
+      <label className="flex items-center text-gray-600 font-bold">
         <span>目標 pt</span>
         <HelpPopover
           className="ml-1"
@@ -40,12 +40,12 @@ export default function PointInputRow({ point, onChange, onAuto }: Props) {
         max={1000}
         value={point}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-26 text-4xl border-b border-gray-300 outline-none px-2 py-1 text-[#5E5E5E] text-center"
+        className="min-h-12 w-full min-w-0 flex-1 border-b border-gray-300 px-2 text-center text-3xl outline-none text-[#5E5E5E] sm:w-26 sm:text-4xl"
       />
 
       <button
         onClick={onAuto}
-        className="flex w-20 items-center gap-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-xl border border-gray-300 px-3 text-sm font-semibold text-gray-600 active:bg-gray-100 sm:w-auto"
       >
         <Sparkles size={16} className="text-yellow-500" />
         自動

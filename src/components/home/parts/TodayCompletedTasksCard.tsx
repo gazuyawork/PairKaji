@@ -274,23 +274,28 @@ export default function TodayCompletedTasksCard({ tasks }: Props) {
     return () => { cancelled = true; };
   }, [completedUids, imgMap]);
 
-  // いいね購読
+  // いいね購読（当日分を1本。likedBy スキーマ）
   useEffect(() => {
     if (!pairEnabled) return;
-    if (!tasks || tasks.length === 0) return;
-    const unsubs: Array<() => void> = [];
-    for (const t of tasks) {
-      const id = t.id;
-      if (!id) continue;
-      const ref = doc(db, 'taskLikes', likeDocId(id, dateKey));
-      const unsub = onSnapshot(ref, (snap) => {
-        const data = snap.data() as TaskLikeDoc | undefined;
-        const likedBy = Array.isArray(data?.likedBy) ? (data!.likedBy as string[]) : [];
-        setLikesMap((prev) => ({ ...prev, [id]: likedBy }));
-      });
-      unsubs.push(unsub);
-    }
-    return () => { unsubs.forEach((f) => f()); };
+    const taskIds = new Set((tasks ?? []).map((t) => t.id).filter(Boolean) as string[]);
+    const qLikes = query(collection(db, 'taskLikes'), where('date', '==', dateKey));
+    const unsub = onSnapshot(
+      qLikes,
+      (snap) => {
+        const next: Record<string, string[]> = {};
+        snap.forEach((d) => {
+          const data = d.data() as TaskLikeDoc;
+          const taskId = typeof data.taskId === 'string' ? data.taskId : '';
+          if (!taskId || !taskIds.has(taskId)) return;
+          next[taskId] = Array.isArray(data.likedBy) ? data.likedBy : [];
+        });
+        setLikesMap(next);
+      },
+      (err) => {
+        console.error('[TodayCompletedTasksCard] likes onSnapshot error:', err);
+      }
+    );
+    return () => unsub();
   }, [pairEnabled, tasks, dateKey]);
 
   // ハートON/OFF切り替え

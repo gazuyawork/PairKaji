@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants';
 import { motion } from 'framer-motion';
 
 /* =========================================
@@ -204,7 +205,11 @@ export default function ForgotPasswordPage() {
 
         {/* 補足（ヘルプリンク等があればここに） */}
         <p className="text-center text-[12px] text-[#8b8b8b] mt-4">
-          アカウントにお心当たりがない場合は、サポートまでお問い合わせください。
+          アカウントにお心当たりがない場合は、
+          <a className="underline" href={SUPPORT_MAILTO}>
+            {SUPPORT_EMAIL}
+          </a>
+          までご連絡ください。
         </p>
       </motion.div>
     </div>

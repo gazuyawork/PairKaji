@@ -2,23 +2,18 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Fragment } from 'react';
 import {
   useState,
   useRef,
   useEffect,
   useMemo,
+  useCallback,
 } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
-  collection,
   doc,
-  onSnapshot,
   updateDoc,
   serverTimestamp,
-  query,
-  where,
-  getDocs,
-  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
@@ -26,39 +21,12 @@ import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
 import { useView } from '@/context/ViewContext';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
-import { useUserPlan } from '@/hooks/useUserPlan';
-import PremiumPromoCard from '@/components/ads/PremiumPromoCard';
-import { useUserUid } from '@/hooks/useUserUid';
-import SortableTaskRow from '@/components/todo/parts/SortableTaskRow';
+import { useHousehold } from '@/context/HouseholdContext';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import { updateTodoTextInTask } from '@/lib/taskUtils';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Search, ShoppingCart, Utensils, Briefcase, Home, Tag, Plane } from 'lucide-react';
-import {
-  DndContext,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable';
-import SlideUpModal from '@/components/common/modals/SlideUpModal'; // ★追加
+import SlideUpModal from '@/components/common/modals/SlideUpModal';
 
-// 配列移動
-const moveItem = <T,>(arr: T[], from: number, to: number) => {
-  const copy = arr.slice();
-  const [it] = copy.splice(from, 1);
-  copy.splice(to, 0, it);
-  return copy;
-};
-
-// order 安全取得
 const getOrderOrInf = (t: { order?: number } | TodoOnlyTask) =>
   typeof (t as { order?: number }).order === 'number'
     ? ((t as { order?: number }).order as number)
@@ -68,96 +36,55 @@ const getOrderOrInf = (t: { order?: number } | TodoOnlyTask) =>
 const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown } =>
   typeof e === 'object' && e !== null && ('code' in e || 'message' in e);
 
-// 表示用に安全な文字列へ
-const safeText = (v: unknown): string => {
-  if (typeof v === 'string' || typeof v === 'number') return String(v);
-  if (v === null || v === undefined) return '';
-  return '[invalid]';
-};
-
-// 取得時に name を正規化（描画までにオブジェクトを除去）
 const normalizeName = (v: unknown): string => {
   if (typeof v === 'string') return v;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return ''; // FieldValue や配列/オブジェクトは空文字へ
+  return '';
 };
 
-/* =========================
-   カテゴリメタ
-   ========================= */
-function getCategoryMeta(raw?: unknown) {
-  const normalized = String(raw ?? '').normalize('NFKC').trim();
-  const category =
-    normalized === '' ||
-    !['買い物', '料理', '旅行', '仕事', '家事', '未分類'].includes(normalized)
-      ? '未分類'
-      : normalized;
-
-  switch (category) {
-    case '料理':
-      return {
-        Icon: Utensils,
-        colorClass: 'text-emerald-500',
-        label: '料理',
-        chipActiveClass:
-          'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
-        activeBg: 'from-emerald-500 to-emerald-600',
-      };
-    case '買い物':
-      return {
-        Icon: ShoppingCart,
-        colorClass: 'text-sky-500',
-        label: '買い物',
-        chipActiveClass:
-          'bg-gradient-to-b from-sky-500 to-sky-600 text-white border-sky-600',
-        activeBg: 'from-sky-500 to-sky-600',
-      };
-    case '旅行':
-      return {
-        Icon: Plane,
-        colorClass: 'text-orange-500',
-        label: '旅行',
-        chipActiveClass:
-          'bg-gradient-to-b from-orange-500 to-orange-600 text-white border-orange-600',
-        activeBg: 'from-orange-500 to-orange-600',
-      };
-    case '仕事':
-      return {
-        Icon: Briefcase,
-        colorClass: 'text-indigo-500',
-        label: '仕事',
-        chipActiveClass:
-          'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-indigo-600',
-        activeBg: 'from-indigo-500 to-indigo-600',
-      };
-    case '家事':
-      return {
-        Icon: Home,
-        colorClass: 'text-rose-500',
-        label: '家事',
-        chipActiveClass:
-          'bg-gradient-to-b from-rose-500 to-rose-600 text-white border-rose-600',
-        activeBg: 'from-rose-500 to-rose-600',
-      };
-    case '未分類':
-    default:
-      return {
-        Icon: Tag,
-        colorClass: 'text-gray-400',
-        label: '未分類',
-        chipActiveClass:
-          'bg-gradient-to-b from-gray-500 to-gray-600 text-white border-gray-600',
-        activeBg: 'from-gray-500 to-gray-600',
-      };
-  }
+function toTodoOnlyTask(t: {
+  id: string;
+  name?: unknown;
+  period?: TodoOnlyTask['period'];
+  todos?: unknown;
+  visible?: boolean;
+  isTodo?: boolean;
+  groupId?: string | null;
+  userId?: string;
+  private?: boolean;
+  order?: number;
+  category?: unknown;
+  categoryName?: unknown;
+  categoryLabel?: unknown;
+  categoryId?: unknown;
+  type?: unknown;
+}): TodoOnlyTask {
+  return {
+    id: t.id,
+    name: normalizeName(t.name),
+    period: t.period ?? '毎日',
+    todos: Array.isArray(t.todos) ? (t.todos as TodoOnlyTask['todos']) : [],
+    visible: t.visible ?? false,
+    isTodo: t.isTodo ?? false,
+    groupId: t.groupId ?? undefined,
+    userId: t.userId ?? '',
+    private: t.private,
+    ...( {
+      order: t.order,
+      category: t.category,
+      categoryName: t.categoryName,
+      categoryLabel: t.categoryLabel,
+      categoryId: t.categoryId,
+      type: t.type,
+    } as Record<string, unknown> ),
+  } as TodoOnlyTask;
 }
 
-/* ========================================================= */
-const CATEGORY_ORDER: Record<string, number> = { '未分類': 1 };
-
 export default function TodoView() {
-  const { selectedTaskName, setSelectedTaskName, index } = useView();
-  const [filterText, setFilterText] = useState('');
+  const { selectedTaskName, setSelectedTaskName, listOpen, setIndex, closeTaskList } = useView();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
 
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
@@ -166,17 +93,11 @@ export default function TodoView() {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);
-  const { plan, isChecking } = useUserPlan();
-  const uid = useUserUid();
+  const { uid, tasks: householdTasks, tasksReady } = useHousehold();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const [, setIsLoading] = useState<boolean>(true);
-
-  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
-  const [addQuery, setAddQuery] = useState('');
-  const [addSelectedCategoryId, setAddSelectedCategoryId] = useState<string | null>(null);
-  const [showSearch, setShowSearch] = useState(false);
 
   const [confirmHide, setConfirmHide] = useState<{ open: boolean; taskId: string | null; source: 'list' | 'detail' | null }>({
     open: false, taskId: null, source: null,
@@ -199,77 +120,59 @@ export default function TodoView() {
   useEffect(() => {
     if (!mounted) return;
     const prev = document.body.style.overflow;
-    if (isAddSheetOpen || selectedTaskId) document.body.style.overflow = 'hidden';
+    if (selectedTaskId) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = prev || '';
     return () => { document.body.style.overflow = prev || ''; };
-  }, [isAddSheetOpen, selectedTaskId, mounted]);
+  }, [selectedTaskId, mounted]);
 
-  // Escで閉じる（AddSheet は SlideUpModal 内でハンドリング、ここは selectedTask 用）
+  const jumpToTaskByName = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      closeTaskList();
+      setIndex?.(1);
+    } catch {
+      /* no-op */
+    }
+    try {
+      const q = new URLSearchParams(params?.toString() ?? '');
+      q.set('index', '1');
+      q.set('search', trimmed);
+      q.set('focus', 'search');
+      router.push(`${pathname}?${q.toString()}`);
+    } catch {
+      router.push(`/main?index=1&search=${encodeURIComponent(trimmed)}&focus=search`);
+    }
+    try {
+      sessionStorage.setItem('goToTaskView', 'true');
+    } catch {
+      /* no-op */
+    }
+    setSelectedTaskId(null);
+  }, [params, pathname, router, setIndex, closeTaskList]);
+
+  // 世帯タスクを Todo 画面用に整形
   useEffect(() => {
-    if (!selectedTaskId) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedTaskId(null); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selectedTaskId]);
+    if (!uid) {
+      setTasks([]);
+      setIsLoading(false);
+      return;
+    }
+    if (!tasksReady) return;
 
-  // Firestore購読（★ name を正規化）
-  useEffect(() => {
-    if (!uid) { setTasks([]); setIsLoading(false); return; }
-    setIsLoading(true);
+    const newTasks = householdTasks
+      .map((t) => toTodoOnlyTask(t))
+      .slice()
+      .sort((a, b) => {
+      const ao = getOrderOrInf(a as { order?: number });
+      const bo = getOrderOrInf(b as { order?: number });
+      if (ao !== bo) return ao - bo;
+      return (a.name ?? '').localeCompare(b.name ?? '');
+    });
 
-    let unsubscribe: (() => void) | null = null;
-    let isMounted = true;
-
-    (async () => {
-      const pairsSnap = await getDocs(
-        query(
-          collection(db, 'pairs'),
-          where('userIds', 'array-contains', uid),
-          where('status', '==', 'confirmed')
-        )
-      );
-
-      const userIds = new Set<string>([uid]);
-      pairsSnap.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (Array.isArray(data.userIds)) (data.userIds as string[]).forEach((id) => userIds.add(id));
-      });
-
-      const ids = Array.from(userIds).slice(0, 10);
-      const q = query(collection(db, 'tasks'), where('userId', 'in', ids));
-      unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          if (!isMounted) return;
-          const rawTasks: TodoOnlyTask[] = snapshot.docs.map((d) => {
-            const data = d.data() as Omit<TodoOnlyTask, 'id'> & { order?: number };
-            return {
-              id: d.id,
-              ...data,
-              // ★ ここで name を安全化
-              name: normalizeName((data as { name?: unknown }).name),
-              todos: Array.isArray(data.todos) ? data.todos : [],
-            };
-          });
-
-          const newTasks = rawTasks
-            .slice()
-            .sort((a, b) => {
-              const ao = getOrderOrInf(a as { order?: number });
-              const bo = getOrderOrInf(b as { order?: number });
-              if (ao !== bo) return ao - bo;
-              return (a.name ?? '').localeCompare(b.name ?? '');
-            });
-
-          setTasks(newTasks);
-          setIsLoading(false);
-        },
-        () => setIsLoading(false)
-      );
-    })().catch(() => setIsLoading(false));
-
-    return () => { isMounted = false; if (unsubscribe) unsubscribe(); };
-  }, [uid]);
+    setTasks(newTasks);
+    setIsLoading(false);
+  }, [uid, householdTasks, tasksReady]);
 
   // フォーカス復帰
   useEffect(() => {
@@ -279,632 +182,165 @@ export default function TodoView() {
     }
   }, [focusedTodoId]);
 
-  // 外部からのselectedTaskName
+  // 外部からの選択。Todo タブが初回マウントされた直後は tasks が空でも世帯データで開く
   useEffect(() => {
-    if (!selectedTaskName) return;
-    let matched = tasks.find((t) => t.id === selectedTaskName);
-    if (!matched) matched = tasks.find((t) => t.name === selectedTaskName);
-    if (matched) {
-      setSelectedTaskId(matched.id);
-      setFilterText('');
-      setSelectedCategoryId(null);
-    } else {
-      setFilterText(selectedTaskName);
-      setSelectedCategoryId(null);
-      setShowSearch(true);
+    if (!listOpen || !selectedTaskName) return;
+    if (!tasksReady) return;
+
+    const matchBy = (list: { id: string; name?: string }[]) =>
+      list.find((t) => t.id === selectedTaskName) ?? list.find((t) => t.name === selectedTaskName);
+
+    const matched = matchBy(tasks) ?? matchBy(householdTasks);
+    if (!matched) {
+      if (householdTasks.length > 0 && tasks.length === 0) return;
+      setSelectedTaskName('');
+      closeTaskList();
+      return;
     }
+
+    setSelectedTaskId(matched.id);
     setSelectedTaskName('');
-  }, [selectedTaskName, setSelectedTaskName, tasks]);
-
-  // dnd sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  // 並び替え完了
-  const handleTaskDragEnd = async (e: DragEndEvent, filteredTaskIds: string[]) => {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-
-    const fromInFiltered = filteredTaskIds.indexOf(String(active.id));
-    const toInFiltered = filteredTaskIds.indexOf(String(over.id));
-    if (fromInFiltered === -1 || toInFiltered === -1) return;
-
-    const allIds = tasks.map((t) => t.id);
-    const newFiltered = moveItem(filteredTaskIds, fromInFiltered, toInFiltered);
-    const filteredSet = new Set(filteredTaskIds);
-
-    let cursor = 0;
-    const newAllOrder = allIds.map((id) => {
-      if (filteredSet.has(id)) {
-        const nid = newFiltered[cursor];
-        cursor += 1;
-        return nid;
-      }
-      return id;
-    });
-
-    const idToTask = tasks.reduce<Record<string, TodoOnlyTask>>((acc, t) => {
-      acc[t.id] = t; return acc;
-    }, {});
-    const newTasks = newAllOrder.map((id) => idToTask[id]).filter((t): t is TodoOnlyTask => Boolean(t));
-    setTasks(newTasks);
-
-    try {
-      const batch = writeBatch(db);
-      newAllOrder.forEach((id, idx) => { batch.update(doc(db, 'tasks', id), { order: idx }); });
-      await batch.commit();
-    } catch (err) {
-      console.error('Failed to update task order:', err);
-      toast.error('タスクの順序を保存できませんでした');
-    }
-  };
+  }, [listOpen, selectedTaskName, setSelectedTaskName, tasks, tasksReady, householdTasks, closeTaskList]);
 
   // 選択中
-  const selectedTask = useMemo(
-    () => (selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null),
-    [selectedTaskId, tasks]
-  );
-
-  // 一覧側カテゴリ選択
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-
-  // 表示用カテゴリ一覧
-  const availableCategories = useMemo(() => {
-    type TaskCategoryShape = {
-      categoryId?: string | null;
-      categoryName?: string | null;
-      categoryLabel?: string | null;
-      category?: string | null;
-    };
-
-    const map = new Map<string, string>();
-    for (const t of tasks) {
-      if (!t.visible) continue;
-      if (!(t.userId === uid || t.private !== true)) continue;
-
-      const c = t as TaskCategoryShape;
-      const id = (c?.categoryId ?? c?.category ?? null) ?? null;
-      if (!id) continue;
-      const label = (c?.categoryName ?? c?.categoryLabel ?? c?.category ?? '未分類') ?? '未分類';
-      if (!map.has(id)) map.set(id, label);
-    }
-
-    return Array.from(map.entries())
-      .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? ''), 'ja'));
-  }, [tasks, uid]);
-
-  // カテゴリ・テキスト反映済みのグループ
-  const categorized = useMemo(() => {
-    const filtered = tasks.filter((task) => {
-      const visibleOk = task.visible;
-      const ownerOk = task.userId === uid || task.private !== true;
-      const text = filterText.trim();
-      const textOk = text === '' ? true : (task.name ?? '').includes(text);
-
-      type WithCategory = { categoryId?: string | null; category?: string | null };
-      const c = task as WithCategory;
-      const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
-      const catOk = selectedCategoryId === null ? true : catId === selectedCategoryId;
-
-      return visibleOk && ownerOk && textOk && catOk;
-    });
-
-    const map = new Map<string, TodoOnlyTask[]>();
-    for (const t of filtered) {
-      type WithCategory = { category?: string | null };
-      const keyRaw = (t as WithCategory).category ?? '未分類';
-      const key = String(keyRaw ?? '').trim() || '未分類';
-      const arr = map.get(key) ?? [];
-      arr.push(t);
-      map.set(key, arr);
-    }
-
-    const entries = Array.from(map.entries()).sort((a, b) => {
-      const aKey = a[0]; const bKey = b[0];
-      const aPrio = CATEGORY_ORDER[aKey] ?? 0;
-      const bPrio = CATEGORY_ORDER[bKey] ?? 0;
-      if (aPrio !== bPrio) return aPrio - bPrio;
-      return aKey.localeCompare(bKey, 'ja');
-    });
-
-    return entries.map(([cat, arr]) => ({ category: cat, items: arr }));
-  }, [tasks, filterText, selectedCategoryId, uid]);
-
-  // DnD 用の全表示ID
-  const allVisibleIds = useMemo(() => categorized.flatMap((g) => g.items.map((t) => t.id)), [categorized]);
-
-  // 再表示シート用の「非表示タスク」カテゴリ一覧
-  const addAvailableCategories = useMemo(() => {
-    type TaskCategoryShape = {
-      categoryId?: string | null;
-      categoryName?: string | null;
-      categoryLabel?: string | null;
-      category?: string | null;
-    };
-
-    const map = new Map<string, string>();
-    for (const t of tasks) {
-      if (t.visible) continue;
-      if (!(t.userId === uid || t.private !== true)) continue;
-
-      const c = t as TaskCategoryShape;
-      const id = (c?.categoryId ?? c?.category ?? null) ?? null;
-      if (!id) continue;
-      const label = (c?.categoryName ?? c?.categoryLabel ?? c?.category ?? '未分類') ?? '未分類';
-      if (!map.has(id)) map.set(id, label);
-    }
-
-    return Array.from(map.entries())
-      .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? ''), 'ja'));
-  }, [tasks, uid]);
+  const selectedTask = useMemo(() => {
+    if (!selectedTaskId) return null;
+    const fromState = tasks.find((t) => t.id === selectedTaskId);
+    if (fromState) return fromState;
+    const fromHousehold = householdTasks.find((t) => t.id === selectedTaskId);
+    return fromHousehold ? toTodoOnlyTask(fromHousehold) : null;
+  }, [selectedTaskId, tasks, householdTasks]);
 
   return (
     <>
-      <div className="h-full flex flex-col bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] overflow-hidden">
-        <main className="overflow-y-auto px-4 pt-5 pb-20">
-          {/* メモモーダル */}
-          {index === 2 && noteModalTask && noteModalTodo && (
-            <TodoNoteModal
-              isOpen={noteModalOpen}
-              onClose={closeNoteModal}
-              todoText={noteModalTodo.text}
-              todoId={noteModalTodo.id}
-              taskId={noteModalTask.id}
-            />
-          )}
+      {listOpen && noteModalTask && noteModalTodo && (
+        <TodoNoteModal
+          isOpen={noteModalOpen}
+          onClose={closeNoteModal}
+          todoText={noteModalTodo.text}
+          todoId={noteModalTodo.id}
+          taskId={noteModalTask.id}
+        />
+      )}
 
-          {/* Sticky 検索 */}
-          {showSearch && (
-            <div className="sticky top-0 z-[999] w-full bg-transparent">
-              <div className="w-full max-w-xl m-auto backdrop-blur-md rounded-lg px-2 pt-2 pb-3">
-                <div
-                  className="flex items-center gap-2 rounded-xl px-3 py-2
-                             bg-gradient-to-b from-white to-gray-50
-                             border border-gray-200
-                             shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
-                >
-                  <Search className="w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={filterText}
-                    onChange={(e) => setFilterText(e.target.value)}
-                    placeholder="キーワードで検索"
-                    className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400 bg-transparent"
-                    autoFocus
-                  />
-                  {filterText && (
-                    <button
-                      type="button"
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                      onClick={() => setFilterText('')}
-                    >
-                      クリア
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 一覧 */}
-          {(() => {
-            if (allVisibleIds.length === 0) {
-              return <p className="text-center text-gray-500 mt-4">TODOはありません。</p>;
-            }
-
-            return (
-              <DndContext sensors={sensors} onDragEnd={(e) => handleTaskDragEnd(e, allVisibleIds)}>
-                <SortableContext items={allVisibleIds} strategy={verticalListSortingStrategy}>
-                  <div className="mx-auto w-full max-w-xl space-y-6">
-                    {categorized.map(({ category, items }) => {
-                      const { Icon: CatIcon, colorClass, label } = getCategoryMeta(category);
-
-                      return (
-                        <section key={category} className="space-y-2">
-                          <header className="flex items-center gap-2 px-1">
-                            <CatIcon size={16} className={`shrink-0 ${colorClass}`} aria-label={`${label} カテゴリ`} />
-                            <h3 className="text-sm font-semibold text-[#5E5E5E]">{label}</h3>
-                          </header>
-
-                          <div className="space-y-2">
-                            {items.map((task) => (
-                              <Fragment key={task.id}>
-                                <SortableTaskRow
-                                  task={task}
-                                  onClickTitle={(taskId) => setSelectedTaskId(taskId)}
-                                  onHide={(taskId) => setConfirmHide({ open: true, taskId, source: 'list' })}
-                                />
-                              </Fragment>
-                            ))}
-                          </div>
-                        </section>
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            );
-          })()}
-
-          {!isChecking && plan === 'free' && <PremiumPromoCard />}
-        </main>
-      </div>
-
-      {/* 右下＋ */}
-      {mounted &&
-        index === 2 &&
-        createPortal(
-          <button
-            type="button"
-            onClick={() => {
-              setAddSelectedCategoryId(null);
-              setAddQuery('');
-              setIsAddSheetOpen(true);
-            }}
-            className="fixed bottom-24 right-[calc((100vw_-_min(100vw,_38rem))/_2_+_1rem)] z-[1100] w-14 h-14 rounded-full
-                 bg-gradient-to-b from-[#FFC25A] to-[#FFA726]
-                 shadow-[0_12px_24px_rgba(0,0,0,0.18)]
-                 ring-2 ring-white text-white flex items-center justify-center
-                 active:translate-y-[1px]
-                 hover:shadow-[0_16px_30px_rgba(0,0,0,0.22)]
-                 transition"
-            aria-label="非表示のTodoを再表示"
-            title="非表示のTodoを再表示"
-          >
-            <Eye className="w-7 h-7" />
-          </button>,
-          document.body
-        )}
-
-      {/* 左下フィルタ＋検索トグル */}
-      {mounted &&
-        index === 2 &&
-        createPortal(
-          <div
-            className="
-              fixed
-              bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]
-              left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
-              z-[1100]
-              rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200
-              shadow-[0_8px_24px_rgba(0,0,0,0.16)]
-              px-2 py-2
-            "
-          >
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-              {availableCategories.map((c, idx) => {
-                const isActive = selectedCategoryId === c.id;
-                const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
-                const key =
-                  typeof c?.id === 'string' || typeof c?.id === 'number'
-                    ? String(c.id)
-                    : `${c.label}-${idx}`;
-
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSelectedCategoryId((prev) => (prev === c.id ? null : c.id))}
-                    className={[
-                      'shrink-0 w-10 h-10 rounded-full border relative overflow-hidden p-0',
-                      'flex items-center justify-center transition-all duration-300',
-                      isActive
-                        ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
-                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.2)]',
-                      'active:translate-y-[1px]',
-                    ].join(' ')}
-                    aria-pressed={isActive}
-                    aria-label={safeText(c.label)}      
-                    title={safeText(c.label)}           
-                  >
-                    <Icon className={`w-6 h-6 ${isActive ? 'text-white' : colorClass}`} />
-                    <span className="sr-only">{safeText(c.label)}</span>
-                  </button>
-                );
-              })}
-
-              {availableCategories.length > 0 && <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setShowSearch((prev) => {
-                    const next = !prev;
-                    if (!next) setFilterText('');
-                    return next;
-                  })
-                }
-                className={[
-                  'w-11 h-11 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                  'shrink-0',
-                  showSearch
-                    ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-[2px] border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-                    : 'bg-white text-gray-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50',
-                ].join(' ')}
-                aria-pressed={showSearch}
-                aria-label={showSearch ? '検索を隠す' : '検索を表示'}
-                title={showSearch ? '検索を隠す' : '検索を表示'}
-              >
-                <Search className={`w-6 h-6 ${showSearch ? 'text-white' : 'text-gray-600'}`} />
-              </button>
-            </div>
-          </div>,
-          document.body
-        )}
-
-      {/* 追加用シート（非表示のToDo再表示） - ★置換：SlideUpModal を使用 */}
-      {mounted && index === 2 && (
+      {mounted && listOpen && (
         <SlideUpModal
-          isOpen={isAddSheetOpen}
-          onClose={() => setIsAddSheetOpen(false)}
-          title="非表示のTodoを再表示"
-          rightInfo={
-            (() => {
-              const q = addQuery.trim().toLowerCase();
-              const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
-              type WithCategory = { categoryId?: string | null; category?: string | null };
-              const filteredByCategory = hidden.filter((t) => {
-                const c = t as WithCategory;
-                const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
-                return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
-              });
-              const filtered = filteredByCategory.filter((t) =>
-                q ? (t.name ?? '').toLowerCase().includes(q) : true
-              );
-              return q || addSelectedCategoryId !== null ? `一致: ${filtered.length}件` : `候補: ${hidden.length}件`;
-            })()
-          }
-        >
-          {/* 検索ボックス */}
-          <div
-            className="flex items-center gap-2 rounded-xl px-3 py-2
-                        bg-gradient-to-b from-white to-gray-50
-                        border border-gray-200
-                        shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
-          >
-            <Search className="w-4 h-4 text-gray-400" />
-
-            <input
-              type="text"
-              value={addQuery}
-              onChange={(e) => setAddQuery(e.target.value)}
-              placeholder="キーワードで検索"
-              className="flex-1 outline-none text-[#5E5E5E] placeholder:text-gray-400"
-            />
-
-            {addQuery && (
-              <button className="text-sm text-gray-600 hover:text-gray-800" onClick={() => setAddQuery('')}>
-                クリア
-              </button>
-            )}
-          </div>
-
-          {/* カテゴリチップ（再表示シート） */}
-          <div className="mt-3">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+          isOpen={!!selectedTask}
+          onClose={() => {
+            setSelectedTaskId(null);
+            closeTaskList();
+          }}
+          title={
+            selectedTask ? (
               <button
                 type="button"
-                onClick={() => setAddSelectedCategoryId(null)}
-                className={`shrink-0 px-3 py-1.5 rounded-full border text-xs transition
-                  ${addSelectedCategoryId === null
-                    ? 'bg-gradient-to-b from-gray-700 to-gray-900 text-white border-gray-800 shadow-[0_6px_14px_rgba(0,0,0,0.25)]'
-                    : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-gray-50'}
-                  active:translate-y-[1px]`}
-                aria-pressed={addSelectedCategoryId === null}
-                title="すべて"
+                onClick={() => jumpToTaskByName(selectedTask.name)}
+                className="max-w-[min(60vw,18rem)] truncate text-left"
+                title="タップしてタスク画面をこのタスク名で絞り込み表示"
               >
-                すべて
+                {selectedTask.name}
               </button>
+            ) : (
+              'リスト'
+            )
+          }
+          containerClassName="!h-[85vh]"
+          bodyClassName="!px-0 !pt-0 !overflow-hidden flex min-h-0 flex-col"
+        >
+          {selectedTask ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <TodoTaskCard
+                inSheet
+                task={selectedTask}
+                tab={activeTabs[selectedTask.id] ?? 'undone'}
+                setTab={(tab) => setActiveTabs((prev) => ({ ...prev, [selectedTask.id]: tab }))}
+                onOpenNote={(text) => {
+                  const todo = selectedTask.todos.find((t) => t.text === text);
+                  if (todo) openNoteModal(selectedTask, todo);
+                }}
+                onAddTodo={async (todoId, text) => {
+                  const newTodos = [...selectedTask.todos, { id: todoId, text, done: false }];
+                  await updateDoc(doc(db, 'tasks', selectedTask.id), {
+                    todos: newTodos,
+                    updatedAt: serverTimestamp(),
+                  });
+                }}
+                onChangeTodo={(todoId, value) => {
+                  setTasks((prev) =>
+                    prev.map((t) =>
+                      t.id === selectedTask.id
+                        ? {
+                            ...t,
+                            todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
+                          }
+                        : t
+                    )
+                  );
+                }}
+                onToggleDone={async (todoId) => {
+                  const updatedTodos = selectedTask.todos.map((td) =>
+                    td.id === todoId ? { ...td, done: !td.done } : td
+                  );
+                  await updateDoc(doc(db, 'tasks', selectedTask.id), {
+                    todos: updatedTodos,
+                    updatedAt: serverTimestamp(),
+                  });
+                }}
+                onBlurTodo={async (todoId, text) => {
+                  const trimmed = text.trim();
+                  if (!trimmed) return;
 
-              {addAvailableCategories.map((c, idx) => {
-                const active = addSelectedCategoryId === c.id;
-                const { Icon, colorClass, activeBg } = getCategoryMeta(c.label);
-                const key =
-                  typeof c?.id === 'string' || typeof c?.id === 'number'
-                    ? String(c.id)
-                    : `${c.label}-${idx}`;
+                  try {
+                    await updateTodoTextInTask(selectedTask.id, todoId, trimmed);
+                  } catch (e: unknown) {
+                    if (hasCodeOrMessage(e)) {
+                      const code = typeof e.code === 'string' ? e.code : undefined;
+                      const message = typeof e.message === 'string' ? e.message : undefined;
+                      if (code === 'DUPLICATE_TODO' || message === 'DUPLICATE_TODO') {
+                        toast.error('既に登録されています。'); return;
+                      }
+                    }
+                    toast.error('保存に失敗しました');
+                    console.error(e);
+                  }
+                }}
+                onDeleteTodo={async (todoId) => {
+                  const updatedTodos = selectedTask.todos.filter((td) => td.id !== todoId);
+                  await updateDoc(doc(db, 'tasks', selectedTask.id), {
+                    todos: updatedTodos,
+                    updatedAt: serverTimestamp(),
+                  });
+                }}
+                todoRefs={todoRefs}
+                focusedTodoId={focusedTodoId}
+                onReorderTodos={async (orderedIds) => {
+                  const idToTodo = selectedTask.todos.reduce<Record<string, (typeof selectedTask.todos)[number]>>((acc, td) => {
+                    acc[td.id] = td; return acc;
+                  }, {});
+                  const newTodos = orderedIds.map((id) => idToTodo[id]).filter((v): v is (typeof selectedTask.todos)[number] => Boolean(v));
+                  setTasks((prev) => prev.map((t) => (t.id === selectedTask.id ? { ...t, todos: newTodos } : t)));
 
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setAddSelectedCategoryId(c.id)}
-                    className={[
-                      'shrink-0 px-3 py-1.5 rounded-full border text-xs transition inline-flex items-center gap-1',
-                      active
-                        ? `bg-gradient-to-b ${activeBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
-                        : 'bg-white text-[#5E5E5E] border-gray-300 shadow-[inset_2px_2px_5px_rgra(0,0,0,0.15)] hover:bg-gray-50',
-                      'active:translate-y-[1px]',
-                    ].join(' ')}
-                    aria-pressed={active}
-                    title={safeText(c.label)}   /* ★ 安全化 */
-                  >
-                    <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : colorClass}`} />
-                    <span>{safeText(c.label)}</span>   {/* ★ 安全化 */}
-                  </button>
-                );
-              })}
+                  try {
+                    await updateDoc(doc(db, 'tasks', selectedTask.id), {
+                      todos: newTodos, updatedAt: serverTimestamp(),
+                    });
+                  } catch (e) {
+                    console.error('reorder update error:', e);
+                    toast.error('並び替えの保存に失敗しました');
+                  }
+                }}
+                onClose={() => {
+                  setSelectedTaskId(null);
+                  closeTaskList();
+                }}
+              />
             </div>
-          </div>
-
-          {/* 一覧グリッド */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-            {(() => {
-              const q = addQuery.trim().toLowerCase();
-              const hidden = tasks.filter((t) => !t.visible && (t.userId === uid || t.private !== true));
-
-              const byCategory = hidden.filter((t) => {
-                type WithCategory = { categoryId?: string | null; category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
-                const c = t as WithCategory;
-                const catId = (c?.categoryId ?? c?.category ?? null) ?? null;
-                return addSelectedCategoryId === null ? true : catId === addSelectedCategoryId;
-              });
-
-              const byKeyword = byCategory.filter((t) => q ? (t.name ?? '').toLowerCase().includes(q) : true);
-
-              if (byKeyword.length === 0) {
-                return <div className="col-span-full text-center text-sm text-gray-500 py-10">一致するToDoが見つかりませんでした。</div>;
-              }
-
-              return byKeyword.map((t) => {
-                type WithCategory = { category?: string | null; categoryName?: string | null; categoryLabel?: string | null; };
-                const catLabel =
-                  ((t as WithCategory).categoryName ??
-                    (t as WithCategory).categoryLabel ??
-                    (t as WithCategory).category ??
-                    '未分類') ?? '未分類';
-                const { Icon, colorClass, label } = getCategoryMeta(catLabel);
-
-                return (
-                  <button
-                    key={t.id}
-                    onClick={async () => {
-                      await updateDoc(doc(db, 'tasks', t.id), {
-                        visible: true,
-                        updatedAt: serverTimestamp(),
-                      });
-                      toast.success('非表示のタスクを再表示しました。');
-                      setFilterText('');
-                      setSelectedCategoryId(null);
-                      setAddSelectedCategoryId(null);
-                      setSelectedTaskId(t.id);
-                      setAddQuery('');
-                      setIsAddSheetOpen(false);
-                    }}
-                    className="w-full px-3 py-3 rounded-xl border text-sm font-semibold text-left transition
-                               bg-gradient-to-b from-white to-gray-50 text-[#5E5E5E] border-gray-200
-                               shadow-[0_2px_1px_rgba(0,0,0,0.1)]
-                               hover:shadow-[0_14px_28px_rgba(0,0,0,0.16)]
-                               hover:border-[#FFCB7D] active:translate-y-[1px]"
-                    title={safeText(t.name)}   /* ★ 安全化 */
-                  >
-                    <span className="line-clamp-2">{safeText(t.name)}</span> {/* ★ 安全化 */}
-                    <span className="mt-1 block text-[11px] text-gray-500">
-                      <span className="inline-flex items-center gap-1">
-                        <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
-                        <span>{label}</span>
-                      </span>
-                    </span>
-                  </button>
-                );
-              });
-            })()}
-          </div>
+          ) : null}
         </SlideUpModal>
       )}
 
-      {/* 詳細オーバーレイ */}
-      {mounted &&
-        index === 2 &&
-        selectedTask &&
-        createPortal(
-          <AnimatePresence>
-            <motion.div
-              key={selectedTask.id}
-              className="fixed inset-0 z-[1300] flex flex-col bg-white"
-              role="dialog"
-              aria-modal="true"
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 24 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-            >
-              <div className="flex-1 overflow-y-auto">
-                <div className="mx-auto w-full max-w-xl">
-                  <TodoTaskCard
-                    task={selectedTask}
-                    tab={activeTabs[selectedTask.id] ?? 'undone'}
-                    setTab={(tab) => setActiveTabs((prev) => ({ ...prev, [selectedTask.id]: tab }))}
-                    onOpenNote={(text) => {
-                      const todo = selectedTask.todos.find((t) => t.text === text);
-                      if (todo) openNoteModal(selectedTask, todo);
-                    }}
-                    onAddTodo={async (todoId, text) => {
-                      const newTodos = [...selectedTask.todos, { id: todoId, text, done: false }];
-                      await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                        todos: newTodos,
-                        updatedAt: serverTimestamp(),
-                      });
-                    }}
-                    onChangeTodo={(todoId, value) => {
-                      setTasks((prev) =>
-                        prev.map((t) =>
-                          t.id === selectedTask.id
-                            ? {
-                                ...t,
-                                todos: t.todos.map((td) => (td.id === todoId ? { ...td, text: value } : td)),
-                              }
-                            : t
-                        )
-                      );
-                    }}
-                    onToggleDone={async (todoId) => {
-                      const updatedTodos = selectedTask.todos.map((td) =>
-                        td.id === todoId ? { ...td, done: !td.done } : td
-                      );
-                      await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                        todos: updatedTodos,
-                        updatedAt: serverTimestamp(),
-                      });
-                    }}
-                    onBlurTodo={async (todoId, text) => {
-                      const trimmed = text.trim();
-                      if (!trimmed) return;
-
-                      try {
-                        await updateTodoTextInTask(selectedTask.id, todoId, trimmed);
-                      } catch (e: unknown) {
-                        if (hasCodeOrMessage(e)) {
-                          const code = typeof e.code === 'string' ? e.code : undefined;
-                          const message = typeof e.message === 'string' ? e.message : undefined;
-                          if (code === 'DUPLICATE_TODO' || message === 'DUPLICATE_TODO') {
-                            toast.error('既に登録されています。'); return;
-                          }
-                        }
-                        toast.error('保存に失敗しました');
-                        console.error(e);
-                      }
-                    }}
-                    onDeleteTodo={async (todoId) => {
-                      const updatedTodos = selectedTask.todos.filter((td) => td.id !== todoId);
-                      await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                        todos: updatedTodos,
-                        updatedAt: serverTimestamp(),
-                      });
-                    }}
-                    todoRefs={todoRefs}
-                    focusedTodoId={focusedTodoId}
-                    onReorderTodos={async (orderedIds) => {
-                      const idToTodo = selectedTask.todos.reduce<Record<string, (typeof selectedTask.todos)[number]>>((acc, td) => {
-                        acc[td.id] = td; return acc;
-                      }, {});
-                      const newTodos = orderedIds.map((id) => idToTodo[id]).filter((v): v is (typeof selectedTask.todos)[number] => Boolean(v));
-                      setTasks((prev) => prev.map((t) => (t.id === selectedTask.id ? { ...t, todos: newTodos } : t)));
-
-                      try {
-                        await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                          todos: newTodos, updatedAt: serverTimestamp(),
-                        });
-                      } catch (e) {
-                        console.error('reorder update error:', e);
-                        toast.error('並び替えの保存に失敗しました');
-                      }
-                    }}
-                    onClose={() => setSelectedTaskId(null)}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          </AnimatePresence>,
-          document.body
-        )}
-
       {/* ConfirmModal */}
-      {mounted && index === 2 && createPortal(
+      {mounted && listOpen && createPortal(
         <ConfirmModal
           isOpen={confirmHide.open}
           title="確認"
@@ -931,7 +367,10 @@ export default function TodoView() {
                   ? { visible: false, groupId: null, updatedAt: serverTimestamp() }
                   : { visible: false, updatedAt: serverTimestamp() };
               await updateDoc(doc(db, 'tasks', taskId), payload);
-              if (confirmHide.source === 'detail') setSelectedTaskId(null);
+              if (confirmHide.source === 'detail') {
+                setSelectedTaskId(null);
+                closeTaskList();
+              }
               toast.success('カードを非表示にしました。');
             } catch (err) {
               console.error(err);

@@ -10,6 +10,7 @@ import {
   verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import { toast } from 'sonner';
+import SlideUpModal from '@/components/common/modals/SlideUpModal';
 
 interface EmailEditModalProps {
   open: boolean;
@@ -63,62 +64,50 @@ export default function EmailEditModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-      <div className="bg-white w-[90%] max-w-xl p-6 rounded-xl shadow-lg relative">
-        <div className="space-y-6 mt-4 mx-3">
-          <div className="text-center">
-            <p className="text-lg font-bold text-[#5E5E5E] font-sans">メールアドレスを変更</p>
-            <p className="text-sm text-gray-500 font-sans mt-1">
-              本人確認のためパスワードを入力してください
-            </p>
-          </div>
-
-          <div className="space-y-4 pt-4">
-            <div>
-              <label className="block text-gray-600 font-semibold text-sm mb-1">
-                新しいメールアドレス
-              </label>
-              <input
-                type="email"
-                placeholder="new@example.com"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                className="w-full border-b border-gray-300 outline-none px-2 py-2 text-[#5E5E5E]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-600 font-semibold text-sm mb-1">
-                現在のパスワード
-              </label>
-              <input
-                type="password"
-                placeholder="パスワード"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border-b border-gray-300 outline-none px-2 py-2 text-[#5E5E5E]"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-          <button
-            onClick={handleUpdate}
-            disabled={loading}
-            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-[#FFCB7D] text-white rounded-lg font-bold hover:shadow-md"
-          >
-            {loading ? '更新中...' : '保存'}
-          </button>
-
-          <button
-            onClick={onClose}
-            className="w-full sm:w-auto px-6 py-3 text-sm sm:text-base bg-gray-200 rounded-lg hover:shadow-md"
-          >
-            キャンセル
-          </button>
-        </div>
+    <SlideUpModal
+      isOpen={open}
+      onClose={onClose}
+      title="メールアドレスを変更"
+      containerClassName="!h-auto max-h-[90vh]"
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          本人確認のためパスワードを入力してください
+        </p>
+        <label className="block space-y-1">
+          <span className="text-sm font-semibold text-gray-600">新しいメールアドレス</span>
+          <input
+            type="email"
+            placeholder="new@example.com"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            className="min-h-12 w-full rounded-xl border border-gray-200 px-3 text-base text-[#5E5E5E] outline-none focus:ring-2 focus:ring-gray-200"
+          />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-sm font-semibold text-gray-600">現在のパスワード</span>
+          <input
+            type="password"
+            placeholder="パスワード"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="min-h-12 w-full rounded-xl border border-gray-200 px-3 text-base text-[#5E5E5E] outline-none focus:ring-2 focus:ring-gray-200"
+          />
+        </label>
+        <button
+          onClick={handleUpdate}
+          disabled={loading}
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#FFCB7D] text-base font-bold text-white active:opacity-90 disabled:bg-gray-300"
+        >
+          {loading ? '更新中...' : '保存'}
+        </button>
+        <button
+          onClick={onClose}
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-gray-200 text-base font-semibold text-gray-700 active:bg-gray-300"
+        >
+          キャンセル
+        </button>
       </div>
-    </div>
+    </SlideUpModal>
   );
 }

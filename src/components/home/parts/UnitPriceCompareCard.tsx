@@ -2,44 +2,33 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
-import { Calculator, CheckCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 type Variant = 'card' | 'modal';
 
-/**
- * 数値として正しい正の値のみを許可
- */
 function parsePositiveNumber(raw: string): number | null {
-  const v = Number(raw);
-  if (!Number.isFinite(v)) return null;
-  if (v <= 0) return null;
+  const v = Number(raw.replace(/,/g, '').trim());
+  if (!Number.isFinite(v) || v <= 0) return null;
   return v;
 }
 
-/**
- * 四捨五入（整数）
- */
-function roundInt(n: number) {
-  return Math.round(n);
+function formatYen(n: number) {
+  return n.toLocaleString('ja-JP', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
+
+const inputClassName =
+  'min-h-12 w-full rounded-xl border border-gray-200 bg-white px-3 text-base tabular-nums outline-none focus:ring-2 focus:ring-gray-200';
 
 export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: Variant }) {
   const [aPrice, setAPrice] = useState('');
   const [aQty, setAQty] = useState('');
   const [bPrice, setBPrice] = useState('');
   const [bQty, setBQty] = useState('');
-
-  const aPriceInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (variant === 'modal') {
-      requestAnimationFrame(() => {
-        aPriceInputRef.current?.focus();
-      });
-    }
-  }, [variant]);
 
   const calc = useMemo(() => {
     const ap = parsePositiveNumber(aPrice);
@@ -54,176 +43,179 @@ export default function UnitPriceCompareCard({ variant = 'card' }: { variant?: V
 
     if (aUnit !== null && bUnit !== null) {
       const diff = aUnit - bUnit;
-      if (Math.abs(diff) < 1e-9) winner = 'same';
+      if (Math.abs(diff) < 0.005) winner = 'same';
       else winner = diff < 0 ? 'A' : 'B';
     }
 
     const diffPerUnit =
       aUnit !== null && bUnit !== null ? Math.abs(aUnit - bUnit) : null;
+    const alignQty = aq && bq ? Math.max(aq, bq) : null;
+    const alignDiff =
+      diffPerUnit !== null && alignQty !== null ? diffPerUnit * alignQty : null;
 
-    return { aUnit, bUnit, winner, diffPerUnit };
+    return { aUnit, bUnit, winner, diffPerUnit, alignQty, alignDiff };
   }, [aPrice, aQty, bPrice, bQty]);
 
-  const inputClassName =
-    'w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-200';
+  const unitText = (unit: number | null) =>
+    unit === null ? '—' : `${formatYen(unit)}円 / 1単位`;
 
   const content = (
-    <div className="space-y-4">
-      {/* A */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-semibold">
-              A
-            </span>
-            <span className="text-sm font-semibold text-gray-800">
-              {calc.aUnit === null
-                ? '—'
-                : `${roundInt(calc.aUnit).toLocaleString()} 円 / 1単位`}
-            </span>
-          </div>
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
+            A
+          </span>
+          <span className="min-w-0 text-right text-sm font-semibold text-gray-800">
+            {unitText(calc.aUnit)}
+          </span>
         </div>
-
         <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1">
-            <div className="text-[11px] text-gray-600">価格（円）</div>
+          <label className="min-w-0 space-y-1">
+            <div className="text-xs font-medium text-gray-600">価格</div>
             <input
-              ref={aPriceInputRef}
               inputMode="decimal"
+              enterKeyHint="next"
+              autoComplete="off"
               value={aPrice}
               onChange={(e) => setAPrice(e.target.value)}
               placeholder="198"
               className={inputClassName}
+              aria-label="Aの価格"
             />
+            <div className="text-[11px] text-gray-400">円</div>
           </label>
-
-          <label className="space-y-1">
-            <div className="text-[11px] text-gray-600">
-              内容量（ g / ml / 個 / etc...）
-            </div>
+          <label className="min-w-0 space-y-1">
+            <div className="text-xs font-medium text-gray-600">内容量</div>
             <input
               inputMode="decimal"
+              enterKeyHint="next"
+              autoComplete="off"
               value={aQty}
               onChange={(e) => setAQty(e.target.value)}
               placeholder="320"
               className={inputClassName}
+              aria-label="Aの内容量"
             />
+            <div className="text-[11px] text-gray-400">g / ml / 個</div>
           </label>
         </div>
       </div>
 
-      {/* B */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white text-xs font-semibold">
-              B
-            </span>
-            <span className="text-sm font-semibold text-gray-800">
-              {calc.bUnit === null
-                ? '—'
-                : `${roundInt(calc.bUnit).toLocaleString()} 円 / 1単位`}
-            </span>
-          </div>
-        </div>
+      <div className="flex items-center justify-center">
+        <span className="rounded-full bg-gray-200 px-3 py-0.5 text-[11px] font-bold tracking-wide text-gray-600">
+          VS
+        </span>
+      </div>
 
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-sm font-bold text-white">
+            B
+          </span>
+          <span className="min-w-0 text-right text-sm font-semibold text-gray-800">
+            {unitText(calc.bUnit)}
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1">
-            <div className="text-[11px] text-gray-600">価格（円）</div>
+          <label className="min-w-0 space-y-1">
+            <div className="text-xs font-medium text-gray-600">価格</div>
             <input
               inputMode="decimal"
+              enterKeyHint="next"
+              autoComplete="off"
               value={bPrice}
               onChange={(e) => setBPrice(e.target.value)}
               placeholder="298"
               className={inputClassName}
+              aria-label="Bの価格"
             />
+            <div className="text-[11px] text-gray-400">円</div>
           </label>
-
-          <label className="space-y-1">
-            <div className="text-[11px] text-gray-600">
-              内容量（ g / ml / 個 / etc...）
-            </div>
+          <label className="min-w-0 space-y-1">
+            <div className="text-xs font-medium text-gray-600">内容量</div>
             <input
               inputMode="decimal"
+              enterKeyHint="done"
+              autoComplete="off"
               value={bQty}
               onChange={(e) => setBQty(e.target.value)}
               placeholder="500"
               className={inputClassName}
+              aria-label="Bの内容量"
             />
+            <div className="text-[11px] text-gray-400">g / ml / 個</div>
           </label>
         </div>
       </div>
 
-      {/* 結果表示 */}
-      {calc.aUnit !== null &&
-        calc.bUnit !== null &&
-        calc.winner !== null && (
-          <div className="text-center text-base text-gray-800">
-            {calc.winner === 'same' ? (
-              // 単価が同じ場合
-              <div className="flex flex-col items-center gap-1 mt-5 mb-8 text-gray-600">
-                <div className="font-semibold">単価は同じです</div>
-                <div className="text-sm">
-                  （どちらも {roundInt(calc.aUnit).toLocaleString()} 円 / 1単位）
-                </div>
+      {calc.aUnit !== null && calc.bUnit !== null && calc.winner !== null && (
+        <div className="pt-1">
+          {calc.winner === 'same' ? (
+            <div className="rounded-2xl bg-gray-100 px-4 py-4 text-center text-gray-700">
+              <div className="text-sm font-semibold">単価は同じです</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums">
+                {formatYen(calc.aUnit)}円
               </div>
-            ) : (
-              // お得表示（アニメーションあり）
-              calc.diffPerUnit !== null && (
-                <motion.div
-                  key="gain"
-                  initial={{ scale: 1 }}
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 0.5 }}
-                  className="flex items-end justify-center gap-1 mt-5 mb-8"
-                >
+              <div className="mt-0.5 text-xs text-gray-500">1単位あたり</div>
+            </div>
+          ) : (
+            calc.diffPerUnit !== null && (
+              <motion.div
+                key="gain"
+                initial={{ scale: 1 }}
+                animate={{ scale: [1, 1.06, 1] }}
+                transition={{ duration: 0.45 }}
+                className={`rounded-2xl px-4 py-4 text-center ${
+                  calc.winner === 'A' ? 'bg-blue-50' : 'bg-red-50'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-800">
                   <CheckCircle
-                    className={`w-5 h-5 ${
-                      calc.winner === 'A'
-                        ? 'text-blue-500'
-                        : 'text-red-500'
+                    className={`h-5 w-5 ${
+                      calc.winner === 'A' ? 'text-blue-500' : 'text-red-500'
                     }`}
                   />
-                  {calc.winner === 'A' ? 'Aのほうが' : 'Bのほうが'}
-                  <span className="text-2xl">
-                    {roundInt(calc.diffPerUnit).toLocaleString()}
-                  </span>
-                  円 / 1単位 お得です！
-                </motion.div>
-              )
-            )}
-          </div>
-        )}
+                  {calc.winner === 'A' ? 'A' : 'B'}のほうがお得
+                </div>
+                <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
+                  {formatYen(calc.diffPerUnit)}円
+                </div>
+                <div className="mt-0.5 text-xs text-gray-500">1単位あたり</div>
+                {calc.alignQty !== null &&
+                  calc.alignDiff !== null &&
+                  calc.alignQty !== 1 && (
+                    <div className="mt-2 text-xs leading-relaxed text-gray-600">
+                      内容量 {calc.alignQty.toLocaleString('ja-JP')} に揃えると
+                      約 {formatYen(calc.alignDiff)}円 安い
+                    </div>
+                  )}
+              </motion.div>
+            )
+          )}
+        </div>
+      )}
 
-      {/* クリア */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setAPrice('');
-            setAQty('');
-            setBPrice('');
-            setBQty('');
-          }}
-          className="col-span-2 text-xs px-3 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          クリア
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => {
+          setAPrice('');
+          setAQty('');
+          setBPrice('');
+          setBQty('');
+        }}
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 active:bg-gray-100"
+      >
+        クリア
+      </button>
     </div>
   );
 
-  // モーダル内は中身のみ
   if (variant === 'modal') return content;
 
-  // Home直置き用
   return (
-    <section className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-center gap-2">
-        <Calculator className="w-5 h-5 text-gray-600" />
-        <h3 className="text-base font-semibold">どっちがお得？</h3>
-      </div>
-      <div className="px-5 py-4">{content}</div>
+    <section className="overflow-hidden rounded-lg bg-white shadow-md">
+      <div className="px-4 py-3">{content}</div>
     </section>
   );
 }

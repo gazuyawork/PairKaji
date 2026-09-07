@@ -13,14 +13,14 @@ import {
   Eraser,
   ChevronDown,
   ChevronUp,
-  Utensils,
   ShoppingCart,
-  Plane,
   type LucideIcon,
   ChevronRight,
 } from 'lucide-react';
 import HelpPopover from '@/components/common/HelpPopover';
 import { forkTaskAsPrivateForSelf } from '@/lib/firebaseUtils';
+import { isChecklistCategory } from '@/lib/checklistTask';
+import { parseCategoryForUI, normalizeCategoryForSave, type TaskCategoryUI } from '@/lib/taskCategory';
 
 // 現在のユーザー判定に使用
 import { auth } from '@/lib/firebase';
@@ -28,25 +28,15 @@ import { auth } from '@/lib/firebase';
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
 
-type TaskCategory = '料理' | '買い物' | '旅行';
-
 type CategoryOption = {
-  key: TaskCategory;
-  label: TaskCategory;
+  key: TaskCategoryUI;
+  label: string;
   Icon: LucideIcon;
   iconColor: string;          // 非選択時のアイコン色
   selectedIconColor?: string; // 選択時のアイコン色
   selectedBg: string;         // 選択時のボタン背景（Tailwindクラス）
 };
 const CATEGORY_OPTIONS: CategoryOption[] = [
-  {
-    key: '料理',
-    label: '料理',
-    Icon: Utensils,
-    iconColor: 'text-emerald-500',
-    selectedIconColor: 'text-white',
-    selectedBg: 'from-emerald-500 to-emerald-600',
-  },
   {
     key: '買い物',
     label: '買い物',
@@ -55,18 +45,10 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
     selectedIconColor: 'text-white',
     selectedBg: 'from-sky-500 to-sky-600',
   },
-  {
-    key: '旅行',
-    label: '旅行',
-    Icon: Plane,
-    iconColor: 'text-orange-500',
-    selectedIconColor: 'text-white',
-    selectedBg: 'from-orange-500 to-orange-600',
-  },
 ];
 
 // ★ ここを null 許容に（未選択は null で統一）
-type TaskWithNote = Task & { note?: string; category: TaskCategory | null };
+type TaskWithNote = Task & { note?: string; category: TaskCategoryUI };
 
 type UserInfo = {
   id: string;
@@ -100,32 +82,7 @@ type Props = {
   existingTasks: Task[];
 };
 
-/* =========================================================
- * カテゴリ正規化（UI表示用 / 保存用）
- * =======================================================*/
-// ✅ UI表示用: Firestore等の値をUIの「未選択(null) or 実カテゴリ」に正規化
-const parseCategoryForUI = (v: unknown): TaskCategory | null => {
-  if (typeof v !== 'string') return null;
-  const s = v.normalize('NFKC').trim().toLowerCase();
-  // 「未設定」はUIでは未選択扱いにする
-  if (s === '未設定' || s === 'みせってい' || s === 'unset' || s === 'unselected' || s === '') {
-    return null;
-  }
-  if (['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s)) return '料理';
-  if (['買い物', '買物', 'かいもの', 'shopping', 'purchase', 'groceries'].includes(s)) return '買い物';
-  if (['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)) return '旅行';
-  return null;
-};
-
-// ✅ 保存用: UIの値(null=未選択)を保存値に正規化（必ず「未設定」or 実カテゴリで返す）
-const formatCategoryForSave = (v: TaskCategory | null): TaskCategory | '未設定' => {
-  if (v == null) return '未設定';
-  const parsed = parseCategoryForUI(v);
-  return parsed ?? '未設定';
-};
-
-// ✅ 比較用（UI内の選択判定）
-const eqCat = (a: unknown, b: TaskCategory) => parseCategoryForUI(a) === b;
+const eqCat = (a: unknown, b: TaskCategoryUI) => parseCategoryForUI(a) === b;
 
 /* =========================================================
  * 便利関数
@@ -195,6 +152,7 @@ export default function EditTaskModal({
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const isIOS = isIOSMobileSafari;
 
   // 改行時のキャレット復元用
@@ -256,7 +214,13 @@ export default function EditTaskModal({
         : [],
       period: task.period,
       note: (task as unknown as { note?: string }).note ?? '',
-      visible: Boolean((task as unknown as { visible?: unknown }).visible),
+      isTodo: Boolean((task as unknown as { isTodo?: unknown }).isTodo) ||
+        (Array.isArray((task as { todos?: unknown[] }).todos) &&
+          ((task as { todos?: unknown[] }).todos?.length ?? 0) > 0),
+      visible: Boolean((task as unknown as { isTodo?: unknown }).isTodo) ||
+        Boolean((task as unknown as { visible?: unknown }).visible) ||
+        (Array.isArray((task as { todos?: unknown[] }).todos) &&
+          ((task as { todos?: unknown[] }).todos?.length ?? 0) > 0),
       category: normalizedCategory, // ★ null or 実カテゴリ（UI用）
     });
 
@@ -265,11 +229,27 @@ export default function EditTaskModal({
     setSaveComplete(false);
     setNoteError(null);
 
+    const isNew = !(task as { id?: string }).id;
+    const noteText = (task as unknown as { note?: string }).note ?? '';
+    const pointVal = (task as unknown as { point?: number }).point ?? 0;
+    const visibleVal = (task as unknown as { visible?: unknown }).visible;
+    const hasAdvanced =
+      normalizedCategory != null ||
+      pointVal > 0 ||
+      Boolean((task as unknown as { private?: unknown }).private) ||
+      noteText.trim().length > 0 ||
+      visibleVal === false ||
+      Boolean((task as unknown as { isTodo?: unknown }).isTodo);
+    setShowMore(!isNew && hasAdvanced);
+
+    const isCoarsePointer =
+      typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
     const timer = setTimeout(() => {
+      if (isCoarsePointer) return;
       nameInputRef.current?.focus();
     }, 50);
     return () => clearTimeout(timer);
-  }, [isOpen, task, isPairConfirmed]);
+  }, [isOpen, (task as { id?: string }).id, isPairConfirmed]);
 
   // body スクロール制御
   useEffect(() => {
@@ -355,13 +335,19 @@ export default function EditTaskModal({
 
   // ★ 同じボタンを押したら「外す」＝ null をセット
   const toggleCategory = useCallback(
-    (cat: TaskCategory) => {
+    (cat: TaskCategoryUI) => {
       if (!editedTask) return;
       const before = editedTask.category;
       const next = eqCat(before, cat) ? null : cat;
-      update('category', next);
+      setEditedTask((prev) => {
+        if (!prev) return prev;
+        if (next && isChecklistCategory(next)) {
+          return { ...prev, category: next, isTodo: true, visible: true };
+        }
+        return { ...prev, category: next };
+      });
     },
-    [editedTask, update]
+    [editedTask]
   );
 
   // 保存
@@ -403,7 +389,8 @@ export default function EditTaskModal({
     setNameError(null);
 
     // ★ 保存値は未選択→'未設定' で統一、選択時はそのまま実カテゴリ
-    const categoryForSave = formatCategoryForSave(editedTask.category);
+    const categoryForSave = normalizeCategoryForSave(editedTask.category);
+    const checklistOn = Boolean((editedTask as unknown as { isTodo?: boolean }).isTodo);
 
     const transformed: Task = {
       ...editedTask,
@@ -411,10 +398,12 @@ export default function EditTaskModal({
       userIds: [...editedUsers],
       daysOfWeek: editedTask.daysOfWeek.map((d) => toDayNumber(d)) as Task['daysOfWeek'],
       private: isPrivate,
+      isTodo: checklistOn,
+      visible: checklistOn,
       name: shouldForkPrivate
         ? (editedTask.name?.endsWith('_コピー') ? editedTask.name : `${editedTask.name}_コピー`)
         : editedTask.name,
-      // ★ 保存時は '未設定' または 実カテゴリ('料理' | '買い物' | '旅行')
+      // ★ 保存時は '未設定' または '買い物'
       category: categoryForSave as unknown as Task['category'],
     } as Task;
 
@@ -540,8 +529,8 @@ export default function EditTaskModal({
       <div className="space-y-6">
         {/* 🏷 タスク入力 */}
         <div className="mb-4">
-          <div className="flex items-center mb-0">
-            <label className="w-20 text-gray-600 shrink-0">タスク名：</label>
+          <div className="mb-0 space-y-1">
+            <label className="block text-sm font-semibold text-gray-600">タスク名</label>
             <input
               ref={nameInputRef}
               type="text"
@@ -574,90 +563,10 @@ export default function EditTaskModal({
                     );
                 setNameError(dup ? 'すでに登録済みです。' : null);
               }}
-              className="w-full border-b border-gray-300 outline-none text-[#5E5E5E]"
+              className="min-h-12 w-full rounded-xl border border-gray-200 px-3 text-base outline-none text-[#5E5E5E] focus:ring-2 focus:ring-gray-200"
             />
           </div>
-          {nameError && <p className="text-xs text-red-500 ml-20 mt-1">{nameError}</p>}
-        </div>
-
-        {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
-        <div className="flex items-center">
-          <label className="w-28 text-gray-600 shrink-0 flex items-center">
-            <span className="inline-flex items-center gap-1 whitespace-nowrap">
-              カテゴリ
-              <HelpPopover
-                className="ml-1"
-                content={
-                  <div className="space-y-2">
-                    Todoがそれぞれのカテゴリに応じて表示が変わります。
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>料理：レシピの管理におすすめです。</li>
-                      <li>買い物：買い物リストとしての利用に便利です。</li>
-                      <li>旅行：旅行の計画に役立ちます。</li>
-                    </ul>
-                  </div>
-                }
-              />
-              <span>：</span>
-            </span>
-          </label>
-
-          <div className="relative flex-1 min-w-0 basis-0">
-            <div
-              ref={catScrollRef}
-              onScroll={measureCatOverflow}
-              className={[
-                'w-full max-w-full',
-                'flex flex-nowrap gap-2 overflow-x-auto',
-                'touch-pan-x overscroll-x-contain',
-                '[-webkit-overflow-scrolling:touch]',
-                '[&::-webkit-scrollbar]:hidden',
-                'scrollbar-width-none',
-                'pr-8',
-                'snap-x snap-mandatory',
-              ].join(' ')}
-              style={{ scrollbarWidth: 'none' }}
-              aria-label="カテゴリ一覧（横スクロール）"
-            >
-              {CATEGORY_OPTIONS.map(({ key, label, Icon, iconColor, selectedIconColor, selectedBg }) => {
-                const selected = eqCat(editedTask.category, key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleCategory(key)}
-                    aria-pressed={selected}
-                    data-cat={key}
-                    className={[
-                      'inline-flex items-center gap-2 px-3 py-2 rounded-full border transition',
-                      'shrink-0 snap-start',
-                      selected
-                        ? `bg-gradient-to-b ${selectedBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
-                        : 'bg-white border-gray-300 text-gray-700 opacity-90 hover:opacity-100',
-                    ].join(' ')}
-                    title={label}
-                  >
-                    <Icon
-                      size={18}
-                      className={selected ? (selectedIconColor ?? 'text-white') : iconColor}
-                      aria-hidden="true"
-                    />
-                    <span className="text-xs font-bold whitespace-nowrap">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 右端グラデ＋矢印パルスのスクロールヒント */}
-            {catOverflow && (
-              <div className="pointer-events-none absolute right-0 top-0 h-full w-10 flex items-center justify-end">
-                <div className="absolute inset-0 bg-gradient-to-l from-white to-transparent" />
-                <div className="relative mr-1 rounded-full bg-black/40 p-1 animate-pulse">
-                  <ChevronRight size={14} className="text-white" />
-                </div>
-              </div>
-            )}
-          </div>
+          {nameError && <p className="mt-1 text-xs text-red-500">{nameError}</p>}
         </div>
 
         {/* 🗓 頻度選択 */}
@@ -711,15 +620,15 @@ export default function EditTaskModal({
 
         {/* 📅 曜日選択（週次のみ） */}
         {editedTask.period === '週次' && (
-          <div className="flex items-center flex-wrap gap-y-2">
-            <label className="w-20 text-gray-600 shrink-0">曜日：</label>
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-600">曜日</label>
             <div className="flex gap-2 flex-wrap">
               {['月', '火', '水', '木', '金', '土', '日'].map((day) => (
                 <button
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`w-6 h-6 rounded-full text-xs font-bold ${
+                  className={`min-h-11 min-w-11 rounded-full text-sm font-bold ${
                     editedTask.daysOfWeek.includes(day)
                       ? 'bg-[#5E5E5E] text-white'
                       : 'bg-gray-200 text-gray-600'
@@ -740,7 +649,7 @@ export default function EditTaskModal({
                 時間
                 <HelpPopover
                   className="ml-1"
-                  content={<div className="space-y-2">設定すると、指定した時間の約30分前に通知が届きます。</div>}
+                  content={<div className="space-y-2">設定すると、指定した時間の約30分前に通知が届きます。アプリを閉じていても届きます。</div>}
                 />
                 <span>：</span>
               </span>
@@ -819,6 +728,90 @@ export default function EditTaskModal({
             ) : null}
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => setShowMore((v) => !v)}
+          className="w-full min-h-11 text-sm text-gray-600 underline"
+        >
+          {showMore ? '詳細を閉じる' : '詳細（ポイント・カテゴリなど）'}
+        </button>
+
+        {showMore && (
+          <>
+        {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
+        <div className="flex items-center">
+          <label className="w-28 text-gray-600 shrink-0 flex items-center">
+            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+              カテゴリ
+              <HelpPopover
+                className="ml-1"
+                content={
+                  <div className="space-y-2">
+                    リストの表示がカテゴリごとに変わります。買い物を選ぶとリストがオンになり、買い物リストとして使えます。
+                  </div>
+                }
+              />
+              <span>：</span>
+            </span>
+          </label>
+
+          <div className="relative flex-1 min-w-0 basis-0">
+            <div
+              ref={catScrollRef}
+              onScroll={measureCatOverflow}
+              className={[
+                'w-full max-w-full',
+                'flex flex-nowrap gap-2 overflow-x-auto',
+                'touch-pan-x overscroll-x-contain',
+                '[-webkit-overflow-scrolling:touch]',
+                '[&::-webkit-scrollbar]:hidden',
+                'scrollbar-width-none',
+                'pr-8',
+                'snap-x snap-mandatory',
+              ].join(' ')}
+              style={{ scrollbarWidth: 'none' }}
+              aria-label="カテゴリ一覧（横スクロール）"
+            >
+              {CATEGORY_OPTIONS.map(({ key, label, Icon, iconColor, selectedIconColor, selectedBg }) => {
+                const selected = eqCat(editedTask.category, key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleCategory(key)}
+                    aria-pressed={selected}
+                    data-cat={key}
+                    className={[
+                      'inline-flex items-center gap-2 px-3 py-2 rounded-full border transition',
+                      'shrink-0 snap-start',
+                      selected
+                        ? `bg-gradient-to-b ${selectedBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
+                        : 'bg-white border-gray-300 text-gray-700 opacity-90 hover:opacity-100',
+                    ].join(' ')}
+                    title={label}
+                  >
+                    <Icon
+                      size={18}
+                      className={selected ? (selectedIconColor ?? 'text-white') : iconColor}
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs font-bold whitespace-nowrap">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {catOverflow && (
+              <div className="pointer-events-none absolute right-0 top-0 h-full w-10 flex items-center justify-end">
+                <div className="absolute inset-0 bg-gradient-to-l from-white to-transparent" />
+                <div className="relative mr-1 rounded-full bg-black/40 p-1 animate-pulse">
+                  <ChevronRight size={14} className="text-white" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ⭐ ポイント（共有のみ） */}
         {!isPrivate && (
@@ -954,38 +947,42 @@ export default function EditTaskModal({
           </>
         )}
 
-        {/* ✅ TODO表示 */}
+        {/* ✅ Todo */}
         {(() => {
-          const isVisible = toStrictBool((editedTask as unknown as { visible?: unknown }).visible);
+          const isOn = Boolean((editedTask as unknown as { isTodo?: boolean }).isTodo);
           return (
             <div className="flex items-center">
               <label className="w-35 text-gray-600 shrink-0 flex items-center">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  TODO表示
-                  <HelpPopover 
-                    className="ml-1" 
+                  Todo
+                  <HelpPopover
+                    className="ml-1"
                     content={
                       <div className="space-y-2">
-                        <p>オンにすると、Todo画面で表示状態となります。</p>
+                        <p>オンにすると、家事画面からリストを開けます。オンの間は、Todo をすべて完了するまでタスクを完了できません。</p>
                       </div>
-                    } />
+                    }
+                  />
                   <span>：</span>
                 </span>
               </label>
               <button
                 type="button"
                 role="switch"
-                aria-checked={isVisible}
-                onClick={() =>
-                  update('visible' as keyof TaskWithNote, (!isVisible) as unknown as TaskWithNote[keyof TaskWithNote])
-                }
+                aria-checked={isOn}
+                onClick={() => {
+                  const next = !isOn;
+                  setEditedTask((prev) =>
+                    prev ? { ...prev, isTodo: next, visible: next } : prev
+                  );
+                }}
                 className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isVisible ? 'bg-yellow-500' : 'bg-gray-300'
+                  isOn ? 'bg-yellow-500' : 'bg-gray-300'
                 }`}
               >
                 <span
                   className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isVisible ? 'translate-x-6' : ''
+                    isOn ? 'translate-x-6' : ''
                   }`}
                 />
               </button>
@@ -1103,6 +1100,8 @@ export default function EditTaskModal({
           </div>
           {noteError && <p className="text-xs text-red-500 mt-1">{noteError}</p>}
         </div>
+          </>
+        )}
       </div>
     </BaseModal>,
     portalTarget

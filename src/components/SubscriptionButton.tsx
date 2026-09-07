@@ -28,7 +28,7 @@ export default function SubscriptionButton({ userId }: Props) {
   const [priceText, setPriceText] = useState('');
   const [consentOpen, setConsentOpen] = useState(false);
   const [consentProcessing, setConsentProcessing] = useState(false);
-  const { plan } = useUserPlan();
+  const { plan, isChecking, isCancelPending, expiryLabel } = useUserPlan();
   const active = plan === 'premium';
 
   const canRender = useMemo(() => isNativeMobile(), []);
@@ -114,57 +114,71 @@ export default function SubscriptionButton({ userId }: Props) {
   if (!canRender) return null;
 
   return (
-    <section className="rounded-xl bg-white/70 border border-black/10 p-4 space-y-3">
-      <div className="text-sm font-semibold">応援プラン（月額）</div>
-      <p className="text-xs text-gray-600">
-        開発継続の応援と、アプリ内の案内表示の非表示に使われます。解約は Google Play から行えます。
-      </p>
+    <section className="rounded-2xl bg-white p-4 shadow space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="text-sm font-semibold text-[#5E5E5E]">応援プラン</div>
+        {!isChecking && (
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              active ? (isCancelPending ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-800') : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {active ? (isCancelPending ? '解約済み' : '加入中') : '未加入'}
+          </span>
+        )}
+      </div>
+
+      {isChecking ? (
+        <p className="text-xs text-gray-500">状態を確認しています…</p>
+      ) : active ? (
+        <p className="text-xs text-gray-600">
+          {isCancelPending
+            ? `更新は停止しています。${expiryLabel ? `${expiryLabel}まで` : '期限まで'}は案内と広告が非表示です。`
+            : '案内と広告は非表示です。解約は Google Play から行えます。'}
+        </p>
+      ) : (
+        <p className="text-xs text-gray-600">
+          開発継続の応援と、アプリ内の案内・広告の非表示に使われます。
+          {priceText ? `（${priceText} / 月）` : ''}
+        </p>
+      )}
 
       {!supported ? (
         <div className="text-sm text-red-600">この端末では Google Play の課金が利用できません。</div>
+      ) : isChecking ? null : active ? (
+        <button
+          type="button"
+          onClick={onManage}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gray-200 px-4 text-sm font-semibold text-gray-800 active:bg-gray-300"
+        >
+          定期購入を管理
+        </button>
       ) : (
-        <>
-          <div className="text-sm">
-            状態：<span className="font-semibold">{active ? '加入中' : '未加入'}</span>
-            {priceText ? <span className="text-gray-600">（{priceText}）</span> : null}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {!active && (
-              <button
-                type="button"
-                onClick={onBuy}
-                disabled={loading}
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-60"
-              >
-                応援する
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onRestore}
-              disabled={loading}
-              className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm disabled:opacity-60"
-            >
-              購入を復元
-            </button>
-            <button
-              type="button"
-              onClick={onManage}
-              className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm"
-            >
-              定期購入を管理
-            </button>
-          </div>
-        </>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onBuy}
+            disabled={loading}
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white active:opacity-90 disabled:opacity-60"
+          >
+            応援する
+          </button>
+          <button
+            type="button"
+            onClick={onRestore}
+            disabled={loading}
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-gray-200 px-4 text-sm font-semibold text-gray-800 active:bg-gray-300 disabled:opacity-60"
+          >
+            購入を復元
+          </button>
+        </div>
       )}
 
       <ConfirmModal
         isOpen={consentOpen}
-        title="定期購入の同意"
+        title="定期購入の確認"
         message={
           <div className="text-left space-y-2">
-            <p className="font-semibold">定期購入の確認</p>
             <p className="text-sm">
               Google Play の定期購入（自動更新）です。購入後は次回更新日まで利用できます。
             </p>
@@ -175,7 +189,7 @@ export default function SubscriptionButton({ userId }: Props) {
         }
         onConfirm={doPurchaseWithConsent}
         onCancel={() => setConsentOpen(false)}
-        confirmLabel="同意して購入する"
+        confirmLabel="購入画面へ進む"
         cancelLabel="キャンセル"
         isProcessing={consentProcessing}
       />

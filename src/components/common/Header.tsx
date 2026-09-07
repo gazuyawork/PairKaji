@@ -3,11 +3,11 @@
 export const dynamic = 'force-dynamic';
 
 import {
-  MoreVertical, User, Mail, LogOut, Loader2, CheckCircle, ArrowLeft,
+  MoreVertical, User, LogOut, Loader2, CheckCircle, ArrowLeft,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { signOutEverywhere } from '@/lib/authSession';
+import { useUserPlan } from '@/hooks/useUserPlan';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
@@ -20,6 +20,8 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
   const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { plan, isChecking } = useUserPlan();
+  const showPricingEntry = isChecking || plan !== 'premium';
 
   // ▼▼ 追加: メニュー領域を参照するref
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,7 +46,6 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
       <div className="mx-auto max-w-xl w-full flex items-center relative h-full px-4">
         {(pathname === '/profile' ||
           pathname === '/contact' ||
-          pathname === '/task_manage' ||
           pathname === '/delete-account' ||
           pathname === '/pricing' ||
           pathname === '/terms' ||
@@ -52,11 +53,11 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => {
-              if (pathname === '/task_manage') {
-                router.push('/main?fromTaskManage=true');
+              if (pathname === '/profile') {
+                router.push('/main');
                 return;
               }
-              router.push('/main');
+              router.back();
             }}
             className="text-[#5E5E5E] active:translate-y-[1px]"
             aria-label="戻る"
@@ -84,7 +85,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
         {showMenu && (
           <div
             ref={menuRef} // ★ 追加
-            className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-42 z-20"
+            className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-42 z-20 no-tab-swipe"
           >
             <ul className="divide-y divide-gray-200">
               <li
@@ -97,16 +98,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
                 <User size={16} />
                 設定
               </li>
-              <li
-                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-                onClick={() => {
-                  setShowMenu(false);
-                  router.push('/contact');
-                }}
-              >
-                <Mail size={16} />
-                お問い合わせ
-              </li>
+              {showPricingEntry && (
               <li
                 className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
                 onClick={() => {
@@ -117,6 +109,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
                 <CheckCircle size={16} />
                 応援プラン
               </li>
+              )}
               <li
                 className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
                 onClick={async () => {
@@ -126,8 +119,7 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
                       'pk_last_dest=' +
                       encodeURIComponent('/login') +
                       '; Path=/; Max-Age=604800; SameSite=Lax';
-                    sessionStorage.setItem('manualSignOut', '1');
-                    await signOut(auth);
+                    await signOutEverywhere();
                   } finally {
                     router.push('/login');
                   }

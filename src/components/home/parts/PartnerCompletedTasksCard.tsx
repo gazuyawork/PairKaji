@@ -11,18 +11,14 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  orderBy,
   query,
   setDoc,
-  where,
-  Timestamp,
   serverTimestamp,
-  getDoc,
-  type QueryDocumentSnapshot,
+  where,
 } from 'firebase/firestore';
-import { getConfirmedPartnerUid } from '@/lib/pairs';
 import { getThisWeekRangeJST } from '@/lib/weeklyRange';
-import HelpPopover from '@/components/common/HelpPopover'; // ★追加
+import HelpPopover from '@/components/common/HelpPopover';
+import { useHousehold } from '@/context/HouseholdContext';
 
 type PartnerTask = {
   id: string;
@@ -33,31 +29,17 @@ type PartnerTask = {
 
 type HeartStateMap = Record<string, boolean>; // key: `${taskId}_${dateKey}`, value: liked?
 
-// Firestoreの tasks ドキュメントで本コンポーネントが参照する最小フィールド
-type FirestoreTask = {
-  name?: unknown;
-  completedAt?: Timestamp | null;
-  completedBy?: unknown;
-  done?: unknown;
-  userIds?: unknown;
-};
-
-function toStringOr<T extends string | null>(v: unknown, fallback: T): string | T {
-  return typeof v === 'string' ? v : fallback;
-}
-function toBoolean(v: unknown, fallback = false): boolean {
-  return typeof v === 'boolean' ? v : fallback;
-}
-function toStringArray(v: unknown): string[] {
-  return Array.isArray(v) ? (v.filter((x) => typeof x === 'string') as string[]) : [];
-}
-// 追加：完了日の日付キー（YYYYMMDD）を作る
 function toDateKey(d: Date | null | undefined): string | null {
   if (!d) return null;
   const y = d.getFullYear();
   const m = (d.getMonth() + 1).toString().padStart(2, '0');
   const day = d.getDate().toString().padStart(2, '0');
   return `${y}${m}${day}`;
+}
+
+function isSameDayLocal(d: Date): boolean {
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
 
 /**
@@ -72,98 +54,81 @@ function toDateKey(d: Date | null | undefined): string | null {
  * - スキーマ：{ taskId, senderId, receiverId, participants:[sender, receiver]（昇順）, createdAt, dateKey, completedAt }
  */
 export default function PartnerCompletedTasksCard() {
-  const COLLECTION = 'taskLikes' as const; // ← コレクション名を定数化
-
+  const COLLECTION = 'taskLikes' as const;
+  const { uid, partnerId: partnerUid, tasks, tasksReady } = useHousehold();
   const [rows, setRows] = useState<PartnerTask[]>([]);
   const [likedMap, setLikedMap] = useState<HeartStateMap>({});
   const [pendingMap, setPendingMap] = useState<Record<string, boolean>>({});
-  const [partnerUid, setPartnerUid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // 今週範囲（JST・月曜はじまり）
   const weekRange = useMemo(() => getThisWeekRangeJST(), []);
 
-  // 初期ロード：パートナーUIDの取得
   useEffect(() => {
-    const u = auth.currentUser;
-    if (!u) return;
-    (async () => {
-      const partner = await getConfirmedPartnerUid(u.uid);
-      setPartnerUid(partner);
-    })();
-  }, []);
-
-  // パートナーの完了タスク（今週分）を購読
-  useEffect(() => {
-    const me = auth.currentUser;
-    if (!me || !partnerUid) return;
-
+    if (!uid || !partnerUid) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     const { start, end } = weekRange;
-    const col = collection(db, 'tasks');
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    const toDate = (v: unknown): Date | null => {
+      if (!v) return null;
+      if (v instanceof Date) return v;
+      if (typeof v === 'object' && v && 'toDate' in v && typeof (v as { toDate: () => Date }).toDate === 'function') {
+        return (v as { toDate: () => Date }).toDate();
+      }
+      if (typeof v === 'string') {
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+      return null;
+    };
+    const list: PartnerTask[] = tasks
+      .filter((t) => {
+        if (!t.done) return false;
+        if (t.completedBy !== partnerUid) return false;
+        if (!(t.userIds ?? []).includes(uid)) return false;
+        const at = toDate(t.completedAt);
+        const ms = at?.getTime();
+        return ms != null && ms >= startMs && ms < endMs;
+      })
+      .map((t) => ({
+        id: t.id,
+        name: t.name || '(名称未設定)',
+        completedAt: toDate(t.completedAt),
+        completedBy: typeof t.completedBy === 'string' ? t.completedBy : null,
+      }))
+      .sort((a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0));
+    setRows(list);
+    setLoading(!tasksReady);
+  }, [uid, partnerUid, tasks, weekRange, tasksReady]);
 
-    const qTasks = query(
-      col,
-      where('done', '==', true),
-      where('completedAt', '>=', Timestamp.fromDate(start)),
-      where('completedAt', '<', Timestamp.fromDate(end)),
-      where('completedBy', '==', partnerUid),
-      where('userIds', 'array-contains', me.uid),
-      orderBy('completedAt', 'asc'),
-    );
+  // 自分が送ったいいねを1本の購読で取る
+  useEffect(() => {
+    if (!uid || !partnerUid) {
+      setLikedMap({});
+      return;
+    }
 
-    const unSub = onSnapshot(
-      qTasks,
+    const qLikes = query(collection(db, COLLECTION), where('senderId', '==', uid));
+    const unsub = onSnapshot(
+      qLikes,
       (snap) => {
-        const list: PartnerTask[] = snap.docs
-          .map((d: QueryDocumentSnapshot) => {
-            const data = d.data() as FirestoreTask;
-            const name = toStringOr(data.name, '(名称未設定)');
-            const completedBy = toStringOr(data.completedBy, null);
-            const completedAt = data.completedAt instanceof Timestamp ? data.completedAt.toDate() : null;
-            const okDone = toBoolean(data.done, true);
-            const okShared = toStringArray(data.userIds).includes(me.uid);
-            if (!okDone || !okShared) {}
-            return { id: d.id, name, completedAt, completedBy };
-          })
-          .sort((a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0));
-        setRows(list);
-        setLoading(false);
+        const next: HeartStateMap = {};
+        snap.forEach((d) => {
+          const data = d.data() as { taskId?: unknown; dateKey?: unknown };
+          const taskId = typeof data.taskId === 'string' ? data.taskId : '';
+          const dateKey = typeof data.dateKey === 'string' ? data.dateKey : '';
+          if (taskId && dateKey) next[`${taskId}_${dateKey}`] = true;
+        });
+        setLikedMap(next);
       },
       (err) => {
-        console.error('PartnerCompletedTasksCard onSnapshot error:', err);
-        setLoading(false);
-      },
-    );
-
-    return () => unSub();
-  }, [partnerUid, weekRange]);
-
-  // 既に自分がLikeしている「今週の完了インスタンス」かをロード
-  useEffect(() => {
-    const me = auth.currentUser;
-    if (!me || rows.length === 0 || !partnerUid) return;
-
-    (async () => {
-      const pairs = await Promise.all(
-        rows.map(async (r) => {
-          const dateKey = toDateKey(r.completedAt);
-          if (!dateKey) return null;
-          const likeKey = `${r.id}_${dateKey}`;
-          const heartId = `${likeKey}_${me.uid}`;
-          const ref = doc(db, COLLECTION, heartId);
-          const snap = await getDoc(ref);
-          return [likeKey, snap.exists()] as const;
-        }),
-      );
-      const newMap: HeartStateMap = {};
-      for (const p of pairs) {
-        if (!p) continue;
-        const [likeKey, liked] = p;
-        newMap[likeKey] = liked;
+        console.error('PartnerCompletedTasksCard likes onSnapshot error:', err);
       }
-      setLikedMap(newMap);
-    })();
-  }, [rows, partnerUid]);
+    );
+    return () => unsub();
+  }, [uid, partnerUid]);
 
   // いいねトグル処理
   const toggleLike = useCallback(
@@ -218,13 +183,13 @@ export default function PartnerCompletedTasksCard() {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="p-2 rounded-full hover:bg-gray-100 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+      className="min-h-11 min-w-11 p-2 flex items-center justify-center rounded-full hover:bg-rose-50 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
       whileTap={{ scale: 0.9 }}
       animate={liked ? { rotate: [0, 20, -15, 0], scale: [1, 1.3, 1.05, 1] } : { scale: 1 }}
       transition={{ duration: 0.45 }}
       aria-label={liked ? 'いいねを取り消す' : 'いいねする'}
     >
-      <HeartIcon className={`w-5 h-5 ${liked ? 'fill-rose-500 text-rose-500' : 'text-gray-400'}`} />
+      <HeartIcon className={`w-6 h-6 ${liked ? 'fill-rose-500 text-rose-500' : 'text-gray-400'}`} />
     </motion.button>
   );
 
@@ -233,6 +198,9 @@ export default function PartnerCompletedTasksCard() {
     if (rows.length === 0) return [];
     const arr = [...rows];
     arr.sort((a, b) => {
+      const aToday = a.completedAt && isSameDayLocal(a.completedAt) ? 0 : 1;
+      const bToday = b.completedAt && isSameDayLocal(b.completedAt) ? 0 : 1;
+      if (aToday !== bToday) return aToday - bToday;
       const aKey = toDateKey(a.completedAt);
       const bKey = toDateKey(b.completedAt);
       const aLiked = aKey ? (likedMap[`${a.id}_${aKey}`] === true ? 1 : 0) : 0;
@@ -240,7 +208,7 @@ export default function PartnerCompletedTasksCard() {
       if (aLiked !== bLiked) return aLiked - bLiked;
       const aTime = a.completedAt?.getTime() ?? 0;
       const bTime = b.completedAt?.getTime() ?? 0;
-      return aTime - bTime;
+      return bTime - aTime;
     });
     return arr;
   }, [rows, likedMap]);
@@ -249,7 +217,7 @@ export default function PartnerCompletedTasksCard() {
     <div className="rounded-2xl border border-gray-200 bg-white p-4 max-w-xl m-auto">
       <div className="mb-3 flex items-center justify-center gap-2">
         <h2 className="text-base font-semibold text-gray-800 flex items-center gap-1">
-          パートナーの完了タスク
+          パートナーの完了
           <HelpPopover
             className="ml-1"
             preferredSide="top"
@@ -258,10 +226,7 @@ export default function PartnerCompletedTasksCard() {
             offsetX={-30} 
             content={
               <div className="space-y-2 text-sm">
-                <p>今週、パートナーが完了したタスクの一覧です。</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>ハートを押すとパートナーに「ありがとう」を送れます。</li>
-                </ul>
+                <p>パートナーが完了した家事です。ハートで「ありがとう」を送れます。</p>
               </div>
             }
           />
@@ -273,7 +238,7 @@ export default function PartnerCompletedTasksCard() {
       ) : loading ? (
         <p className="text-sm text-gray-500">読み込み中…</p>
       ) : displayRows.length === 0 ? (
-        <p className="text-sm text-gray-500">今週の完了タスクはまだありません。</p>
+        <p className="text-sm text-gray-500">相手が完了すると、ここでありがとうを送れます。</p>
       ) : (
         <motion.ul layout className="space-y-2" layoutScroll>
           {displayRows.map((t) => {
@@ -286,7 +251,7 @@ export default function PartnerCompletedTasksCard() {
               <motion.li
                 key={t.id}
                 layout
-                className="flex items-center justify-between border-b border-gray-200 px-3 pt-1 rounded-md"
+                className="flex items-center justify-between gap-2 border-b border-gray-200 px-2 min-h-11 rounded-md"
                 initial={false}
                 animate={
                   liked
