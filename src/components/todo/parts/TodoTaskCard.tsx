@@ -23,7 +23,6 @@ import { useScrollMeter } from './hooks/useScrollMeter';
 import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
 
 // ルーティング & ビューコンテキスト
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useView } from '@/context/ViewContext';
 
 /* ------------------------------ helpers ------------------------------ */
@@ -63,6 +62,8 @@ interface Props {
   onClose?: () => void;
   /** シート内表示（下から出るモーダル） */
   inSheet?: boolean;
+  /** リストをオンで保存した直後は、追加欄を開いた状態で出す */
+  startAdding?: boolean;
 }
 
 /* ------------------------------- component ------------------------------ */
@@ -83,12 +84,9 @@ export default function TodoTaskCard({
   onReorderTodos,
   onClose,
   inSheet = false,
+  startAdding = false,
 }: Props) {
-  // ルーター & 現在のURL/クエリ、ビュー切替
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const { setIndex } = useView();
+  const { openTaskScreen } = useView();
 
   // todos抽出
   const rawTodos = (task as unknown as { todos?: unknown }).todos;
@@ -191,7 +189,8 @@ export default function TodoTaskCard({
   /* ------------------------------ 入力トグル ------------------------------ */
 
   // 別画面は出さず、ヘッダー2段目の「タブ」を隠して右側の入力を画面幅いっぱいに展開
-  const [isInputOpen, setIsInputOpen] = useState(false);
+  const [isInputOpen, setIsInputOpen] = useState(startAdding);
+  const didStartAddingRef = useRef(false);
   const inputWrapRef = useRef<HTMLDivElement | null>(null);
 
   /* iOS検出とフォーカス用ダミー入力 */
@@ -216,6 +215,24 @@ export default function TodoTaskCard({
   };
 
   const closeAddInput = () => setIsInputOpen(false);
+
+  useEffect(() => {
+    if (!startAdding || didStartAddingRef.current) return;
+    didStartAddingRef.current = true;
+    setIsInputOpen(true);
+    const coarse =
+      typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+    if (!coarse) return;
+    const focus = () => inputRef.current?.focus();
+    const raf = requestAnimationFrame(focus);
+    const soon = window.setTimeout(focus, 250);
+    const later = window.setTimeout(focus, 600);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(soon);
+      window.clearTimeout(later);
+    };
+  }, [startAdding]);
 
   // [ADD] 入力ボックス外クリックでクローズ（クリックアウェイ）
   useEffect(() => {
@@ -349,39 +366,9 @@ export default function TodoTaskCard({
   const jumpToTaskFilter = useCallback(() => {
     const name = (task as unknown as { name?: string }).name?.trim() ?? '';
     if (!name) return;
-
-    // 1) ビューをタスク画面へ切替（最優先）
-    try {
-      setIndex?.(1);
-    } catch {
-      /* no-op */
-    }
-
-    // 2) URLクエリを更新（既存クエリは維持しつつ必要なキーを上書き）
-    try {
-      // useSearchParams() が null でも安全に扱えるよう toString() を経由
-      const q = new URLSearchParams(params?.toString() ?? '');
-      q.set('index', '1');
-      q.set('search', name);
-      q.set('focus', 'search');
-
-      // 現在のパスに対してクエリのみ更新（scrollはそのまま）
-      router.push(`${pathname}?${q.toString()}`);
-    } catch {
-      // 失敗時はフォールバックで /main を直接指定（プロジェクト構成に合わせ調整）
-      router.push(`/main?index=1&search=${encodeURIComponent(name)}&focus=search`);
-    }
-
-    // 3) メイン側で参照している可能性のあるフラグ
-    try {
-      sessionStorage.setItem('goToTaskView', 'true');
-    } catch {
-      /* no-op */
-    }
-
-    // 4) このカード（モーダル）を閉じる
+    openTaskScreen({ search: name });
     onClose?.();
-  }, [task, setIndex, params, pathname, router, onClose]);
+  }, [task, openTaskScreen, onClose]);
 
   /* ---------------------------- render (card) ---------------------------- */
 
@@ -570,7 +557,6 @@ export default function TodoTaskCard({
                         )}
                         placeholder={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
                         inputMode="text"
-                        autoFocus
                       />
                       <button
                         type="button"

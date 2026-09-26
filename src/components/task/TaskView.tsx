@@ -397,6 +397,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const pendingDeleteResolver = useRef<((value: boolean) => void) | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [holdingDoneIds, setHoldingDoneIds] = useState<Set<string>>(() => new Set());
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
   const [orphanCleaning, setOrphanCleaning] = useState(false);
   const orphanPromptDismissedRef = useRef(false);
@@ -408,7 +409,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const filterHintTimerRef = useRef<number | null>(null);
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
   const todayDate = useMemo(() => new Date().getDate(), []);
-  const { index, selectedTaskName, setSelectedTaskName, listOpen, openTaskList } = useView();
+  const { index, selectedTaskName, setSelectedTaskName, listOpen, openTaskList, taskScreenRequest } = useView();
   const pendingListTaskIdRef = useRef<string | null>(null);
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
   const hasAnyCompleted = useMemo(
@@ -470,6 +471,23 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       setFlaggedFilter(true);
     }
   }, [params]);
+
+  const seenTaskScreenRequest = useRef(0);
+  useEffect(() => {
+    if (taskScreenRequest.token === 0 || taskScreenRequest.token === seenTaskScreenRequest.current) return;
+    seenTaskScreenRequest.current = taskScreenRequest.token;
+    if (taskScreenRequest.flagged) setFlaggedFilter(true);
+    if (taskScreenRequest.search) {
+      setSearchTerm(taskScreenRequest.search);
+      setShowSearchBox(true);
+      requestAnimationFrame(() => {
+        const el = searchInputRef.current;
+        if (!el) return;
+        el.focus();
+        el.select?.();
+      });
+    }
+  }, [taskScreenRequest]);
 
   // 「パートナー解除後の孤児データ削除」案内の判定
   useEffect(() => {
@@ -614,6 +632,14 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       }
     }
 
+    const completing = !target.done;
+    if (completing) {
+      setHoldingDoneIds((prev) => {
+        const next = new Set(prev);
+        next.add(target.id);
+        return next;
+      });
+    }
     await toggleTaskDoneStatus(
       target.id,
       uid,
@@ -621,6 +647,16 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       target.name,
       getOpt(target, 'person') ?? ''
     );
+    if (completing) {
+      window.setTimeout(() => {
+        setHoldingDoneIds((prev) => {
+          if (!prev.has(target.id)) return prev;
+          const next = new Set(prev);
+          next.delete(target.id);
+          return next;
+        });
+      }, 450);
+    }
     return true;
   };
 
@@ -638,7 +674,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     if (!id) return;
     if (!householdTasks.some((t) => t.id === id)) return;
     pendingListTaskIdRef.current = null;
-    openTaskList(id);
+    openTaskList(id, { startAdding: true });
   }, [householdTasks, openTaskList]);
 
   // タスク更新
@@ -649,7 +685,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       !taskShowsOnTodoTab(source) &&
       (updated as { isTodo?: boolean }).isTodo === true;
     try {
-      if (!uid) return;
+      if (!uid) throw new Error('ログインしていません');
       const updatedTask: TaskManageTask = {
         ...(updated as TaskManageTask),
         id: updated.id ?? '',
@@ -658,13 +694,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       setEditTargetTask(null);
       if (!openListAfterSave || !savedId) return;
       if (householdTasks.some((t) => t.id === savedId)) {
-        openTaskList(savedId);
+        openTaskList(savedId, { startAdding: true });
       } else {
         pendingListTaskIdRef.current = savedId;
       }
     } catch (error) {
       console.error('タスク更新に失敗しました:', error);
-      toast.error(error instanceof Error ? error.message : 'タスクの保存に失敗しました');
+      throw error;
     }
   };
 
@@ -1310,7 +1346,7 @@ const toggleSelectionMode = useCallback(() => {
                       <ul className="space-y-1.5 [touch-action:pan-y]">
                         {(() => {
                           const visibleList = sortByDisplayOrder(listTasks).filter(
-                            (t) => showCompleted || !t.done || searchActive
+                            (t) => showCompleted || !t.done || holdingDoneIds.has(t.id) || searchActive
                           );
                           if (visibleList.length === 0) return null;
                           if (selectionMode) {
@@ -1425,7 +1461,7 @@ const toggleSelectionMode = useCallback(() => {
                     <ul className="space-y-1.5 [touch-action:pan-y]">
                       {(() => {
                         const visibleList = orderedAllForPeriod.filter(
-                          (t) => showCompleted || !t.done || searchActive
+                          (t) => showCompleted || !t.done || holdingDoneIds.has(t.id) || searchActive
                         );
 
                         if (selectionMode) {

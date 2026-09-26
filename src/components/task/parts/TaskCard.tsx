@@ -164,9 +164,10 @@ function TaskCard({
 
   const handleClick = async () => {
     if (showActions) return;
+    const wasDone = !!task.done;
     const ok = await onToggleDone(period, task.id);
     if (ok === false) return;
-    if (!task.done) {
+    if (!wasDone) {
       setAnimateTrigger((prev) => prev + 1);
       setLocalDone(true);
     }

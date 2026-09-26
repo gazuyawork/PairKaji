@@ -53,14 +53,7 @@ export default function TodayListsCard() {
             >
               <ListTodo className="h-5 w-5 shrink-0 text-blue-600" />
               <span className="min-w-0 flex-1">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate font-semibold text-[#5E5E5E]">{task.name}</span>
-                  {lastId === task.id && (
-                    <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                      続き
-                    </span>
-                  )}
-                </span>
+                <span className="block truncate font-semibold text-[#5E5E5E]">{task.name}</span>
                 <span className="block text-xs text-gray-500">{listLabel(task)}</span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />

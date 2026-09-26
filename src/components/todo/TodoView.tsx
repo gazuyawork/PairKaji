@@ -9,7 +9,6 @@ import {
   useMemo,
   useCallback,
 } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   doc,
   updateDoc,
@@ -81,10 +80,7 @@ function toTodoOnlyTask(t: {
 }
 
 export default function TodoView() {
-  const { selectedTaskName, setSelectedTaskName, listOpen, setIndex, closeTaskList } = useView();
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
+  const { selectedTaskName, setSelectedTaskName, listOpen, listAddTaskId, closeTaskList, openTaskScreen } = useView();
 
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
@@ -128,28 +124,9 @@ export default function TodoView() {
   const jumpToTaskByName = useCallback((name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    try {
-      closeTaskList();
-      setIndex?.(1);
-    } catch {
-      /* no-op */
-    }
-    try {
-      const q = new URLSearchParams(params?.toString() ?? '');
-      q.set('index', '1');
-      q.set('search', trimmed);
-      q.set('focus', 'search');
-      router.push(`${pathname}?${q.toString()}`);
-    } catch {
-      router.push(`/main?index=1&search=${encodeURIComponent(trimmed)}&focus=search`);
-    }
-    try {
-      sessionStorage.setItem('goToTaskView', 'true');
-    } catch {
-      /* no-op */
-    }
+    openTaskScreen({ search: trimmed });
     setSelectedTaskId(null);
-  }, [params, pathname, router, setIndex, closeTaskList]);
+  }, [openTaskScreen]);
 
   // 世帯タスクを Todo 画面用に整形
   useEffect(() => {
@@ -251,6 +228,7 @@ export default function TodoView() {
             <div className="flex min-h-0 flex-1 flex-col">
               <TodoTaskCard
                 inSheet
+                startAdding={listAddTaskId === selectedTask.id}
                 task={selectedTask}
                 tab={activeTabs[selectedTask.id] ?? 'undone'}
                 setTab={(tab) => setActiveTabs((prev) => ({ ...prev, [selectedTask.id]: tab }))}

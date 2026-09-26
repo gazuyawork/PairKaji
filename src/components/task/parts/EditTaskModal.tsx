@@ -22,6 +22,25 @@ import { BURDEN_OPTIONS, burdenWeight } from '@/lib/burden';
 
 // 現在のユーザー判定に使用
 import { auth } from '@/lib/firebase';
+import { toast } from 'sonner';
+
+const SAVE_TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(work: Promise<T>, ms = SAVE_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('save-timeout')), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
 
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
@@ -54,7 +73,7 @@ type Props = {
   isOpen: boolean;
   task: Task;
   onClose: () => void;
-  onSave: (updated: Task) => void;
+  onSave: (updated: Task) => void | Promise<void>;
   users: UserInfo[];
   isPairConfirmed: boolean;
   existingTasks: Task[];
@@ -231,6 +250,7 @@ export default function EditTaskModal({
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const savingRef = useRef(false);
   const [shouldClose, setShouldClose] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
@@ -283,7 +303,11 @@ export default function EditTaskModal({
 
   // モーダルオープン時：初期取り込み
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      savingRef.current = false;
+      return;
+    }
+    if (savingRef.current) return;
 
     // ★ 読み込み時も UI用に正規化（'未設定' 等は null として未選択扱い）
     const normalizedCategory = parseCategoryForUI(
@@ -338,13 +362,11 @@ export default function EditTaskModal({
       hasTime;
     setShowMore(!isNew && hasAdvanced);
 
-    const isCoarsePointer =
-      typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-    const timer = setTimeout(() => {
-      if (isCoarsePointer) return;
+    if (!isNew) return;
+    const timer = window.setTimeout(() => {
       nameInputRef.current?.focus();
     }, 50);
-    return () => clearTimeout(timer);
+    return () => window.clearTimeout(timer);
   }, [isOpen, (task as { id?: string }).id, isPairConfirmed]);
 
   // body スクロール制御
@@ -524,48 +546,42 @@ export default function EditTaskModal({
       transformed.calendarEventId = (task as { calendarEventId?: string }).calendarEventId ?? '';
     }
 
+    if (savingRef.current) return;
+    savingRef.current = true;
     setIsSaving(true);
 
-    if (shouldForkPrivate) {
-      try {
-        const newId = await forkTaskAsPrivateForSelf(task.id!);
-        onSave({ ...transformed, id: newId, calendarEventId: '' });
-
-        if (closeTimerRef.current) {
-          clearTimeout(closeTimerRef.current);
-          closeTimerRef.current = null;
-        }
-        setTimeout(() => {
-          setIsSaving(false);
-          setSaveComplete(true);
-          closeTimerRef.current = setTimeout(() => {
-            setSaveComplete(false);
-            setShouldClose(true);
-          }, 1500);
-        }, 300);
-      } catch (e) {
-        console.error(e);
-        setIsSaving(false);
+    try {
+      if (shouldForkPrivate) {
+        const newId = await withTimeout(forkTaskAsPrivateForSelf(task.id!));
+        await withTimeout(Promise.resolve(onSave({ ...transformed, id: newId, calendarEventId: '' })));
+      } else {
+        await withTimeout(Promise.resolve(onSave(transformed)));
       }
-      return;
-    }
 
-    // 通常保存
-    onSave(transformed);
-
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-
-    setTimeout(() => {
       setIsSaving(false);
       setSaveComplete(true);
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
       closeTimerRef.current = setTimeout(() => {
         setSaveComplete(false);
         setShouldClose(true);
-      }, 1500);
-    }, 300);
+      }, 900);
+    } catch (e) {
+      console.error(e);
+      setIsSaving(false);
+      setSaveComplete(false);
+      const timedOut = e instanceof Error && e.message === 'save-timeout';
+      toast.error(
+        timedOut
+          ? '保存に時間がかかっています。通信状況を確認してもう一度お試しください。'
+          : e instanceof Error && e.message
+            ? e.message
+            : 'タスクの保存に失敗しました'
+      );
+      savingRef.current = false;
+    }
   }, [editedTask, existingTasks, isPrivate, onSave, task, calendarSync]);
 
   // 備考テキスト変更後にキャレット位置を復元

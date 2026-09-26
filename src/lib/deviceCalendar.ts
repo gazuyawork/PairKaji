@@ -180,14 +180,37 @@ function buildEventDraft(task: CalendarTaskLike): EventDraft | null {
   };
 }
 
-async function ensureNativeAccess(): Promise<boolean> {
+const CALENDAR_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(work: Promise<T>, ms = CALENDAR_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('calendar-timeout')), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+async function ensureNativeAccess(): Promise<'ok' | 'denied' | 'timeout'> {
   try {
-    await CapacitorCalendar.requestFullCalendarAccess();
-    return true;
+    await withTimeout(CapacitorCalendar.requestFullCalendarAccess());
+    return 'ok';
   } catch (err) {
     console.error('[calendar] permission', err);
-    toast.error('カレンダーへのアクセスが許可されていません');
-    return false;
+    const timedOut = err instanceof Error && err.message === 'calendar-timeout';
+    toast.error(
+      timedOut
+        ? 'カレンダーの応答がないため、予定の更新をスキップしました'
+        : 'カレンダーへのアクセスが許可されていません'
+    );
+    return timedOut ? 'timeout' : 'denied';
   }
 }
 
@@ -206,10 +229,12 @@ function nativePayload(draft: EventDraft) {
 
 async function nativeDelete(eventId: string) {
   try {
-    await CapacitorCalendar.deleteEvent({
-      id: eventId,
-      span: EventSpan.THIS_AND_FUTURE_EVENTS,
-    });
+    await withTimeout(
+      CapacitorCalendar.deleteEvent({
+        id: eventId,
+        span: EventSpan.THIS_AND_FUTURE_EVENTS,
+      })
+    );
   } catch (err) {
     console.warn('[calendar] delete skipped', err);
   }
@@ -219,8 +244,8 @@ export async function removeTaskCalendarEvent(task: CalendarTaskLike | null | un
   if (!isDeviceCalendarAvailable()) return;
   const eventId = task?.calendarEventId?.trim();
   if (!eventId) return;
-  const ok = await ensureNativeAccess();
-  if (!ok) return;
+  const access = await ensureNativeAccess();
+  if (access !== 'ok') return;
   await nativeDelete(eventId);
 }
 
@@ -247,28 +272,43 @@ export async function syncTaskWithDeviceCalendar(
   const draft = buildEventDraft(prepared);
   if (!draft || !taskId) return { calendarSync: false, calendarEventId: existingId };
 
-  const ok = await ensureNativeAccess();
-  if (!ok) return { calendarSync: false, calendarEventId: existingId };
+  const access = await ensureNativeAccess();
+  if (access === 'timeout') {
+    return {
+      calendarSync: prepared.calendarSync === true,
+      calendarEventId: existingId,
+    };
+  }
+  if (access !== 'ok') return { calendarSync: false, calendarEventId: existingId };
 
   const payload = nativePayload(draft);
   try {
     if (existingId) {
-      await CapacitorCalendar.modifyEvent({
-        id: existingId,
-        span: EventSpan.THIS_AND_FUTURE_EVENTS,
-        ...payload,
-      });
+      await withTimeout(
+        CapacitorCalendar.modifyEvent({
+          id: existingId,
+          span: EventSpan.THIS_AND_FUTURE_EVENTS,
+          ...payload,
+        })
+      );
       toast.success('カレンダーの予定を更新しました');
       return { calendarSync: true, calendarEventId: existingId };
     }
-    const created = await CapacitorCalendar.createEvent(payload);
+    const created = await withTimeout(CapacitorCalendar.createEvent(payload));
     toast.success('カレンダーに予定を追加しました');
     return { calendarSync: true, calendarEventId: created.id };
   } catch (err) {
     console.error('[calendar] sync failed', err);
+    if (err instanceof Error && err.message === 'calendar-timeout') {
+      toast.error('カレンダーの応答がないため、予定の更新をスキップしました');
+      return {
+        calendarSync: prepared.calendarSync === true,
+        calendarEventId: existingId,
+      };
+    }
     if (existingId) {
       try {
-        const created = await CapacitorCalendar.createEvent(payload);
+        const created = await withTimeout(CapacitorCalendar.createEvent(payload));
         toast.success('カレンダーに予定を追加しました');
         return { calendarSync: true, calendarEventId: created.id };
       } catch (retryErr) {

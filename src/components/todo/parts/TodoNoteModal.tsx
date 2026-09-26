@@ -26,6 +26,25 @@ import {
 } from 'firebase/storage';
 import BaseModal from '../../common/modals/BaseModal';
 import NextImage from 'next/image';
+import { toast } from 'sonner';
+
+const SAVE_TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(work: Promise<T>, ms = SAVE_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('save-timeout')), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
 
 // ▼▼ dnd-kit（参考URL・チェックリストの並び替え用） ▼▼
 import {
@@ -253,6 +272,7 @@ export default function TodoNoteModal({
 
   const [memo, setMemo] = useState('');
   const [initialLoad, setInitialLoad] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saveLabel, setSaveLabel] = useState('保存');
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
@@ -347,11 +367,15 @@ export default function TodoNoteModal({
 
   // --- 初期データの取得 ---
   useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
     const fetchTodoData = async () => {
-      if (!taskId || !todoId) return;
       try {
+        if (!taskId || !todoId) return;
         const tRef = doc(db, 'tasks', taskId);
-        const tSnap = await getDoc(tRef);
+        const tSnap = await withTimeout(getDoc(tRef), 15_000);
+        if (cancelled) return;
         if (!tSnap.exists()) return;
 
         const taskData = tSnap.data() as TaskDoc;
@@ -402,21 +426,31 @@ export default function TodoNoteModal({
           existingChecklist.length > 0
             ? existingChecklist
             : [{ id: `cl_${Math.random().toString(16).slice(2)}`, text: '', done: false }];
+        if (cancelled) return;
         setChecklist(safeChecklist);
         setCheckIds(safeChecklist.map((c) => c.id));
+        setLoadFailed(false);
       } catch (e) {
         console.error('初期データの取得に失敗:', e);
+        if (!cancelled) {
+          setLoadFailed(true);
+          toast.error('内容を読み込めませんでした。閉じてもう一度開いてください。');
+        }
       } finally {
-        setInitialLoad(false);
-        setTimeout(updateHints, 0);
+        if (!cancelled) {
+          setInitialLoad(false);
+          setTimeout(updateHints, 0);
+        }
       }
     };
 
-    if (isOpen) {
-      setInitialLoad(true);
-      void fetchTodoData();
-    }
-  }, [isOpen, taskId, todoId, todoText, updateHints]);
+    setInitialLoad(true);
+    setLoadFailed(false);
+    void fetchTodoData();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, taskId, todoId, updateHints]);
 
   // ★ 初期ロード完了後、内容があるならプレビュー / なければ編集 をデフォルトにする
   useEffect(() => {
@@ -714,68 +748,63 @@ export default function TodoNoteModal({
     setIsSaving(true);
 
     try {
-      // 画像アップロード
-      let nextImage: string | null = imageUrl;
-      if (!isImageRemoved && pendingUpload) {
-        const ext = pendingUpload.mime === 'image/webp' ? 'webp' : 'jpg';
-        const path = `task_todos/${taskId}/${todoId}/${Date.now()}.${ext}`;
-        const fileRef = storageRef(storage, path);
-        await uploadBytes(fileRef, pendingUpload.blob, {
-          contentType: pendingUpload.mime,
-          customMetadata: { ownerUid: user.uid, taskId, todoId },
-        });
-        nextImage = await getDownloadURL(fileRef);
-      }
-
-      // URL/ラベルの整形（空URL行を除外）
-      const pairs = referenceUrls.map((url, i) => ({ url, label: referenceLabels[i] ?? '' }));
-      const filteredPairs = pairs.filter((p) => isString(p.url) && p.url.trim() !== '');
-      const urlsForSave = filteredPairs.map((p) => p.url.trim());
-      const labelsForSave = filteredPairs.map((p) => (p.label ?? '').trim());
-
-      // Firestore 更新 payload
-      const payload: TodoUpdates = {
-        memo,
-        referenceUrls: urlsForSave,
-        referenceUrlLabels: labelsForSave,
-      };
-
-      (payload as TodoUpdates & { text?: string }).text = todoTitle.trim();
-
-      if (isImageRemoved) {
-        (payload as { imageUrl?: string | null }).imageUrl = null;
-      } else       if (nextImage) {
-        (payload as { imageUrl?: string | null }).imageUrl = nextImage;
-      }
-
-      (payload as { checklist?: ChecklistItem[] }).checklist = checklist
-        .filter((c) => (c.text ?? '').trim() !== '')
-        .map((c) => ({ id: c.id, text: c.text.trim(), done: !!c.done }));
-
-      await updateTodoInTask(taskId, todoId, payload);
-
-      // Storage クリーンアップ
-      try {
-        const urlsToDelete: string[] = [];
-        if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImage) {
-          urlsToDelete.push(previousImageUrl);
+      const nextImage = await withTimeout((async () => {
+        let uploaded: string | null = imageUrl;
+        if (!isImageRemoved && pendingUpload) {
+          const ext = pendingUpload.mime === 'image/webp' ? 'webp' : 'jpg';
+          const path = `task_todos/${taskId}/${todoId}/${Date.now()}.${ext}`;
+          const fileRef = storageRef(storage, path);
+          await uploadBytes(fileRef, pendingUpload.blob, {
+            contentType: pendingUpload.mime,
+            customMetadata: { ownerUid: user.uid, taskId, todoId },
+          });
+          uploaded = await getDownloadURL(fileRef);
         }
-        if (isImageRemoved && previousImageUrl) {
-          urlsToDelete.push(previousImageUrl);
+
+        const pairs = referenceUrls.map((url, i) => ({ url, label: referenceLabels[i] ?? '' }));
+        const filteredPairs = pairs.filter((p) => isString(p.url) && p.url.trim() !== '');
+        const urlsForSave = filteredPairs.map((p) => p.url.trim());
+        const labelsForSave = filteredPairs.map((p) => (p.label ?? '').trim());
+
+        const payload: TodoUpdates = {
+          memo,
+          referenceUrls: urlsForSave,
+          referenceUrlLabels: labelsForSave,
+        };
+
+        (payload as TodoUpdates & { text?: string }).text = todoTitle.trim();
+
+        if (isImageRemoved) {
+          (payload as { imageUrl?: string | null }).imageUrl = null;
+        } else if (uploaded) {
+          (payload as { imageUrl?: string | null }).imageUrl = uploaded;
         }
-        await Promise.all(
+
+        (payload as { checklist?: ChecklistItem[] }).checklist = checklist
+          .filter((c) => (c.text ?? '').trim() !== '')
+          .map((c) => ({ id: c.id, text: c.text.trim(), done: !!c.done }));
+
+        await updateTodoInTask(taskId, todoId, payload);
+        return uploaded;
+      })());
+
+      const urlsToDelete: string[] = [];
+      if (!isImageRemoved && previousImageUrl && previousImageUrl !== nextImage) {
+        urlsToDelete.push(previousImageUrl);
+      }
+      if (isImageRemoved && previousImageUrl) {
+        urlsToDelete.push(previousImageUrl);
+      }
+      if (urlsToDelete.length > 0) {
+        void Promise.all(
           urlsToDelete.map(async (url) => {
             try {
-              const refFromUrl = storageRef(storage, url);
-              await deleteObject(refFromUrl);
+              await withTimeout(deleteObject(storageRef(storage, url)), 8_000);
             } catch (e) {
               console.warn('Storage 画像削除に失敗:', url, e);
             }
           })
         );
-        setPreviousImageUrl(isImageRemoved ? null : nextImage ?? null);
-      } catch (e) {
-        console.warn('Storage クリーンアップ処理で警告:', e);
       }
 
       if (previewUrl) {
@@ -785,16 +814,24 @@ export default function TodoNoteModal({
       setPendingUpload(null);
       setIsImageRemoved(false);
       setImageUrl(nextImage ?? null);
+      setPreviousImageUrl(isImageRemoved ? null : nextImage ?? null);
 
       setSaveComplete(true);
       setTimeout(() => {
         setIsSaving(false);
         setSaveComplete(false);
         onClose();
-      }, 1500);
+      }, 900);
     } catch (error) {
       console.error('保存に失敗しました:', error);
       setIsSaving(false);
+      setSaveComplete(false);
+      const timedOut = error instanceof Error && error.message === 'save-timeout';
+      toast.error(
+        timedOut
+          ? '保存に時間がかかっています。通信状況を確認してもう一度お試しください。'
+          : '保存に失敗しました。通信状況を確認してもう一度お試しください。'
+      );
     }
   };
 
@@ -889,6 +926,7 @@ export default function TodoNoteModal({
       onClose={onClose}
       onSaveClick={handleSave}
       saveLabel={saveLabel}
+      saveDisabled={loadFailed}
       hideActions={hideActions}
     >
       <div className="relative">

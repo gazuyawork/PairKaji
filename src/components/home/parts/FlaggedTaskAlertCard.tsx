@@ -4,9 +4,9 @@
 export const dynamic = 'force-dynamic';
 
 import { Flag } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useView } from '@/context/ViewContext';
 import { getViewedFlaggedTaskIds, markTaskAsViewed } from '@/utils/viewedTasks';
 import type { Task } from '@/types/Task';
 import { auth } from '@/lib/firebase';
@@ -22,7 +22,7 @@ type Props = {
 };
 
 export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
-  const router = useRouter();
+  const { openTaskScreen } = useView();
   const [isNew, setIsNew] = useState(false);
 
   // 未閲覧件数（=バッジ数）を算出
@@ -71,9 +71,8 @@ export default function FlaggedTaskAlertCard({ flaggedTasks = [] }: Props) {
     // 既読化直後にバッジもクリア
     void clearAppBadgeSafe();
 
-    const timestamp = new Date().getTime();
-    router.push(`/main?view=task&index=2&flagged=true&_t=${timestamp}`);
-  }, [flaggedTasks, router]);
+    openTaskScreen({ flagged: true });
+  }, [flaggedTasks, openTaskScreen]);
 
   return (
     <motion.div
