@@ -13,14 +13,12 @@ import {
   Eraser,
   ChevronDown,
   ChevronUp,
-  ShoppingCart,
-  type LucideIcon,
-  ChevronRight,
 } from 'lucide-react';
 import HelpPopover from '@/components/common/HelpPopover';
 import { forkTaskAsPrivateForSelf } from '@/lib/firebaseUtils';
-import { isChecklistCategory } from '@/lib/checklistTask';
 import { parseCategoryForUI, normalizeCategoryForSave, type TaskCategoryUI } from '@/lib/taskCategory';
+import { isCalendarPeriod, isDeviceCalendarAvailable, jstYmd, jstWeekdayKanji, withCalendarDefaults } from '@/lib/deviceCalendar';
+import { BURDEN_OPTIONS, burdenWeight } from '@/lib/burden';
 
 // 現在のユーザー判定に使用
 import { auth } from '@/lib/firebase';
@@ -28,26 +26,6 @@ import { auth } from '@/lib/firebase';
 const MAX_TEXTAREA_VH = 50;
 const NOTE_MAX = 500;
 
-type CategoryOption = {
-  key: TaskCategoryUI;
-  label: string;
-  Icon: LucideIcon;
-  iconColor: string;          // 非選択時のアイコン色
-  selectedIconColor?: string; // 選択時のアイコン色
-  selectedBg: string;         // 選択時のボタン背景（Tailwindクラス）
-};
-const CATEGORY_OPTIONS: CategoryOption[] = [
-  {
-    key: '買い物',
-    label: '買い物',
-    Icon: ShoppingCart,
-    iconColor: 'text-sky-500',
-    selectedIconColor: 'text-white',
-    selectedBg: 'from-sky-500 to-sky-600',
-  },
-];
-
-// ★ ここを null 許容に（未選択は null で統一）
 type TaskWithNote = Task & { note?: string; category: TaskCategoryUI };
 
 type UserInfo = {
@@ -82,12 +60,16 @@ type Props = {
   existingTasks: Task[];
 };
 
-const eqCat = (a: unknown, b: TaskCategoryUI) => parseCategoryForUI(a) === b;
-
 /* =========================================================
  * 便利関数
  * =======================================================*/
 const toStrictBool = (v: unknown): boolean => v === true || v === 'true' || v === 1 || v === '1';
+
+const listEnabledFromTask = (task: { isTodo?: unknown; visible?: unknown; todos?: unknown }): boolean => {
+  if (task.isTodo === false || task.visible === false) return false;
+  if (task.isTodo === true || task.visible === true) return true;
+  return Array.isArray(task.todos) && task.todos.length > 0;
+};
 
 const resolveUserImageSrc = (user: UserInfo): string => {
   const candidates: Array<string | undefined> = [
@@ -123,6 +105,116 @@ const dayNumberToNameSafe: Record<number, string | undefined> =
 const toDayNumber = (d: string | number): string | number =>
   typeof d === 'string' ? (dayNameToNumberSafe[d] ?? d) : d;
 
+const TIME_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const TIME_MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+function parseHm(value: string): { h: string; m: string } | null {
+  const matched = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!matched) return null;
+  const h = Number(matched[1]);
+  const m = Number(matched[2]);
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+    return null;
+  }
+  return { h: String(h).padStart(2, '0'), m: String(m).padStart(2, '0') };
+}
+
+function OptionalTimeField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const parsed = parseHm(value);
+  const [picking, setPicking] = useState(() => Boolean(parsed));
+  const [hour, setHour] = useState(parsed?.h ?? '');
+  const [minute, setMinute] = useState(parsed?.m ?? '');
+
+  useEffect(() => {
+    const next = parseHm(value);
+    if (next) {
+      setPicking(true);
+      setHour(next.h);
+      setMinute(next.m);
+      return;
+    }
+    if (!value) {
+      setHour('');
+      setMinute('');
+    }
+  }, [value]);
+
+  const clear = () => {
+    setHour('');
+    setMinute('');
+    setPicking(false);
+    onChange('');
+  };
+
+  const commit = (nextHour: string, nextMinute: string) => {
+    setHour(nextHour);
+    setMinute(nextMinute);
+    if (nextHour && nextMinute) onChange(`${nextHour}:${nextMinute}`);
+    else onChange('');
+  };
+
+  if (!picking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setPicking(true)}
+        className="min-h-11 text-sm font-medium text-gray-600 underline underline-offset-2"
+      >
+        時間を指定（任意）
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1">
+      <select
+        aria-label="時"
+        value={hour}
+        onChange={(e) => commit(e.target.value, minute)}
+        className="min-h-11 min-w-[4.5rem] border-b border-gray-300 bg-transparent px-1 outline-none"
+      >
+        <option value="">--</option>
+        {TIME_HOURS.map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      <span className="text-gray-500">:</span>
+      <select
+        aria-label="分"
+        value={minute}
+        onChange={(e) => commit(hour, e.target.value)}
+        className="min-h-11 min-w-[4.5rem] border-b border-gray-300 bg-transparent px-1 outline-none"
+      >
+        <option value="">--</option>
+        {TIME_MINUTES.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <HelpPopover
+        className="ml-1"
+        content={
+          <div className="space-y-2">
+            任意です。未指定のまま保存できます。設定すると、指定した時間の約30分前に通知が届きます。
+          </div>
+        }
+      />
+      <button type="button" onClick={clear} className="text-red-500" title="時間をクリア">
+        <Eraser size={18} />
+      </button>
+    </div>
+  );
+}
+
 export default function EditTaskModal({
   isOpen,
   task,
@@ -153,14 +245,13 @@ export default function EditTaskModal({
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [calendarSync, setCalendarSync] = useState(false);
   const isIOS = isIOSMobileSafari;
 
   // 改行時のキャレット復元用
   const caretRef = useRef<{ start: number; end: number } | null>(null);
 
   // カテゴリ行の横スクロール関連
-  const catScrollRef = useRef<HTMLDivElement | null>(null);
-  const [catOverflow, setCatOverflow] = useState(false);
 
   // 端末判定（iOS Mobile Safari）
   useEffect(() => {
@@ -205,41 +296,46 @@ export default function EditTaskModal({
       return num;
     });
 
-    setEditedTask({
-      ...task,
-      daysOfWeek: daysAsNames,
-      dates: Array.isArray(task.dates) ? task.dates : [],
-      users: Array.isArray((task as { users?: string[] }).users)
-        ? (task as { users?: string[] }).users!
-        : [],
-      period: task.period,
-      note: (task as unknown as { note?: string }).note ?? '',
-      isTodo: Boolean((task as unknown as { isTodo?: unknown }).isTodo) ||
-        (Array.isArray((task as { todos?: unknown[] }).todos) &&
-          ((task as { todos?: unknown[] }).todos?.length ?? 0) > 0),
-      visible: Boolean((task as unknown as { isTodo?: unknown }).isTodo) ||
-        Boolean((task as unknown as { visible?: unknown }).visible) ||
-        (Array.isArray((task as { todos?: unknown[] }).todos) &&
-          ((task as { todos?: unknown[] }).todos?.length ?? 0) > 0),
-      category: normalizedCategory, // ★ null or 実カテゴリ（UI用）
-    });
+    setEditedTask(
+      withCalendarDefaults({
+        ...task,
+        time: typeof task.time === 'string' ? task.time : '',
+        daysOfWeek: daysAsNames,
+        dates: Array.isArray(task.dates) ? task.dates : [],
+        users: Array.isArray((task as { users?: string[] }).users)
+          ? (task as { users?: string[] }).users!
+          : [],
+        period: task.period,
+        burden: burdenWeight((task as { burden?: unknown }).burden),
+        note: (task as unknown as { note?: string }).note ?? '',
+        isTodo: listEnabledFromTask(task),
+        visible: listEnabledFromTask(task),
+        category: normalizedCategory, // ★ null or 実カテゴリ（UI用）
+      } as TaskWithNote)
+    );
 
     setIsPrivate(Boolean((task as unknown as { private?: unknown }).private) || !isPairConfirmed);
+    setCalendarSync(
+      Boolean((task as { calendarSync?: boolean }).calendarSync) ||
+        Boolean((task as { calendarEventId?: string }).calendarEventId)
+    );
     setIsSaving(false);
     setSaveComplete(false);
     setNoteError(null);
 
     const isNew = !(task as { id?: string }).id;
     const noteText = (task as unknown as { note?: string }).note ?? '';
-    const pointVal = (task as unknown as { point?: number }).point ?? 0;
     const visibleVal = (task as unknown as { visible?: unknown }).visible;
+    const hasTime = Boolean(
+      parseHm(typeof task.time === 'string' ? task.time : '')
+    );
     const hasAdvanced =
       normalizedCategory != null ||
-      pointVal > 0 ||
       Boolean((task as unknown as { private?: unknown }).private) ||
       noteText.trim().length > 0 ||
       visibleVal === false ||
-      Boolean((task as unknown as { isTodo?: unknown }).isTodo);
+      Boolean((task as unknown as { isTodo?: unknown }).isTodo) ||
+      hasTime;
     setShowMore(!isNew && hasAdvanced);
 
     const isCoarsePointer =
@@ -333,22 +429,35 @@ export default function EditTaskModal({
     [editedTask, update]
   );
 
-  // ★ 同じボタンを押したら「外す」＝ null をセット
-  const toggleCategory = useCallback(
-    (cat: TaskCategoryUI) => {
-      if (!editedTask) return;
-      const before = editedTask.category;
-      const next = eqCat(before, cat) ? null : cat;
-      setEditedTask((prev) => {
-        if (!prev) return prev;
-        if (next && isChecklistCategory(next)) {
-          return { ...prev, category: next, isTodo: true, visible: true };
+  const setPeriod = useCallback((newPeriod: Period) => {
+    setEditedTask((prev) => {
+      if (!prev) return prev;
+      const updated: TaskWithNote = { ...prev, period: newPeriod };
+      if (newPeriod === '毎日') {
+        updated.daysOfWeek = [];
+        updated.dates = [];
+      } else if (newPeriod === '週次') {
+        updated.dates = [];
+        if (!(updated.daysOfWeek ?? []).length) {
+          updated.daysOfWeek = [jstWeekdayKanji()];
         }
-        return { ...prev, category: next };
-      });
-    },
-    [editedTask]
-  );
+      } else if (newPeriod === '不定期') {
+        updated.daysOfWeek = [];
+        if (!(updated.dates?.[0] ?? '').trim()) {
+          updated.dates = [jstYmd()];
+        }
+      }
+      return updated;
+    });
+  }, []);
+
+  const setListEnabled = useCallback((on: boolean) => {
+    setEditedTask((prev) => {
+      if (!prev) return prev;
+      if (!on) return { ...prev, isTodo: false, visible: false };
+      return { ...prev, isTodo: true, visible: true };
+    });
+  }, []);
 
   // 保存
   const handleSave = useCallback(async () => {
@@ -388,7 +497,6 @@ export default function EditTaskModal({
     }
     setNameError(null);
 
-    // ★ 保存値は未選択→'未設定' で統一、選択時はそのまま実カテゴリ
     const categoryForSave = normalizeCategoryForSave(editedTask.category);
     const checklistOn = Boolean((editedTask as unknown as { isTodo?: boolean }).isTodo);
 
@@ -397,22 +505,31 @@ export default function EditTaskModal({
       users: [...editedUsers],
       userIds: [...editedUsers],
       daysOfWeek: editedTask.daysOfWeek.map((d) => toDayNumber(d)) as Task['daysOfWeek'],
+      time: typeof editedTask.time === 'string' ? editedTask.time.trim() : '',
       private: isPrivate,
       isTodo: checklistOn,
       visible: checklistOn,
       name: shouldForkPrivate
         ? (editedTask.name?.endsWith('_コピー') ? editedTask.name : `${editedTask.name}_コピー`)
         : editedTask.name,
-      // ★ 保存時は '未設定' または '買い物'
       category: categoryForSave as unknown as Task['category'],
+      calendarEventId: (editedTask as { calendarEventId?: string }).calendarEventId ?? '',
     } as Task;
+    const scheduled = withCalendarDefaults(transformed);
+    Object.assign(transformed, scheduled);
+    if (isDeviceCalendarAvailable()) {
+      transformed.calendarSync = calendarSync && isCalendarPeriod(transformed.period);
+    } else {
+      transformed.calendarSync = Boolean((task as { calendarSync?: boolean }).calendarSync);
+      transformed.calendarEventId = (task as { calendarEventId?: string }).calendarEventId ?? '';
+    }
 
     setIsSaving(true);
 
     if (shouldForkPrivate) {
       try {
         const newId = await forkTaskAsPrivateForSelf(task.id!);
-        onSave({ ...transformed, id: newId });
+        onSave({ ...transformed, id: newId, calendarEventId: '' });
 
         if (closeTimerRef.current) {
           clearTimeout(closeTimerRef.current);
@@ -449,38 +566,7 @@ export default function EditTaskModal({
         setShouldClose(true);
       }, 1500);
     }, 300);
-  }, [editedTask, existingTasks, isPrivate, onSave, task]);
-
-  // カテゴリのオーバーフローチェック
-  const measureCatOverflow = useCallback(() => {
-    const el = catScrollRef.current;
-    if (!el) return;
-    const hasOverflow = el.scrollWidth > el.clientWidth + 1;
-    setCatOverflow(hasOverflow);
-  }, []);
-
-  // モーダルオープン時にオーバーフロー測定 & 揺らぎでスクロールを示唆
-  useEffect(() => {
-    if (!isOpen) return;
-    requestAnimationFrame(() => {
-      measureCatOverflow();
-      const el = catScrollRef.current;
-      if (!el) return;
-      if (el.scrollWidth > el.clientWidth + 1) {
-        const to = Math.min(32, el.scrollWidth - el.clientWidth);
-        el.scrollTo({ left: 0, behavior: 'auto' });
-        setTimeout(() => el.scrollTo({ left: to, behavior: 'smooth' }), 120);
-        setTimeout(() => el.scrollTo({ left: 0, behavior: 'smooth' }), 420);
-      }
-    });
-  }, [isOpen, measureCatOverflow]);
-
-  // リサイズ時に再測定
-  useEffect(() => {
-    const onResize = () => measureCatOverflow();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [measureCatOverflow]);
+  }, [editedTask, existingTasks, isPrivate, onSave, task, calendarSync]);
 
   // 備考テキスト変更後にキャレット位置を復元
   useLayoutEffect(() => {
@@ -526,7 +612,7 @@ export default function EditTaskModal({
       disableCloseAnimation
       saveDisabled={!!nameError || !!noteError}
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* 🏷 タスク入力 */}
         <div className="mb-4">
           <div className="mb-0 space-y-1">
@@ -569,53 +655,72 @@ export default function EditTaskModal({
           {nameError && <p className="mt-1 text-xs text-red-500">{nameError}</p>}
         </div>
 
-        {/* 🗓 頻度選択 */}
-        <div className="flex items-center">
-          <label className="w-20 text-gray-600 shrink-0 flex items-center">
-            <span className="inline-flex items-center gap-1 whitespace-nowrap">
-              頻度
-              <HelpPopover
-                className="ml-1"
-                content={
-                  <div className="space-y-2">
-                    タスクの頻度を設定します。
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>毎日：毎日おこなうタスクに使用します。</li>
-                      <li>週次：週間のタスクに使用します。</li>
-                      <li>不定期：不定期に実施するタスクに使用します。</li>
-                    </ul>
-                  </div>
-                }
-              />
-              <span>：</span>
-            </span>
+        <div className="space-y-2">
+          <label className="flex items-center gap-1 text-sm font-semibold text-gray-600">
+            頻度
+            <HelpPopover
+              content={
+                <div className="space-y-2">
+                  タスクの頻度を設定します。
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>毎日：毎日おこなうタスクに使用します。</li>
+                    <li>週次：週間のタスクに使用します。</li>
+                    <li>不定期：不定期に実施するタスクに使用します。</li>
+                  </ul>
+                </div>
+              }
+            />
           </label>
-          <select
-            value={editedTask.period}
-            onChange={(e) => {
-              const newPeriod = e.target.value as Period;
-              setEditedTask((prev) => {
-                if (!prev) return prev;
-                const updated: TaskWithNote = { ...prev, period: newPeriod };
-                if (newPeriod === '毎日') {
-                  updated.daysOfWeek = [];
-                  updated.dates = [];
-                } else if (newPeriod === '週次') {
-                  updated.dates = [];
-                } else if (newPeriod === '不定期') {
-                  updated.daysOfWeek = [];
-                }
-                return updated;
-              });
-            }}
-            className="w-full border-b border-gray-300 outline-none pl-2"
-          >
-            {(['毎日', '週次', '不定期'] as Period[]).map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          <div className="grid grid-cols-3 gap-2">
+            {(['毎日', '週次', '不定期'] as Period[]).map((p) => {
+              const selected = editedTask.period === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPeriod(p)}
+                  aria-pressed={selected}
+                  className={`min-h-12 rounded-xl text-sm font-bold ${
+                    selected ? 'bg-[#5E5E5E] text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="flex items-center gap-1 text-sm font-semibold text-gray-600">
+            重さ
+            <HelpPopover
+              content={
+                <div className="space-y-2">
+                  <p>履歴の負担は、完了した回数にこの重さを掛けて、完了した人に付きます。</p>
+                  <p>未設定の家事は中として扱います。</p>
+                </div>
+              }
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {BURDEN_OPTIONS.map((option) => {
+              const selected = burdenWeight(editedTask.burden) === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => update('burden', option.value)}
+                  aria-pressed={selected}
+                  className={`min-h-12 rounded-xl text-sm font-bold ${
+                    selected ? 'bg-[#5E5E5E] text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* 📅 曜日選択（週次のみ） */}
@@ -641,91 +746,104 @@ export default function EditTaskModal({
           </div>
         )}
 
-        {/* ⏰ 時刻（週次/毎日） */}
-        {(editedTask.period === '週次' || editedTask.period === '毎日') && (
-          <div className="flex items-center">
-            <label className="w-20 text-gray-600 shrink-0 flex items-center">
-              <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                時間
-                <HelpPopover
-                  className="ml-1"
-                  content={<div className="space-y-2">設定すると、指定した時間の約30分前に通知が届きます。アプリを閉じていても届きます。</div>}
-                />
-                <span>：</span>
-              </span>
-            </label>
-            <div className="relative w-[40%]">
-              {isIOS && (!editedTask.time || editedTask.time === '') && (
-                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-                  --:--
-                </span>
-              )}
-              <input
-                type="time"
-                value={editedTask.time || ''}
-                onChange={(e) => update('time', e.target.value as TaskWithNote['time'])}
-                className="w-[90%] border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
-              />
-            </div>
-            {editedTask.time && (
-              <button
-                type="button"
-                onClick={() => update('time', '' as TaskWithNote['time'])}
-                className="text-red-500"
-                title="時間をクリア"
-              >
-                <Eraser size={18} />
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* 📆 日付＆時間（不定期） */}
         {editedTask.period === '不定期' && (
-          <div className="flex items-center gap-2">
-            <label className="w-20 text-gray-600 shrink-0">日付：</label>
-
-            <div className="relative w-[40%]">
-              {isIOS && (!(editedTask.dates?.[0]) || editedTask.dates?.[0] === '') && (
-                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-                  yyyy-mm-dd
-                </span>
-              )}
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-600">日付</label>
+            <div className="flex items-center gap-2">
               <input
                 type="date"
                 value={editedTask.dates?.[0] || ''}
                 onChange={(e) => update('dates', [e.target.value] as TaskWithNote['dates'])}
-                className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
+                className="min-h-12 min-w-0 flex-1 rounded-xl border border-gray-200 px-3 text-base text-[#5E5E5E] outline-none focus:ring-2 focus:ring-gray-200"
               />
+              {editedTask.dates?.[0] ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    update('dates', [''] as TaskWithNote['dates']);
+                  }}
+                  className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-xl text-red-500"
+                  title="日付をクリア"
+                  aria-label="日付をクリア"
+                >
+                  <Eraser size={18} />
+                </button>
+              ) : null}
             </div>
+          </div>
+        )}
 
-            <div className="relative w-[30%]">
-              {isIOS && (!editedTask.time || editedTask.time === '') && (
-                <span className="absolute left-2 top-1 text-gray-400 text-md pointer-events-none z-0">
-                  --:--
-                </span>
-              )}
-              <input
-                type="time"
-                value={editedTask.time || ''}
-                onChange={(e) => update('time', e.target.value as TaskWithNote['time'])}
-                className="w-[90%] b border-b border-gray-300 px-2 py-1 bg-transparent focus:outline-none pr-1 relative z-10 min-w-0"
+        {(() => {
+          const listOn = Boolean((editedTask as { isTodo?: boolean }).isTodo);
+          return (
+            <div className="rounded-2xl border border-gray-200 bg-[#fffaf1] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1 text-sm font-semibold text-gray-700">
+                    リスト
+                    <HelpPopover
+                      content={
+                        <div className="space-y-2">
+                          <p>オンにすると、タスク画面から項目リストを開けます。項目が残っていても、タスク自体は完了できます。</p>
+                          <p>手順や持ち物など、チェックしたい項目を並べて使えます。</p>
+                        </div>
+                      }
+                    />
+                  </p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                    チェック項目を付けて管理できます。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={listOn}
+                  aria-label="リスト"
+                  onClick={() => setListEnabled(!listOn)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-300 ${
+                    listOn ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
+                      listOn ? 'translate-x-5' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {mounted && isDeviceCalendarAvailable() && isCalendarPeriod(editedTask.period) && (
+          <div className="flex items-center justify-between gap-3">
+            <label className="min-w-0 text-sm font-semibold text-gray-600">
+              <span className="inline-flex items-center gap-1">
+                カレンダー
+                <HelpPopover
+                  content={
+                    <div className="space-y-2">
+                      オンにすると、保存時に端末のカレンダーへ予定を追加します。日付や時間が変わると予定も更新されます。
+                    </div>
+                  }
+                />
+              </span>
+            </label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={calendarSync}
+              onClick={() => setCalendarSync((v) => !v)}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-300 ${
+                calendarSync ? 'bg-yellow-400' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
+                  calendarSync ? 'translate-x-5' : ''
+                }`}
               />
-            </div>
-
-            {(editedTask.dates?.[0] || editedTask.time) ? (
-              <button
-                type="button"
-                onClick={() => {
-                  update('dates', [''] as TaskWithNote['dates']);
-                  update('time', '' as TaskWithNote['time']);
-                }}
-                className="text-red-500"
-                title="日付と時間をクリア"
-              >
-                <Eraser size={18} />
-              </button>
-            ) : null}
+            </button>
           </div>
         )}
 
@@ -734,150 +852,41 @@ export default function EditTaskModal({
           onClick={() => setShowMore((v) => !v)}
           className="w-full min-h-11 text-sm text-gray-600 underline"
         >
-          {showMore ? '詳細を閉じる' : '詳細（ポイント・カテゴリなど）'}
+          {showMore ? '詳細を閉じる' : '詳細（時間・担当・備考）'}
         </button>
 
         {showMore && (
           <>
-        {/* 🍱 カテゴリ選択（横スクロール・1行固定） */}
-        <div className="flex items-center">
-          <label className="w-28 text-gray-600 shrink-0 flex items-center">
-            <span className="inline-flex items-center gap-1 whitespace-nowrap">
-              カテゴリ
-              <HelpPopover
-                className="ml-1"
-                content={
-                  <div className="space-y-2">
-                    リストの表示がカテゴリごとに変わります。買い物を選ぶとリストがオンになり、買い物リストとして使えます。
-                  </div>
-                }
-              />
-              <span>：</span>
-            </span>
-          </label>
-
-          <div className="relative flex-1 min-w-0 basis-0">
-            <div
-              ref={catScrollRef}
-              onScroll={measureCatOverflow}
-              className={[
-                'w-full max-w-full',
-                'flex flex-nowrap gap-2 overflow-x-auto',
-                'touch-pan-x overscroll-x-contain',
-                '[-webkit-overflow-scrolling:touch]',
-                '[&::-webkit-scrollbar]:hidden',
-                'scrollbar-width-none',
-                'pr-8',
-                'snap-x snap-mandatory',
-              ].join(' ')}
-              style={{ scrollbarWidth: 'none' }}
-              aria-label="カテゴリ一覧（横スクロール）"
-            >
-              {CATEGORY_OPTIONS.map(({ key, label, Icon, iconColor, selectedIconColor, selectedBg }) => {
-                const selected = eqCat(editedTask.category, key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleCategory(key)}
-                    aria-pressed={selected}
-                    data-cat={key}
-                    className={[
-                      'inline-flex items-center gap-2 px-3 py-2 rounded-full border transition',
-                      'shrink-0 snap-start',
-                      selected
-                        ? `bg-gradient-to-b ${selectedBg} text-white border-2 border-transparent shadow-[0_6px_14px_rgba(0,0,0,0.18)]`
-                        : 'bg-white border-gray-300 text-gray-700 opacity-90 hover:opacity-100',
-                    ].join(' ')}
-                    title={label}
-                  >
-                    <Icon
-                      size={18}
-                      className={selected ? (selectedIconColor ?? 'text-white') : iconColor}
-                      aria-hidden="true"
-                    />
-                    <span className="text-xs font-bold whitespace-nowrap">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {catOverflow && (
-              <div className="pointer-events-none absolute right-0 top-0 h-full w-10 flex items-center justify-end">
-                <div className="absolute inset-0 bg-gradient-to-l from-white to-transparent" />
-                <div className="relative mr-1 rounded-full bg-black/40 p-1 animate-pulse">
-                  <ChevronRight size={14} className="text-white" />
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="space-y-2">
+          <label className="block text-sm font-semibold text-gray-600">時間</label>
+          <OptionalTimeField
+            key={`time-more-${isOpen}-${(task as { id?: string }).id || 'new'}`}
+            value={editedTask.time || ''}
+            onChange={(next) => update('time', next as TaskWithNote['time'])}
+          />
         </div>
 
-        {/* ⭐ ポイント（共有のみ） */}
-        {!isPrivate && (
-          <div className="flex items-center">
-            <label className="w-25 text-gray-600 shrink-0 flex items-center">
-              <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                ポイント
-                <HelpPopover
-                  className="ml-1"
-                  content={
-                    <div className="space-y-2">
-                      ポイントを設定すると、タスクの完了時に実施したユーザーへポイントが付与されます。
-                    </div>
-                  }
-                />
-                <span>：</span>
-              </span>
-            </label>
-            <select
-              value={(editedTask as unknown as { point?: number }).point ?? 0}
-              onChange={(e) =>
-                update(
-                  'point' as keyof TaskWithNote,
-                  Number(e.target.value) as unknown as TaskWithNote[keyof TaskWithNote]
-                )
-              }
-              className="w-full border-b border-gray-300 outline-none pl-2"
-            >
-              {Array.from({ length: 11 }, (_, i) => i).map((val) => (
-                <option key={val} value={val}>
-                  {val} pt
-                </option>
-              ))}
-            </select>
-
-            {(((editedTask as unknown as { point?: number }).point ?? 0) === 0) && (
-              <span className="ml-2 text-xs text-gray-500 whitespace-nowrap">（ポイントを使用しない）</span>
-            )}
-          </div>
-        )}
-
-        {/* 👤 担当者（共有時）/ 🔒 プライベート */}
         {isPairConfirmed && (
           <>
             {!isPrivate && (
-              <div className="flex items-center">
-                <label className="w-26 text-gray-600 shrink-0 flex items-center">
-                  <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                    担当者
-                    <HelpPopover
-                      className="ml-1"
-                      content={
-                        <div className="space-y-2">
-                          <p>担当決めに使用します。</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>選択していない場合は共通のアイコンが表示されます。</li>
-                          </ul>
-                        </div>
-                      }
-                    />
-                    <span>：</span>
-                  </span>
+              <div className="space-y-2">
+                <label className="flex items-center gap-1 text-sm font-semibold text-gray-600">
+                  担当者
+                  <HelpPopover
+                    content={
+                      <div className="space-y-2">
+                        <p>一覧では、担当が1人の家事だけ画像を出します。</p>
+                        <p>履歴の負担は、担当ではなく完了した人に付きます。</p>
+                        <ul className="list-disc pl-5 space-y-1">
+                          <li>選択していない場合、一覧にはアイコンを出しません。</li>
+                        </ul>
+                      </div>
+                    }
+                  />
                 </label>
                 <div className="flex gap-2">
                   {users.map((user) => {
-                    const isSelected = editedTask.users[0] === user.id;
+                    const isSelected = editedTask.users.length === 1 && editedTask.users[0] === user.id;
                     const imgSrc = resolveUserImageSrc(user);
                     return (
                       <button
@@ -906,12 +915,11 @@ export default function EditTaskModal({
               </div>
             )}
 
-            <div className="flex items-center">
-              <label className="w-35 text-gray-600 shrink-0 flex items-center">
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+            <div className="flex items-center justify-between gap-3">
+              <label className="min-w-0 text-sm font-semibold text-gray-600">
+                <span className="inline-flex items-center gap-1">
                   プライベート
                   <HelpPopover
-                    className="ml-1"
                     content={
                       <div className="space-y-2">
                         <p>
@@ -919,27 +927,27 @@ export default function EditTaskModal({
                           <span className="font-semibold">自分だけ</span>に表示されます。
                         </p>
                         <ul className="list-disc pl-5 space-y-1">
-                          <li>ポイントや担当者の設定は無効化されます。</li>
+                          <li>担当者の設定は無効化されます。</li>
                           <li>パートナーが作成したタスクをプライベートに変更するときはコピーとして作成されます。</li>
                         </ul>
                       </div>
                     }
                   />
-                  <span>：</span>
                 </span>
               </label>
               <button
                 type="button"
                 role="switch"
                 aria-checked={isPrivate}
+                aria-label="プライベート"
                 onClick={() => setIsPrivate((v) => !v)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-300 ${
                   isPrivate ? 'bg-yellow-400' : 'bg-gray-300'
                 }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isPrivate ? 'translate-x-6' : ''
+                  className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
+                    isPrivate ? 'translate-x-5' : ''
                   }`}
                 />
               </button>
@@ -947,52 +955,8 @@ export default function EditTaskModal({
           </>
         )}
 
-        {/* ✅ Todo */}
-        {(() => {
-          const isOn = Boolean((editedTask as unknown as { isTodo?: boolean }).isTodo);
-          return (
-            <div className="flex items-center">
-              <label className="w-35 text-gray-600 shrink-0 flex items-center">
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  Todo
-                  <HelpPopover
-                    className="ml-1"
-                    content={
-                      <div className="space-y-2">
-                        <p>オンにすると、家事画面からリストを開けます。オンの間は、Todo をすべて完了するまでタスクを完了できません。</p>
-                      </div>
-                    }
-                  />
-                  <span>：</span>
-                </span>
-              </label>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isOn}
-                onClick={() => {
-                  const next = !isOn;
-                  setEditedTask((prev) =>
-                    prev ? { ...prev, isTodo: next, visible: next } : prev
-                  );
-                }}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isOn ? 'bg-yellow-500' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                    isOn ? 'translate-x-6' : ''
-                  }`}
-                />
-              </button>
-            </div>
-          );
-        })()}
-
-        {/* 📝 備考（←ここを全面改修） */}
         <div className="relative w-full max-w-full min-w-0">
-          <label className="block text-gray-600 mb-2">備考：</label>
+          <label className="mb-2 block text-sm font-semibold text-gray-600">備考</label>
 
           {/* 親は枠線のみ（スクロールは持たせない） */}
           <div
@@ -1017,7 +981,7 @@ export default function EditTaskModal({
               onWheelCapture={(e) => e.stopPropagation()}
               className={[
                 'relative w-full',
-                'max-h-[50vh] overflow-y-auto overflow-x-hidden',
+                'max-h-40 overflow-y-auto overflow-x-hidden',
                 '[-webkit-overflow-scrolling:touch]',
                 'touch-pan-y overscroll-y-contain',
                 'px-0 py-0',

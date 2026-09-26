@@ -138,7 +138,7 @@ export default function SubscriptionButton({ userId }: Props) {
         </p>
       ) : (
         <p className="text-xs text-gray-600">
-          開発継続の応援と、アプリ内の案内・広告の非表示に使われます。
+          開発継続の応援にもなります。案内と広告を出さないための任意プランです。
           {priceText ? `（${priceText} / 月）` : ''}
         </p>
       )}
@@ -161,7 +161,7 @@ export default function SubscriptionButton({ userId }: Props) {
             disabled={loading}
             className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white active:opacity-90 disabled:opacity-60"
           >
-            応援する
+            画面をすっきりする
           </button>
           <button
             type="button"

@@ -90,7 +90,7 @@ const LEGACY_DEFAULT_SLIDES: Array<{ src: string; title?: string; description?: 
     src: '/onboarding/slide3.png',
     title: '本日の進捗',
     description:
-      '今日の完了タスクや予定を一覧で確認。Weeklyポイントで達成度も可視化されます。',
+      '今日の完了タスクや予定を一覧で確認できます。',
   },
 ];
 
@@ -121,7 +121,7 @@ const DEFAULT_PAGES: SlidePage[] = [
     blocks: [
       {
         description:
-          '今日の完了タスクや予定を一覧で確認。Weeklyポイントで達成度も可視化されます。',
+          '今日の完了タスクや予定を一覧で確認できます。',
         src: '/onboarding/slide3.png',
       },
     ],

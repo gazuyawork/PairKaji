@@ -24,9 +24,6 @@ import {
 } from 'date-fns';
 import { X, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUserUid } from '@/hooks/useUserUid';
-import StageImage from './StageImage';
-import PreloadHeartGardenImages from './PreloadHeartGardenImages';
-import HeartNutrientFlow from './HeartNutrientFlow';
 
 type Props = {
   isOpen?: boolean;
@@ -65,21 +62,6 @@ type LikeDoc = {
   taskId?: string | null;
 };
 
-const HEART_GARDEN_IMAGES = [
-  '/assets/heart-garden/stage1.png',
-  '/assets/heart-garden/stage2.png',
-  '/assets/heart-garden/stage3.png',
-  '/assets/heart-garden/stage4.png',
-] as const;
-
-const STAGE_THRESHOLDS = { leaf: 2, grow: 5, blossom: 10 } as const;
-
-function resolveStage(totalThisWeek: number): 0 | 1 | 2 | 3 {
-  if (totalThisWeek >= STAGE_THRESHOLDS.blossom) return 3;
-  if (totalThisWeek >= STAGE_THRESHOLDS.grow) return 2;
-  if (totalThisWeek >= STAGE_THRESHOLDS.leaf) return 1;
-  return 0;
-}
 
 // id 末尾の `YYYY-MM-DD` を拾う（古い実装保険）
 function toDateFromIdSuffix(id: string): Date | null {
@@ -148,121 +130,6 @@ function toDateFromLikeDate(val: unknown, keyLabel: string): Date | null {
   }
   dbg(`toDateFromLikeDate[${keyLabel}]: unrecognized`, val);
   return null;
-}
-
-/** 色の型 */
-type HeartColor = 'pink' | 'blue';
-
-function FloatingHearts({
-  pinkCount,
-  blueCount,
-  fadeInKey = 0,
-}: {
-  pinkCount: number;
-  blueCount: number;
-  fadeInKey?: number;
-}) {
-  const MAX_PER_COLOR = 24;
-  const nPink = Math.min(Math.max(pinkCount, 0), MAX_PER_COLOR);
-  const nBlue = Math.min(Math.max(blueCount, 0), MAX_PER_COLOR);
-  const total = nPink + nBlue;
-
-  const seeds = React.useMemo(() => {
-    type Seed = {
-      id: string;
-      leftPct: number;
-      topPct: number;
-      dur: number;
-      delay: number;
-      blinkDur: number;
-      blinkDelay: number;
-      scale: number;
-      color: HeartColor;
-    };
-
-    const makeOne = (i: number, color: HeartColor): Seed => {
-      // 色ごとに“わずかに”位置・タイミングのバイアスを変える（重なり軽減）
-      const biasX = color === 'pink' ? 0 : 3;   // 青は+3%側に寄せる
-      const biasY = color === 'pink' ? 0 : -2;  // 青は-2%側に寄せる
-
-      const leftPct = 6 + Math.random() * 88 + biasX;  // 6%〜94% (+bias)
-      const topPct = 8 + Math.random() * 84 + biasY;   // 8%〜92% (+bias)
-      const dur = 10 + Math.random() * 8;              // 10s〜18s
-      const delay = Math.random() * 2 + (color === 'blue' ? 0.3 : 0); // 青は0.3s遅らせがち
-      const blinkDur = 3.5 + Math.random() * 3.5;      // 3.5s〜7s
-      const blinkDelay = Math.random() * 1.2;
-      const scale = 0.7 + Math.random() * 0.6;         // 0.7〜1.3
-      return {
-        id: `${fadeInKey}-${color}-${i}`,
-        leftPct,
-        topPct,
-        dur,
-        delay,
-        blinkDur,
-        blinkDelay,
-        scale,
-        color,
-      };
-    };
-
-    const arr: Seed[] = [];
-    for (let i = 0; i < nPink; i += 1) arr.push(makeOne(i, 'pink'));
-    for (let i = 0; i < nBlue; i += 1) arr.push(makeOne(i, 'blue'));
-
-    // 両色を軽くシャッフルして、描画順で固まらないようにする
-    for (let i = arr.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }, [nPink, nBlue, fadeInKey]);
-
-  if (total === 0) return null;
-
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      {seeds.map((s) => (
-        <span
-          key={s.id}
-          className="absolute float-heart will-change-transform"
-          style={{
-            left: `${s.leftPct}%`,
-            top: `${s.topPct}%`,
-            animationDuration: `${s.dur}s, 0.6s, ${s.blinkDur}s`,
-            animationDelay: `${s.delay}s, 0s, ${0.6 + s.blinkDelay}s`,
-            transform: `translate(-50%, -50%) scale(${s.scale})`,
-            opacity: 0,
-          }}
-        >
-          <Heart
-            className={
-              s.color === 'pink'
-                ? 'w-4 h-4 text-rose-400/80'
-                : 'w-4 h-4 text-sky-400/80'
-            }
-          />
-        </span>
-      ))}
-
-      <style jsx>{`
-        .float-heart {
-          animation-name: heartDrift, heartFadeIn, heartBlink;
-          animation-timing-function: ease-in-out, ease-out, ease-in-out;
-          animation-iteration-count: infinite, 1, infinite;
-          animation-fill-mode: both, forwards, both;
-        }
-        @keyframes heartDrift {
-          0% { transform: translate(calc(-50% + 0px), calc(-50% + 0px)) scale(1) rotate(0deg); }
-          25% { transform: translate(calc(-50% + 28px), calc(-50% - 36px)) scale(1.06) rotate(8deg); }
-          50% { transform: translate(calc(-50% + 0px), calc(-50% - 56px)) scale(0.97) rotate(-9deg); }
-          75% { transform: translate(calc(-50% - 32px), calc(-50% - 22px)) scale(1.04) rotate(7deg); }
-          100% { transform: translate(calc(-50% + 0px), calc(-50% + 0px)) scale(1) rotate(0deg); }
-        }
-        @keyframes heartFadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
-        @keyframes heartBlink { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-      `}</style>
-    </div>
-  );
 }
 
 export default function HeartsHistoryModal({
@@ -447,143 +314,79 @@ export default function HeartsHistoryModal({
   };
 
   // 集計
-  const { totalReceived, totalGiven, weekRangeLabel, stage, totalThisWeek } = useMemo(() => {
+  const {
+    totalReceived,
+    totalGiven,
+    weekRangeLabel,
+  } = useMemo(() => {
     time('calc totals');
 
     const { start, end } = weekBounds;
-    const inRange = (d: Date | null) => !!d && isWithinInterval(d, { start, end });
+    const inWeek = (d: Date | null) => !!d && isWithinInterval(d, { start, end });
 
-    let tr = 0;
-    let tg = 0;
+    let weekRecv = 0;
+    let weekGive = 0;
 
     group('iterate received');
     for (const r of rawLikesReceived) {
       const d = extractDate(r);
-      const okRange = inRange(d);
       const okFromPartner = isReceivedFromPartner(r.senderId);
       dbg('received item', {
         id: r.id,
         d,
-        okRange,
         okFromPartner,
         senderId: r.senderId,
         receiverId: r.receiverId,
       });
-      if (!okRange) continue;
       if (!okFromPartner) continue;
-      tr += 1;
+      if (inWeek(d)) weekRecv += 1;
     }
     groupEnd();
 
     group('iterate given');
     for (const r of rawLikesGiven) {
       const d = extractDate(r);
-      const okRange = inRange(d);
       const okByMe = isGivenByMe(r.receiverId);
       dbg('given item', {
         id: r.id,
         d,
-        okRange,
         okByMe,
         senderId: r.senderId,
         receiverId: r.receiverId,
       });
-      if (!okRange) continue;
       if (!okByMe) continue;
-      tg += 1;
+      if (inWeek(d)) weekGive += 1;
     }
     groupEnd();
 
-    const total = tr + tg;
-    const stg = resolveStage(total);
     const label = `${format(start, 'M/d')} - ${format(end, 'M/d')}`;
 
-    dbg('totals ->', { totalReceived: tr, totalGiven: tg, totalThisWeek: total, stage: stg, weekRangeLabel: label });
+    dbg('totals ->', {
+      weekRecv,
+      weekGive,
+      weekRangeLabel: label,
+    });
     timeEnd('calc totals');
 
-    return { totalReceived: tr, totalGiven: tg, totalThisWeek: total, stage: stg, weekRangeLabel: label };
-    // 依存配列：uid/partnerId は useCallback に含まれているため **不要**。
+    return {
+      totalReceived: weekRecv,
+      totalGiven: weekGive,
+      weekRangeLabel: label,
+    };
   }, [rawLikesReceived, rawLikesGiven, weekBounds, isReceivedFromPartner, isGivenByMe]);
-
-  // 吸収アニメ
-  const lastSeenKey = useMemo(() => {
-    const s = format(weekBounds.start, 'yyyy-MM-dd');
-    const e = format(weekBounds.end, 'yyyy-MM-dd');
-    const key = `hhm_last_seen_received_${s}_${e}`;
-    dbg('lastSeenKey=', key);
-    return key;
-  }, [weekBounds]);
-
-  const [feedCount, setFeedCount] = useState(0);
-  const [feedActive, setFeedActive] = useState(false);
-  const [driftKey, setDriftKey] = useState(0);
-
-  useEffect(() => {
-    if (!active) return;
-    group('open effect');
-    dbg('isOpen=', isOpen, 'weekOffset=', weekOffset, 'totalReceived=', totalReceived);
-
-    if (weekOffset !== 0) {
-      setFeedActive(false);
-      setFeedCount(0);
-      setDriftKey((k) => k + 1);
-      dbg('past week -> no feed animation, driftKey++');
-      groupEnd();
-      return;
-    }
-
-    let last = 0;
-    try {
-      const raw = localStorage.getItem(lastSeenKey);
-      if (raw) last = Math.max(0, Number(raw) || 0);
-    } catch (e) {
-      dbg('localStorage read error', e);
-    }
-    dbg('lastSeen=', last);
-
-    const delta = totalReceived - last;
-    dbg('delta=', delta);
-
-    if (delta > 0) {
-      setFeedCount(delta);
-      setFeedActive(true);
-      dbg('start feed animation. count=', delta);
-      const t = setTimeout(() => {
-        setFeedActive(false);
-        setDriftKey((k) => k + 1);
-        dbg('end feed animation, driftKey++ and persist lastSeen');
-        try {
-          localStorage.setItem(lastSeenKey, String(totalReceived));
-        } catch (e) {
-          dbg('localStorage write error', e);
-        }
-      }, 1300);
-      groupEnd();
-      return () => clearTimeout(t);
-    }
-
-    setFeedActive(false);
-    setFeedCount(0);
-    setDriftKey((k) => k + 1);
-    dbg('no new received -> just driftKey++');
-    groupEnd();
-  }, [active, weekOffset, totalReceived, lastSeenKey]);
-
-  const showDrift = totalReceived > 0 || totalGiven > 0;
 
   useEffect(() => {
     if (!active) return;
     group('open summary');
     dbg('uid=', uid, 'partnerId=', partnerId, 'weekOffset=', weekOffset);
     dbg('weekRangeLabel=', weekRangeLabel);
-    dbg('counts:', { totalReceived, totalGiven, totalThisWeek, stage });
+    dbg('counts:', { totalReceived, totalGiven });
     groupEnd();
-  }, [active, uid, partnerId, weekOffset, weekRangeLabel, totalReceived, totalGiven, totalThisWeek, stage]);
+  }, [active, uid, partnerId, weekOffset, weekRangeLabel, totalReceived, totalGiven]);
 
   const body = (
     <>
-      <PreloadHeartGardenImages hrefs={[...HEART_GARDEN_IMAGES]} />
-
+      {!(isPage && hideWeekNav) && (
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {!hideWeekNav && (
@@ -620,34 +423,10 @@ export default function HeartsHistoryModal({
           </button>
         )}
       </div>
+      )}
 
-      <div className="mt-3 relative flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white/70 p-4 overflow-hidden shadow-sm">
-        <p className="text-xs text-gray-500 z-10">
-          受け取ったハート（ピンク）と贈ったハート（青）で、庭が育ちます。
-        </p>
-        <div className="relative z-0" style={{ width: 144, height: 144 }}>
-          <div
-            className={`garden-sway-container ${feedActive ? 'paused' : ''}`}
-            data-stage={resolveStage(totalThisWeek)}
-            aria-label="heart-garden-plant"
-          >
-            <StageImage
-              stage={resolveStage(totalThisWeek)}
-              sources={HEART_GARDEN_IMAGES as [string, string, string, string]}
-              size={144}
-            />
-          </div>
-
-          {weekOffset === 0 && <HeartNutrientFlow count={feedCount} targetSize={144} active={feedActive} />}
-        </div>
-
-        {showDrift && (
-          <div className="absolute inset-0 z-10">
-            <FloatingHearts pinkCount={totalReceived} blueCount={totalGiven} fadeInKey={driftKey} />
-          </div>
-        )}
-
-        <div className="flex items-center gap-6 text-base z-20">
+      <div className={`${isPage ? 'mt-0' : 'mt-3'} rounded-2xl border border-gray-200 bg-white ${isPage ? 'shadow-sm' : 'bg-white/70 shadow-sm'}`}>
+        <div className="flex items-center justify-center gap-6 px-4 py-4 text-base">
           <span className="inline-flex items-center gap-2">
             <Heart className="w-4 h-4 text-rose-500" />
             <span className="text-xs text-gray-500">もらった</span>
@@ -660,37 +439,11 @@ export default function HeartsHistoryModal({
           </span>
         </div>
       </div>
-
-      <style jsx>{`
-        .garden-sway-container {
-          width: 144px;
-          height: 144px;
-          transform-origin: 50% 100%;
-          animation-name: garden-sway;
-          animation-duration: 5.8s;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-          animation-fill-mode: both;
-          will-change: transform;
-        }
-        .garden-sway-container.paused {
-          animation-play-state: paused;
-        }
-        .garden-sway-container[data-stage="0"] { animation-duration: 6.2s; }
-        .garden-sway-container[data-stage="1"] { animation-duration: 5.8s; }
-        .garden-sway-container[data-stage="2"] { animation-duration: 5.2s; }
-        .garden-sway-container[data-stage="3"] { animation-duration: 4.8s; }
-        @keyframes garden-sway {
-          0%   { transform: rotate(-1.1deg); }
-          50%  { transform: rotate( 1.1deg); }
-          100% { transform: rotate(-1.1deg); }
-        }
-      `}</style>
     </>
   );
 
   if (isPage) {
-    return <div className="max-w-xl mx-auto">{body}</div>;
+    return body;
   }
 
   return (

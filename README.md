@@ -36,7 +36,6 @@ pairkaji/
 │ │ ├── firebaseUtils.ts # Firestore関連ユーティリティ
 │ │ ├── taskUtils.ts # タスク保存・処理ロジック
 │ │ ├── pairUtils.ts # ペア関連処理
-│ │ ├── pointUtils.ts # ポイント関連処理
 │ │ └── ... # 各種ユーティリティ
 │ ├── store/ # Zustand等のグローバルストア（将来拡張用）
 │ ├── types/ # 型定義（Task, Pairなど）
@@ -76,7 +75,7 @@ yaml
 
 - Firebase Authentication によるログイン/新規登録
 - ペア設定（招待コード式）、承認・拒否・解除可能
-- ペア成立後、タスク・ポイント共有が可能
+- ペア成立後、タスク共有が可能
 
 ---
 

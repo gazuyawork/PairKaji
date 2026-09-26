@@ -4,7 +4,10 @@
 export const dynamic = 'force-dynamic'
 
 import { Home, BookOpenCheck, History } from 'lucide-react';
+import { useMemo } from 'react';
 import { useView } from '@/context/ViewContext';
+import { useHousehold } from '@/context/HouseholdContext';
+import { isTaskScheduledToday } from '@/lib/todayTask';
 
 type Props = {
   currentIndex: number;
@@ -13,9 +16,19 @@ type Props = {
 
 export default function FooterNav({ currentIndex, setIndex }: Props) {
   const { listOpen, closeTaskList } = useView();
+  const { uid, tasks } = useHousehold();
+  const todayRemainingCount = useMemo(() => {
+    if (!uid) return 0;
+    return tasks.filter(
+      (t) =>
+        (t.userId === uid || (t.userIds ?? []).includes(uid)) &&
+        !t.done &&
+        isTaskScheduledToday(t)
+    ).length;
+  }, [tasks, uid]);
   const navItems = [
     { name: 'ホーム', icon: Home },
-    { name: '家事', icon: BookOpenCheck },
+    { name: 'タスク', icon: BookOpenCheck },
     { name: '履歴', icon: History },
   ];
 
@@ -31,20 +44,30 @@ export default function FooterNav({ currentIndex, setIndex }: Props) {
               <button
                 type="button"
                 onClick={() => {
-                  if (index === 1 && currentIndex === 1 && listOpen) {
+                  if (index === 1 && listOpen) {
                     closeTaskList();
-                    return;
                   }
                   setIndex(index);
                 }}
                 className="w-full min-h-11 py-2 flex flex-col items-center justify-center cursor-pointer"
                 aria-current={isActive ? 'page' : undefined}
-                aria-label={item.name}
+                aria-label={
+                  index === 1 && todayRemainingCount > 0
+                    ? `タスク、今日の残り ${todayRemainingCount} 件`
+                    : item.name
+                }
               >
-                <Icon
-                  size={26}
-                  className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'}
-                />
+                <span className="relative">
+                  <Icon
+                    size={26}
+                    className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'}
+                  />
+                  {index === 1 && todayRemainingCount > 0 && (
+                    <span className="absolute -right-2.5 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                      {todayRemainingCount > 9 ? '9+' : todayRemainingCount}
+                    </span>
+                  )}
+                </span>
                 <span
                   className={`mt-0.5 text-xs ${
                     isActive ? 'text-[#FFCB7D] font-semibold' : 'text-[#5E5E5E]'

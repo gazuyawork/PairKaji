@@ -24,8 +24,8 @@ export default function PairPremiumHint() {
     if (!hasShared) return;
 
     markPremiumHintShown(uid);
-    toast('応援プラン', {
-      description: '2人での利用が始まりました。案内と広告を消すこともできます。',
+    toast('画面をすっきりする', {
+      description: '2人の家事とリストは無料です。案内と広告だけ外せます。',
       action: {
         label: '見る',
         onClick: () => router.push('/pricing'),

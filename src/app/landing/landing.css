@@ -77,3 +77,25 @@ details[open] summary::after {
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+html.dark .bg-grid-soft {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+}
+html.dark .soft-card {
+  background: rgba(52, 43, 36, 0.86);
+}
+html.dark .logo-medallion {
+  background: rgba(52, 43, 36, 0.9);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+html.dark summary::after {
+  border-right-color: #d4c8bc;
+  border-bottom-color: #d4c8bc;
+}
+html.dark .text-wave {
+  background: linear-gradient(270deg, #f3ece4, #d4c8bc);
+  background-size: 800% 800%;
+  -webkit-background-clip: text;
+}

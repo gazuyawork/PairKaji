@@ -38,6 +38,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 import UnitPriceCompareToolCard from '@/components/home/parts/UnitPriceCompareToolCard';
 import PartnerCompletedTasksCard from '@/components/home/parts/PartnerCompletedTasksCard';
+import TodayListsCard from '@/components/home/parts/TodayListsCard';
 
 /* =========================================================
  * SortableCard（編集モードON時のみ使用）
@@ -334,6 +335,10 @@ export default function HomeView() {
               daysOfWeek: task.daysOfWeek,
               done: !!task.done,
               opensTodo: taskShowsOnTodoTab(task),
+              point: task.point,
+              person: task.person,
+              todos: task.todos,
+              isTodo: task.isTodo,
             }))}
           />
         );
@@ -453,6 +458,7 @@ export default function HomeView() {
             )}
             {!isLoading && flaggedCount > 0 && <FlaggedTaskAlertCard flaggedTasks={flaggedTasks} />}
             {!isLoading && <FirstSharedTaskCard />}
+            {!isLoading && <TodayListsCard />}
 
             {/* ★★★ 変更：編集モードONのときだけ DnD を有効化。OFFのときは静的描画 */}
             {(() => {

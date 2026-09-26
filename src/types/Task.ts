@@ -35,6 +35,8 @@ export type Task = {
   title: string;
   name: string;
   point: number;
+  /** 負担の重さ。1=小, 2=中, 3=大。未設定は中として扱う。 */
+  burden?: 1 | 2 | 3;
   users: string[];
   daysOfWeek: string[];
   dates: string[];
@@ -57,6 +59,8 @@ export type Task = {
   time?: string;
   note?: string;
   category?: TaskCategory | null;
+  calendarSync?: boolean;
+  calendarEventId?: string;
 };
 
 

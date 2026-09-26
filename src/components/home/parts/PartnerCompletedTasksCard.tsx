@@ -5,6 +5,12 @@ export const dynamic = 'force-dynamic';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Heart as HeartIcon, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import {
+  CappedListToggle,
+  CappedScrollFrame,
+  LIST_COLLAPSED_COUNT,
+  LIST_VIEWPORT_COUNT,
+} from '@/components/common/CappedTaskList';
 import { auth, db } from '@/lib/firebase';
 import {
   collection,
@@ -48,18 +54,29 @@ function isSameDayLocal(d: Date): boolean {
  * - 並び順：
  *    1) 「未いいね」グループ（古い→新しいの昇順）
  *    2) 「いいね済み」グループ（古い→新しいの昇順）
- * - 件数：制限なし（5件超もカードが縦に拡大して全件表示）
+ * - 件数：はじめは3件。開くと5件分までスクロール
  * - 右端ハートで「いいね」トグル（自分→相手）
  * - taskLikes ドキュメントID：`${taskId}_${YYYYMMDD}_${senderUid}` （完了インスタンス単位）
  * - スキーマ：{ taskId, senderId, receiverId, participants:[sender, receiver]（昇順）, createdAt, dateKey, completedAt }
  */
 export default function PartnerCompletedTasksCard() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => setDark(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+  const rowBase = dark ? '#342b24' : '#ffffff';
+  const rowLiked = dark ? '#4a3034' : '#fff1f2';
   const COLLECTION = 'taskLikes' as const;
   const { uid, partnerId: partnerUid, tasks, tasksReady } = useHousehold();
   const [rows, setRows] = useState<PartnerTask[]>([]);
   const [likedMap, setLikedMap] = useState<HeartStateMap>({});
   const [pendingMap, setPendingMap] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [listExpanded, setListExpanded] = useState(false);
   const weekRange = useMemo(() => getThisWeekRangeJST(), []);
 
   useEffect(() => {
@@ -226,7 +243,7 @@ export default function PartnerCompletedTasksCard() {
             offsetX={-30} 
             content={
               <div className="space-y-2 text-sm">
-                <p>パートナーが完了した家事です。ハートで「ありがとう」を送れます。</p>
+                <p>パートナーが完了した家事です。ハートで「ありがとう」を送れます。はじめは3件まで表示します。</p>
               </div>
             }
           />
@@ -240,39 +257,56 @@ export default function PartnerCompletedTasksCard() {
       ) : displayRows.length === 0 ? (
         <p className="text-sm text-gray-500">相手が完了すると、ここでありがとうを送れます。</p>
       ) : (
-        <motion.ul layout className="space-y-2" layoutScroll>
-          {displayRows.map((t) => {
-            const dateKey = toDateKey(t.completedAt);
-            const likeKey = dateKey ? `${t.id}_${dateKey}` : `${t.id}_nodate`;
-            const liked = likedMap[likeKey] === true;
-            const disabled = pendingMap[likeKey] === true || !dateKey;
+        <>
+          <CappedScrollFrame
+            listScrolls={listExpanded && displayRows.length > LIST_VIEWPORT_COUNT}
+            itemCount={
+              listExpanded ? displayRows.length : Math.min(displayRows.length, LIST_COLLAPSED_COUNT)
+            }
+          >
+            <motion.ul layout className="space-y-2" layoutScroll>
+              {(listExpanded
+                ? displayRows
+                : displayRows.slice(0, LIST_COLLAPSED_COUNT)
+              ).map((t) => {
+                const dateKey = toDateKey(t.completedAt);
+                const likeKey = dateKey ? `${t.id}_${dateKey}` : `${t.id}_nodate`;
+                const liked = likedMap[likeKey] === true;
+                const disabled = pendingMap[likeKey] === true || !dateKey;
 
-            return (
-              <motion.li
-                key={t.id}
-                layout
-                className="flex items-center justify-between gap-2 border-b border-gray-200 px-2 min-h-11 rounded-md"
-                initial={false}
-                animate={
-                  liked
-                    ? { backgroundColor: ['#ffffff', '#fff1f2', '#ffffff'] }
-                    : { backgroundColor: '#ffffff' }
-                }
-                transition={{ duration: 0.6, type: 'tween' }}
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-700" />
-                  <span className="text-sm text-gray-800">{t.name}</span>
-                </div>
-                <HeartButton
-                  liked={liked}
-                  onClick={() => toggleLike(t.id, t.completedAt ?? null)}
-                  disabled={disabled}
-                />
-              </motion.li>
-            );
-          })}
-        </motion.ul>
+                return (
+                  <motion.li
+                    key={t.id}
+                    layout
+                    className="flex items-center justify-between gap-2 border-b border-gray-200 px-2 min-h-11 rounded-md"
+                    initial={false}
+                    animate={
+                      liked
+                        ? { backgroundColor: [rowBase, rowLiked, rowBase] }
+                        : { backgroundColor: rowBase }
+                    }
+                    transition={{ duration: 0.6, type: 'tween' }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-700" />
+                      <span className="text-sm text-gray-800">{t.name}</span>
+                    </div>
+                    <HeartButton
+                      liked={liked}
+                      onClick={() => toggleLike(t.id, t.completedAt ?? null)}
+                      disabled={disabled}
+                    />
+                  </motion.li>
+                );
+              })}
+            </motion.ul>
+          </CappedScrollFrame>
+          <CappedListToggle
+            expanded={listExpanded}
+            totalCount={displayRows.length}
+            onToggle={() => setListExpanded((v) => !v)}
+          />
+        </>
       )}
     </div>
   );

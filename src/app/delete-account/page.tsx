@@ -92,7 +92,7 @@ export default function DeleteAccountPage() {
         <div className="w-full space-y-6">
           {/* 概要説明 */}
           <p className="text-sm text-[#5E5E5E]">
-            アカウントを削除すると、これまでのすべての情報（タスク、ポイントなど）が失われます。
+            アカウントを削除すると、これまでのすべての情報（タスクなど）が失われます。
           </p>
 
           {/* 注意事項 + 同意UI */}
@@ -100,7 +100,7 @@ export default function DeleteAccountPage() {
             <h2 className="text-base font-semibold text-[#333]">退会前の確認事項</h2>
             <ul className="space-y-2 list-disc pl-5 text-sm text-[#5E5E5E]">
               <li>
-                退会すると、このアプリ内のすべての情報（タスク、TODO、ポイント、ハート履歴、プロフィールなど）は
+                退会すると、このアプリ内のすべての情報（タスク、TODO、ハート履歴、プロフィールなど）は
                 <strong>復元できません</strong>。
               </li>
               <li>

@@ -124,14 +124,6 @@ service cloud.firestore {
       );
     }
 
-    // ポイントはペア相手のドキュメントも更新する
-    match /points/{uid} {
-      allow read, write: if signedIn();
-      match /history/{hid} {
-        allow read, write: if signedIn();
-      }
-    }
-
     match /savings/{id} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;

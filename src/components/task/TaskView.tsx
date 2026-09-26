@@ -8,7 +8,6 @@ import SearchBox from '@/components/task/parts/SearchBox';
 import {
   collection,
   updateDoc,
-  deleteDoc,
   doc,
   getDocs,
   serverTimestamp,
@@ -21,9 +20,12 @@ import {
   toggleTaskDoneStatus,
   saveSingleTask,
   removeOrphanSharedTasksIfPairMissing,
+  deleteTaskFromFirestore,
 } from '@/lib/firebaseUtils';
 import { toast } from 'sonner';
-import { canCompleteTodoTask, taskShowsOnTodoTab } from '@/lib/checklistTask';
+import { taskShowsOnTodoTab, countUndoneTodos } from '@/lib/checklistTask';
+import { fuzzyIncludes } from '@/lib/fuzzyText';
+import { isTaskScheduledToday } from '@/lib/todayTask';
 import { useProfileImages } from '@/hooks/useProfileImages';
 import {
   Lightbulb,
@@ -40,7 +42,7 @@ import {
   ToggleRight,
   Copy,
   GripVertical,
-  ListTodo,
+  Plus,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
@@ -276,7 +278,7 @@ function SelectModeRow({
   };
 
   const dateStr = task.dates?.[0] ? task.dates[0].replace(/-/g, '/').slice(5) : '';
-  const timeStr = task.time || '';
+  const timeStr = /^\d{1,2}:\d{2}$/.test((task.time || '').trim()) ? (task.time || '').trim() : '';
   const order = ['0', '1', '2', '3', '4', '5', '6'];
   const dayKanjiToNumber: Record<string, string> = {
     日: '0', 月: '1', 火: '2', 水: '3', 木: '4', 金: '5', 土: '6',
@@ -390,19 +392,24 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [privateFilter, setPrivateFilter] = useState(false);
   const [flaggedFilter, setFlaggedFilter] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmKind, setConfirmKind] = useState<'undo' | 'leftover'>('undo');
   const pendingConfirmResolver = useRef<((value: boolean) => void) | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const pendingDeleteResolver = useRef<((value: boolean) => void) | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
+  const [orphanCleaning, setOrphanCleaning] = useState(false);
   const orphanPromptDismissedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(true);
+  const [filterHint, setFilterHint] = useState<{ text: string; x: number; y: number } | null>(null);
+  const filterHintTimerRef = useRef<number | null>(null);
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
   const todayDate = useMemo(() => new Date().getDate(), []);
-  const { index, selectedTaskName, setSelectedTaskName, openTaskList, listOpen } = useView();
+  const { index, selectedTaskName, setSelectedTaskName, listOpen, openTaskList } = useView();
+  const pendingListTaskIdRef = useRef<string | null>(null);
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
   const hasAnyCompleted = useMemo(
     () => periods.some((p) => (tasksState[p] ?? []).some((t) => t.done)),
@@ -457,18 +464,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     }
   }, [urlSearch, urlFocusSearch]);
 
-  const isSameOrBeforeToday = (ymd: string): boolean => {
-    if (typeof ymd !== 'string') return false;
-    const [y, m, d] = ymd.split('-').map(Number);
-    if (!y || !m || !d) return false;
-    const target = new Date(y, m - 1, d, 0, 0, 0, 0);
-
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-
-    return target.getTime() <= today.getTime();
-  };
-
   useEffect(() => {
     const flaggedParam = params?.get('flagged');
     if (flaggedParam === 'true') {
@@ -506,12 +501,14 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       name: '',
       title: '',
       point: 0,
+      burden: 2,
       period: '毎日',
       dates: [],
       daysOfWeek: [],
+      time: '',
       isTodo: false,
       userId: uid ?? '',
-      users: assignees,
+      users: [],
       userIds: assignees,
       done: false,
       visible: false,
@@ -532,41 +529,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [createEmptyTask]);
 
   // 今日対象かどうか（期日すぎも含む）
-  const isTodayTask = useCallback((task: Task): boolean => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
-    const dayNumberToKanji: Record<number, string> = {
-      0: '日',
-      1: '月',
-      2: '火',
-      3: '水',
-      4: '木',
-      5: '金',
-      6: '土',
-    };
-    const todayDayKanji = dayNumberToKanji[today.getDay()];
-
-    if (task.period === '毎日') return true;
-
-    if (task.period === '週次') {
-      if (!Array.isArray(task.daysOfWeek)) return false;
-      return task.daysOfWeek.includes(todayDayKanji);
-    }
-
-    if (task.period === '不定期') {
-      if (!Array.isArray(task.dates) || task.dates.length === 0) return false;
-
-      if (task.dates.includes(todayStr)) return true;
-
-      return task.dates.some((d) => isSameOrBeforeToday(d));
-    }
-
-    return false;
-  }, []);
+  const isTodayTask = useCallback((task: Task): boolean => isTaskScheduledToday(task), []);
 
   useEffect(() => {
     if (index !== 1 || listOpen || !selectedTaskName) return;
@@ -619,29 +582,35 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [index, listOpen, focusTaskId, todayFilter, showCompleted, searchTerm, flaggedFilter, privateFilter]);
 
   // Done トグル時のロジック
-  const toggleDone = async (period: Period, taskId: string) => {
-    const target = tasksState[period].find((t) => t.id === taskId);
+  const toggleDone = async (period: Period, taskId: string): Promise<boolean> => {
+    const target =
+      tasksState[period].find((t) => t.id === taskId) ??
+      periods.flatMap((p) => tasksState[p] ?? []).find((t) => t.id === taskId);
     if (!target) {
       console.warn('[toggleDone] 対象タスクが見つかりません:', taskId);
-      return;
+      return false;
     }
     if (!uid) {
       console.warn('[toggleDone] 未ログイン状態です');
-      return;
+      return false;
     }
 
     if (target.done) {
       const proceed = await new Promise<boolean>((resolve) => {
         pendingConfirmResolver.current = resolve;
+        setConfirmKind('undo');
         setConfirmOpen(true);
       });
-      if (!proceed) return;
+      if (!proceed) return false;
     } else {
-      const gate = canCompleteTodoTask(target);
-      if (!gate.ok) {
-        toast.error(gate.reason);
-        openTaskList(target.id);
-        return;
+      const leftover = countUndoneTodos(target.todos);
+      if (leftover > 0) {
+        const proceed = await new Promise<boolean>((resolve) => {
+          pendingConfirmResolver.current = resolve;
+          setConfirmKind('leftover');
+          setConfirmOpen(true);
+        });
+        if (!proceed) return false;
       }
     }
 
@@ -650,29 +619,49 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       uid,
       !target.done,
       target.name,
-      target.point,
       getOpt(target, 'person') ?? ''
     );
+    return true;
   };
 
   const deleteTask = async (_period: Period, id: string) => {
     try {
-      await deleteDoc(doc(db, 'tasks', id));
+      await deleteTaskFromFirestore(id);
     } catch (error) {
       console.error('タスクの削除に失敗しました:', error);
     }
   };
 
+  // 新規タスクは保存反映後にリストを開く
+  useEffect(() => {
+    const id = pendingListTaskIdRef.current;
+    if (!id) return;
+    if (!householdTasks.some((t) => t.id === id)) return;
+    pendingListTaskIdRef.current = null;
+    openTaskList(id);
+  }, [householdTasks, openTaskList]);
+
   // タスク更新
   const updateTask = async (_oldPeriod: Period, updated: Task) => {
+    const source = editTargetTask;
+    const openListAfterSave =
+      !!source &&
+      !taskShowsOnTodoTab(source) &&
+      (updated as { isTodo?: boolean }).isTodo === true;
     try {
       if (!uid) return;
       const updatedTask: TaskManageTask = {
         ...(updated as TaskManageTask),
         id: updated.id ?? '',
       };
-      await saveSingleTask(updatedTask, uid);
+      const savedId = await saveSingleTask(updatedTask, uid);
       setEditTargetTask(null);
+      if (!openListAfterSave || !savedId) return;
+      if (householdTasks.some((t) => t.id === savedId)) {
+        openTaskList(savedId);
+      } else {
+        pendingListTaskIdRef.current = savedId;
+      }
     } catch (error) {
       console.error('タスク更新に失敗しました:', error);
       toast.error(error instanceof Error ? error.message : 'タスクの保存に失敗しました');
@@ -847,6 +836,19 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   }, [uid, partnerUserId, profileImage, partnerImage]);
 
   // 虫眼鏡ボタンで検索UIをトグル（閉じる時は検索語をクリア）
+  const showFilterHint = useCallback((text: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    setFilterHint({ text, x: rect.left + rect.width / 2, y: rect.top });
+    if (filterHintTimerRef.current != null) window.clearTimeout(filterHintTimerRef.current);
+    filterHintTimerRef.current = window.setTimeout(() => setFilterHint(null), 1400);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (filterHintTimerRef.current != null) window.clearTimeout(filterHintTimerRef.current);
+    };
+  }, []);
+
   const handleToggleSearch = useCallback(() => {
     if (isSearchVisible) {
       setShowSearchBox(false);
@@ -882,14 +884,7 @@ const toggleSelectionMode = useCallback(() => {
 
   setSelectionMode(next);
 
-  if (next) {
-    // 🔛 OFF → ON
-    toast.success('編集モードに切り替えました');
-  } else {
-    // 🔚 ON → OFF
-    setSelectedIds(new Set());
-    toast.success('編集モードを終了しました');
-  }
+  if (!next) setSelectedIds(new Set());
 }, [selectionMode]);
 
   const toggleSelect = useCallback((taskId: string) => {
@@ -1167,11 +1162,13 @@ const toggleSelectionMode = useCallback(() => {
           isOpen={confirmOpen}
           title=""
           message={
-            pairStatus === 'confirmed' ? (
+            confirmKind === 'leftover' ? (
               <>
-                <div className="text-xl font-semibold mb-2">タスクを未処理に戻しますか？</div>
-                <div className="text-sm text-gray-600">※パートナーが完了したタスクのポイントは減算されません。</div>
+                <div className="text-xl font-semibold mb-2">リストに未完了の項目が残っています</div>
+                <div className="text-sm text-gray-600">このタスクを完了しても、残った項目はリストに残ります。</div>
               </>
+            ) : pairStatus === 'confirmed' ? (
+              <div className="text-base font-semibold">タスクを未処理に戻しますか？</div>
             ) : (
               <div className="text-base font-semibold">タスクを未処理に戻しますか？</div>
             )
@@ -1186,7 +1183,7 @@ const toggleSelectionMode = useCallback(() => {
             pendingConfirmResolver.current?.(false);
             pendingConfirmResolver.current = null;
           }}
-          confirmLabel="OK"
+          confirmLabel={confirmKind === 'leftover' ? '完了する' : 'OK'}
           cancelLabel="キャンセル"
         />
 
@@ -1194,24 +1191,41 @@ const toggleSelectionMode = useCallback(() => {
         <ConfirmModal
           isOpen={showOrphanConfirm}
           title=""
-          message={<div className="text-base font-semibold">パートナーを解消したため、共有タスクなど不要なデータを削除します。</div>}
+          message={
+            <div className="text-base font-semibold">
+              {orphanCleaning
+                ? '不要なデータを削除しています'
+                : 'パートナーを解消したため、共有タスクなど不要なデータを削除します。'}
+            </div>
+          }
           onConfirm={async () => {
-            if (!uid) return;
-            await removeOrphanSharedTasksIfPairMissing();
+            if (!uid || orphanCleaning) return;
+            setOrphanCleaning(true);
             try {
-              await updateDoc(doc(db, 'users', uid), { sharedTasksCleaned: true });
+              await removeOrphanSharedTasksIfPairMissing();
+              try {
+                await updateDoc(doc(db, 'users', uid), { sharedTasksCleaned: true });
+              } catch (err) {
+                console.error('[OrphanCheck] フラグ保存に失敗:', err);
+              }
+              orphanPromptDismissedRef.current = true;
+              setShowOrphanConfirm(false);
             } catch (err) {
-              console.error('[OrphanCheck] フラグ保存に失敗:', err);
+              console.error('[OrphanCheck] 削除に失敗:', err);
+              toast.error('削除に失敗しました。通信状況を確認して再度お試しください。');
+            } finally {
+              setOrphanCleaning(false);
             }
-            orphanPromptDismissedRef.current = true;
-            setShowOrphanConfirm(false);
           }}
           onCancel={() => {
+            if (orphanCleaning) return;
             orphanPromptDismissedRef.current = true;
             setShowOrphanConfirm(false);
           }}
           confirmLabel="削除する"
           cancelLabel="後で"
+          isProcessing={orphanCleaning}
+          processingMessage="完了するまで画面を閉じずにお待ちください。"
         />
 
         <div>
@@ -1233,7 +1247,7 @@ const toggleSelectionMode = useCallback(() => {
                   (task) =>
                     uid &&
                     (task.userId === uid || (task.userIds ?? []).includes(uid)) &&
-                    (!searchTerm || task.name.includes(searchTerm)) &&
+                    (!searchTerm || fuzzyIncludes(task.name, searchTerm)) &&
                     (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
                     (!flaggedFilter || getOpt(task, 'flagged') === true)
@@ -1261,7 +1275,7 @@ const toggleSelectionMode = useCallback(() => {
                       {hasAnyTask
                         ? '表示するタスクはありません。'
                         : showPairStart
-                          ? 'つながった相手と、最初の家事を追加しましょう。'
+                          ? 'つながった相手と、最初のタスクを追加しましょう。'
                           : '右下の＋からタスクを追加できます。'}
                     </p>
                     {showPairStart && (
@@ -1270,7 +1284,7 @@ const toggleSelectionMode = useCallback(() => {
                         onClick={() => window.dispatchEvent(new Event('open-new-task-modal'))}
                         className="mt-4 min-h-11 px-5 rounded-lg bg-[#FFCB7D] text-white text-sm font-semibold"
                       >
-                        家事を追加する
+                        タスクを追加する
                       </button>
                     )}
                   </div>
@@ -1279,34 +1293,83 @@ const toggleSelectionMode = useCallback(() => {
 
               return (
                 <>
-                  {!selectionMode && listTasks.length > 0 && (
+                  {listTasks.length > 0 && (
                     <div className="mx-auto w-full max-w-xl mb-4">
                       <div className="flex items-center justify-between mt-0 mb-2 px-2">
                         <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
                           <span className="inline-block rounded-full px-3 py-1 text-sm text-white bg-gradient-to-b from-[#7eb6ff] to-[#4d8fe8] shadow-md shadow-black/20 shadow-inner">
-                            リストがある家事
+                            リストがあるタスク
                           </span>
-                          <span className="text-sm text-gray-600">{listTasks.length} 件</span>
+                          <span className="text-sm text-gray-600">
+                            {listTasks.filter((t) => !t.done).length === 0
+                              ? 'すべてのリストが完了しました。'
+                              : `残り ${listTasks.filter((t) => !t.done).length} 件`}
+                          </span>
                         </h2>
                       </div>
-                      <ul className="space-y-1.5">
-                        {listTasks.map((task) => (
-                          <li key={`list-entry-${task.id}`}>
-                            <button
-                              type="button"
-                              onClick={() => openTaskList(task.id)}
-                              className="flex w-full min-h-[58px] items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-sm active:scale-[0.99]"
+                      <ul className="space-y-1.5 [touch-action:pan-y]">
+                        {(() => {
+                          const visibleList = sortByDisplayOrder(listTasks).filter(
+                            (t) => showCompleted || !t.done || searchActive
+                          );
+                          if (visibleList.length === 0) return null;
+                          if (selectionMode) {
+                            return visibleList.map((task) => (
+                              <li key={task.id} className="relative">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSelect(task.id)}
+                                  className={`flex w-full min-h-[58px] items-center gap-2 rounded-xl border px-3 py-2 text-left ${
+                                    selectedIds.has(task.id)
+                                      ? 'border-emerald-400 ring-2 ring-emerald-200 bg-white'
+                                      : 'border-gray-200 bg-white'
+                                  }`}
+                                  aria-pressed={selectedIds.has(task.id)}
+                                >
+                                  {selectedIds.has(task.id) ? (
+                                    <CheckCircle className="w-5 h-5 shrink-0 text-emerald-600" />
+                                  ) : (
+                                    <Circle className="w-5 h-5 shrink-0 text-gray-400" />
+                                  )}
+                                  <span className="min-w-0 flex-1 truncate font-semibold text-[#5E5E5E]">
+                                    {task.name}
+                                  </span>
+                                </button>
+                              </li>
+                            ));
+                          }
+                          return visibleList.map((task, idx) => (
+                            <li
+                              key={task.id}
+                              ref={(el) => {
+                                taskRowRefs.current[task.id] = el;
+                              }}
+                              className="relative transition-all duration-200"
                             >
-                              <ListTodo className="w-5 h-5 shrink-0 text-blue-600" />
-                              <span className="min-w-0 flex-1 truncate font-semibold text-[#5E5E5E]">
-                                {task.name}
-                              </span>
-                              <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
-                                リスト
-                              </span>
-                            </button>
-                          </li>
-                        ))}
+                              <TaskCard
+                                task={task}
+                                period={task.period ?? '毎日'}
+                                index={idx}
+                                highlighted={focusTaskId === task.id}
+                                onToggleDone={toggleDone}
+                                onDelete={deleteTask}
+                                onEdit={() =>
+                                  setEditTargetTask({
+                                    ...task,
+                                    period: task.period,
+                                    daysOfWeek: task.daysOfWeek ?? [],
+                                    dates: task.dates ?? [],
+                                    isTodo: getOpt(task, 'isTodo') ?? false,
+                                  })
+                                }
+                                userList={userList}
+                                isPairConfirmed={pairStatus === 'confirmed'}
+                                isPrivate={getOpt(task, 'private') === true}
+                                onLongPress={(x, y) => setLongPressPosition({ x, y })}
+                              />
+                            </li>
+                          ));
+                        })()}
                       </ul>
                     </div>
                   )}
@@ -1316,7 +1379,8 @@ const toggleSelectionMode = useCallback(() => {
                   (task) =>
                     uid &&
                     (task.userId === uid || (task.userIds ?? []).includes(uid)) &&
-                    (!searchTerm || task.name.includes(searchTerm)) &&
+                    !taskShowsOnTodoTab(task) &&
+                    (!searchTerm || fuzzyIncludes(task.name, searchTerm)) &&
                     (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
                     (!privateFilter || getOpt(task, 'private') === true) &&
                     (!flaggedFilter || getOpt(task, 'flagged') === true)
@@ -1339,7 +1403,7 @@ const toggleSelectionMode = useCallback(() => {
 
                 return (
                   <div key={period} className="mx-auto w-full max-w-xl">
-                    <div className={`flex items-center justify-between ${i === 0 ? 'mt-0' : 'mt-4'} mb-2 px-2`}>
+                    <div className={`flex items-center justify-between ${i === 0 && listTasks.length === 0 ? 'mt-0' : 'mt-4'} mb-2 px-2`}>
                       <h2 className="text-lg font-bold text-[#5E5E5E] font-sans flex items-center gap-2">
                         <span
                           className={`inline-block rounded-full px-3 py-1 text-sm text-white 
@@ -1441,25 +1505,34 @@ const toggleSelectionMode = useCallback(() => {
           typeof window !== 'undefined' &&
           createPortal(
             <div className="w-full pointer-events-none">
+              {filterHint && (
+                <div
+                  className="pointer-events-none fixed z-[1300] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-full bg-[#5E5E5E] px-2.5 py-1 text-xs font-semibold text-white shadow-md"
+                  style={{ left: filterHint.x, top: filterHint.y - 8 }}
+                >
+                  {filterHint.text}
+                </div>
+              )}
               <div
                 className="
-          fixed
-          bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]  /* 新規＋と重ならない高さ */
-          left-[calc((100vw_-_min(100vw,_36rem))/_2_+_1rem)]
-          z-[1100]
-          pointer-events-auto
+          fixed inset-x-0 z-[1200]
+          bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]
+          flex items-center justify-center gap-3
+          px-4 pointer-events-none
         "
               >
-                {/* ガラス風コンテナ */}
-                <div className="rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-2 py-2">
-                  {/* 横スクロール行 */}
+                {/* フィルタと追加ボタンを同じ高さで画面中央に置く */}
+                <div className="pointer-events-auto min-w-0 w-max max-w-[calc(100vw-2rem-3.5rem-0.75rem)] overflow-hidden rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-1.5 py-2 min-[420px]:px-2">
                   <div
-                    className="flex items-center gap-1 overflow-x-auto no-scrollbar horizontal-scroll pr-1 pl-1 whitespace-nowrap"
+                    className="flex items-center gap-0.5 overflow-x-auto overscroll-x-contain no-scrollbar horizontal-scroll px-0.5 whitespace-nowrap min-[420px]:gap-1 min-[420px]:px-1 [&_button]:h-9 [&_button]:w-9 min-[420px]:[&_button]:h-10 min-[420px]:[&_button]:w-10 [&_.w-px]:mx-0.5 min-[420px]:[&_.w-px]:mx-1"
                     style={{ WebkitOverflowScrolling: 'touch' }}
                   >
                     {/* ==== 選択モードトグル ==== */}
                     <button
-                      onClick={toggleSelectionMode}
+                      onClick={(e) => {
+                        showFilterHint(selectionMode ? '編集モード OFF' : '編集モード ON', e.currentTarget);
+                        toggleSelectionMode();
+                      }}
                       aria-pressed={selectionMode}
                       title="選択モード"
                       className={[
@@ -1475,7 +1548,11 @@ const toggleSelectionMode = useCallback(() => {
 
                     {hasAnyCompleted && (
                       <button
-                        onClick={() => setShowCompleted((prev) => !prev)}
+                        onClick={(e) => {
+                          const next = !showCompleted;
+                          setShowCompleted(next);
+                          showFilterHint(next ? '完了タスク ON' : '完了タスク OFF', e.currentTarget);
+                        }}
                         aria-pressed={showCompleted}
                         title={
                           showCompleted
@@ -1543,7 +1620,11 @@ const toggleSelectionMode = useCallback(() => {
                       <>
                         {/* 📅 本日フィルター */}
                         <button
-                          onClick={() => setTodayFilter((prev) => !prev)}
+                          onClick={(e) => {
+                            const next = !todayFilter;
+                            setTodayFilter(next);
+                            showFilterHint(next ? '本日だけ ON' : '本日だけ OFF', e.currentTarget);
+                          }}
                           aria-pressed={todayFilter}
                           aria-label="本日のタスクに絞り込む"
                           title="本日のタスクに絞り込む"
@@ -1569,7 +1650,11 @@ const toggleSelectionMode = useCallback(() => {
                         {/* 🔒 プライベート（ペア確定時のみ） */}
                         {pairStatus === 'confirmed' && (
                           <button
-                            onClick={() => setPrivateFilter((prev) => !prev)}
+                            onClick={(e) => {
+                              const next = !privateFilter;
+                              setPrivateFilter(next);
+                              showFilterHint(next ? '個人のみ ON' : '個人のみ OFF', e.currentTarget);
+                            }}
                             aria-pressed={privateFilter}
                             aria-label="プライベートタスクのみ表示"
                             title="プライベートタスク"
@@ -1587,7 +1672,11 @@ const toggleSelectionMode = useCallback(() => {
 
                         {/* 🚩 フラグ */}
                         <button
-                          onClick={() => setFlaggedFilter((prev) => !prev)}
+                          onClick={(e) => {
+                            const next = !flaggedFilter;
+                            setFlaggedFilter(next);
+                            showFilterHint(next ? '注意のみ ON' : '注意のみ OFF', e.currentTarget);
+                          }}
                           aria-pressed={flaggedFilter}
                           aria-label="フラグ付きタスクのみ表示"
                           title="フラグ付きタスク"
@@ -1607,7 +1696,10 @@ const toggleSelectionMode = useCallback(() => {
                     {/* 🔎 検索（虫眼鏡） */}
                     <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
                     <button
-                      onPointerDown={handleToggleSearch}
+                      onPointerDown={(e) => {
+                        showFilterHint(isSearchVisible ? '検索 OFF' : '検索 ON', e.currentTarget);
+                        handleToggleSearch();
+                      }}
                       aria-pressed={isSearchVisible}
                       aria-label="検索ボックスを表示/非表示"
                       title="検索"
@@ -1623,6 +1715,14 @@ const toggleSelectionMode = useCallback(() => {
                     </button>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event('open-new-task-modal'))}
+                  className="pointer-events-auto shrink-0 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#FFC25A] to-[#FFA726] text-white shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white transition-transform hover:scale-105 active:translate-y-[1px]"
+                  aria-label="新規タスク追加"
+                >
+                  <Plus className="h-7 w-7" />
+                </button>
               </div>
             </div>,
             document.body

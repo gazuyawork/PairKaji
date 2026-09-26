@@ -12,16 +12,16 @@ export function isShoppingCategory(raw: unknown): boolean {
 export function isRetiredCategory(raw: unknown): boolean {
   const s = asNorm(raw);
   return (
+    isShoppingCategory(raw) ||
     ['料理', 'りょうり', 'cooking', 'cook', 'meal'].includes(s) ||
     ['旅行', 'りょこう', 'travel', 'trip', 'journey', 'tour'].includes(s)
   );
 }
 
-export function parseCategoryForUI(v: unknown): TaskCategoryUI {
-  if (isShoppingCategory(v)) return '買い物';
+export function parseCategoryForUI(_v: unknown): TaskCategoryUI {
   return null;
 }
 
-export function normalizeCategoryForSave(v: unknown): TaskCategory {
-  return isShoppingCategory(v) ? '買い物' : '未設定';
+export function normalizeCategoryForSave(_v: unknown): TaskCategory {
+  return '未設定';
 }

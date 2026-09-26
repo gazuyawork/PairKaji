@@ -2,7 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, ReactNode } from 'react';
+import { writeLastListTaskId } from '@/lib/todayTask';
 
 // ✅ Context の型定義：どのような値を保持・更新するかを明示
 type ViewContextType = {
@@ -32,20 +33,23 @@ export function ViewProvider({ children, initialIndex = 0 }: ViewProviderProps) 
   const [selectedTaskName, setSelectedTaskName] = useState<string>('');
   const [listOpen, setListOpen] = useState(false);
 
-  const setIndex = (next: number) => {
+  const setIndex = useCallback((next: number) => {
     setIndexState(next);
     if (next !== 1) setListOpen(false);
-  };
+  }, []);
 
-  const openTaskList = (taskId?: string) => {
-    if (taskId) setSelectedTaskName(taskId);
+  const openTaskList = useCallback((taskId?: string) => {
+    if (taskId) {
+      setSelectedTaskName(taskId);
+      writeLastListTaskId(taskId);
+    }
     setIndexState(1);
     setListOpen(true);
-  };
+  }, []);
 
-  const closeTaskList = () => {
+  const closeTaskList = useCallback(() => {
     setListOpen(false);
-  };
+  }, []);
 
   return (
     <ViewContext.Provider

@@ -16,13 +16,14 @@ import {
   getDoc,
   arrayRemove,
   writeBatch,
+  deleteField,
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import type { Task, TaskManageTask, FirestoreTask, TaskCategory } from '@/types/Task';
 import { normalizeCategoryForSave } from '@/lib/taskCategory';
 import { db, auth } from '@/lib/firebase';
 import { handleFirestoreError } from './errorUtils';
-import { canCompleteTodoTask } from '@/lib/checklistTask';
+import { syncTaskWithDeviceCalendar, removeTaskCalendarEvent } from '@/lib/deviceCalendar';
 
 /* =========================================================
  * 型・型ガード
@@ -39,6 +40,7 @@ type TaskDocMinimal = {
   title?: string;
   period?: '毎日' | '週次' | '不定期';
   point?: number;
+  burden?: number;
   daysOfWeek?: (string | number)[];
   dates?: string[];
   time?: string;
@@ -126,7 +128,7 @@ const stripUndefinedDeep = <T>(input: T): T => {
 /* =========================================================
  * 保存用正規化
  *  - Firestore は undefined を保存しないので削除
- *  - category は必ず '未設定' | '買い物' のいずれかに統一
+ *  - category は '未設定' に統一する
  * =======================================================*/
 type NormalizedTaskPayload = {
   userId: string;
@@ -136,6 +138,7 @@ type NormalizedTaskPayload = {
   name: string;
   period: '毎日' | '週次' | '不定期';
   point: number | null;
+  burden: 1 | 2 | 3;
   visible: boolean | null;
   dates: string[];
   daysOfWeek: (string | number)[];
@@ -143,6 +146,8 @@ type NormalizedTaskPayload = {
   note: string;
   private: boolean;
   isTodo: boolean;
+  calendarSync: boolean;
+  calendarEventId: string;
 };
 
 const normalizeTaskPayload = (
@@ -154,6 +159,8 @@ const normalizeTaskPayload = (
 
   const pointVal = r.point;
   const point = pointVal === '' || pointVal == null ? null : Number(pointVal);
+  const burdenVal = r.burden;
+  const burden = burdenVal === 1 || burdenVal === 2 || burdenVal === 3 ? burdenVal : 2;
 
   const visibleVal = r.visible;
   const visible = visibleVal === '' || visibleVal == null ? null : Boolean(visibleVal);
@@ -175,13 +182,16 @@ const normalizeTaskPayload = (
         ? ((r.period as '毎日' | '週次' | '不定期') ?? '毎日')
         : '毎日',
     point: Number.isNaN(point) ? null : point,
+    burden,
     visible,
     dates: asStringArray(r.dates),
     daysOfWeek: Array.isArray(r.daysOfWeek) ? (r.daysOfWeek as (string | number)[]) : [],
-    time: isString(r.time) ? r.time : '',
+    time: isString(r.time) ? r.time.trim() : '',
     note: isString(r.note) ? r.note : r.note == null ? '' : String(r.note),
     private: r.private === true,
     isTodo: r.isTodo === true,
+    calendarSync: r.calendarSync === true,
+    calendarEventId: isString(r.calendarEventId) ? r.calendarEventId : '',
   };
 
   // 念のため undefined 除去
@@ -255,6 +265,7 @@ export const buildFirestoreTaskData = (
     title: task.title ?? '',
     period: task.period ?? '毎日',
     point: task.point ?? 0,
+    burden: task.burden === 1 || task.burden === 3 ? task.burden : 2,
     daysOfWeek: convertedDaysOfWeek,
     dates: task.dates ?? [],
     time: task.time ?? '',
@@ -315,7 +326,6 @@ export const addTaskCompletion = async (
   userId: string,
   userIds: string[],
   taskName: string,
-  point: number,
   person: string
 ) => {
   try {
@@ -325,7 +335,6 @@ export const addTaskCompletion = async (
       userId,
       userIds,
       taskName,
-      point,
       person,
       date: todayISO,
       createdAt: serverTimestamp(),
@@ -358,6 +367,7 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
       {
         name: task.name,
         point: task.point,
+        burden: task.burden === 1 || task.burden === 3 ? task.burden : 2,
         dates: task.dates,
         daysOfWeek: task.daysOfWeek,
         period: task.period,
@@ -368,12 +378,28 @@ export const saveSingleTask = async (task: TaskManageTask, uid: string) => {
         isTodo: (task as unknown as TaskDocMinimal).isTodo === true,
         users: (task as unknown as TaskDocMinimal).users,
         category: (task as unknown as TaskDocMinimal).category,
+        calendarSync: task.calendarSync === true,
+        calendarEventId: task.calendarEventId ?? '',
       },
       uid,
       householdIds
     );
 
-    await saveTaskToFirestore(task.id, taskData);
+    const savedId = await saveTaskToFirestore(task.id ? task.id : null, taskData);
+    const calendar = await syncTaskWithDeviceCalendar({
+      ...task,
+      id: savedId,
+      calendarSync: task.calendarSync === true,
+      calendarEventId: task.calendarEventId ?? '',
+    });
+    await updateDoc(doc(db, 'tasks', savedId), {
+      calendarSync: calendar.calendarSync,
+      calendarEventId: calendar.calendarEventId
+        ? calendar.calendarEventId
+        : deleteField(),
+      updatedAt: serverTimestamp(),
+    });
+    return savedId;
   } catch (error) {
     console.error('タスク保存失敗:', error);
     throw error;
@@ -419,7 +445,7 @@ export const cleanObject = <T>(obj: T): T => {
 export const saveTaskToFirestore = async (
   taskId: string | null,
   taskData: Record<string, unknown>
-): Promise<void> => {
+): Promise<string> => {
   try {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('ログインしていません');
@@ -512,6 +538,7 @@ export const saveTaskToFirestore = async (
       const updatePayload = stripUndefinedDeep(updatePayloadBase);
 
       await updateDoc(taskRef, updatePayload);
+      return taskId;
     } else {
       // ★ 新規作成：'未設定' もそのまま保存
       const createPayloadBase: Record<string, unknown> = {
@@ -525,7 +552,8 @@ export const saveTaskToFirestore = async (
       // ★ 新規作成も undefined を除去してから addDoc
       const createPayload = stripUndefinedDeep(createPayloadBase);
 
-      await addDoc(collection(db, 'tasks'), createPayload);
+      const created = await addDoc(collection(db, 'tasks'), createPayload);
+      return created.id;
     }
   } catch (err) {
     throw err;
@@ -545,9 +573,24 @@ export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => 
       return;
     }
 
-    const taskData = taskSnap.data() as TaskDocMinimal;
+    const taskData = taskSnap.data() as TaskDocMinimal & {
+      calendarEventId?: string;
+      calendarSync?: boolean;
+      name?: string;
+    };
     const userId = isString(taskData.userId) ? taskData.userId : '';
     const dates = asStringArray(taskData.dates);
+
+    await removeTaskCalendarEvent({
+      id: taskId,
+      name: taskData.name,
+      calendarEventId: taskData.calendarEventId,
+      calendarSync: taskData.calendarSync,
+      period: taskData.period,
+      dates,
+      daysOfWeek: taskData.daysOfWeek,
+      time: taskData.time,
+    });
 
     if (userId) {
       await removeTaskIdFromNotifyLogs(userId, taskId, dates);
@@ -592,9 +635,6 @@ export const updateTodoInTask = async (
     text?: string;
 
     memo?: string;
-    price?: number | null;
-    quantity?: number | null;
-    unit?: string;
     imageUrl?: string | null;
     referenceUrls?: string[];
     referenceUrlLabels?: string[];
@@ -630,17 +670,6 @@ export const updateTodoInTask = async (
   // --- memo（指定時のみ反映） ---
   if (typeof updates.memo !== 'undefined') {
     next = { ...next, memo: updates.memo };
-  }
-
-  // --- price / quantity / unit ---
-  if ('price' in updates) {
-    next = { ...next, price: updates.price ?? null };
-  }
-  if ('quantity' in updates) {
-    next = { ...next, quantity: updates.quantity ?? null };
-  }
-  if ('unit' in updates) {
-    next = { ...next, unit: updates.unit };
   }
 
   // --- referenceUrls（配列を整える） ---
@@ -689,32 +718,15 @@ export const updateTodoInTask = async (
     next = { ...next, checklist: normalized };
   }
 
+  const retiredPriceKeys = ['price', 'quantity', 'unit', 'comparePrice', 'compareQuantity'] as const;
+  const cleaned = { ...next } as TodoDoc & Record<string, unknown>;
+  for (const key of retiredPriceKeys) delete cleaned[key];
+  next = cleaned;
+
   // 置換して保存
   const newTodos = todos.slice();
   newTodos[index] = next;
   await updateDoc(taskRef, { todos: newTodos });
-};
-
-/* =========================================================
- * 差額（節約）ログ
- * =======================================================*/
-export const addSavingsLog = async (
-  userId: string,
-  taskId: string,
-  todoId: string,
-  currentUnitPrice: number,
-  compareUnitPrice: number,
-  difference: number
-) => {
-  await addDoc(collection(db, 'savings'), {
-    userId,
-    taskId,
-    todoId,
-    currentUnitPrice,
-    compareUnitPrice,
-    difference,
-    savedAt: serverTimestamp(),
-  });
 };
 
 /* =========================================================
@@ -744,7 +756,6 @@ export const toggleTaskDoneStatus = async (
   userId: string,
   done: boolean,
   taskName?: string,
-  point?: number,
   person?: string
 ) => {
   try {
@@ -761,17 +772,6 @@ export const toggleTaskDoneStatus = async (
     }
 
     if (done) {
-      const currentSnap = await getDoc(taskRef);
-      const currentData = (currentSnap.data() || {}) as TaskDocMinimal;
-      const gate = canCompleteTodoTask({
-        isTodo: currentData.isTodo,
-        visible: currentData.visible,
-        todos: currentData.todos,
-      });
-      if (!gate.ok) {
-        throw new Error(gate.reason);
-      }
-
       // 完了
       await updateDoc(taskRef, {
         done: true,
@@ -784,8 +784,8 @@ export const toggleTaskDoneStatus = async (
       const taskData = taskSnap.data() as TaskDocMinimal | undefined;
       const isPrivate = taskData?.private === true;
 
-      if (!isPrivate && taskName && typeof point === 'number' && person) {
-        await addTaskCompletion(taskId, userId, userIds, taskName, point, person);
+      if (!isPrivate && taskName) {
+        await addTaskCompletion(taskId, userId, userIds, taskName, person ?? '');
       }
     } else {
       // 未完了へ戻す
@@ -839,16 +839,23 @@ export const removeOrphanSharedTasksIfPairMissing = async (): Promise<void> => {
       query(collection(db, 'tasks'), where('userIds', 'array-contains', user.uid))
     );
 
-    const deletePromises: Promise<void>[] = [];
+    const idsToDelete: string[] = [];
     taskSnap.forEach((taskDoc) => {
       const taskData = taskDoc.data() as TaskDocMinimal;
       const uids = Array.isArray(taskData.userIds) ? taskData.userIds : [];
       if (uids.length > 1) {
-        deletePromises.push(deleteDoc(doc(db, 'tasks', taskDoc.id)));
+        idsToDelete.push(taskDoc.id);
       }
     });
 
-    await Promise.all(deletePromises);
+    const CHUNK = 450;
+    for (let i = 0; i < idsToDelete.length; i += CHUNK) {
+      const batch = writeBatch(db);
+      for (const id of idsToDelete.slice(i, i + CHUNK)) {
+        batch.delete(doc(db, 'tasks', id));
+      }
+      await batch.commit();
+    }
   } catch (error) {
     handleFirestoreError(error);
   }
@@ -935,6 +942,7 @@ export const forkTaskAsPrivateForSelf = async (sourceTaskId: string): Promise<st
         : src.point == null
         ? 0
         : Number(src.point) || 0,
+    burden: src.burden === 1 || src.burden === 3 ? src.burden : 2,
     daysOfWeek: Array.isArray(src.daysOfWeek) ? src.daysOfWeek : [],
     dates: Array.isArray(src.dates) ? src.dates : [],
     time: typeof src.time === 'string' ? src.time : '',

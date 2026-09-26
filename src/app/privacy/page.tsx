@@ -12,7 +12,7 @@ export default function PrivacyPage() {
       <h2 className="text-base font-semibold text-gray-900 pt-2">1. 取得する情報</h2>
       <ul className="list-disc pl-5 space-y-1">
         <li>アカウント情報（メールアドレス、表示名、認証識別子）</li>
-        <li>アプリ内データ（タスク、TODO、ポイント、ペア設定、プロフィール画像など）</li>
+        <li>アプリ内データ（タスク、TODO、ペア設定、プロフィール画像など）</li>
         <li>端末通知に必要な情報（プッシュ購読情報）</li>
         <li>課金に関する情報（Google Play の購入トークン、プラン状態。決済カード番号は取得しません）</li>
         <li>広告配信に必要な情報（無料プラン時。Google AdMob が端末・広告識別子を利用する場合があります）</li>

@@ -1,5 +1,6 @@
 import { useMemo, type ComponentType } from 'react';
 import { Tag, ShoppingCart } from 'lucide-react';
+import { normalizeFuzzy } from '@/lib/fuzzyText';
 
 export type SimpleTodo = {
   id: string;
@@ -12,14 +13,7 @@ export type SimpleTodo = {
   quantity?: number | null;
 };
 
-export const normalizeJP = (v: unknown): string => {
-  if (typeof v !== 'string') return '';
-  const s = v.normalize('NFKC').toLowerCase();
-  const hira = s.replace(/[\u30a1-\u30f6]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
-  return hira.replace(/[\u30fcー\s\u3000]/g, '');
-};
+export const normalizeJP = normalizeFuzzy;
 
 export const CATEGORY_ICON_MAP: Record<
   string,

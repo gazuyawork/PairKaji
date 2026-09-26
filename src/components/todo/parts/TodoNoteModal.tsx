@@ -12,13 +12,9 @@ import {
   useMemo,
 } from 'react';
 import { ChevronDown, ChevronUp, Plus, GripVertical, X } from 'lucide-react';
-import ShoppingDetailsEditor from '@/components/todo/parts/ShoppingDetailsEditor';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import {
-  addDoc,
-  collection,
-  serverTimestamp,
   doc,
   getDoc,
 } from 'firebase/firestore';
@@ -28,7 +24,6 @@ import {
   getDownloadURL,
   deleteObject,
 } from 'firebase/storage';
-import { useUnitPriceDifferenceAnimation } from '@/hooks/useUnitPriceDifferenceAnimation';
 import BaseModal from '../../common/modals/BaseModal';
 import NextImage from 'next/image';
 
@@ -51,17 +46,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import { parseCategoryForUI } from '@/lib/taskCategory';
 // ▲▲ dnd-kit ▲▲
 
 /* ---------------- Types & guards ---------------- */
 
-type Category = '買い物';
-
 type ChecklistItem = { id: string; text: string; done: boolean };
 
 type TaskDoc = {
-  category?: Category;
   todos?: TodoDoc[];
 };
 
@@ -82,9 +73,6 @@ type TodoDoc = {
 
 function isString(v: unknown): v is string {
   return typeof v === 'string';
-}
-function isNumber(v: unknown): v is number {
-  return typeof v === 'number' && Number.isFinite(v);
 }
 function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter(isString) : [];
@@ -264,12 +252,6 @@ export default function TodoNoteModal({
   const [todoTitle, setTodoTitle] = useState(todoText);
 
   const [memo, setMemo] = useState('');
-  const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState('g');
-  const [compareMode, setCompareMode] = useState(false);
-  const [comparePrice, setComparePrice] = useState('');
-  const [compareQuantity, setCompareQuantity] = useState('');
   const [initialLoad, setInitialLoad] = useState(true);
   const [saveLabel, setSaveLabel] = useState('保存');
   const [isSaving, setIsSaving] = useState(false);
@@ -279,15 +261,9 @@ export default function TodoNoteModal({
   const [isPreview, setIsPreview] = useState(false);
   const [modeInitialized, setModeInitialized] = useState(false);
 
-  const [category, setCategory] = useState<Category | null>(null);
-
   // ▼▼ バリデーション制御 ▼▼
   const [errorsShown, setErrorsShown] = useState(false);
   const [urlErrors, setUrlErrors] = useState<string[]>([]);
-  const [shoppingErrors, setShoppingErrors] = useState<{ price?: string; quantity?: string; unit?: string }>({});
-
-  const compareQuantityRef = useRef<string>('');
-  useEffect(() => { compareQuantityRef.current = compareQuantity; }, [compareQuantity]);
 
   // 画像
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -325,15 +301,6 @@ export default function TodoNoteModal({
   const hasMemo = useMemo(() => memo.trim().length > 0, [memo]);
   const hasImage = useMemo(() => imageUrl !== null, [imageUrl]);
 
-  const hasShopping = useMemo(() => {
-    if (category !== '買い物') return false;
-    const p = Number.parseFloat(price);
-    const q = Number.parseFloat(quantity);
-    const validPrice = Number.isFinite(p) && p > 0;
-    const validQty = Number.isFinite(q) && q > 0;
-    return validPrice || validQty;
-  }, [category, price, quantity]);
-
   const hasReference = useMemo(
     () => referenceUrls.some((u) => u.trim() !== ''),
     [referenceUrls]
@@ -344,21 +311,9 @@ export default function TodoNoteModal({
     [checklist]
   );
 
-  const isUncategorized = useMemo(() => {
-    if (category == null) return true;
-    const v = String(category).normalize('NFKC').trim();
-    return v === '' || v === '未設定' || v === '未分類' || v === '未選択';
-  }, [category]);
-
   const hasContent = useMemo(() => {
-    return (
-      hasMemo ||
-      hasImage ||
-      hasShopping ||
-      hasReference ||
-      (isUncategorized && hasChecklist)
-    );
-  }, [hasMemo, hasImage, hasShopping, hasReference, isUncategorized, hasChecklist]);
+    return hasMemo || hasImage || hasReference || hasChecklist;
+  }, [hasMemo, hasImage, hasReference, hasChecklist]);
 
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [showScrollUpHint, setShowScrollUpHint] = useState(false);
@@ -375,114 +330,6 @@ export default function TodoNoteModal({
 
   const onTextareaScroll = useCallback(() => updateHints(), [updateHints]);
 
-  const numericPrice = Number.parseFloat(price);
-  const numericQuantity = Number.parseFloat(quantity);
-  const numericComparePrice = Number.parseFloat(comparePrice);
-  const numericCompareQuantity = Number.parseFloat(compareQuantity);
-  const isCompareQuantityMissing =
-    !numericCompareQuantity || Number.isNaN(numericCompareQuantity) || numericCompareQuantity <= 0;
-  const safeCompareQuantity = isCompareQuantityMissing ? 1 : numericCompareQuantity;
-  const safeQuantity = numericQuantity > 0 ? numericQuantity : 1;
-  const currentUnitPrice =
-    numericPrice > 0 && safeQuantity > 0 ? numericPrice / safeQuantity : null;
-  const compareUnitPrice =
-    numericComparePrice > 0 ? numericComparePrice / safeCompareQuantity : null;
-  const unitPriceDiff =
-    compareUnitPrice !== null && currentUnitPrice !== null
-      ? compareUnitPrice - currentUnitPrice
-      : null;
-  const totalDifference =
-    unitPriceDiff !== null ? unitPriceDiff * safeCompareQuantity : null;
-
-  const { animatedDifference, animationComplete: diffAnimationComplete } =
-    useUnitPriceDifferenceAnimation(totalDifference);
-
-  // ★ プレビュー時の「買い物」表示（完全に静的：編集不可）
-  const shoppingPreview = useMemo(() => {
-    if (category !== '買い物') return null;
-
-    const p = Number.parseFloat(price);
-    const q = Number.parseFloat(quantity);
-
-    const hasP = Number.isFinite(p) && p > 0;
-    const hasQ = Number.isFinite(q) && q > 0;
-    const unitTxt = (unit ?? '').trim() || 'g';
-
-    const unitPrice =
-      hasP && hasQ && q > 0 ? Math.round((p / q) * 100) / 100 : null;
-
-    const cmpP = Number.parseFloat(comparePrice);
-    const cmpQ = Number.parseFloat(compareQuantity);
-    const hasCmpP = Number.isFinite(cmpP) && cmpP > 0;
-    const hasCmpQ = Number.isFinite(cmpQ) && cmpQ > 0;
-
-    const cmpUnitPrice =
-      hasCmpP && hasCmpQ && cmpQ > 0 ? Math.round((cmpP / cmpQ) * 100) / 100 : null;
-
-    const diff =
-      unitPrice != null && cmpUnitPrice != null ? Math.round((cmpUnitPrice - unitPrice) * 100) / 100 : null;
-
-    return (
-      <div className="mt-4 ml-2 space-y-3">
-        <h3 className="font-medium">買い物</h3>
-
-        <div className="grid grid-cols-12 gap-2 items-end">
-          <div className="col-span-5">
-            <div className="text-xs text-gray-500 mb-1">価格</div>
-            <div className="border-b border-gray-200 pb-1 tabular-nums">
-              {hasP ? `${p}` : '—'}
-            </div>
-          </div>
-          <div className="col-span-5">
-            <div className="text-xs text-gray-500 mb-1">数量</div>
-            <div className="border-b border-gray-200 pb-1 tabular-nums">
-              {hasQ ? `${q}` : '—'} {hasQ ? unitTxt : ''}
-            </div>
-          </div>
-          <div className="col-span-2">
-            <div className="text-xs text-gray-500 mb-1">単価</div>
-            <div className="border-b border-gray-200 pb-1 tabular-nums text-right">
-              {unitPrice != null ? `${unitPrice}` : '—'}
-            </div>
-          </div>
-        </div>
-
-        {(Number.parseFloat(comparePrice) > 0 || Number.parseFloat(compareQuantity) > 0) && (
-          <div className="pt-2 border-t border-gray-100">
-            <div className="text-xs text-gray-500 mb-2">比較</div>
-
-            <div className="grid grid-cols-12 gap-2 items-end">
-              <div className="col-span-5">
-                <div className="text-xs text-gray-500 mb-1">比較価格</div>
-                <div className="border-b border-gray-200 pb-1 tabular-nums">
-                  {hasCmpP ? `${cmpP}` : '—'}
-                </div>
-              </div>
-              <div className="col-span-5">
-                <div className="text-xs text-gray-500 mb-1">比較数量</div>
-                <div className="border-b border-gray-200 pb-1 tabular-nums">
-                  {hasCmpQ ? `${cmpQ}` : '—'} {hasCmpQ ? unitTxt : ''}
-                </div>
-              </div>
-              <div className="col-span-2">
-                <div className="text-xs text-gray-500 mb-1">比較単価</div>
-                <div className="border-b border-gray-200 pb-1 tabular-nums text-right">
-                  {cmpUnitPrice != null ? `${cmpUnitPrice}` : '—'}
-                </div>
-              </div>
-            </div>
-
-            {diff != null && (
-              <p className="mt-2 text-sm text-gray-700">
-                差額（単価）: <span className="tabular-nums">{diff}</span>
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }, [category, price, quantity, unit, comparePrice, compareQuantity]);
-
   useEffect(() => setMounted(true), []);
 
   // ★ モーダルを開くたびに、モード初期化フラグをリセット（初期データ取得後に決める）
@@ -498,11 +345,6 @@ export default function TodoNoteModal({
     setTodoTitle(todoText);
   }, [todoText]);
 
-  useEffect(() => {
-    const parsed = Number.parseFloat(comparePrice);
-    setSaveLabel(!Number.isNaN(parsed) && parsed > 0 ? '価格を更新する' : '保存');
-  }, [comparePrice]);
-
   // --- 初期データの取得 ---
   useEffect(() => {
     const fetchTodoData = async () => {
@@ -513,7 +355,6 @@ export default function TodoNoteModal({
         if (!tSnap.exists()) return;
 
         const taskData = tSnap.data() as TaskDoc;
-        setCategory(parseCategoryForUI(taskData?.category));
 
         const todos = isTodoArray(taskData.todos) ? taskData.todos : [];
         const todo = todos.find((t) => t.id === todoId);
@@ -523,13 +364,6 @@ export default function TodoNoteModal({
         setTodoTitle(todo.text ?? todoText);
 
         setMemo(todo.memo ?? '');
-        setPrice(isNumber(todo.price) ? String(todo.price) : '');
-        setQuantity(isNumber(todo.quantity) ? String(todo.quantity) : '');
-        setUnit(todo.unit ?? 'g');
-
-        if ((!compareQuantityRef.current || compareQuantityRef.current === '') && isNumber(todo.quantity)) {
-          setCompareQuantity(String(todo.quantity));
-        }
 
         const existingImageUrl = isString(todo.imageUrl) ? todo.imageUrl : null;
         setImageUrl(existingImageUrl);
@@ -864,28 +698,9 @@ export default function TodoNoteModal({
       u.trim() && !isValidUrlLoose(u) ? 'URLの形式が正しくありません。' : ''
     );
 
-    const shopErr: { price?: string; quantity?: string; unit?: string } = {};
-    if (category === '買い物') {
-      const p = Number.parseFloat(price);
-      const q = Number.parseFloat(quantity);
-      const hasP = Number.isFinite(p) && p > 0;
-      const hasQ = Number.isFinite(q) && q > 0;
-
-      if (hasP && !hasQ) shopErr.quantity = '数量を入力してください。';
-      if (hasQ && !hasP && !(Number.parseFloat(comparePrice) > 0)) {
-        shopErr.price = '価格を入力してください。';
-      }
-      if (hasQ && !unit.trim()) shopErr.unit = '単位を選択してください。';
-    }
-
     setUrlErrors(nextUrlErrors);
-    setShoppingErrors(shopErr);
-
-    const hasUrlError = nextUrlErrors.some((e) => !!e);
-    const hasShopError = Object.keys(shopErr).length > 0;
-
-    return !(hasUrlError || hasShopError);
-  }, [referenceUrls, category, price, quantity, unit, comparePrice]);
+    return !nextUrlErrors.some((e) => !!e);
+  }, [referenceUrls]);
 
   // 保存（編集時のみ使う想定）
   const handleSave = async () => {
@@ -897,29 +712,6 @@ export default function TodoNoteModal({
     if (!okCommon) return;
 
     setIsSaving(true);
-
-    const nPrice = Number.parseFloat(price);
-    const nQty = Number.parseFloat(quantity);
-    const nCmpPrice = Number.parseFloat(comparePrice);
-    const nCmpQty = Number.parseFloat(compareQuantity);
-
-    const appliedPrice = nCmpPrice > 0 ? nCmpPrice : nPrice;
-    const rawQuantity = nCmpPrice > 0 ? nCmpQty : nQty;
-    const validQuantity = Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : null;
-    const appliedUnit = validQuantity ? unit : null;
-
-    const safeCmpQty = nCmpQty > 0 ? nCmpQty : 1;
-    const safeQty = nQty > 0 ? nQty : 1;
-    const currentUnitPriceCalced =
-      nPrice > 0 && safeQty > 0 ? nPrice / safeQty : null;
-    const compareUnitPriceCalced =
-      nCmpPrice > 0 ? nCmpPrice / safeCmpQty : null;
-    const unitPriceDiffCalced =
-      compareUnitPriceCalced !== null && currentUnitPriceCalced !== null
-        ? compareUnitPriceCalced - currentUnitPriceCalced
-        : null;
-    const totalDifferenceCalced =
-      unitPriceDiffCalced !== null ? unitPriceDiffCalced * safeCmpQty : null;
 
     try {
       // 画像アップロード
@@ -944,15 +736,11 @@ export default function TodoNoteModal({
       // Firestore 更新 payload
       const payload: TodoUpdates = {
         memo,
-        price: Number.isFinite(appliedPrice) && appliedPrice! > 0 ? appliedPrice : null,
-        quantity: validQuantity,
         referenceUrls: urlsForSave,
         referenceUrlLabels: labelsForSave,
       };
 
       (payload as TodoUpdates & { text?: string }).text = todoTitle.trim();
-
-      if (appliedUnit) (payload as { unit?: string }).unit = appliedUnit;
 
       if (isImageRemoved) {
         (payload as { imageUrl?: string | null }).imageUrl = null;
@@ -988,17 +776,6 @@ export default function TodoNoteModal({
         setPreviousImageUrl(isImageRemoved ? null : nextImage ?? null);
       } catch (e) {
         console.warn('Storage クリーンアップ処理で警告:', e);
-      }
-
-      if (totalDifferenceCalced !== null) {
-        await addDoc(collection(db, 'savings'), {
-          userId: user.uid,
-          todoId,
-          savedAt: serverTimestamp(),
-          currentUnitPrice: currentUnitPriceCalced,
-          compareUnitPrice: compareUnitPriceCalced,
-          difference: Math.round(totalDifferenceCalced),
-        });
       }
 
       if (previewUrl) {
@@ -1383,8 +1160,8 @@ export default function TodoNoteModal({
           )}
           {/* ▲▲ 参考URLここまで ▲▲ */}
 
-          {/* ▼▼ チェックリスト（カテゴリ未選択のときだけ表示・必須ではない） ▼▼ */}
-          {(isUncategorized) && (!isPreview || hasChecklist) && (
+          {/* ▼▼ チェックリスト（必須ではない） ▼▼ */}
+          {(!isPreview || hasChecklist) && (
             <div className="pt-2 pb-3 mt-2">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-medium">チェックリスト</h3>
@@ -1553,44 +1330,6 @@ export default function TodoNoteModal({
             </div>
           )}
           {/* ▲▲ チェックリストここまで ▲▲ */}
-
-          {/* 買い物カテゴリ */}
-          {category === '買い物' && (
-            <>
-              {isPreview ? (
-                // ★重要：プレビュー時は ShoppingDetailsEditor を使わず、完全に静的表示（価格/数量編集不可）
-                shoppingPreview
-              ) : (
-                <>
-                  <ShoppingDetailsEditor
-                    price={price}
-                    quantity={quantity}
-                    unit={unit}
-                    compareMode={compareMode}
-                    comparePrice={comparePrice}
-                    compareQuantity={compareQuantity}
-                    onChangePrice={setPrice}
-                    onChangeQuantity={setQuantity}
-                    onChangeUnit={setUnit}
-                    onToggleCompareMode={(next) => setCompareMode(next)}
-                    onChangeComparePrice={setComparePrice}
-                    onChangeCompareQuantity={setCompareQuantity}
-                    animatedDifference={animatedDifference}
-                    animationComplete={diffAnimationComplete}
-                    isPreview={false}
-                    onRequestEditMode={() => setIsPreview(false)}
-                  />
-                  {errorsShown && (shoppingErrors.price || shoppingErrors.quantity || shoppingErrors.unit) && (
-                    <ul className="mt-2 text-xs text-red-500 list-disc list-inside">
-                      {shoppingErrors.price && <li>{shoppingErrors.price}</li>}
-                      {shoppingErrors.quantity && <li>{shoppingErrors.quantity}</li>}
-                      {shoppingErrors.unit && <li>{shoppingErrors.unit}</li>}
-                    </ul>
-                  )}
-                </>
-              )}
-            </>
-          )}
         </div>
       </div>
     </BaseModal>

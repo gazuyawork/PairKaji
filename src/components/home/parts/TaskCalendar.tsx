@@ -7,9 +7,14 @@ import { dayNumberToName } from '@/lib/constants';
 import { useRef, useState, useMemo, useLayoutEffect, type ReactNode, type TouchEvent } from 'react';
 import { ja } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Circle } from 'lucide-react';
 import HelpPopover from '@/components/common/HelpPopover';
 import { useView } from '@/context/ViewContext';
+import { useHousehold } from '@/context/HouseholdContext';
+import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
+import { countUndoneTodos } from '@/lib/checklistTask';
+import { isTaskScheduledToday } from '@/lib/todayTask';
+import ConfirmModal from '@/components/common/modals/ConfirmModal';
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -20,6 +25,10 @@ type CalendarTask = {
   daysOfWeek?: string[]; // dayNumberToName の値に一致する曜日文字列
   done: boolean;         // 完了フラグ
   opensTodo?: boolean;
+  point?: number;
+  person?: string;
+  todos?: unknown;
+  isTodo?: boolean;
 };
 
 type Props = {
@@ -55,7 +64,6 @@ const PERIOD_DOT: Record<PeriodKind, string> = {
   daily: 'bg-blue-400',
 };
 
-const COLLAPSED_COUNT = 3;
 const VIEWPORT_COUNT = 5;
 const VIEWPORT_LIST_CLASS =
   'no-tab-swipe max-h-[calc(5*2.75rem+4*0.375rem)] overflow-y-auto overscroll-y-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch] pb-1';
@@ -115,25 +123,15 @@ function DayTaskListFrame({
 
 export default function TaskCalendar({ tasks }: Props) {
   const { setIndex, setSelectedTaskName, openTaskList } = useView();
+  const { uid } = useHousehold();
   const today = new Date();
   const startToday = startOfDay(today);
   const [showUpcoming, setShowUpcoming] = useState(false);
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [leftoverConfirm, setLeftoverConfirm] = useState<CalendarTask | null>(null);
   const todayRemaining = useMemo(() => {
-    return tasks.filter((task) => {
-      const isDaily = task.period === '毎日';
-      const isDateTask = task.dates?.some((dateStr) => isSameDay(parseISO(dateStr), today));
-      const isWeeklyTask =
-        task.period === '週次' &&
-        task.daysOfWeek?.includes(dayNumberToName[String(today.getDay())]);
-      const isOverdueIrregularToday =
-        task.period === '不定期' &&
-        task.done === false &&
-        (task.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false);
-      const isTargetDay = isDaily || isDateTask || isWeeklyTask || isOverdueIrregularToday;
-      return isTargetDay && task.done !== true;
-    }).length;
-  }, [tasks, startToday]);
+    return tasks.filter((task) => isTaskScheduledToday(task) && task.done !== true).length;
+  }, [tasks]);
 
   // ✅ 1週間分（本日含む7日）
   const days: Date[] = Array.from({ length: 7 }, (_, i) => addDays(today, i));
@@ -158,13 +156,25 @@ export default function TaskCalendar({ tasks }: Props) {
     }
   };
 
-  const toggleExpandedDay = (key: string) => {
-    setExpandedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const completeTodayTask = async (task: CalendarTask, skipLeftoverCheck = false) => {
+    if (!uid || task.done || completingId) return;
+    if (!skipLeftoverCheck && countUndoneTodos(task.todos) > 0) {
+      setLeftoverConfirm(task);
+      return;
+    }
+    setCompletingId(task.id);
+    try {
+      await toggleTaskDoneStatus(
+        task.id,
+        uid,
+        true,
+        task.name,
+        task.person ?? ''
+      );
+    } finally {
+      setCompletingId(null);
+      setLeftoverConfirm(null);
+    }
   };
 
   // ===== ▼▼ 並び順制御 ▼▼ =====
@@ -208,7 +218,7 @@ export default function TaskCalendar({ tasks }: Props) {
             offsetX={-30}
             content={
               <div className="space-y-2 text-sm">
-                <p>はじめは今日の家事を3件まで表示します。「他〇件を見る」で開き、5件分の枠をスクロールして残りを確認できます。タップすると Todo の家事は Todo タブ、それ以外は Task タブが開きます。</p>
+                <p>今日の家事は5件まで表示します。それを超える分は、枠の中をスクロールして確認できます。左の丸で完了できます。名前をタップすると、リスト付きはリスト、それ以外は家事タブが開きます。</p>
                 {/* <ul className="list-disc pl-5 space-y-1">
                   <li>並び順は「期限切れ → 毎日 → 週次 → 不定期」、同カテゴリ内は50音順です。</li>
                 </ul> */}
@@ -232,6 +242,10 @@ export default function TaskCalendar({ tasks }: Props) {
             //  2) ＋ 不定期の期限切れ（今日より前の期日がある）は「今日の列」に表示
             //  3) ★ 当日列だけ完了フラグを反映して非表示にする（他日は表示）
             const dailyTasks = tasks.filter((task) => {
+              if (isSameDay(day, today)) {
+                return isTaskScheduledToday(task) && !isDoneOnThisDay(task, day);
+              }
+
               const isDaily = task.period === '毎日';
 
               const isDateTask = task.dates?.some((dateStr) =>
@@ -242,19 +256,7 @@ export default function TaskCalendar({ tasks }: Props) {
                 task.period === '週次' &&
                 task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
 
-              // ▼ 不定期の「期限切れ」を今日の列に表示
-              const isOverdueIrregularToday =
-                task.period === '不定期' &&
-                task.done === false &&
-                isSameDay(day, today) &&
-                (task.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false);
-
-              const isTargetDay = isDaily || isDateTask || isWeeklyTask || isOverdueIrregularToday;
-
-              // ★ 当日列のみ完了を非表示にする
-              const shouldHide = isDoneOnThisDay(task, day);
-
-              return isTargetDay && !shouldHide;
+              return (isDaily || isDateTask || isWeeklyTask) && !isDoneOnThisDay(task, day);
             });
 
             // ★ 並び替え：
@@ -288,12 +290,7 @@ export default function TaskCalendar({ tasks }: Props) {
             const todayOnly = !showUpcoming && isTodayCol;
             const dayKey = format(day, 'yyyy-MM-dd');
             const colClass = `${hasTask ? 'bg-orange-100' : 'bg-[#fffaf1]'} border-gray-300 shadow-inner`;
-            const isDayExpanded = expandedDays.has(dayKey);
-            const visibleTasks = isDayExpanded
-              ? sortedTasks
-              : sortedTasks.slice(0, COLLAPSED_COUNT);
-            const hiddenCount = Math.max(sortedTasks.length - COLLAPSED_COUNT, 0);
-            const listScrolls = isDayExpanded && sortedTasks.length > VIEWPORT_COUNT;
+            const listScrolls = sortedTasks.length > VIEWPORT_COUNT;
 
             return (
               <motion.div
@@ -309,51 +306,58 @@ export default function TaskCalendar({ tasks }: Props) {
 
                 <AnimatePresence initial={false} mode="popLayout">
                   {hasTask ? (
-                    <DayTaskListFrame listScrolls={listScrolls} itemCount={visibleTasks.length}>
-                    {visibleTasks.map((task) => {
+                    <DayTaskListFrame listScrolls={listScrolls} itemCount={sortedTasks.length}>
+                    {sortedTasks.map((task) => {
                       const kind = periodKindForDay(task, day, today, startToday);
-                      const destLabel = task.opensTodo ? 'リスト' : '家事';
 
                       return (
-                        <motion.button
-                          type="button"
+                        <motion.div
                           key={task.id}
                           layout
                           variants={itemVariants}
                           initial="initial"
                           animate="animate"
                           exit="exit"
-                          title={`${task.name}（${destLabel}へ）`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (task.opensTodo) {
-                              openTaskList(task.id);
-                            } else {
-                              setSelectedTaskName(task.id);
-                              setIndex(1);
-                            }
-                          }}
-                          className={`flex min-h-11 w-full items-center gap-2 rounded-xl border border-gray-200 bg-white text-left shadow-sm active:scale-[0.99] ${
-                            todayOnly ? 'px-3' : 'px-1.5'
+                          className={`flex min-h-11 w-full items-center gap-1 rounded-xl border border-gray-200 bg-white shadow-sm ${
+                            todayOnly ? 'pr-2' : 'px-1.5'
                           }`}
                         >
-                          <span className={`h-6 w-1.5 shrink-0 rounded-full ${PERIOD_DOT[kind]}`} />
-                          <span
-                            className="min-w-0 flex-1 truncate text-sm font-semibold text-[#5E5E5E]"
+                          {todayOnly && (
+                            <button
+                              type="button"
+                              aria-label={`${task.name}を完了する`}
+                              title="完了する"
+                              disabled={completingId === task.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void completeTodayTask(task);
+                              }}
+                              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-400 active:bg-gray-100 disabled:opacity-50"
+                            >
+                              <Circle className="h-6 w-6" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            title={task.name}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (task.opensTodo) {
+                                openTaskList(task.id);
+                              } else {
+                                setSelectedTaskName(task.id);
+                                setIndex(1);
+                              }
+                            }}
+                            className="flex min-h-11 min-w-0 flex-1 items-center gap-2 py-1 text-left active:scale-[0.99]"
                           >
-                            {task.name}
-                          </span>
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                              task.opensTodo
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {destLabel}
-                          </span>
-                          {todayOnly && <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />}
-                        </motion.button>
+                            <span className={`h-6 w-1.5 shrink-0 rounded-full ${PERIOD_DOT[kind]}`} />
+                            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#5E5E5E]">
+                              {task.name}
+                            </span>
+                            {todayOnly && <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />}
+                          </button>
+                        </motion.div>
                       );
                     })}
                     </DayTaskListFrame>
@@ -370,25 +374,6 @@ export default function TaskCalendar({ tasks }: Props) {
                   )}
                 </AnimatePresence>
 
-                {sortedTasks.length > COLLAPSED_COUNT && (
-                  <button
-                    type="button"
-                    onClick={() => toggleExpandedDay(dayKey)}
-                    className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600 active:bg-gray-100"
-                  >
-                    {isDayExpanded ? (
-                      <>
-                        <ChevronUp className="h-4 w-4" />
-                        件数を絞る
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-4 w-4" />
-                        他 {hiddenCount} 件を見る
-                      </>
-                    )}
-                  </button>
-                )}
               </motion.div>
             );
           })}
@@ -439,6 +424,24 @@ export default function TaskCalendar({ tasks }: Props) {
           <span>期限切れ</span>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={leftoverConfirm !== null}
+        title=""
+        message={
+          <>
+            <div className="text-xl font-semibold mb-2">リストに未完了の項目が残っています</div>
+            <div className="text-sm text-gray-600">この家事を完了しても、残った項目はリストに残ります。</div>
+          </>
+        }
+        onConfirm={() => {
+          if (leftoverConfirm) void completeTodayTask(leftoverConfirm, true);
+        }}
+        onCancel={() => setLeftoverConfirm(null)}
+        confirmLabel="完了する"
+        cancelLabel="キャンセル"
+        isProcessing={completingId !== null}
+      />
     </div>
   );
 }

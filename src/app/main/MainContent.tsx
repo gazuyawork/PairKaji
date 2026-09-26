@@ -16,7 +16,6 @@ import Header from '@/components/common/Header';
 import { useView } from '@/context/ViewContext';
 import { useFreeHomeBannerAd } from '@/hooks/useFreeHomeBannerAd';
 import clsx from 'clsx';
-import { Plus } from 'lucide-react';
 import PairPremiumHint from '@/components/home/parts/PairPremiumHint';
 
 /**
@@ -65,7 +64,7 @@ export default function MainContent() {
 
   // タイトルは index から算出（メモ化）
   const currentTitle = useMemo(() => {
-    const titles = ['ホーム', '家事', '履歴'];
+    const titles = ['ホーム', 'タスク', '履歴'];
     return titles[index] ?? 'タイトル未設定';
   }, [index]);
 
@@ -193,24 +192,6 @@ function AuthedMainContent(props: {
           )}
           {listOpen && <TodoView />}
         </div>
-
-        {index === 1 && !listOpen && (
-          <div className="fixed inset-x-0 bottom-26 z-[1000] pointer-events-none">
-            <div className="mx-auto max-w-xl relative px-24 mb-12">
-              <button
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new Event('open-new-task-modal'));
-                  }
-                }}
-                className="absolute right-0 w-14 h-14 rounded-full text-white text-3xl bg-gradient-to-b from-[#FFC25A] to-[#FFA726] shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white hover:scale-105 active:translate-y-[1px] transition-transform flex items-center justify-center pointer-events-auto mr-5"
-                aria-label="新規タスク追加"
-              >
-                <Plus className="w-7 h-7" />
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="border-t border-gray-200">
           <FooterNav currentIndex={index} setIndex={setIndex} />

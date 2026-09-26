@@ -10,6 +10,8 @@ import AdsenseWebLoader from '@/components/ads/AdsenseWebLoader';
 import AppBadgeInitializer from '@/components/system/AppBadgeInitializer';
 
 import { AuthProvider } from '@/context/AuthContext';
+import DarkModeSync from '@/components/system/DarkModeSync';
+import PortraitLock from '@/components/system/PortraitLock';
 
 // [追加] すべての「？」(HelpPopover) をグローバルにON/OFFするためのProviderとトグル
 import { HelpHintsProvider } from '@/context/HelpHintsContext';
@@ -36,7 +38,7 @@ export const metadata: Metadata = {
   // LP側の値を反映
   title: 'PairKaji | 家事を2人で分担するアプリ',
   description:
-    'PairKajiは、家事を2人で分担・見える化するためのタスク管理アプリです。タスクの進捗共有、ポイント付与、TODO管理がカンタンに。',
+    'PairKajiは、家事を2人で分担・見える化するためのタスク管理アプリです。タスクの進捗共有とTODO管理がカンタンに。',
   robots: { index: true, follow: true },
   openGraph: {
     images: ['/images/default.png'],
@@ -74,9 +76,16 @@ return (
     <head>
       {/* ✅ 静的 manifest を明示 */}
       <link rel="manifest" href="/manifest.webmanifest" />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `try{if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')}catch(e){}`,
+        }}
+      />
     </head>
 
     <body className="font-sans bg-white text-gray-800 h-full antialiased">
+        <DarkModeSync />
+        <PortraitLock />
 
         <TimerProvider>
           {/* 起動直後にローカルキャッシュの未読数でバッジを即時反映 */}

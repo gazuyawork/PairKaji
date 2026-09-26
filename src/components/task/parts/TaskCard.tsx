@@ -16,8 +16,7 @@ import { db } from '@/lib/firebase';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import SlideUpModal from '@/components/common/modals/SlideUpModal';
 import LinkifiedText from '@/components/common/LinkifiedText';
-import { toast } from 'sonner';
-import { canCompleteTodoTask, taskShowsOnTodoTab } from '@/lib/checklistTask';
+import { taskShowsOnTodoTab } from '@/lib/checklistTask';
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
@@ -54,7 +53,7 @@ type Props = {
   task: Task;
   period: Period;
   index: number;
-  onToggleDone: (period: Period, taskId: string) => void;
+  onToggleDone: (period: Period, taskId: string) => void | Promise<boolean | void>;
   onDelete: (period: Period, id: string) => void;
   onEdit: () => void;
   userList: UserInfo[];
@@ -98,12 +97,15 @@ function TaskCard({
     setLocalDone(task.done);
   }, [task.done]);
 
-  const { profileImage, profileName } = useMemo(() => {
-    const assignedUserId = task.users?.[0];
+  const assignee = useMemo(() => {
+    const assignedUserId =
+      Array.isArray(task.users) && task.users.length === 1 ? task.users[0] : null;
+    if (!assignedUserId) return null;
     const assignedUser = userList.find((u) => u.id === assignedUserId);
+    if (!assignedUser) return null;
     return {
-      profileImage: assignedUser?.imageUrl ?? '/images/default.png',
-      profileName: assignedUser?.name ?? '未設定',
+      profileImage: assignedUser.imageUrl,
+      profileName: assignedUser.name,
     };
   }, [task.users, userList]);
 
@@ -123,7 +125,7 @@ function TaskCard({
     return d.replace(/-/g, '/').slice(5);
   }, [task.dates]);
 
-  const timeStr = task.time || '';
+  const timeStr = /^\d{1,2}:\d{2}$/.test((task.time || '').trim()) ? (task.time || '').trim() : '';
 
   const toggleFlag = async () => {
     if (task.done) return;
@@ -160,21 +162,14 @@ function TaskCard({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (showActions) return;
+    const ok = await onToggleDone(period, task.id);
+    if (ok === false) return;
     if (!task.done) {
-      const gate = canCompleteTodoTask(task);
-      if (!gate.ok) {
-        toast.error(gate.reason);
-        openTaskList(task.id);
-        return;
-      }
+      setAnimateTrigger((prev) => prev + 1);
+      setLocalDone(true);
     }
-    setAnimateTrigger((prev) => prev + 1);
-    setLocalDone(true);
-    setTimeout(() => {
-      onToggleDone(period, task.id);
-    }, 300);
   };
 
   const handleDelete = () => {
@@ -389,16 +384,11 @@ function TaskCard({
             <div className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300">
               <SquareUser className="w-5 h-5 text-green-600" />
             </div>
-          ) : !task.private && task.point > 0 ? (
-            <p className="text-[#5E5E5E] font-sans text-right text-sm leading-none pr-0.5">
-              {task.point}
-              <span className="text-[10px]">pt</span>
-            </p>
           ) : null}
-          {!task.private && isPairConfirmed && (
+          {!task.private && isPairConfirmed && assignee && (
             <Image
-              src={profileImage || '/images/default.png'}
-              alt={`${profileName}のアイコン`}
+              src={assignee.profileImage}
+              alt={`${assignee.profileName}のアイコン`}
               width={32}
               height={32}
               className="rounded-full border border-gray-300 object-cover aspect-square select-none"

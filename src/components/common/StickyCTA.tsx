@@ -65,7 +65,7 @@ export default function StickyCTA({
             <div className="hidden md:flex md:flex-col">
               <p className="text-base font-semibold leading-tight">{title}</p>
               <p className="text-xs opacity-90">
-                会員登録は1分。タスク・TODO・ポイント管理をすぐに体験できます。
+                会員登録は1分。タスクとTODOの管理をすぐに体験できます。
               </p>
             </div>
           </div>

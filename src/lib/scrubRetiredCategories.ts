@@ -11,7 +11,16 @@ import { isRetiredCategory } from '@/lib/taskCategory';
 const doneIds = new Set<string>();
 const inFlight = new Set<string>();
 
-const RETIRED_TODO_KEYS = ['recipe', 'timeStart', 'timeEnd'] as const;
+const RETIRED_TODO_KEYS = [
+  'recipe',
+  'timeStart',
+  'timeEnd',
+  'price',
+  'quantity',
+  'unit',
+  'comparePrice',
+  'compareQuantity',
+] as const;
 
 function scrubTodoObject(raw: unknown): { value: unknown; changed: boolean } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -30,7 +39,7 @@ function scrubTodoObject(raw: unknown): { value: unknown; changed: boolean } {
   return { value: next, changed };
 }
 
-/** 料理・旅行カテゴリと専用フィールドを Firestore から除去する（1ドキュメント1回） */
+/** 廃止カテゴリ（買い物・料理・旅行）と価格などの専用フィールドを Firestore から除去する（1ドキュメント1回） */
 export function scrubRetiredTaskData(taskId: string, data: Record<string, unknown>): void {
   if (doneIds.has(taskId) || inFlight.has(taskId)) return;
 
@@ -64,12 +73,12 @@ export function scrubRetiredTaskData(taskId: string, data: Record<string, unknow
       await Promise.all(
         sub.docs.map(async (todoDoc) => {
           const d = todoDoc.data();
-          if (!RETIRED_TODO_KEYS.some((key) => key in d)) return;
-          await updateDoc(todoDoc.ref, {
-            recipe: deleteField(),
-            timeStart: deleteField(),
-            timeEnd: deleteField(),
-          });
+          const fieldUpdates: Record<string, ReturnType<typeof deleteField>> = {};
+          for (const key of RETIRED_TODO_KEYS) {
+            if (key in d) fieldUpdates[key] = deleteField();
+          }
+          if (Object.keys(fieldUpdates).length === 0) return;
+          await updateDoc(todoDoc.ref, fieldUpdates);
         })
       );
       doneIds.add(taskId);

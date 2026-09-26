@@ -46,7 +46,7 @@ export default function LandingPage() {
   const features: Feature[] = [
     {
       title: 'ふたりで家事を共有',
-      desc: 'ペアを組むと、タスク・TODO・ポイントがリアルタイムで共有されます。双方が編集可能で、状態が即時に同期されます。',
+      desc: 'ペアを組むと、タスクとTODOがリアルタイムで共有されます。双方が編集可能で、状態が即時に同期されます。',
       icon: Users,
       // badge: 'Premium',
       // detail: (
@@ -79,12 +79,12 @@ export default function LandingPage() {
     },
     {
       title: 'ToDo管理',
-      desc: 'タスクに対してTODOを設定できます。例えば「お買い物」タスクに対してTODOを作成することで、お買い物リストとして使用することが出来ます。',
+      desc: 'タスクにチェックリストを付けられます。手順や持ち物を項目にして、その場でチェックできます。',
       icon: ListChecks,
     },
     {
-      title: 'ポイント制度',
-      desc: 'WeeklyPoints / PairPoints で家事の可視化することで、パートナーが頑張りがわかります。',
+      title: '完了の見える化',
+      desc: '誰がどの家事を終えたかが履歴に残ります。ありがとうも送れます。',
       icon: CheckCircle,
     },
     {
@@ -116,7 +116,7 @@ export default function LandingPage() {
     },
     {
       title: 'プライベートでの使用',
-      desc: 'パートナー設定をおこなった後でも、タスク登録時にPrivateモードをONにすることで、パートナーにタスクが見えなくなります。※Privateタスクはポイントに加算されません。',
+      desc: 'パートナー設定をおこなった後でも、タスク登録時にPrivateモードをONにすることで、パートナーにタスクが見えなくなります。',
       icon: Crown,
       // detail: (
       //   <div className="mt-3 space-y-3">
@@ -137,7 +137,7 @@ export default function LandingPage() {
       title: 'ふたりで使い始めるにはどうすればいいですか？',
       detail: (
         <p className="text-gray-700 leading-relaxed text-[14px] mt-1">
-          ホーム画面、またはプロフィール画面で招待コードを発行し、相手が承認することでペアが確定します。確定後はタスク・TODO・ポイントが共有され、お互いに編集できます。<br />
+          ホーム画面、またはプロフィール画面で招待コードを発行し、相手が承認することでペアが確定します。確定後はタスクとTODOが共有され、お互いに編集できます。<br />
           ※個人で作成していたタスクは共有されませんので、共有したい場合はタスクの編集より、Privateモードをオフにしてください。
         </p>
       ),
@@ -150,18 +150,13 @@ export default function LandingPage() {
     },
     {
       title: 'ペアを解除したらデータはどうなりますか？',
-      desc: '解除後はプライベートタスク・TODOは保持されますが、共有タスクは削除されます。また、ポイントは使用できなくなります。',
+      desc: '解除後はプライベートタスク・TODOは保持されますが、共有タスクは削除されます。',
       icon: User,
     },
     {
       title: '通知は何で届きますか？',
       desc: '現在はプッシュ通知に対応しています。週次または日付指定のタスクが送信の対象となります。時間指定をしているタスクは、指定時間の30分程度前に通知が届きます。',
       icon: BellRing,
-    },
-    {
-      title: 'ポイント機能はどのように使用すればいいですか？',
-      desc: '家事の偏りが見え、話し合いの材料にできます。',
-      icon: CheckCircle,
     },
     {
       title: '対応環境は？インストールできますか？',
@@ -186,7 +181,7 @@ export default function LandingPage() {
     },
     {
       title: '料金やプレミアム機能はありますか？',
-      desc: '応援プラン（Google Play の月額定期購入）にご加入いただくと、アプリ内の案内表示が非表示になります。料金は購入画面の表示に従います。基本機能は無料のまま利用できます。',
+      desc: '家事・リスト・ペア共有は無料です。応援プラン（Google Play の月額）に加入すると、アプリ内の案内と広告が非表示になります。料金は購入画面の表示に従います。',
       icon: Crown,
     },
     // {
@@ -258,7 +253,7 @@ export default function LandingPage() {
           </h2>
           <p className="text-gray-600 text-[15px] md:text-[17px] leading-relaxed max-w-2xl mx-auto mt-4">
             PairKajiは、ふたりの家事を「見える化」して、気持ちよく分担できるようにするアプリ。
-            タスク、TODO、ポイント管理をスマホでもPCでもサクサク操作。
+            タスクとTODOの管理をスマホでもPCでもサクサク操作。
           </p>
 
           {/* <div className="flex justify-center gap-3 mt-7">

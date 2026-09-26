@@ -671,12 +671,6 @@ export default function TodoTaskCard({
                 <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
                   {finalFilteredTodos.map((todo) => {
                     const hasMemo = typeof todo.memo === 'string' && todo.memo.trim() !== '';
-                    const hasShopping =
-                      category === '買い物' &&
-                      ((typeof todo.price === 'number' && Number.isFinite(todo.price) && (todo.price ?? 0) > 0) ||
-                        (typeof todo.quantity === 'number' &&
-                          Number.isFinite(todo.quantity) &&
-                          (todo.quantity ?? 0) > 0));
                     const hasImage = typeof todo.imageUrl === 'string' && todo.imageUrl.trim() !== '';
 
                     const hasReferenceUrls =
@@ -704,7 +698,6 @@ export default function TodoTaskCard({
 
                     const hasContentForIcon =
                       hasMemo ||
-                      hasShopping ||
                       hasImage ||
                       hasReferenceUrls ||
                       hasChecklist;
