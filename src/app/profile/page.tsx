@@ -56,6 +56,15 @@ import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import HelpHintsToggle from '@/components/common/HelpHintsToggle';
 import { useUserPlan } from '@/hooks/useUserPlan';
 
+function partnerUidFromPair(pair: Pair, uid: string): string {
+  const ids = Array.isArray(pair.userIds) ? pair.userIds : [];
+  const other = ids.find((id) => id && id !== uid);
+  if (other) return other;
+  if (pair.userAId && pair.userAId !== uid) return pair.userAId;
+  if (pair.userBId && pair.userBId !== uid) return pair.userBId;
+  return '';
+}
+
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -73,6 +82,8 @@ export default function ProfilePage() {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
+  const [partnerUid, setPartnerUid] = useState('');
+  const [partnerName, setPartnerName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [pairBusy, setPairBusy] = useState(false);
@@ -213,6 +224,7 @@ export default function ProfilePage() {
           setPartnerEmail(pair.emailB ?? '');
           setPairDocId(pairDoc.id);
           setIsPairConfirmed(pair.status === 'confirmed');
+          setPartnerUid(pair.status === 'confirmed' ? partnerUidFromPair(pair, uid) : '');
 
           if (pair.partnerImageUrl) {
             setPartnerImage(pair.partnerImageUrl);
@@ -230,6 +242,7 @@ export default function ProfilePage() {
           setPartnerEmail('');
           setPairDocId(null);
           setIsPairConfirmed(false);
+          setPartnerUid('');
           setPartnerImage(null);
           if (typeof window !== 'undefined') {
             localStorage.removeItem('partnerImage');
@@ -282,6 +295,7 @@ export default function ProfilePage() {
           setPartnerEmail(pair.emailB ?? '');
           setPairDocId(pairDoc.id);
           setIsPairConfirmed(pair.status === 'confirmed');
+          setPartnerUid(pair.status === 'confirmed' ? partnerUidFromPair(pair, uid) : '');
 
           if (pair.partnerImageUrl) {
             setPartnerImage(pair.partnerImageUrl);
@@ -299,6 +313,7 @@ export default function ProfilePage() {
           setPartnerEmail('');
           setPairDocId(null);
           setIsPairConfirmed(false);
+          setPartnerUid('');
           setPartnerImage(null);
           if (typeof window !== 'undefined') {
             localStorage.removeItem('partnerImage');
@@ -335,6 +350,22 @@ export default function ProfilePage() {
     };
   }, [uid, email]);
 
+  useEffect(() => {
+    if (!partnerUid) {
+      setPartnerName('');
+      return;
+    }
+    const unsub = onSnapshot(
+      doc(db, 'users', partnerUid),
+      (snap) => {
+        const raw = snap.data()?.name;
+        setPartnerName(typeof raw === 'string' ? raw.trim() : '');
+      },
+      () => setPartnerName('')
+    );
+    return () => unsub();
+  }, [partnerUid]);
+
   const handleSendInvite = async () => {
     setPairBusy(true);
     try {
@@ -354,7 +385,7 @@ export default function ProfilePage() {
     try {
       await joinPairByCode(joinCode);
       toast.success('パートナーとつながりました', {
-        description: 'ホームから、最初の家事を追加できます。',
+        description: 'ホームから、最初のタスクを追加できます。',
       });
       setJoinCode('');
       setIsPairConfirmed(true);
@@ -372,7 +403,7 @@ export default function ProfilePage() {
     try {
       await acceptIncomingPairInvite(pendingApproval.pairId);
       toast.success('ペア設定を承認しました', {
-        description: 'ホームから、最初の家事を追加できます。',
+        description: 'ホームから、最初のタスクを追加できます。',
       });
       setIsPairConfirmed(true);
       setPendingApproval(null);
@@ -416,6 +447,7 @@ export default function ProfilePage() {
           toast.success('ペアを解除しました');
           setIsPairConfirmed(false);
           setPartnerEmail('');
+          setPartnerUid('');
           setInviteCode('');
           setPairDocId(null);
         } catch (_err: unknown) {
@@ -502,7 +534,8 @@ export default function ProfilePage() {
                 isPairLoading={isPairLoading}
                 pendingApproval={pendingApproval}
                 isPairConfirmed={isPairConfirmed}
-                partnerEmail={partnerEmail}
+                partnerEmail={partnerEmail && partnerEmail !== email ? partnerEmail : ''}
+                partnerName={partnerName}
                 partnerImage={partnerImage ?? '/images/default.png'}
                 inviteCode={inviteCode}
                 pairDocId={pairDocId}

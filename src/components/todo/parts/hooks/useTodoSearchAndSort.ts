@@ -6,6 +6,8 @@ export type SimpleTodo = {
   id: string;
   text: string;
   done: boolean;
+  /** 完了した日（日本時間の YYYY-MM-DD） */
+  completedAt?: string | null;
   memo?: string | null;
   imageUrl?: string | null;
   referenceUrls?: Array<string | null>;
@@ -31,6 +33,12 @@ export const useCategoryIcon = (category?: string | null) => {
     };
   }, [category]);
 };
+
+function completedYmd(todo: SimpleTodo): string | null {
+  const value = todo.completedAt;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  return value;
+}
 
 const todoMatchesQuery = (todo: SimpleTodo, q: string) => {
   const nameHit = normalizeJP(todo.text).includes(q);
@@ -71,9 +79,20 @@ export const useTodoSearchAndSort = ({
 
   const finalFilteredTodos = useMemo(() => {
     const q = normalizeJP(searchQuery.trim());
-    if (q === '') return baseFilteredByTab;
-    return baseFilteredByTab.filter((todo) => todoMatchesQuery(todo, q));
-  }, [baseFilteredByTab, searchQuery]);
+    const filtered = q === '' ? baseFilteredByTab : baseFilteredByTab.filter((todo) => todoMatchesQuery(todo, q));
+    if (tab !== 'done') return filtered;
+    return filtered
+      .map((todo, index) => ({ todo, index }))
+      .sort((a, b) => {
+        const ad = completedYmd(a.todo);
+        const bd = completedYmd(b.todo);
+        if (ad && bd && ad !== bd) return ad < bd ? 1 : -1;
+        if (ad && !bd) return -1;
+        if (!ad && bd) return 1;
+        return a.index - b.index;
+      })
+      .map((row) => row.todo);
+  }, [baseFilteredByTab, searchQuery, tab]);
 
   const isFilteredView = useMemo(
     () => finalFilteredTodos.length < baseFilteredByTab.length,

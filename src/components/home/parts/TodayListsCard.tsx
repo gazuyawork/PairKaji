@@ -53,7 +53,7 @@ export default function TodayListsCard() {
             >
               <ListTodo className="h-5 w-5 shrink-0 text-blue-600" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold text-[#5E5E5E]">{task.name}</span>
+                <span className="block truncate text-sm font-semibold text-[#5E5E5E]">{task.name}</span>
                 <span className="block text-xs text-gray-500">{listLabel(task)}</span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />

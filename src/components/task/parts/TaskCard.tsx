@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, Notebook, SquareUser, MoreVertical } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, Notebook, SquareUser, MoreVertical, Hourglass, List } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo, memo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -13,6 +13,8 @@ import clsx from 'clsx';
 import { useView } from '@/context/ViewContext';
 import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { toast } from 'sonner';
+import { setTaskHeld } from '@/lib/taskUtils';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import SlideUpModal from '@/components/common/modals/SlideUpModal';
 import LinkifiedText from '@/components/common/LinkifiedText';
@@ -79,7 +81,6 @@ function TaskCard({
 
   const cardRef = useRef<HTMLDivElement | null>(null);
 
-  const [animateTrigger, setAnimateTrigger] = useState(0);
   const [showActions, setShowActions] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(true);
   const [swipeDirection, setSwipeDirection] = useState<'right' | null>(null);
@@ -90,7 +91,8 @@ function TaskCard({
   // 備考モーダル開閉
   const [showNote, setShowNote] = useState(false);
 
-  const noteText = (task as TaskWithNote).note?.trim();
+  const noteRaw = (task as TaskWithNote).note;
+  const noteText = typeof noteRaw === 'string' ? noteRaw.trim() : '';
   const showOnTodo = taskShowsOnTodoTab(task);
 
   useEffect(() => {
@@ -110,22 +112,41 @@ function TaskCard({
   }, [task.users, userList]);
 
   const sortedDays = useMemo(() => {
-    if (!task.daysOfWeek) return [];
+    if (!Array.isArray(task.daysOfWeek)) return [];
     const order = ['0', '1', '2', '3', '4', '5', '6'];
-    return [...task.daysOfWeek].sort(
-      (a, b) => order.indexOf(dayKanjiToNumber[a]) - order.indexOf(dayKanjiToNumber[b])
+    return task.daysOfWeek.slice().sort(
+      (a, b) => order.indexOf(dayKanjiToNumber[a] ?? '') - order.indexOf(dayKanjiToNumber[b] ?? '')
     );
   }, [task.daysOfWeek]);
 
   // 日付/時間の表示用フォーマッタ
   const dateStr = useMemo(() => {
     const d = task.dates?.[0];
-    if (!d) return '';
+    if (typeof d !== 'string' || !d) return '';
     // YYYY-MM-DD -> MM/DD
     return d.replace(/-/g, '/').slice(5);
   }, [task.dates]);
 
-  const timeStr = /^\d{1,2}:\d{2}$/.test((task.time || '').trim()) ? (task.time || '').trim() : '';
+  const timeRaw = typeof task.time === 'string' ? task.time.trim() : '';
+  const timeStr = /^\d{1,2}:\d{2}$/.test(timeRaw) ? timeRaw : '';
+
+  const holdBusyRef = useRef(false);
+  const toggleHold = async () => {
+    if (holdBusyRef.current) return;
+    holdBusyRef.current = true;
+    const nextHeld = task.held !== true;
+    try {
+      await setTaskHeld(task.id, nextHeld);
+      toast.success(nextHeld ? '保留にしました' : '再開しました');
+      setShowActions(false);
+      setShowActionButtons(false);
+    } catch (error) {
+      console.error('保留の更新エラー:', error);
+      toast.error(nextHeld ? '保留に失敗しました' : '再開に失敗しました');
+    } finally {
+      holdBusyRef.current = false;
+    }
+  };
 
   const toggleFlag = async () => {
     if (task.done) return;
@@ -164,13 +185,14 @@ function TaskCard({
 
   const handleClick = async () => {
     if (showActions) return;
+    if (task.held) {
+      toast.info('保留中です');
+      return;
+    }
     const wasDone = !!task.done;
     const ok = await onToggleDone(period, task.id);
     if (ok === false) return;
-    if (!wasDone) {
-      setAnimateTrigger((prev) => prev + 1);
-      setLocalDone(true);
-    }
+    if (!wasDone) setLocalDone(true);
   };
 
   const handleDelete = () => {
@@ -224,7 +246,7 @@ function TaskCard({
 
       {showActions && showActionButtons && swipeDirection === null && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             {/* 削除 */}
             <button
               onClick={(e) => {
@@ -235,6 +257,25 @@ function TaskCard({
               title="削除"
             >
               <Trash2 className="w-5 h-5" />
+            </button>
+
+            {/* 保留 */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void toggleHold();
+              }}
+              className={clsx(
+                'w-12 h-12 rounded-full shadow ring-offset-1 flex items-center justify-center text-white transition-all duration-150',
+                task.held
+                  ? 'bg-gradient-to-b from-amber-300 to-amber-500 ring-1 ring-amber-300'
+                  : 'bg-gray-300 ring-1 ring-gray-300'
+              )}
+              title={task.held ? '再開' : '保留'}
+              aria-label={task.held ? '再開' : '保留'}
+            >
+              <Hourglass className="w-5 h-5" />
             </button>
 
             {/* フラグ */}
@@ -278,25 +319,25 @@ function TaskCard({
           setSwipeDirection(null);
         }}
         className={clsx(
-          'w-full relative flex items-center gap-1 overflow-hidden px-2 py-2 [touch-action:pan-y] min-h-[58px]',
+          'w-full relative flex items-center gap-1 overflow-hidden px-2 py-1.5 [touch-action:pan-y] min-h-[52px]',
           'group text-[#5E5E5E]',
           'rounded-xl border border-gray-200 border-[#e5e5e5]',
           'bg-gradient-to-b from-white to-gray-50 bg-white',
           'shadow-[0_2px_1px_rgba(0,0,0,0.08)] hover:shadow-md',
-          'transition-all duration-300',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCB7D]/50',
-          task.done && 'opacity-50 scale-[0.99]',
+          task.done && 'opacity-50',
           isDragging && 'opacity-70',
           highlighted && 'ring-2 ring-[#FFCB7D] border-[#FFCB7D] shadow-[0_0_0_3px_rgba(255,203,125,0.35)]'
         )}
       >
         {showOnTodo && (
           <div
-            className="pointer-events-none absolute top-0 left-0 z-10 flex h-[30px] w-[30px] items-center justify-center bg-gradient-to-br from-blue-400 to-blue-600 text-[11px] font-bold text-white shadow-inner ring-1 ring-white/40"
+            className="pointer-events-none absolute top-0 left-0 z-10 flex h-[30px] w-[30px] items-center justify-center bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-inner ring-1 ring-white/40"
             style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
-            aria-hidden
+            role="img"
+            aria-label="リスト"
           >
-            <span className="translate-x-[-4px] translate-y-[-6px]">T</span>
+            <List className="h-3 w-3 translate-x-[-7px] translate-y-[-7px]" strokeWidth={2.5} aria-hidden />
           </div>
         )}
 
@@ -306,13 +347,16 @@ function TaskCard({
             e.stopPropagation();
             handleClick();
           }}
-          className="flex h-10 w-10 shrink-0 items-center justify-center"
-          aria-label={localDone ? '完了を取り消す' : '完了する'}
+          className={clsx(
+            'flex h-10 w-10 shrink-0 items-center justify-center',
+            task.held && 'opacity-40'
+          )}
+          aria-label={task.held ? '保留中' : localDone ? '完了を取り消す' : '完了する'}
+          title={task.held ? '保留中' : undefined}
         >
           <div className="relative w-6 h-6">
             {localDone ? (
               <motion.div
-                key={animateTrigger}
                 className="absolute top-0 left-0 w-full h-full"
                 initial={{ rotate: 0, scale: 1 }}
                 animate={{ rotate: 360, scale: [1, 1.3, 1] }}
@@ -329,7 +373,21 @@ function TaskCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1 min-w-0">
             {task.flagged && <Flag className="text-red-500 w-4 h-4 shrink-0" />}
-            <span className="text-[#5E5E5E] font-bold font-sans truncate">{task.name}</span>
+            <span className="truncate font-sans text-sm font-bold text-[#5E5E5E]">{task.name}</span>
+            {task.held && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void toggleHold();
+                }}
+                className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold leading-none text-gray-500"
+                aria-label="保留を解除"
+                title="保留を解除"
+              >
+                保留
+              </button>
+            )}
           </div>
           <div className="mt-0.5 flex items-center gap-1 min-w-0">
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[11px] text-gray-600">
@@ -376,9 +434,9 @@ function TaskCard({
                 e.stopPropagation();
                 setShowNote(true);
               }}
-              className="p-1.5 rounded-full"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-yellow-500 transition-colors hover:bg-gray-200 active:bg-gray-300"
             >
-              <Notebook className="w-5 h-5 text-yellow-500" />
+              <Notebook className="h-[18px] w-[18px]" />
             </button>
           )}
           {task.private && isPairConfirmed ? (
@@ -396,6 +454,20 @@ function TaskCard({
               draggable={false}
             />
           )}
+          {showOnTodo && (
+            <button
+              type="button"
+              title="リスト"
+              aria-label="リストを開く"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTodoClick();
+              }}
+              className="pc-only-list-btn h-8 items-center justify-center rounded-lg bg-gradient-to-b from-blue-300 to-blue-500 px-2 text-xs font-bold text-white shadow-sm"
+            >
+              リスト
+            </button>
+          )}
           <button
             type="button"
             title="編集・削除"
@@ -404,7 +476,7 @@ function TaskCard({
               e.stopPropagation();
               openActions();
             }}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-gray-400 active:bg-gray-100"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 active:bg-gray-100"
           >
             <MoreVertical className="h-4 w-4" />
           </button>

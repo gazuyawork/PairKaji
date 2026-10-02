@@ -7,7 +7,7 @@ import { dayNumberToName } from '@/lib/constants';
 import { useRef, useState, useMemo, useLayoutEffect, type ReactNode, type TouchEvent } from 'react';
 import { ja } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronRight, Circle } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Circle, CheckCircle } from 'lucide-react';
 import HelpPopover from '@/components/common/HelpPopover';
 import { useView } from '@/context/ViewContext';
 import { useHousehold } from '@/context/HouseholdContext';
@@ -15,6 +15,12 @@ import { toggleTaskDoneStatus } from '@/lib/firebaseUtils';
 import { countUndoneTodos } from '@/lib/checklistTask';
 import { isTaskScheduledToday } from '@/lib/todayTask';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
+
+function safeParseISO(value: unknown): Date | null {
+  if (typeof value !== 'string' || value.length < 8) return null;
+  const parsed = parseISO(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 // ✅ TaskCalendar専用型（軽量）
 type CalendarTask = {
@@ -24,6 +30,7 @@ type CalendarTask = {
   dates?: string[];      // 'YYYY-MM-DD' などの ISO 文字列想定
   daysOfWeek?: string[]; // dayNumberToName の値に一致する曜日文字列
   done: boolean;         // 完了フラグ
+  held?: boolean;
   opensTodo?: boolean;
   point?: number;
   person?: string;
@@ -45,11 +52,19 @@ function periodKindForDay(
 ): PeriodKind {
   const isWeeklyTask =
     task.period === '週次' &&
-    task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
-  const isDateTask = task.dates?.some((dateStr) => isSameDay(parseISO(dateStr), day));
+    Array.isArray(task.daysOfWeek) &&
+    task.daysOfWeek.includes(dayNumberToName[String(day.getDay())]);
+  const isDateTask = Array.isArray(task.dates) && task.dates.some((dateStr) => {
+    const parsed = safeParseISO(dateStr);
+    return parsed ? isSameDay(parsed, day) : false;
+  });
   const isOverdue =
     task.period === '不定期' &&
-    (task.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false) &&
+    Array.isArray(task.dates) &&
+    task.dates.some((dateStr) => {
+      const parsed = safeParseISO(dateStr);
+      return parsed ? isBefore(parsed, startToday) : false;
+    }) &&
     isSameDay(day, today);
   if (isOverdue) return 'overdue';
   if (isWeeklyTask) return 'weekly';
@@ -128,6 +143,7 @@ export default function TaskCalendar({ tasks }: Props) {
   const startToday = startOfDay(today);
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [holdingDoneIds, setHoldingDoneIds] = useState<Set<string>>(() => new Set());
   const [leftoverConfirm, setLeftoverConfirm] = useState<CalendarTask | null>(null);
   const todayRemaining = useMemo(() => {
     return tasks.filter((task) => isTaskScheduledToday(task) && task.done !== true).length;
@@ -163,6 +179,11 @@ export default function TaskCalendar({ tasks }: Props) {
       return;
     }
     setCompletingId(task.id);
+    setHoldingDoneIds((prev) => {
+      const next = new Set(prev);
+      next.add(task.id);
+      return next;
+    });
     try {
       await toggleTaskDoneStatus(
         task.id,
@@ -174,6 +195,14 @@ export default function TaskCalendar({ tasks }: Props) {
     } finally {
       setCompletingId(null);
       setLeftoverConfirm(null);
+      window.setTimeout(() => {
+        setHoldingDoneIds((prev) => {
+          if (!prev.has(task.id)) return prev;
+          const next = new Set(prev);
+          next.delete(task.id);
+          return next;
+        });
+      }, 450);
     }
   };
 
@@ -193,9 +222,9 @@ export default function TaskCalendar({ tasks }: Props) {
   // ===== ▲▲ ここまで ▲▲ =====
 
   const itemVariants = {
-    initial: { opacity: 0, scale: 0.98, y: -4 },
-    animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.15 } },
-    exit: { opacity: 0, scale: 0.98, y: -4, transition: { duration: 0.12 } },
+    initial: { opacity: 1 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0, transition: { duration: 0.12 } },
   };
 
   // 当日列だけ完了状態を反映する
@@ -208,7 +237,7 @@ export default function TaskCalendar({ tasks }: Props) {
     <div className="bg-white mx-auto w-full max-w-xl p-4 rounded-xl text-center shadow-md border border-[#e5e5e5]">
       <h2 className="text-base font-bold text-[#5E5E5E] mb-4 text-center">
         <span className="inline-flex items-center gap-1 align-middle">
-          今日の家事
+          今日のタスク
           {todayRemaining > 0 ? ` · 残り ${todayRemaining}` : ''}
           <HelpPopover
             className="ml-1"
@@ -218,7 +247,7 @@ export default function TaskCalendar({ tasks }: Props) {
             offsetX={-30}
             content={
               <div className="space-y-2 text-sm">
-                <p>今日の家事は5件まで表示します。それを超える分は、枠の中をスクロールして確認できます。左の丸で完了できます。名前をタップすると、リスト付きはリスト、それ以外は家事タブが開きます。</p>
+                <p>今日のタスクは5件まで表示します。それを超える分は、枠の中をスクロールして確認できます。左の丸で完了できます。名前をタップすると、リスト付きはリスト、それ以外はタスク画面が開きます。</p>
                 {/* <ul className="list-disc pl-5 space-y-1">
                   <li>並び順は「期限切れ → 毎日 → 週次 → 不定期」、同カテゴリ内は50音順です。</li>
                 </ul> */}
@@ -242,19 +271,25 @@ export default function TaskCalendar({ tasks }: Props) {
             //  2) ＋ 不定期の期限切れ（今日より前の期日がある）は「今日の列」に表示
             //  3) ★ 当日列だけ完了フラグを反映して非表示にする（他日は表示）
             const dailyTasks = tasks.filter((task) => {
+              if (task.held) return false;
               if (isSameDay(day, today)) {
-                return isTaskScheduledToday(task) && !isDoneOnThisDay(task, day);
+                return (
+                  isTaskScheduledToday(task) &&
+                  (!isDoneOnThisDay(task, day) || holdingDoneIds.has(task.id))
+                );
               }
 
               const isDaily = task.period === '毎日';
 
-              const isDateTask = task.dates?.some((dateStr) =>
-                isSameDay(parseISO(dateStr), day)
-              );
+              const isDateTask = Array.isArray(task.dates) && task.dates.some((dateStr) => {
+                const parsed = safeParseISO(dateStr);
+                return parsed ? isSameDay(parsed, day) : false;
+              });
 
               const isWeeklyTask =
                 task.period === '週次' &&
-                task.daysOfWeek?.includes(dayNumberToName[String(day.getDay())]);
+                Array.isArray(task.daysOfWeek) &&
+                task.daysOfWeek.includes(dayNumberToName[String(day.getDay())]);
 
               return (isDaily || isDateTask || isWeeklyTask) && !isDoneOnThisDay(task, day);
             });
@@ -268,12 +303,18 @@ export default function TaskCalendar({ tasks }: Props) {
               .sort((a, b) => {
                 const isOverdueA =
                   a.period === '不定期' &&
-                  (a.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false) &&
+                  (Array.isArray(a.dates) && a.dates.some((dateStr) => {
+                    const parsed = safeParseISO(dateStr);
+                    return parsed ? isBefore(parsed, startToday) : false;
+                  })) &&
                   isSameDay(day, today);
 
                 const isOverdueB =
                   b.period === '不定期' &&
-                  (b.dates?.some((dateStr) => isBefore(parseISO(dateStr), startToday)) ?? false) &&
+                  (Array.isArray(b.dates) && b.dates.some((dateStr) => {
+                    const parsed = safeParseISO(dateStr);
+                    return parsed ? isBefore(parsed, startToday) : false;
+                  })) &&
                   isSameDay(day, today);
 
                 if (isOverdueA && !isOverdueB) return -1;
@@ -282,7 +323,7 @@ export default function TaskCalendar({ tasks }: Props) {
                 const pr = periodRank[a.period] - periodRank[b.period];
                 if (pr !== 0) return pr;
 
-                return collator.compare(a.name, b.name);
+                return collator.compare(String(a.name ?? ''), String(b.name ?? ''));
               });
 
             const hasTask = sortedTasks.length > 0;
@@ -293,9 +334,8 @@ export default function TaskCalendar({ tasks }: Props) {
             const listScrolls = sortedTasks.length > VIEWPORT_COUNT;
 
             return (
-              <motion.div
+              <div
                 key={dayKey}
-                layout
                 className={`${todayOnly ? 'w-full' : 'w-2/5 sm:w-[100px] flex-shrink-0'} rounded-lg p-2 min-h-[60px] border select-none ${colClass}`}
               >
 
@@ -304,16 +344,15 @@ export default function TaskCalendar({ tasks }: Props) {
                 </div>
                 <hr className="my-1 border-gray-300 opacity-40" />
 
-                <AnimatePresence initial={false} mode="popLayout">
+                <DayTaskListFrame listScrolls={listScrolls} itemCount={sortedTasks.length}>
+                <AnimatePresence initial={false}>
                   {hasTask ? (
-                    <DayTaskListFrame listScrolls={listScrolls} itemCount={sortedTasks.length}>
-                    {sortedTasks.map((task) => {
+                    sortedTasks.map((task) => {
                       const kind = periodKindForDay(task, day, today, startToday);
 
                       return (
                         <motion.div
                           key={task.id}
-                          layout
                           variants={itemVariants}
                           initial="initial"
                           animate="animate"
@@ -334,7 +373,11 @@ export default function TaskCalendar({ tasks }: Props) {
                               }}
                               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-400 active:bg-gray-100 disabled:opacity-50"
                             >
-                              <Circle className="h-6 w-6" />
+                              {task.done ? (
+                                <CheckCircle className="h-6 w-6 text-emerald-500" />
+                              ) : (
+                                <Circle className="h-6 w-6" />
+                              )}
                             </button>
                           )}
                           <button
@@ -359,8 +402,7 @@ export default function TaskCalendar({ tasks }: Props) {
                           </button>
                         </motion.div>
                       );
-                    })}
-                    </DayTaskListFrame>
+                    })
                   ) : (
                     <motion.div
                       key="no-task"
@@ -373,8 +415,9 @@ export default function TaskCalendar({ tasks }: Props) {
                     </motion.div>
                   )}
                 </AnimatePresence>
+                </DayTaskListFrame>
 
-              </motion.div>
+              </div>
             );
           })}
         </div>
@@ -431,7 +474,7 @@ export default function TaskCalendar({ tasks }: Props) {
         message={
           <>
             <div className="text-xl font-semibold mb-2">リストに未完了の項目が残っています</div>
-            <div className="text-sm text-gray-600">この家事を完了しても、残った項目はリストに残ります。</div>
+            <div className="text-sm text-gray-600">このタスクを完了しても、残った項目はリストに残ります。</div>
           </>
         }
         onConfirm={() => {

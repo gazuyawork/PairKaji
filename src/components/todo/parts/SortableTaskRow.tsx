@@ -77,7 +77,7 @@ export default function SortableTaskRow({ task, onClickTitle, onHide }: Props) {
         {/* 非表示ボタン（保存は親側で実行） */}
         <button
           type="button"
-          aria-label="このToDoカードを非表示にする"
+          aria-label="このリストを非表示にする"
           title="非表示（データは残ります）"
           className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600 transition"
           onClick={() => onHide(task.id)}

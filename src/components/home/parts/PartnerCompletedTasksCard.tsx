@@ -243,7 +243,7 @@ export default function PartnerCompletedTasksCard() {
             offsetX={-30} 
             content={
               <div className="space-y-2 text-sm">
-                <p>パートナーが完了した家事です。ハートで「ありがとう」を送れます。はじめは3件まで表示します。</p>
+                <p>パートナーが完了したタスクです。ハートで「ありがとう」を送れます。はじめは3件まで表示します。</p>
               </div>
             }
           />

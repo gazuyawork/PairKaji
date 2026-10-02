@@ -97,6 +97,8 @@ export const resetCompletedTasks = async (): Promise<number> => {
   for (const docSnap of snapshot.docs) {
     const raw = docSnap.data() as FirestoreTaskRaw;
 
+    if ((raw as { held?: unknown }).held === true) continue;
+
     const period = typeof raw.period === 'string' ? raw.period : undefined;
     const skipped = raw.skipped === true;
 

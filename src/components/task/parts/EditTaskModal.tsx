@@ -146,14 +146,12 @@ function OptionalTimeField({
   onChange: (next: string) => void;
 }) {
   const parsed = parseHm(value);
-  const [picking, setPicking] = useState(() => Boolean(parsed));
   const [hour, setHour] = useState(parsed?.h ?? '');
   const [minute, setMinute] = useState(parsed?.m ?? '');
 
   useEffect(() => {
     const next = parseHm(value);
     if (next) {
-      setPicking(true);
       setHour(next.h);
       setMinute(next.m);
       return;
@@ -167,7 +165,6 @@ function OptionalTimeField({
   const clear = () => {
     setHour('');
     setMinute('');
-    setPicking(false);
     onChange('');
   };
 
@@ -232,6 +229,23 @@ function OptionalTimeField({
       </button>
     </div>
   );
+}
+
+function sameTaskName(a: unknown, b: unknown): boolean {
+  const left = typeof a === 'string' ? a.trim() : '';
+  const right = typeof b === 'string' ? b.trim() : '';
+  return left.length > 0 && left === right;
+}
+
+/** いま開いているタスク以外に、同じ名前が既にあるか */
+function hasDuplicateTaskName(
+  name: string,
+  excludeId: string | undefined,
+  tasks: Task[],
+  skip: boolean
+): boolean {
+  if (skip) return false;
+  return tasks.some((t) => t.id !== excludeId && sameTaskName(t.name, name));
 }
 
 export default function EditTaskModal({
@@ -363,10 +377,13 @@ export default function EditTaskModal({
     setShowMore(!isNew && hasAdvanced);
 
     if (!isNew) return;
-    const timer = window.setTimeout(() => {
-      nameInputRef.current?.focus();
-    }, 50);
-    return () => window.clearTimeout(timer);
+    const focusName = () => nameInputRef.current?.focus();
+    const timer = window.setTimeout(focusName, 50);
+    const later = window.setTimeout(focusName, 300);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(later);
+    };
   }, [isOpen, (task as { id?: string }).id, isPairConfirmed]);
 
   // body スクロール制御
@@ -498,22 +515,15 @@ export default function EditTaskModal({
     }
 
     const editedUsers = Array.isArray(editedTask.users) ? editedTask.users : [];
-    const isDuplicate = existingTasks.some(
-      (t) =>
-        t.name === editedTask.name &&
-        t.id !== editedTask.id &&
-        Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
-        ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
-          editedUsers.includes(uid)
-        )
-    );
 
     const currentUid = auth.currentUser?.uid;
     const originalOwner = (task as unknown as { userId?: string }).userId;
     const shouldForkPrivate =
       isPrivate && !!task.id && !!originalOwner && !!currentUid && originalOwner !== currentUid;
 
-    if (!shouldForkPrivate && isDuplicate) {
+    if (
+      hasDuplicateTaskName(editedTask.name ?? '', task.id, existingTasks, shouldForkPrivate)
+    ) {
       setNameError('すでに登録済みです。');
       return;
     }
@@ -572,15 +582,20 @@ export default function EditTaskModal({
       console.error(e);
       setIsSaving(false);
       setSaveComplete(false);
+      savingRef.current = false;
+      const message = e instanceof Error ? e.message : '';
+      if (message.includes('同名') || message.includes('すでに登録')) {
+        setNameError('すでに登録済みです。');
+        return;
+      }
       const timedOut = e instanceof Error && e.message === 'save-timeout';
       toast.error(
         timedOut
           ? '保存に時間がかかっています。通信状況を確認してもう一度お試しください。'
-          : e instanceof Error && e.message
-            ? e.message
+          : message
+            ? message
             : 'タスクの保存に失敗しました'
       );
-      savingRef.current = false;
     }
   }, [editedTask, existingTasks, isPrivate, onSave, task, calendarSync]);
 
@@ -636,12 +651,12 @@ export default function EditTaskModal({
             <input
               ref={nameInputRef}
               type="text"
+              autoFocus={!(task as { id?: string }).id}
               value={editedTask.name}
               onChange={(e) => {
                 const newName = e.target.value;
                 update('name', newName as TaskWithNote['name']);
 
-                const editedUsersInner = Array.isArray(editedTask.users) ? editedTask.users : [];
                 const currentUid = auth.currentUser?.uid;
                 const originalOwner = (task as unknown as { userId?: string }).userId;
                 const shouldForkPrivate =
@@ -651,18 +666,12 @@ export default function EditTaskModal({
                   !!currentUid &&
                   originalOwner !== currentUid;
 
-                // 即時チェックも、複製モード時はスキップ
-                const dup = shouldForkPrivate
-                  ? false
-                  : existingTasks.some(
-                      (t) =>
-                        t.name === newName &&
-                        t.id !== (task as unknown as { id?: string }).id &&
-                        Array.isArray((t as unknown as { userIds?: string[] }).userIds) &&
-                        ((t as unknown as { userIds?: string[] }).userIds ?? []).some((uid) =>
-                          editedUsersInner.includes(uid)
-                        )
-                    );
+                const dup = hasDuplicateTaskName(
+                  newName,
+                  (task as { id?: string }).id,
+                  existingTasks,
+                  shouldForkPrivate
+                );
                 setNameError(dup ? 'すでに登録済みです。' : null);
               }}
               className="min-h-12 w-full rounded-xl border border-gray-200 px-3 text-base outline-none text-[#5E5E5E] focus:ring-2 focus:ring-gray-200"
@@ -714,7 +723,7 @@ export default function EditTaskModal({
               content={
                 <div className="space-y-2">
                   <p>履歴の負担は、完了した回数にこの重さを掛けて、完了した人に付きます。</p>
-                  <p>未設定の家事は中として扱います。</p>
+                  <p>未設定のタスクは中として扱います。</p>
                 </div>
               }
             />
@@ -891,7 +900,7 @@ export default function EditTaskModal({
                   <HelpPopover
                     content={
                       <div className="space-y-2">
-                        <p>一覧では、担当が1人の家事だけ画像を出します。</p>
+                        <p>一覧では、担当が1人のタスクだけ画像を出します。</p>
                         <p>履歴の負担は、担当ではなく完了した人に付きます。</p>
                         <ul className="list-disc pl-5 space-y-1">
                           <li>選択していない場合、一覧にはアイコンを出しません。</li>

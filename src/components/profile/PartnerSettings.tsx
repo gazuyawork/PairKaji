@@ -25,6 +25,7 @@ type PartnerSettingsProps = {
   onJoinByCode: () => void;
   onRemovePair: () => void;
   partnerImage: string;
+  partnerName?: string;
   isRemoving: boolean;
   busy?: boolean;
 };
@@ -45,6 +46,7 @@ export default function PartnerSettings({
   onJoinByCode,
   onRemovePair,
   partnerImage,
+  partnerName = '',
   isRemoving,
   busy = false,
 }: PartnerSettingsProps) {
@@ -93,8 +95,9 @@ export default function PartnerSettings({
                   />
                 </div>
                 <div className="min-w-0 text-[#5E5E5E]">
-                  <p className="font-semibold">つながっています</p>
-                  <p className="truncate text-sm">{partnerEmail}</p>
+                  <p className="truncate font-semibold">{partnerName || 'パートナー'}</p>
+                  <p className="text-xs text-gray-500">つながっています</p>
+                  {partnerEmail ? <p className="truncate text-sm">{partnerEmail}</p> : null}
                 </div>
               </div>
               <button

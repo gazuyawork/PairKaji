@@ -43,10 +43,11 @@ export const mapFirestoreDocToTask = (
     point: data.point ?? 0,
     burden: burdenWeight((data as { burden?: unknown }).burden),
     done: data.done ?? false,
+    held: (data as { held?: unknown }).held === true,
     completedAt: data.completedAt ?? null,
     completedBy: data.completedBy ?? '',
     person: user,
-    daysOfWeek: (data.daysOfWeek ?? []).map((code: string | number) => {
+    daysOfWeek: (Array.isArray(data.daysOfWeek) ? data.daysOfWeek : []).map((code: string | number) => {
       if (typeof code === 'string') {
         const head = code.trim()[0];
         if (head && '日月火水木金土'.includes(head)) return head;

@@ -79,7 +79,7 @@ const LEGACY_DEFAULT_SLIDES: Array<{ src: string; title?: string; description?: 
     src: '/onboarding/slide1.png',
     title: 'ようこそ PairKaji へ',
     description:
-      'タスクを2人でシェアして、家事をもっとスムーズに。最初に基本の動線だけチェックしましょう。',
+      'タスクを2人でシェアして、分担をもっとスムーズに。最初に基本の動線だけチェックしましょう。',
   },
   {
     src: '/onboarding/slide2.png',
@@ -101,7 +101,7 @@ const DEFAULT_PAGES: SlidePage[] = [
     blocks: [
       {
         description:
-          'タスクを2人でシェアして、家事をもっとスムーズに。最初に基本の動線だけチェックしましょう。',
+          'タスクを2人でシェアして、分担をもっとスムーズに。最初に基本の動線だけチェックしましょう。',
         src: '/onboarding/slide1.png',
       },
     ],

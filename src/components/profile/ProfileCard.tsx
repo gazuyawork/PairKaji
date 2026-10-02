@@ -6,8 +6,9 @@ import { motion } from 'framer-motion';
 import { db, auth } from '@/lib/firebase';
 import { uploadProfileImage } from '@/lib/firebaseUtils';
 import { Check, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import ProfileImageAdjustModal from '@/components/profile/ProfileImageAdjustModal';
 
 type ProfileCardProps = {
   profileImage: string | null;
@@ -48,6 +49,37 @@ export default function ProfileCard({
   };
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [adjustUrl, setAdjustUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadAdjusted = (file: File) => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error('ログイン状態が確認できません');
+      return;
+    }
+    setIsUploadingImage(true);
+    uploadProfileImage(user.uid, file, 'user')
+      .then((downloadUrl) => {
+        setProfileImage(downloadUrl);
+        return updateDoc(doc(db, 'users', user.uid), {
+          imageUrl: downloadUrl,
+          updatedAt: serverTimestamp(),
+        });
+      })
+      .catch((err) => {
+        console.error('画像アップロード失敗', err);
+        toast.error('プロフィール画像の更新に失敗しました');
+      })
+      .finally(() => {
+        setIsUploadingImage(false);
+      });
+  };
+
+  const closeAdjust = () => {
+    if (adjustUrl) URL.revokeObjectURL(adjustUrl);
+    setAdjustUrl(null);
+  };
 
   return (
     <motion.div
@@ -84,11 +116,13 @@ export default function ProfileCard({
               )}
 
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
+                  e.target.value = '';
                   if (!file) return;
 
                   if (!file.type.startsWith('image/')) {
@@ -101,30 +135,8 @@ export default function ProfileCard({
                     return;
                   }
 
-                  const user = auth.currentUser;
-                  if (!user) {
-                    toast.error('ログイン状態が確認できません');
-                    return;
-                  }
-
-                  setIsUploadingImage(true);
-
-                  uploadProfileImage(user.uid, file, 'user')
-                    .then((downloadUrl) => {
-                      setProfileImage(downloadUrl);
-                      // Firestore の imageUrl も更新
-                      return updateDoc(doc(db, 'users', user.uid), {
-                        imageUrl: downloadUrl,
-                        updatedAt: serverTimestamp(),
-                      });
-                    })
-                    .catch((err) => {
-                      console.error('画像アップロード失敗', err);
-                      toast.error('プロフィール画像の更新に失敗しました');
-                    })
-                    .finally(() => {
-                      setIsUploadingImage(false);
-                    });
+                  if (adjustUrl) URL.revokeObjectURL(adjustUrl);
+                  setAdjustUrl(URL.createObjectURL(file));
                 }}
               />
             </>
@@ -213,6 +225,16 @@ export default function ProfileCard({
           )}
         </div>
       </div>
+      {adjustUrl && (
+        <ProfileImageAdjustModal
+          imageUrl={adjustUrl}
+          onCancel={closeAdjust}
+          onConfirm={(file) => {
+            closeAdjust();
+            uploadAdjusted(file);
+          }}
+        />
+      )}
     </motion.div>
   );
 }

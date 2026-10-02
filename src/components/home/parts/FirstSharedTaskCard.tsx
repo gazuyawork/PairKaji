@@ -48,7 +48,7 @@ export default function FirstSharedTaskCard() {
       </button>
       <div className="flex items-center gap-2 mb-2">
         <ListTodo className="w-5 h-5 text-emerald-600" />
-        <p className="font-semibold text-gray-800">最初の家事を追加しましょう</p>
+        <p className="font-semibold text-gray-800">最初のタスクを追加しましょう</p>
       </div>
       <p className="text-sm text-gray-600 mb-4 leading-relaxed">
         つながった相手と、まずは1件だけ共有タスクを置くと、分担が始まります。
@@ -58,7 +58,7 @@ export default function FirstSharedTaskCard() {
         onClick={openNewTask}
         className="w-full min-h-11 bg-[#FFCB7D] text-white py-2 rounded-lg text-sm font-semibold"
       >
-        家事を追加する
+        タスクを追加する
       </button>
     </div>
   );

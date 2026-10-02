@@ -45,7 +45,6 @@ const PUBLIC_PATHS = new Set<string>([
   '/verify',
   '/terms',
   '/privacy',
-  '/landing',
   '/contact',
   '/pricing',
 ]);

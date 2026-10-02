@@ -141,7 +141,7 @@ export default function LoginClient() {
   if (checkingSession) {
     return (
       <div className="min-h-screen w-full bg-[#F5EADB] flex items-center justify-center px-4">
-        <div className="inline-flex items-center gap-2 text-neutral-700">
+        <div className="inline-flex items-center gap-2 text-neutral-700 dark:text-[#e4d9ce]">
           <LoadingSpinner size={18} />
           <span>確認中...</span>
         </div>
@@ -165,32 +165,33 @@ export default function LoginClient() {
               width={150}
               height={36}
               priority
+              className="dark:brightness-0 dark:invert"
             />
           </motion.div>
-          <div className="mt-2 text-sm text-neutral-700">ログイン</div>
+          <div className="mt-2 text-sm text-neutral-700 dark:text-[#e4d9ce]">ログイン</div>
         </div>
 
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="bg-white/70 backdrop-blur rounded-2xl shadow-sm border border-black/5 p-5"
+          className="bg-white/70 backdrop-blur rounded-2xl shadow-sm border border-black/5 dark:border-[#5a4e44] p-5"
         >
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-neutral-800 mb-1">メールアドレス</label>
+              <label className="block text-sm text-neutral-800 dark:text-[#f3ece4] mb-1">メールアドレス</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 autoComplete="email"
-                className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-base outline-none focus:ring-2 focus:ring-black/10"
+                className="w-full rounded-xl border border-black/10 dark:border-[#6a5e54] bg-[#fff] dark:bg-[#241c16] px-4 py-3 text-base text-neutral-900 dark:text-[#f3ece4] placeholder:text-neutral-400 dark:placeholder:text-[#a89888] outline-none focus:ring-2 focus:ring-black/10 dark:focus:ring-white/25"
               />
             </div>
 
             <div>
-              <label className="block text-sm text-neutral-800 mb-1">パスワード</label>
+              <label className="block text-sm text-neutral-800 dark:text-[#f3ece4] mb-1">パスワード</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -198,12 +199,12 @@ export default function LoginClient() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••"
                   autoComplete="current-password"
-                  className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 pr-12 text-base outline-none focus:ring-2 focus:ring-black/10"
+                  className="w-full rounded-xl border border-black/10 dark:border-[#6a5e54] bg-[#fff] dark:bg-[#241c16] px-4 py-3 pr-12 text-base text-neutral-900 dark:text-[#f3ece4] placeholder:text-neutral-400 dark:placeholder:text-[#a89888] outline-none focus:ring-2 focus:ring-black/10 dark:focus:ring-white/25"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-[#c0b3a6]"
                   aria-label="toggle password visibility"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -232,12 +233,12 @@ export default function LoginClient() {
             <button
               type="button"
               onClick={handleForgotPassword}
-              className="w-full text-sm text-neutral-700 underline underline-offset-4 py-1"
+              className="w-full text-sm text-neutral-700 dark:text-[#e4d9ce] underline underline-offset-4 py-1"
             >
               パスワードを忘れた方はこちら
             </button>
 
-            <div className="h-px bg-black/10 my-2" />
+            <div className="h-px bg-black/10 dark:bg-white/20 my-2" />
 
             <button
               type="button"
@@ -252,7 +253,7 @@ export default function LoginClient() {
               type="button"
               onClick={handleGoSignup}
               disabled={isLoading}
-              className="w-full rounded-xl border border-black/20 bg-white py-3 text-base font-medium text-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-xl border border-black/20 dark:border-[#c0b3a6] bg-[#fff] dark:bg-[#241c16] py-3 text-base font-medium text-neutral-800 dark:text-[#f3ece4] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               初めての方はこちら
             </button>

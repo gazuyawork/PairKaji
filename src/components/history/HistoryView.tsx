@@ -63,7 +63,7 @@ export default function HistoryView() {
         <section>
           <h2 className="mb-2 px-1 text-base font-semibold text-gray-800 inline-flex items-center gap-1.5">
             <CheckCircle className="w-4 h-4 text-emerald-600" />
-            家事の分担
+            タスクの分担
           </h2>
           <TaskHistoryModal
             variant="page"

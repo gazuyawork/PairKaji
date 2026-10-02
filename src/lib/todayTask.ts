@@ -51,10 +51,12 @@ type TodayTaskLike = Pick<Task, 'period'> & {
   isTodo?: boolean;
   todos?: unknown;
   visible?: boolean;
+  held?: boolean;
 };
 
-/** 今日やる家事か（不定期の期日超過・期限なしリストも含む） */
+/** 今日やる家事か（不定期の期日超過・期限なしリストも含む）。保留中は対象外。 */
 export function isTaskScheduledToday(task: TodayTaskLike, now = new Date()): boolean {
+  if (task.held === true) return false;
   const todayStr = formatLocalDate(now);
   const dates = Array.isArray(task.dates) ? task.dates : [];
   if (dates.some((d) => typeof d === 'string' && d.slice(0, 10) === todayStr)) return true;

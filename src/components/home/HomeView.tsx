@@ -21,13 +21,13 @@ import { toast } from 'sonner';
 
 // ▼ DnD Kit
 import {
-  DndContext,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
   DragOverlay,
 } from '@dnd-kit/core';
+import RecoverableDndContext from '@/components/common/RecoverableDndContext';
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -208,9 +208,11 @@ export default function HomeView() {
     uid,
     tasks: householdTasks,
     hasPairConfirmed,
+    pairsReady,
     tasksReady,
   } = useHousehold();
-  const isLoading = !tasksReady;
+  const isLoading = !tasksReady || !pairsReady;
+  const isPairInactive = pairsReady && !hasPairConfirmed;
   const tasks = useMemo(
     () => (uid ? householdTasks.filter((t) => t.userId === uid || (t.userIds ?? []).includes(uid)) : householdTasks),
     [householdTasks, uid]
@@ -305,8 +307,6 @@ export default function HomeView() {
     setCardOrder((prev) => pinFixedHomeCards(arrayMove(prev, oldIndex, newIndex)));
   };
 
-  const isPairInactive = !hasPairConfirmed;
-
   // ▼ ID → 実体
   const renderCardContent = (id: CardId): ReactNode => {
     switch (id) {
@@ -334,6 +334,7 @@ export default function HomeView() {
               dates: task.dates,
               daysOfWeek: task.daysOfWeek,
               done: !!task.done,
+              held: task.held === true,
               opensTodo: taskShowsOnTodoTab(task),
               point: task.point,
               person: task.person,
@@ -345,6 +346,7 @@ export default function HomeView() {
       }
 
       case 'todayDone':
+        if (!pairsReady) return null;
         return isPairInactive ? (
           <PairNeededCard title="パートナーの完了" />
         ) : (
@@ -463,7 +465,7 @@ export default function HomeView() {
             {/* ★★★ 変更：編集モードONのときだけ DnD を有効化。OFFのときは静的描画 */}
             {(() => {
               const candidateSet = new Set<CardId>();
-              if (!isLoading && !hasPairConfirmed) {
+              if (!isLoading && isPairInactive) {
                 candidateSet.add('pairInvite');
               }
 
@@ -502,7 +504,7 @@ export default function HomeView() {
               const dndIds = items.filter((v) => !PINNED_HOME_CARDS.has(v.id)).map((v) => v.id);
               return (
                 <div className="no-tab-swipe">
-                <DndContext
+                <RecoverableDndContext
                   sensors={sensors}
                   onDragStart={(e) => {
                     setIsDraggingCard(true);
@@ -549,13 +551,11 @@ export default function HomeView() {
                   </SortableContext>
 
                   <DragOverlay>
-                    {activeCardId && items.find((v) => v.id === (activeCardId as CardId)) ? (
-                      <div className="rounded-lg">
-                        {items.find((v) => v.id === (activeCardId as CardId))!.node}
-                      </div>
+                    {activeCardId && items.some((v) => v.id === (activeCardId as CardId)) ? (
+                      <div className="rounded-lg">{renderCardContent(activeCardId as CardId)}</div>
                     ) : null}
                   </DragOverlay>
-                </DndContext>
+                </RecoverableDndContext>
                 </div>
               );
             })()}

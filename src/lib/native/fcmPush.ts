@@ -58,8 +58,8 @@ async function ensureReminderChannel(): Promise<void> {
   try {
     await PushNotifications.createChannel({
       id: FCM_CHANNEL_ID,
-      name: '家事リマインド',
-      description: '家事の時間前やフラグのお知らせ',
+      name: 'タスクリマインド',
+      description: 'タスクの時間前やフラグのお知らせ',
       importance: 5,
       visibility: 1,
       vibration: true,

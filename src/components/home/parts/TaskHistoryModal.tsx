@@ -110,18 +110,32 @@ export default function TaskHistoryModal({
     const unSub = onSnapshot(
       qWeek,
       (snap) => {
-        const list: CompletionRow[] = snap.docs.map((doc) => {
-          const d = doc.data() as DocumentData;
-          return {
-            id: doc.id,
-            taskId: (d.taskId as string) ?? '',
-            taskName: (d.taskName as string) ?? '(名称未設定)',
-            createdAt: d.createdAt ? (d.createdAt as Timestamp).toDate() : null,
-            person: (d.person as string) ?? null,                 // 担当者（表示用に保持）
-            userId: (d.userId as string) ?? null,                 // 実際に完了したユーザー
-          };
-        });
-        setRows(list);
+        try {
+          const list: CompletionRow[] = snap.docs.map((doc) => {
+            const d = doc.data() as DocumentData;
+            const created = d.createdAt as { toDate?: () => Date } | null | undefined;
+            let createdAt: Date | null = null;
+            if (created && typeof created.toDate === 'function') {
+              try {
+                const date = created.toDate();
+                createdAt = Number.isNaN(date.getTime()) ? null : date;
+              } catch {
+                createdAt = null;
+              }
+            }
+            return {
+              id: doc.id,
+              taskId: (d.taskId as string) ?? '',
+              taskName: (d.taskName as string) ?? '(名称未設定)',
+              createdAt,
+              person: (d.person as string) ?? null,
+              userId: (d.userId as string) ?? null,
+            };
+          });
+          setRows(list);
+        } catch (err) {
+          console.error('TaskHistoryModal snapshot map failed:', err);
+        }
       },
       (err) => {
         console.error('TaskHistoryModal onSnapshot(taskCompletions) error:', err);
@@ -323,7 +337,7 @@ export default function TaskHistoryModal({
           {!hideWeekNav && (
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-lg font-semibold text-gray-800">完了した家事</h3>
+              <h3 className="text-lg font-semibold text-gray-800">完了したタスク</h3>
             </div>
           )}
           {!hideWeekNav && (

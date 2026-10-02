@@ -54,7 +54,7 @@ export default function PairInviteCard() {
     try {
       await joinPairByCode(joinCode);
       toast.success('パートナーとつながりました', {
-        description: 'ホームから、最初の家事を追加できます。',
+        description: 'ホームから、最初のタスクを追加できます。',
       });
       setJoinCode('');
     } catch (err) {
@@ -82,7 +82,7 @@ export default function PairInviteCard() {
     try {
       await acceptIncomingPairInvite(incomingInvite.pairId);
       toast.success('ペア設定を承認しました', {
-        description: 'ホームから、最初の家事を追加できます。',
+        description: 'ホームから、最初のタスクを追加できます。',
       });
     } catch (err) {
       toast.error(pairInviteErrorMessage(err, '承認できませんでした'));
@@ -129,7 +129,7 @@ export default function PairInviteCard() {
           <UserPlus className="w-6 h-6 text-orange-500" />
           <p className="font-semibold text-lg text-gray-700">ペアリングの招待が来ています</p>
         </div>
-        <p className="text-sm text-gray-500 text-center mb-4">承認すると、家事を一緒に管理できます。</p>
+        <p className="text-sm text-gray-500 text-center mb-4">承認すると、タスクを一緒に管理できます。</p>
         <div className="flex flex-col gap-2">
           <button
             type="button"

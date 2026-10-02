@@ -4,11 +4,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { resolveAuthUser } from '@/lib/authSession';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 type Props = { children: React.ReactNode };
 
@@ -20,7 +21,6 @@ const PUBLIC_PATHS = new Set<string>([
   '/verify',
   '/terms',
   '/privacy',
-  '/landing',
   '/contact',
   '/pricing',
 ]);
@@ -28,15 +28,20 @@ const PUBLIC_PATHS = new Set<string>([
 export default function RequireAuth({ children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
-  const settledRef = useRef(false);
+  const isPublic = PUBLIC_PATHS.has(pathname || '');
+  const [allowed, setAllowed] = useState(isPublic);
 
   useEffect(() => {
-    const isPublic = PUBLIC_PATHS.has(pathname || '');
+    if (isPublic) {
+      setAllowed(true);
+      return;
+    }
+
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
     const goLogin = () => {
-      if (isPublic) return;
+      setAllowed(false);
       const next = encodeURIComponent(pathname || '/main');
       router.replace(`/login?next=${next}`);
     };
@@ -44,13 +49,13 @@ export default function RequireAuth({ children }: Props) {
     void (async () => {
       const user = await resolveAuthUser();
       if (cancelled) return;
-      settledRef.current = true;
       if (!user) {
         goLogin();
         return;
       }
+      setAllowed(true);
       unsub = onAuthStateChanged(auth, (nextUser) => {
-        if (!settledRef.current || cancelled) return;
+        if (cancelled) return;
         if (!nextUser) goLogin();
       });
     })();
@@ -59,7 +64,13 @@ export default function RequireAuth({ children }: Props) {
       cancelled = true;
       unsub?.();
     };
-  }, [pathname, router]);
+  }, [isPublic, pathname, router]);
 
-  return <>{children}</>;
+  if (allowed) return <>{children}</>;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
+      <LoadingSpinner size={48} />
+    </div>
+  );
 }

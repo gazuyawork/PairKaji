@@ -48,7 +48,6 @@ function withTimeout<T>(work: Promise<T>, ms = SAVE_TIMEOUT_MS): Promise<T> {
 
 // ▼▼ dnd-kit（参考URL・チェックリストの並び替え用） ▼▼
 import {
-  DndContext,
   closestCenter,
   PointerSensor,
   TouchSensor,
@@ -57,6 +56,7 @@ import {
   type DragEndEvent,
   type DraggableAttributes,
 } from '@dnd-kit/core';
+import RecoverableDndContext from '@/components/common/RecoverableDndContext';
 import {
   SortableContext,
   useSortable,
@@ -315,6 +315,7 @@ export default function TodoNoteModal({
   const showMediaFrame = isOpen && !!displaySrc;
 
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 内容の存在判定
@@ -539,6 +540,18 @@ export default function TodoNoteModal({
       setPendingCheckFocusIndex(null);
     }
   }, [pendingCheckFocusIndex, checklist.length, checkIds.length]);
+
+  const resizeTitle = useCallback(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen || isPreview) return;
+    resizeTitle();
+  }, [isOpen, isPreview, todoTitle, resizeTitle]);
 
   // テキストエリアのリサイズ等（備考）
   const resizeTextarea = useCallback(() => {
@@ -950,16 +963,21 @@ export default function TodoNoteModal({
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               {isPreview ? (
-                <h2 className="text-2xl font-bold text-gray-800 break-words">
+                <h2 className="text-base font-bold text-gray-800 break-words">
                   {todoTitle.trim() ? todoTitle : '（未入力）'}
                 </h2>
               ) : (
-                <input
+                <textarea
+                  ref={titleRef}
                   value={todoTitle}
-                  onChange={(e) => setTodoTitle(e.target.value)}
-                  placeholder="TODO名を入力"
-                  className="w-full text-2xl font-bold text-gray-800 bg-transparent border-b border-gray-200 focus:outline-none focus:border-blue-500 pb-1"
-                  aria-label="TODO名"
+                  rows={1}
+                  onChange={(e) => setTodoTitle(e.target.value.replace(/\r?\n/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.preventDefault();
+                  }}
+                  placeholder="リスト名を入力"
+                  className="w-full resize-none overflow-hidden break-words text-base font-bold text-gray-800 bg-transparent border-b border-gray-200 focus:outline-none focus:border-blue-500 pb-1"
+                  aria-label="リスト名"
                 />
               )}
             </div>
@@ -1104,7 +1122,7 @@ export default function TodoNoteModal({
 
               {!isPreview ? (
                 <>
-                  <DndContext
+                  <RecoverableDndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     modifiers={[restrictToVerticalAxis, restrictToParentElement]}
@@ -1177,7 +1195,7 @@ export default function TodoNoteModal({
                         ))}
                       </div>
                     </SortableContext>
-                  </DndContext>
+                  </RecoverableDndContext>
                 </>
               ) : (
                 <ul className="list-disc list-inside text-md text-blue-500 marker:text-black">
@@ -1224,7 +1242,7 @@ export default function TodoNoteModal({
               </div>
 
               {!isPreview ? (
-                <DndContext
+                <RecoverableDndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   modifiers={[restrictToVerticalAxis, restrictToParentElement]}
@@ -1329,7 +1347,7 @@ export default function TodoNoteModal({
                       ))}
                     </div>
                   </SortableContext>
-                </DndContext>
+                </RecoverableDndContext>
               ) : (
                 <ul className="space-y-2">
                   {checklist

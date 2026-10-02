@@ -16,13 +16,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import TodoTaskCard from '@/components/todo/parts/TodoTaskCard';
-import type { TodoOnlyTask } from '@/types/TodoOnlyTask';
+import type { TodoItem, TodoOnlyTask } from '@/types/TodoOnlyTask';
 import { toast } from 'sonner';
 import { useView } from '@/context/ViewContext';
 import TodoNoteModal from '@/components/todo/parts/TodoNoteModal';
 import { useHousehold } from '@/context/HouseholdContext';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
-import { updateTodoTextInTask } from '@/lib/taskUtils';
+import { jstYmd } from '@/lib/deviceCalendar';
 import { createPortal } from 'react-dom';
 import SlideUpModal from '@/components/common/modals/SlideUpModal';
 
@@ -30,10 +30,6 @@ const getOrderOrInf = (t: { order?: number } | TodoOnlyTask) =>
   typeof (t as { order?: number }).order === 'number'
     ? ((t as { order?: number }).order as number)
     : Number.POSITIVE_INFINITY;
-
-// error ガード
-const hasCodeOrMessage = (e: unknown): e is { code?: unknown; message?: unknown } =>
-  typeof e === 'object' && e !== null && ('code' in e || 'message' in e);
 
 const normalizeName = (v: unknown): string => {
   if (typeof v === 'string') return v;
@@ -83,6 +79,41 @@ export default function TodoView() {
   const { selectedTaskName, setSelectedTaskName, listOpen, listAddTaskId, closeTaskList, openTaskScreen } = useView();
 
   const [tasks, setTasks] = useState<TodoOnlyTask[]>([]);
+  const tasksRef = useRef<TodoOnlyTask[]>([]);
+  tasksRef.current = tasks;
+  const todoWritesRef = useRef<Map<string, { todos: TodoItem[]; inflight: number }>>(new Map());
+  const todoWriteTailRef = useRef<Map<string, Promise<void>>>(new Map());
+
+  const commitTodos = useCallback((taskId: string, recipe: (current: TodoItem[]) => TodoItem[]) => {
+    const pending = todoWritesRef.current.get(taskId)?.todos;
+    const fromState = tasksRef.current.find((t) => t.id === taskId)?.todos ?? [];
+    const next = recipe(pending ?? fromState);
+    const prevInflight = todoWritesRef.current.get(taskId)?.inflight ?? 0;
+    todoWritesRef.current.set(taskId, { todos: next, inflight: prevInflight + 1 });
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, todos: next } : t)));
+
+    const tail = todoWriteTailRef.current.get(taskId) ?? Promise.resolve();
+    const job = tail
+      .catch(() => undefined)
+      .then(async () => {
+        const latest = todoWritesRef.current.get(taskId)?.todos ?? next;
+        await updateDoc(doc(db, 'tasks', taskId), {
+          todos: latest,
+          updatedAt: serverTimestamp(),
+        });
+      })
+      .catch((e) => {
+        console.error(e);
+        toast.error('保存に失敗しました');
+      })
+      .finally(() => {
+        const cur = todoWritesRef.current.get(taskId);
+        if (!cur) return;
+        cur.inflight -= 1;
+        if (cur.inflight <= 0) todoWritesRef.current.delete(taskId);
+      });
+    todoWriteTailRef.current.set(taskId, job);
+  }, []);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
   const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -145,6 +176,10 @@ export default function TodoView() {
       const bo = getOrderOrInf(b as { order?: number });
       if (ao !== bo) return ao - bo;
       return (a.name ?? '').localeCompare(b.name ?? '');
+    }).map((t) => {
+      const pending = todoWritesRef.current.get(t.id);
+      if (pending && pending.inflight > 0) return { ...t, todos: pending.todos };
+      return t;
     });
 
     setTasks(newTasks);
@@ -236,12 +271,11 @@ export default function TodoView() {
                   const todo = selectedTask.todos.find((t) => t.text === text);
                   if (todo) openNoteModal(selectedTask, todo);
                 }}
-                onAddTodo={async (todoId, text) => {
-                  const newTodos = [...selectedTask.todos, { id: todoId, text, done: false }];
-                  await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                    todos: newTodos,
-                    updatedAt: serverTimestamp(),
-                  });
+                onAddTodo={(todoId, text) => {
+                  commitTodos(selectedTask.id, (current) => [
+                    { id: todoId, text, done: false },
+                    ...current.filter((td) => td.id !== todoId),
+                  ]);
                 }}
                 onChangeTodo={(todoId, value) => {
                   setTasks((prev) =>
@@ -255,57 +289,43 @@ export default function TodoView() {
                     )
                   );
                 }}
-                onToggleDone={async (todoId) => {
-                  const updatedTodos = selectedTask.todos.map((td) =>
-                    td.id === todoId ? { ...td, done: !td.done } : td
+                onToggleDone={(todoId) => {
+                  commitTodos(selectedTask.id, (current) =>
+                    current.map((td) => {
+                      if (td.id !== todoId) return td;
+                      if (td.done) {
+                        const next = { ...td, done: false };
+                        delete next.completedAt;
+                        return next;
+                      }
+                      return { ...td, done: true, completedAt: jstYmd() };
+                    })
                   );
-                  await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                    todos: updatedTodos,
-                    updatedAt: serverTimestamp(),
-                  });
                 }}
-                onBlurTodo={async (todoId, text) => {
+                onBlurTodo={(todoId, text) => {
                   const trimmed = text.trim();
                   if (!trimmed) return;
-
-                  try {
-                    await updateTodoTextInTask(selectedTask.id, todoId, trimmed);
-                  } catch (e: unknown) {
-                    if (hasCodeOrMessage(e)) {
-                      const code = typeof e.code === 'string' ? e.code : undefined;
-                      const message = typeof e.message === 'string' ? e.message : undefined;
-                      if (code === 'DUPLICATE_TODO' || message === 'DUPLICATE_TODO') {
-                        toast.error('既に登録されています。'); return;
-                      }
-                    }
-                    toast.error('保存に失敗しました');
-                    console.error(e);
-                  }
+                  commitTodos(selectedTask.id, (current) =>
+                    current.map((td) => (td.id === todoId ? { ...td, text: trimmed } : td))
+                  );
                 }}
-                onDeleteTodo={async (todoId) => {
-                  const updatedTodos = selectedTask.todos.filter((td) => td.id !== todoId);
-                  await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                    todos: updatedTodos,
-                    updatedAt: serverTimestamp(),
-                  });
+                onDeleteTodo={(todoId) => {
+                  commitTodos(selectedTask.id, (current) => current.filter((td) => td.id !== todoId));
                 }}
                 todoRefs={todoRefs}
                 focusedTodoId={focusedTodoId}
-                onReorderTodos={async (orderedIds) => {
-                  const idToTodo = selectedTask.todos.reduce<Record<string, (typeof selectedTask.todos)[number]>>((acc, td) => {
-                    acc[td.id] = td; return acc;
-                  }, {});
-                  const newTodos = orderedIds.map((id) => idToTodo[id]).filter((v): v is (typeof selectedTask.todos)[number] => Boolean(v));
-                  setTasks((prev) => prev.map((t) => (t.id === selectedTask.id ? { ...t, todos: newTodos } : t)));
-
-                  try {
-                    await updateDoc(doc(db, 'tasks', selectedTask.id), {
-                      todos: newTodos, updatedAt: serverTimestamp(),
-                    });
-                  } catch (e) {
-                    console.error('reorder update error:', e);
-                    toast.error('並び替えの保存に失敗しました');
-                  }
+                onReorderTodos={(orderedIds) => {
+                  commitTodos(selectedTask.id, (current) => {
+                    const idToTodo = current.reduce<Record<string, TodoItem>>((acc, td) => {
+                      acc[td.id] = td;
+                      return acc;
+                    }, {});
+                    const ordered = orderedIds
+                      .map((id) => idToTodo[id])
+                      .filter((td): td is TodoItem => Boolean(td));
+                    const rest = current.filter((td) => !orderedIds.includes(td.id));
+                    return [...ordered, ...rest];
+                  });
                 }}
                 onClose={() => {
                   setSelectedTaskId(null);
@@ -324,7 +344,7 @@ export default function TodoView() {
           title="確認"
           message={
             <div className="space-y-2 text-left">
-              <p>このToDoグループを<strong>一覧から非表示</strong>にします。</p>
+              <p>このリストを<strong>一覧から非表示</strong>にします。</p>
               <p className="text-xs text-gray-500">※ データは削除されません。再表示から戻すことができます。</p>
             </div>
           }

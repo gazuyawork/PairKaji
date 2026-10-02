@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle, Circle, Notebook, Trash2, GripVertical as Grip } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -10,6 +10,13 @@ import type { Variants } from 'framer-motion';
 import { toast } from 'sonner';
 import type { SimpleTodo } from './hooks/useTodoSearchAndSort';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
+
+function formatCompletedMd(value: unknown): string {
+  if (typeof value !== 'string' || !value) return '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return '';
+  return `${Number(match[2])}/${Number(match[3])}`;
+}
 
 const SHAKE_VARIANTS: Variants = {
   shake: { x: [0, -6, 6, -4, 4, -2, 2, 0], transition: { duration: 0.4 } },
@@ -19,12 +26,29 @@ const SHAKE_VARIANTS: Variants = {
 type ToggleLockDetail = { locked: boolean; id: string | null };
 let GLOBAL_TOGGLE_LOCK = false;
 let GLOBAL_ANIMATING_ID: string | null = null;
+let toggleLockToken = 0;
 const LOCK_EVENT_NAME = 'pk-todo-toggle-lock';
 
 function emitToggleLock(locked: boolean, id: string | null) {
   if (typeof window === 'undefined') return;
   const ev = new CustomEvent<ToggleLockDetail>(LOCK_EVENT_NAME, { detail: { locked, id } });
   window.dispatchEvent(ev);
+}
+
+function beginToggleLock(id: string) {
+  const token = ++toggleLockToken;
+  GLOBAL_TOGGLE_LOCK = true;
+  GLOBAL_ANIMATING_ID = id;
+  emitToggleLock(true, id);
+  return token;
+}
+
+function endToggleLock(token: number) {
+  if (token !== toggleLockToken) return;
+  toggleLockToken += 1;
+  GLOBAL_TOGGLE_LOCK = false;
+  GLOBAL_ANIMATING_ID = null;
+  emitToggleLock(false, null);
 }
 
 type Props = {
@@ -59,6 +83,7 @@ export default function SortableTodoRow({
   hasContentForIcon,
 }: Props) {
   const [isEditingRow, setIsEditingRow] = useState(false);
+  const toggleLockTokenRef = useRef<number | null>(null);
   const [text, setText] = useState<string>(todo.text ?? '');
   const [isComposingRow, setIsComposingRow] = useState(false);
 
@@ -92,6 +117,15 @@ export default function SortableTodoRow({
     };
     window.addEventListener(LOCK_EVENT_NAME, handler as EventListener);
     return () => window.removeEventListener(LOCK_EVENT_NAME, handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      const token = toggleLockTokenRef.current;
+      if (token == null) return;
+      toggleLockTokenRef.current = null;
+      endToggleLock(token);
+    };
   }, []);
 
   useEffect(() => {
@@ -160,23 +194,21 @@ export default function SortableTodoRow({
 
   /* ================= トグル（完了/未完） ================= */
   const handleToggleClick = () => {
-    if (isLocked) return;
+    if (isLocked || GLOBAL_TOGGLE_LOCK) return;
     if (!todo.done) {
-      // 未処理 → 完了（アニメ）
-      GLOBAL_TOGGLE_LOCK = true;
-      GLOBAL_ANIMATING_ID = todo.id;
-      emitToggleLock(true, todo.id);
-      setTimeout(() => {
-        onToggleDone(todo.id);
-        // 余韻
-        setTimeout(() => {
-          GLOBAL_TOGGLE_LOCK = false;
-          GLOBAL_ANIMATING_ID = null;
-          emitToggleLock(false, null);
-        }, 50);
-      }, 500); // アニメ時間
+      const token = beginToggleLock(todo.id);
+      toggleLockTokenRef.current = token;
+      window.setTimeout(() => {
+        try {
+          onToggleDone(todo.id);
+        } finally {
+          window.setTimeout(() => {
+            if (toggleLockTokenRef.current === token) toggleLockTokenRef.current = null;
+            endToggleLock(token);
+          }, 50);
+        }
+      }, 500);
     } else {
-      // 完了 → 未処理（アニメなし即時）
       onToggleDone(todo.id);
     }
   };
@@ -193,7 +225,7 @@ export default function SortableTodoRow({
         title="確認"
         message={
           <>
-            <div>このTODOを削除します。よろしいですか？</div>
+            <div>この項目を削除します。よろしいですか？</div>
             <div>（元に戻せません）</div>
           </>
         }
@@ -204,19 +236,16 @@ export default function SortableTodoRow({
       />
 
       <div className="flex items-center gap-2">
-        {/* Drag handle（ドラッグ専用。ゴミ箱には付けない） */}
-        <span
-          className={clsx(
-            'cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none',
-            !dndEnabled && 'opacity-40 cursor-not-allowed hover:text-gray-300'
-          )}
-          title={dndEnabled ? 'ドラッグで並び替え' : '並び替えできません'}
-          aria-disabled={!dndEnabled}
-          {...(attributes as React.HTMLAttributes<HTMLSpanElement>)}
-          {...(listeners as unknown as React.DOMAttributes<HTMLSpanElement>)}
-        >
-          <Grip size={18} aria-label="並び替え" />
-        </span>
+        {dndEnabled && (
+          <span
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
+            title="ドラッグで並び替え"
+            {...(attributes as React.HTMLAttributes<HTMLSpanElement>)}
+            {...(listeners as unknown as React.DOMAttributes<HTMLSpanElement>)}
+          >
+            <Grip size={18} aria-label="並び替え" />
+          </span>
+        )}
 
         {/* チェックボックス（相対ラップ：真上にアニメを重ねる） */}
         <div className="relative inline-flex items-center justify-center w-6 h-6">
@@ -287,18 +316,21 @@ export default function SortableTodoRow({
             todo.done ? 'text-gray-400 line-through' : 'text-black',
             isLocked && 'cursor-not-allowed opacity-70'
           )}
-          placeholder="TODOを入力"
-          aria-label="TODOを入力"
+          placeholder="リストを入力"
+          aria-label="リストを入力"
         />
 
-        {/* メモ開く */}
+        {todo.done && formatCompletedMd(todo.completedAt) && (
+          <span className="shrink-0 text-[11px] leading-none text-gray-400 tabular-nums">
+            {formatCompletedMd(todo.completedAt)}
+          </span>
+        )}
+
         <button
           type="button"
           className={clsx(
-            'mr-1',
-            hasContentForIcon
-              ? 'text-orange-400 hover:text-orange-500 active:text-orange-600'
-              : 'text-gray-400 hover:text-emerald-500 active:text-yellow-600',
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 transition-colors hover:bg-gray-200 active:bg-gray-300',
+            hasContentForIcon ? 'text-orange-400' : 'text-gray-400',
             isLocked && 'cursor-not-allowed opacity-70'
           )}
           onClick={() => onOpenNote(todo.text)}
@@ -306,20 +338,22 @@ export default function SortableTodoRow({
           aria-label="メモを開く"
           title="メモを開く"
         >
-          <Notebook size={22} />
+          <Notebook size={18} />
         </button>
 
-        {/* ゴミ箱（1回クリック→確認モーダル） */}
         <motion.button
           type="button"
-          onClick={handleTodoDeleteClick} // 1回クリックで確認→削除
-          variants={SHAKE_VARIANTS} // （今後使う可能性に備え残すが、animateは指定しない）
+          onClick={handleTodoDeleteClick}
+          variants={SHAKE_VARIANTS}
           disabled={isLocked}
-          className={clsx('p-1 rounded-md', isLocked && 'cursor-not-allowed opacity-70')}
+          className={clsx(
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors hover:bg-gray-200 hover:text-red-500 active:bg-gray-300',
+            isLocked && 'cursor-not-allowed opacity-70'
+          )}
           aria-label="削除"
           title="削除"
         >
-          <Trash2 size={22} className="text-gray-400 hover:text-red-500 transition-colors" />
+          <Trash2 size={18} />
         </motion.button>
       </div>
 

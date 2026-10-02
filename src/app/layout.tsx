@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   // LP側の値を反映
   title: 'PairKaji | 家事を2人で分担するアプリ',
   description:
-    'PairKajiは、家事を2人で分担・見える化するためのタスク管理アプリです。タスクの進捗共有とTODO管理がカンタンに。',
+    'PairKajiは、家事を2人で分担・見える化するためのタスク管理アプリです。タスクの進捗共有とリスト管理がカンタンに。',
   robots: { index: true, follow: true },
   openGraph: {
     images: ['/images/default.png'],
@@ -79,6 +79,11 @@ return (
       <script
         dangerouslySetInnerHTML={{
           __html: `try{if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')}catch(e){}`,
+        }}
+      />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{var k='pk_boot_recover_v2';if(localStorage.getItem(k))return;if(!navigator.serviceWorker)return;navigator.serviceWorker.getRegistrations().then(function(regs){if(!regs.length&&!navigator.serviceWorker.controller)return;localStorage.setItem(k,'1');return Promise.all(regs.map(function(r){return r.unregister()})).then(function(){var clear=window.caches?caches.keys().then(function(keys){return Promise.all(keys.map(function(key){return caches.delete(key)}))}):Promise.resolve();return clear.then(function(){if(!navigator.serviceWorker.controller){location.reload();return;}var done=false;var go=function(){if(done)return;done=true;location.reload();};navigator.serviceWorker.addEventListener('controllerchange',go);setTimeout(go,1200);})})})}catch(e){}})();`,
         }}
       />
     </head>

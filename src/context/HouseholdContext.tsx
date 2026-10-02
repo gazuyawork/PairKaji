@@ -81,6 +81,27 @@ function mapPair(d: QueryDocumentSnapshot<DocumentData>): PairRecord {
   };
 }
 
+function snapshotUpdatedMs(d: QueryDocumentSnapshot<DocumentData>): number {
+  const withTime = d as QueryDocumentSnapshot<DocumentData> & {
+    updateTime?: { toMillis?: () => number };
+  };
+  try {
+    const fromSnap = withTime.updateTime?.toMillis?.();
+    if (typeof fromSnap === 'number') return fromSnap;
+  } catch {
+    /* 時刻が取れないスナップショットは 0 */
+  }
+  const raw = (d.data() as { updatedAt?: unknown }).updatedAt;
+  if (raw && typeof raw === 'object' && typeof (raw as { toMillis?: unknown }).toMillis === 'function') {
+    try {
+      return (raw as { toMillis: () => number }).toMillis();
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}
+
 function mapHouseholdTask(d: QueryDocumentSnapshot<DocumentData>): HouseholdTask {
   const base = mapFirestoreDocToTask(d as QueryDocumentSnapshot<FirestoreTask>);
   const data = d.data() as Record<string, unknown>;
@@ -97,7 +118,7 @@ function mapHouseholdTask(d: QueryDocumentSnapshot<DocumentData>): HouseholdTask
 }
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const uid = user?.uid ?? null;
   const email = user?.email ?? null;
 
@@ -112,6 +133,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [partnerImage, setPartnerImage] = useState(DEFAULT_PROFILE_IMAGE);
 
   useEffect(() => {
+    if (authLoading) {
+      setPairsReady(false);
+      return;
+    }
     if (!uid) {
       setPairs([]);
       setPairsReady(true);
@@ -133,7 +158,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       }
     );
     return () => unsub();
-  }, [uid]);
+  }, [uid, authLoading]);
 
   useEffect(() => {
     if (!email) {
@@ -211,6 +236,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }, [pairs, uid]);
 
   useEffect(() => {
+    if (authLoading) {
+      setTasksReady(false);
+      return;
+    }
     if (!uid) {
       setTasks([]);
       setTasksReady(true);
@@ -218,16 +247,23 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     }
 
     setTasksReady(false);
-    const mapA = new Map<string, HouseholdTask>();
-    const mapB = new Map<string, HouseholdTask>();
+    const mapA = new Map<string, { task: HouseholdTask; updatedMs: number }>();
+    const mapB = new Map<string, { task: HouseholdTask; updatedMs: number }>();
     let gotA = false;
     let gotB = false;
 
     const publish = () => {
-      const merged = new Map(mapA);
-      mapB.forEach((task, id) => merged.set(id, task));
-      setTasks(Array.from(merged.values()).map((t) => applyLocalDayReset(t)));
-      if (gotA && gotB) setTasksReady(true);
+      try {
+        const merged = new Map(mapA);
+        mapB.forEach((entry, id) => {
+          const prev = merged.get(id);
+          if (!prev || entry.updatedMs >= prev.updatedMs) merged.set(id, entry);
+        });
+        setTasks(Array.from(merged.values()).map((entry) => applyLocalDayReset(entry.task)));
+        if (gotA && gotB) setTasksReady(true);
+      } catch (err) {
+        console.warn('[Household] tasks publish failed:', err);
+      }
     };
 
     const unsubA = onSnapshot(
@@ -235,8 +271,12 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       (snap) => {
         mapA.clear();
         snap.docs.forEach((d) => {
-          scrubRetiredTaskData(d.id, d.data() as Record<string, unknown>);
-          mapA.set(d.id, mapHouseholdTask(d));
+          try {
+            scrubRetiredTaskData(d.id, d.data() as Record<string, unknown>);
+            mapA.set(d.id, { task: mapHouseholdTask(d), updatedMs: snapshotUpdatedMs(d) });
+          } catch (err) {
+            console.warn('[Household] tasks(userIds) map failed:', d.id, err);
+          }
         });
         gotA = true;
         publish();
@@ -252,8 +292,12 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       (snap) => {
         mapB.clear();
         snap.docs.forEach((d) => {
-          scrubRetiredTaskData(d.id, d.data() as Record<string, unknown>);
-          mapB.set(d.id, mapHouseholdTask(d));
+          try {
+            scrubRetiredTaskData(d.id, d.data() as Record<string, unknown>);
+            mapB.set(d.id, { task: mapHouseholdTask(d), updatedMs: snapshotUpdatedMs(d) });
+          } catch (err) {
+            console.warn('[Household] tasks(userId) map failed:', d.id, err);
+          }
         });
         gotB = true;
         publish();
@@ -269,7 +313,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       unsubA();
       unsubB();
     };
-  }, [uid]);
+  }, [uid, authLoading]);
 
   useEffect(() => {
     if (!partnerId) {

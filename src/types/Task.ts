@@ -42,6 +42,8 @@ export type Task = {
   dates: string[];
   isTodo: boolean;
   done?: boolean;
+  /** 保留中は今日のタスクに出さない。頻度・リスト・履歴は残す。 */
+  held?: boolean;
   person?: string;
   image?: string;
   groupId?: string | null;

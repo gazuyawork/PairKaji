@@ -7,7 +7,7 @@ export default function Page() {
     <Suspense
       fallback={
         <div className="min-h-screen w-full bg-[#F5EADB] flex items-center justify-center px-4">
-          <div className="inline-flex items-center gap-2 text-neutral-700">
+          <div className="inline-flex items-center gap-2 text-neutral-700 dark:text-[#e4d9ce]">
             <LoadingSpinner size={18} />
             <span>読み込み中...</span>
           </div>

@@ -7,7 +7,7 @@ export default function TermsPage() {
     <LegalPage title="利用規約">
       <p>本規約は、PairKaji（以下「本アプリ」）の利用条件を定めるものです。本アプリを利用することで、本規約に同意したものとみなします。</p>
       <h2 className="text-base font-semibold text-gray-900 pt-2">1. サービス内容</h2>
-      <p>本アプリは、家事・TODO のペア管理を目的としたサービスです。機能は予告なく変更・終了する場合があります。</p>
+      <p>本アプリは、タスクとリストのペア管理を目的としたサービスです。機能は予告なく変更・終了する場合があります。</p>
       <h2 className="text-base font-semibold text-gray-900 pt-2">2. アカウント</h2>
       <p>利用者は正確な情報で登録し、認証情報を自己の責任で管理してください。退会はアプリ内のアカウント削除から行えます。</p>
       <h2 className="text-base font-semibold text-gray-900 pt-2">3. 有料プラン</h2>

@@ -64,6 +64,7 @@ type TodoDoc = {
   id: string;
   text?: string;
   done?: boolean;
+  completedAt?: string;
   memo?: string;
   price?: number | null;
   quantity?: number | null;
@@ -202,6 +203,22 @@ const normalizeTaskPayload = (
   });
 
   return payload;
+};
+
+/** 保留のオンオフ。解除時は未完了に戻して、今日の対象へ戻す。 */
+export const setTaskHeld = async (taskId: string, held: boolean): Promise<void> => {
+  const taskRef = doc(db, 'tasks', taskId);
+  if (held) {
+    await updateDoc(taskRef, { held: true, updatedAt: serverTimestamp() });
+    return;
+  }
+  await updateDoc(taskRef, {
+    held: false,
+    done: false,
+    completedAt: null,
+    completedBy: '',
+    updatedAt: serverTimestamp(),
+  });
 };
 
 /* =========================================================
@@ -757,19 +774,9 @@ export const toggleTaskDoneStatus = async (
   done: boolean,
   taskName?: string,
   person?: string
-) => {
+): Promise<boolean> => {
   try {
     const taskRef = doc(db, 'tasks', taskId);
-
-    // ペア userIds
-    let userIds = [userId];
-    const pairId = typeof window !== 'undefined' ? sessionStorage.getItem('pairId') : null;
-
-    if (pairId) {
-      const pairDoc = await getDoc(doc(db, 'pairs', pairId));
-      const pairData = pairDoc.data() as PairDoc | undefined;
-      if (pairData?.userIds) userIds = pairData.userIds;
-    }
 
     if (done) {
       // 完了
@@ -785,6 +792,13 @@ export const toggleTaskDoneStatus = async (
       const isPrivate = taskData?.private === true;
 
       if (!isPrivate && taskName) {
+        const pairUserIds = await fetchPairUserIds(userId);
+        const taskUserIds = Array.isArray(taskData?.userIds)
+          ? taskData.userIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+          : [];
+        const sharedIds = pairUserIds.length > 0 ? pairUserIds : taskUserIds;
+        const userIds = Array.from(new Set(sharedIds.length > 0 ? sharedIds : [userId]));
+        if (!userIds.includes(userId)) userIds.push(userId);
         await addTaskCompletion(taskId, userId, userIds, taskName, person ?? '');
       }
     } else {
@@ -812,8 +826,10 @@ export const toggleTaskDoneStatus = async (
       const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref));
       await Promise.all(deletePromises);
     }
+    return true;
   } catch (error) {
     handleFirestoreError(error);
+    return false;
   }
 };
 

@@ -9,12 +9,12 @@ import { motion, type Variants, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
 import {
-  DndContext,
   useSensor,
   useSensors,
   PointerSensor,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import RecoverableDndContext from '@/components/common/RecoverableDndContext';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 import SortableTodoRow from './SortableTodoRow';
@@ -160,6 +160,7 @@ export default function TodoTaskCard({
   }
 
   const handleDragEnd = (e: DragEndEvent) => {
+    if (tab === 'done') return;
     const { active, over } = e;
     if (!over || active.id === over.id) return;
 
@@ -209,9 +210,11 @@ export default function TodoTaskCard({
 
     setIsInputOpen(true);
 
-    // 表示反映後に本入力へフォーカスを引き継ぎ（iOSでも維持されやすい）
-    requestAnimationFrame(() => inputRef.current?.focus());
-    setTimeout(() => inputRef.current?.focus(), 120);
+    // プラスボタンの退場後に入力欄が出るので、表示が終わってからカーソルを置く
+    const focus = () => inputRef.current?.focus();
+    requestAnimationFrame(focus);
+    window.setTimeout(focus, 280);
+    window.setTimeout(focus, 600);
   };
 
   const closeAddInput = () => setIsInputOpen(false);
@@ -220,12 +223,9 @@ export default function TodoTaskCard({
     if (!startAdding || didStartAddingRef.current) return;
     didStartAddingRef.current = true;
     setIsInputOpen(true);
-    const coarse =
-      typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-    if (!coarse) return;
     const focus = () => inputRef.current?.focus();
     const raf = requestAnimationFrame(focus);
-    const soon = window.setTimeout(focus, 250);
+    const soon = window.setTimeout(focus, 280);
     const later = window.setTimeout(focus, 600);
     return () => {
       cancelAnimationFrame(raf);
@@ -259,9 +259,6 @@ export default function TodoTaskCard({
   }, [isInputOpen]);
 
   /* ------------------------------ add new todo ----------------------------- */
-
-  // 直近に追加した TODO のID（DB反映後に先頭へ固定）
-  const pendingNewIdRef = useRef<string | null>(null);
 
   // 先頭へスクロール
   const scrollListToTop = useCallback(
@@ -302,9 +299,6 @@ export default function TodoTaskCard({
 
     onAddTodo(newId, trimmed);
 
-    // まずはDB反映待ち（todosに newId が現れたら並び替えを適用）
-    pendingNewIdRef.current = newId;
-
     // 追加直後に一覧を先頭へ
     scrollListToTop('smooth');
 
@@ -313,26 +307,6 @@ export default function TodoTaskCard({
     setInputError(null);
     requestAnimationFrame(() => inputRef.current?.focus?.());
   };
-
-  /* -------------------- 新規追加は先頭へ -------------------- */
-  useEffect(() => {
-    const newId = pendingNewIdRef.current;
-    if (!newId) return;
-
-    const ids = todos.map((t) => t.id);
-    if (!ids.includes(newId)) return;
-
-    const rest = todos
-      .filter((t) => t.id !== newId)
-      .map((t, idx) => ({ id: t.id, idx }));
-    const nextIds = [newId, ...rest.sort((a, b) => a.idx - b.idx).map((r) => r.id)];
-
-    const same = ids.length === nextIds.length && ids.every((v, i) => v === nextIds[i]);
-    if (!same) onReorderTodos(nextIds);
-
-    requestAnimationFrame(() => scrollListToTop('smooth'));
-    pendingNewIdRef.current = null;
-  }, [todos, onReorderTodos, scrollListToTop]);
 
   /* ------------------------------ 閉じる（×） ------------------------------ */
 
@@ -471,7 +445,7 @@ export default function TodoTaskCard({
                       layout={false} /* ← レイアウトの補間を禁止 */
                       type="button"
                       onClick={openAddInput}
-                      aria-label="TODOを追加"
+                      aria-label="リストを追加"
                       className={clsx(
                         'ml-auto block mb-2',
                         'rounded-full shadow-md',
@@ -490,7 +464,7 @@ export default function TodoTaskCard({
                     <motion.div
                       key="full-input"
                       ref={inputWrapRef}
-                      layoutId="addInputInline"
+                      layout={false}
                       className="
                         w-full
                         px-3 py-1 mb-1
@@ -508,6 +482,7 @@ export default function TodoTaskCard({
                       <input
                         ref={inputRef}
                         type="text"
+                        autoFocus
                         value={newTodoText}
                         onChange={(e) => {
                           setNewTodoText(e.target.value);
@@ -547,15 +522,15 @@ export default function TodoTaskCard({
                         onCompositionEnd={() => setIsComposingAdd(false)}
                         disabled={tab !== 'undone' || !canAdd}
                         aria-disabled={tab !== 'undone' || !canAdd}
-                        aria-label="TODOを入力"
-                        title={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
+                        aria-label="リストを入力"
+                        title={tab === 'undone' ? 'リストを入力してEnterで追加' : '未処理タブで追加できます'}
                         className={clsx(
                           'flex-1 min-w-0 bg-transparent outline-none h-9 text-[16px]',
                           tab === 'undone' && canAdd
                             ? 'border-gray-300 text-black'
                             : 'border-gray-200 text-gray-400 cursor-not-allowed',
                         )}
-                        placeholder={tab === 'undone' ? 'TODOを入力してEnterで追加' : '未処理タブで追加できます'}
+                        placeholder={tab === 'undone' ? 'リストを入力してEnterで追加' : '未処理タブで追加できます'}
                         inputMode="text"
                       />
                       <button
@@ -612,9 +587,9 @@ export default function TodoTaskCard({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="TODOを検索"
+                  placeholder="リストを検索"
                   className="w-full pl-8 pr-8 py-1.5 outline-none focus:ring-2 focus:ring-orange-300"
-                  aria-label="TODOを検索"
+                  aria-label="リストを検索"
                 />
                 {searchQuery.trim() !== '' && (
                   <button
@@ -653,7 +628,7 @@ export default function TodoTaskCard({
                 <div className="text-gray-400 italic pl-2">該当する未処理のタスクはありません</div>
               )}
 
-              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+              <RecoverableDndContext sensors={sensors} onDragEnd={handleDragEnd}>
                 <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
                   {finalFilteredTodos.map((todo) => {
                     const hasMemo = typeof todo.memo === 'string' && todo.memo.trim() !== '';
@@ -692,7 +667,7 @@ export default function TodoTaskCard({
                       <div key={todo.id} data-todo-row>
                         <SortableTodoRow
                           todo={todo}
-                          dndEnabled={true}
+                          dndEnabled={tab === 'undone'}
                           focusedTodoId={focusedTodoId}
                           todoRefs={todoRefs}
                           todos={todos}
@@ -709,7 +684,7 @@ export default function TodoTaskCard({
                     );
                   })}
                 </SortableContext>
-              </DndContext>
+              </RecoverableDndContext>
             </div>
 
             {showScrollDownHint && (

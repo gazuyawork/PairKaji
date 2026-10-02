@@ -9,7 +9,7 @@ import type { Firestore } from 'firebase-admin/firestore';
  * - points … userId == uid のドキュメント削除
  * - push_subscriptions … uid == uid のドキュメント削除
  * - saving … userId == uid のドキュメント削除
- * - taskCompletions … usersIds array-contains uid のドキュメント削除
+ * - taskCompletions … userIds から uid を外す。自分だけの記録は削除
  * - taskLikes … participants array-contains uid のドキュメント削除
  * - tasks … userIds から uid を除外（空なら削除）＋ userId == uid のドキュメント削除
  * - pairs … userIds に uid を含むドキュメントを削除
@@ -41,10 +41,9 @@ export const onAuthUserDelete = auth.user().onDelete(async (user) => {
   await deleteCollectionWhereEquals(db, 'tasks', 'userId', uid, 400);
   await deleteCollectionWhereEquals(db, 'push_subscriptions', 'uid', uid, 400);
 
-  // 3) 配列に uid を含むドキュメントを削除
-  //    - taskCompletions.usersIds array-contains uid
-  //    - taskLikes.participants  array-contains uid
-  await deleteCollectionWhereArrayContains(db, 'taskCompletions', 'usersIds', uid, 400);
+  // 3) 完了記録は userIds から本人を外す。自分だけの記録は削除する
+  await cleanupTaskCompletions(db, uid);
+  // いいねは参加者配列から削除する
   await deleteCollectionWhereArrayContains(db, 'taskLikes', 'participants', uid, 400);
 
   // 4) tasks.userIds から uid を外す（空になればドキュメント削除）
@@ -91,6 +90,60 @@ async function deleteCollectionWhereEquals(
 
     if (snap.size < batchSize) break;
   }
+}
+
+/**
+ * 完了記録:
+ * - userIds に uid がいる記録から本人を外す
+ * - 外したあとに誰も残らなければ削除する
+ * - 完了者（userId）が本人で、閲覧者が本人だけの記録も削除する
+ */
+async function cleanupTaskCompletions(database: Firestore, uid: string): Promise<void> {
+  const batchSize = 400;
+
+  for (;;) {
+    const snap = await database
+      .collection('taskCompletions')
+      .where('userIds', 'array-contains', uid)
+      .limit(batchSize)
+      .get();
+    if (snap.empty) break;
+
+    const batch = database.batch();
+    for (const d of snap.docs) {
+      const next = viewerIdsWithout(d.data().userIds, uid);
+      if (next.length === 0) batch.delete(d.ref);
+      else batch.update(d.ref, { userIds: next });
+    }
+    await batch.commit();
+    if (snap.size < batchSize) break;
+  }
+
+  for (;;) {
+    const snap = await database
+      .collection('taskCompletions')
+      .where('userId', '==', uid)
+      .limit(batchSize)
+      .get();
+    if (snap.empty) break;
+
+    const batch = database.batch();
+    let writes = 0;
+    for (const d of snap.docs) {
+      const next = viewerIdsWithout(d.data().userIds, uid);
+      if (next.length > 0) continue;
+      batch.delete(d.ref);
+      writes += 1;
+    }
+    if (writes === 0) break;
+    await batch.commit();
+    if (snap.size < batchSize) break;
+  }
+}
+
+function viewerIdsWithout(raw: unknown, uid: string): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((id): id is string => typeof id === 'string' && id !== uid);
 }
 
 /**

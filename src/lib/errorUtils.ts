@@ -14,6 +14,21 @@ import { toast } from 'sonner';
  * @param error 捕捉した例外オブジェクト（型は unknown を想定）
  */
 export const handleFirestoreError = (error: unknown): void => {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('INTERNAL ASSERTION FAILED')) {
+    console.error(error);
+    toast.error('通信の状態が崩れたため、画面を読み直します');
+    try {
+      const key = 'pk_firestore_reload_once';
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        window.setTimeout(() => location.reload(), 600);
+      }
+    } catch {
+      /* sessionStorage が使えないときはトーストだけ */
+    }
+    return;
+  }
   if (error instanceof Error) {
     toast.error(`Firestoreエラー: ${error.message}`);
   } else {

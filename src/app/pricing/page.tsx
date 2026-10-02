@@ -125,7 +125,7 @@ export default function PricingPage() {
             ? `解約済みです。${expiryLabel ? `${expiryLabel}まで` : '期限まで'}は案内と広告が非表示のままです。`
             : isPremium
               ? '応援プランに加入中です。案内と広告は出していません。'
-              : '家事・リスト・ペア共有は無料です。応援プランは、2人の画面から案内と広告を外す任意の月額です。'}
+              : 'タスク・リスト・ペア共有は無料です。応援プランは、2人の画面から案内と広告を外す任意の月額です。'}
         </p>
       </div>
 
@@ -150,7 +150,7 @@ export default function PricingPage() {
             <ul className="space-y-2 text-sm text-gray-700 mb-4 mt-3">
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                家事・リスト・ペア共有は、加入しなくても使えます
+                タスク・リスト・ペア共有は、加入しなくても使えます
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />

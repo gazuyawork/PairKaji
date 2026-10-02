@@ -3,6 +3,7 @@ import {
   deleteField,
   doc,
   getDocs,
+  runTransaction,
   updateDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -44,15 +45,9 @@ export function scrubRetiredTaskData(taskId: string, data: Record<string, unknow
   if (doneIds.has(taskId) || inFlight.has(taskId)) return;
 
   const categoryRetired = isRetiredCategory(data.category);
-  let todosChanged = false;
-  let nextTodos: unknown[] | undefined;
-  if (Array.isArray(data.todos)) {
-    nextTodos = data.todos.map((item) => {
-      const scrubbed = scrubTodoObject(item);
-      if (scrubbed.changed) todosChanged = true;
-      return scrubbed.value;
-    });
-  }
+  const todosChanged =
+    Array.isArray(data.todos) &&
+    data.todos.some((item) => scrubTodoObject(item).changed);
 
   if (!categoryRetired && !todosChanged) {
     doneIds.add(taskId);
@@ -62,12 +57,24 @@ export function scrubRetiredTaskData(taskId: string, data: Record<string, unknow
   inFlight.add(taskId);
   void (async () => {
     try {
-      const updates: Record<string, unknown> = {};
-      if (categoryRetired) updates.category = '未設定';
-      if (todosChanged && nextTodos) updates.todos = nextTodos;
-      if (Object.keys(updates).length > 0) {
-        await updateDoc(doc(db, 'tasks', taskId), updates);
-      }
+      const taskRef = doc(db, 'tasks', taskId);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(taskRef);
+        if (!snap.exists()) return;
+        const latest = snap.data() as Record<string, unknown>;
+        const updates: Record<string, unknown> = {};
+        if (isRetiredCategory(latest.category)) updates.category = '未設定';
+        if (Array.isArray(latest.todos)) {
+          let changed = false;
+          const scrubbedTodos = latest.todos.map((item) => {
+            const scrubbed = scrubTodoObject(item);
+            if (scrubbed.changed) changed = true;
+            return scrubbed.value;
+          });
+          if (changed) updates.todos = scrubbedTodos;
+        }
+        if (Object.keys(updates).length > 0) tx.update(taskRef, updates);
+      });
 
       const sub = await getDocs(collection(db, 'tasks', taskId, 'todos'));
       await Promise.all(

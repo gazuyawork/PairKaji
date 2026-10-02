@@ -127,6 +127,7 @@ export async function runDailyTaskReset(label: '05:30' | '05:45'): Promise<{ pro
 
   for (const [, docSnap] of targets) {
     const raw = docSnap.data() as any;
+    if (raw?.held === true) continue;
 
     // 本日がスケジュール対象日か
     const period: string | undefined = raw?.period;

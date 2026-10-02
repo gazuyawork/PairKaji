@@ -8,7 +8,8 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { signOutEverywhere } from '@/lib/authSession';
 import { useUserPlan } from '@/hooks/useUserPlan';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 
 type HeaderProps = {
@@ -23,15 +24,39 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
   const { plan, isChecking } = useUserPlan();
   const showPricingEntry = isChecking || plan !== 'premium';
 
-  // ▼▼ 追加: メニュー領域を参照するref
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
 
-  // ▼▼ 追加: メニュー外クリックで閉じる処理
+  useLayoutEffect(() => {
+    if (!showMenu) {
+      setMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const button = menuButtonRef.current;
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [showMenu]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (menuButtonRef.current?.contains(target)) return;
+      setShowMenu(false);
     };
     if (showMenu) {
       document.addEventListener('mousedown', handleClickOutside);
@@ -66,41 +91,46 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
           </motion.button>
         )}
 
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-2xl font-sans text-[#5E5E5E]">
+        <h1 className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 text-2xl font-sans text-[#5E5E5E]">
           {title ?? 'タイトル未設定'}
         </h1>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative z-10 ml-auto flex items-center gap-2">
           {saveStatus === 'saving' && <Loader2 className="animate-spin text-gray-400" size={20} />}
           {saveStatus === 'saved' && <CheckCircle className="text-green-500" size={20} />}
           <button
-            className="text-[#5E5E5E]"
+            ref={menuButtonRef}
+            type="button"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#5E5E5E] active:bg-gray-100"
             onClick={() => setShowMenu(prev => !prev)}
             aria-label="メニュー"
+            aria-expanded={showMenu}
           >
             <MoreVertical size={24} />
           </button>
         </div>
 
-        {showMenu && (
+        {showMenu && menuPos && createPortal(
           <div
-            ref={menuRef} // ★ 追加
-            className="absolute top-14 right-4 bg-white border border-gray-300 rounded-xl shadow-lg w-42 z-20 no-tab-swipe"
+            ref={menuRef}
+            style={{ top: menuPos.top, right: menuPos.right }}
+            className="fixed z-[80] w-44 overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg no-tab-swipe"
           >
-            <ul className="divide-y divide-gray-200">
-              <li
-                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-                onClick={() => {
-                  setShowMenu(false);
-                  router.push('/profile');
-                }}
-              >
-                <User size={16} />
-                設定
-              </li>
-              {showPricingEntry && (
-              <li
-                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+            <button
+              type="button"
+              className="flex min-h-12 w-full items-center gap-2 px-4 text-left text-[#5E5E5E] hover:bg-gray-100"
+              onClick={() => {
+                setShowMenu(false);
+                router.push('/profile');
+              }}
+            >
+              <User size={16} />
+              設定
+            </button>
+            {showPricingEntry && (
+              <button
+                type="button"
+                className="flex min-h-12 w-full items-center gap-2 border-t border-gray-200 px-4 text-left text-[#5E5E5E] hover:bg-gray-100"
                 onClick={() => {
                   setShowMenu(false);
                   router.push('/pricing');
@@ -108,28 +138,29 @@ export default function Header({ title, saveStatus = 'idle' }: HeaderProps) {
               >
                 <CheckCircle size={16} />
                 応援プラン
-              </li>
-              )}
-              <li
-                className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-                onClick={async () => {
-                  setShowMenu(false);
-                  try {
-                    document.cookie =
-                      'pk_last_dest=' +
-                      encodeURIComponent('/login') +
-                      '; Path=/; Max-Age=604800; SameSite=Lax';
-                    await signOutEverywhere();
-                  } finally {
-                    router.push('/login');
-                  }
-                }}
-              >
-                <LogOut size={16} />
-                ログアウト
-              </li>
-            </ul>
-          </div>
+              </button>
+            )}
+            <button
+              type="button"
+              className="flex min-h-12 w-full items-center gap-2 border-t border-gray-200 px-4 text-left text-[#5E5E5E] hover:bg-gray-100"
+              onClick={async () => {
+                setShowMenu(false);
+                try {
+                  document.cookie =
+                    'pk_last_dest=' +
+                    encodeURIComponent('/login') +
+                    '; Path=/; Max-Age=604800; SameSite=Lax';
+                  await signOutEverywhere();
+                } finally {
+                  router.push('/login');
+                }
+              }}
+            >
+              <LogOut size={16} />
+              ログアウト
+            </button>
+          </div>,
+          document.body
         )}
       </div>
     </header>

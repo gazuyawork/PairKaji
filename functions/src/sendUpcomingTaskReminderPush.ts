@@ -302,6 +302,7 @@ export const sendUpcomingTaskReminderPush = onSchedule(
 
       for (const doc of docs) {
         const d = doc.data() as Record<string, unknown>;
+        if (d.held === true) continue;
 
         const task: TaskDoc = {
           id: doc.id,

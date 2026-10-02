@@ -138,6 +138,23 @@ service cloud.firestore {
       allow read, write: if isSelf(uid);
     }
 
+    match /pair_task_orders/{pairId} {
+      function pairDoc() {
+        return get(/databases/$(database)/documents/pairs/$(pairId));
+      }
+      function isConfirmedPairMember() {
+        return signedIn()
+          && pairDoc().exists
+          && pairDoc().data.status == 'confirmed'
+          && request.auth.uid in pairDoc().data.userIds;
+      }
+      allow read: if isConfirmedPairMember();
+      allow create, update: if isConfirmedPairMember()
+        && request.resource.data.keys().hasOnly(['ids', 'updatedAt'])
+        && request.resource.data.ids is list
+        && request.resource.data.ids.size() <= 500;
+    }
+
     match /contacts/{id} {
       allow create: if signedIn();
       allow read, update, delete: if false;

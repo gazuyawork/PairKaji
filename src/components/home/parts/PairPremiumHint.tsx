@@ -25,7 +25,7 @@ export default function PairPremiumHint() {
 
     markPremiumHintShown(uid);
     toast('画面をすっきりする', {
-      description: '2人の家事とリストは無料です。案内と広告だけ外せます。',
+      description: '2人のタスクとリストは無料です。案内と広告だけ外せます。',
       action: {
         label: '見る',
         onClick: () => router.push('/pricing'),

@@ -1,7 +1,7 @@
 // src/components/task/TaskView.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import TaskCard from '@/components/task/parts/TaskCard';
 import EditTaskModal from '@/components/task/parts/EditTaskModal';
 import SearchBox from '@/components/task/parts/SearchBox';
@@ -14,10 +14,12 @@ import {
   getDoc,
   writeBatch,
   setDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   toggleTaskDoneStatus,
+  setTaskHeld,
   saveSingleTask,
   removeOrphanSharedTasksIfPairMissing,
   deleteTaskFromFirestore,
@@ -34,12 +36,12 @@ import {
   Calendar,
   Clock,
   Flag,
+  Hourglass,
   Search,
   CheckCircle,
   Circle,
   Trash2,
-  ToggleLeft,
-  ToggleRight,
+  ListChecks,
   Copy,
   GripVertical,
   Plus,
@@ -54,13 +56,13 @@ import { useView } from '@/context/ViewContext';
 
 /* ========= dnd-kit（タッチ対応のドラッグ＆ドロップ） ========= */
 import {
-  DndContext,
   DragEndEvent,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import RecoverableDndContext from '@/components/common/RecoverableDndContext';
 import {
   arrayMove,
   SortableContext,
@@ -277,13 +279,16 @@ function SelectModeRow({
     transition,
   };
 
-  const dateStr = task.dates?.[0] ? task.dates[0].replace(/-/g, '/').slice(5) : '';
-  const timeStr = /^\d{1,2}:\d{2}$/.test((task.time || '').trim()) ? (task.time || '').trim() : '';
+  const rawDate = task.dates?.[0];
+  const dateStr = typeof rawDate === 'string' && rawDate ? rawDate.replace(/-/g, '/').slice(5) : '';
+  const timeRaw = typeof task.time === 'string' ? task.time.trim() : '';
+  const timeStr = /^\d{1,2}:\d{2}$/.test(timeRaw) ? timeRaw : '';
   const order = ['0', '1', '2', '3', '4', '5', '6'];
   const dayKanjiToNumber: Record<string, string> = {
     日: '0', 月: '1', 火: '2', 水: '3', 木: '4', 金: '5', 土: '6',
   };
-  const sortedDays = [...(task.daysOfWeek ?? [])].sort(
+  const dayList = Array.isArray(task.daysOfWeek) ? task.daysOfWeek : [];
+  const sortedDays = dayList.slice().sort(
     (a, b) => order.indexOf(dayKanjiToNumber[a] ?? '') - order.indexOf(dayKanjiToNumber[b] ?? '')
   );
 
@@ -291,7 +296,7 @@ function SelectModeRow({
     <li ref={setNodeRef} style={style} className="relative transition-all duration-200">
       <div
         className={clsx(
-          'w-full relative flex items-center gap-1 overflow-hidden px-2 py-2 [touch-action:pan-y] min-h-[58px]',
+          'w-full relative flex items-center gap-1 overflow-hidden px-2 py-1.5 [touch-action:pan-y] min-h-[52px]',
           'text-[#5E5E5E]',
           'rounded-xl border border-gray-200',
           'bg-gradient-to-b from-white to-gray-50',
@@ -323,7 +328,7 @@ function SelectModeRow({
         >
           <div className="flex min-w-0 items-center gap-1">
             {task.flagged && <Flag className="h-4 w-4 shrink-0 text-red-500" />}
-            <span className="truncate font-sans font-bold text-[#5E5E5E]">{task.name || '(無題)'}</span>
+            <span className="truncate font-sans text-sm font-bold text-[#5E5E5E]">{task.name || '(無題)'}</span>
           </div>
           <div className="mt-0.5 flex min-w-0 items-center gap-1">
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[11px] text-gray-600">
@@ -355,6 +360,26 @@ function SelectModeRow({
           </div>
         </button>
 
+        {task.held && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void setTaskHeld(task.id, false)
+                .then(() => toast.success('再開しました'))
+                .catch((error) => {
+                  console.error('保留の解除エラー:', error);
+                  toast.error('再開に失敗しました');
+                });
+            }}
+            className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold leading-none text-gray-500"
+            aria-label="保留を解除"
+            title="保留を解除"
+          >
+            保留
+          </button>
+        )}
+
         <button
           type="button"
           className="flex h-10 w-10 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing touch-none select-none"
@@ -370,10 +395,33 @@ function SelectModeRow({
   );
 }
 
+function idsFromOrderDoc(data: { ids?: unknown } | undefined): string[] | null {
+  if (!Array.isArray(data?.ids)) return null;
+  const ids = data.ids.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  return ids;
+}
+
+function applyListOrderIds(
+  orderMap: Record<string, number>,
+  listTaskIds: string[],
+  listOrderIds: string[] | null
+): Record<string, number> {
+  if (!listOrderIds) return orderMap;
+  const idSet = new Set(listTaskIds);
+  const ordered = listOrderIds.filter((id) => idSet.has(id));
+  const remain = listTaskIds.filter((id) => !ordered.includes(id));
+  const next = { ...orderMap };
+  [...ordered, ...remain].forEach((id, idx) => {
+    next[id] = idx;
+  });
+  return next;
+}
+
 export default function TaskView({ initialSearch = '', onModalOpenChange }: Props) {
   const {
     uid,
     tasks: householdTasks,
+    pairs,
     hasPairConfirmed,
     partnerId,
     pairsReady,
@@ -387,10 +435,16 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [tasksState, setTasksState] = useState<Record<Period, Task[]>>(INITIAL_TASK_GROUPS);
   const [editTargetTask, setEditTargetTask] = useState<Task | null>(null);
+  const confirmedPairId = useMemo(() => {
+    if (!uid || !hasPairConfirmed) return null;
+    const pair = pairs.find((item) => item.status === 'confirmed' && item.userIds.includes(uid));
+    return pair?.id ?? null;
+  }, [uid, hasPairConfirmed, pairs]);
   const pairStatus: 'confirmed' | 'none' = hasPairConfirmed ? 'confirmed' : 'none';
   const partnerUserId = partnerId;
   const [privateFilter, setPrivateFilter] = useState(false);
   const [flaggedFilter, setFlaggedFilter] = useState(false);
+  const [heldFilter, setHeldFilter] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmKind, setConfirmKind] = useState<'undo' | 'leftover'>('undo');
   const pendingConfirmResolver = useRef<((value: boolean) => void) | null>(null);
@@ -398,6 +452,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const pendingDeleteResolver = useRef<((value: boolean) => void) | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [holdingDoneIds, setHoldingDoneIds] = useState<Set<string>>(() => new Set());
+  const optimisticDoneRef = useRef<Map<string, boolean>>(new Map());
+  const toggleInflightRef = useRef<Set<string>>(new Set());
   const [showOrphanConfirm, setShowOrphanConfirm] = useState(false);
   const [orphanCleaning, setOrphanCleaning] = useState(false);
   const orphanPromptDismissedRef = useRef(false);
@@ -406,7 +462,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [todayFilter, setTodayFilter] = useState(true);
   const [filterHint, setFilterHint] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [filterHintNudge, setFilterHintNudge] = useState(0);
   const filterHintTimerRef = useRef<number | null>(null);
+  const filterHintElRef = useRef<HTMLDivElement>(null);
   const isSearchVisible = showSearchBox || (searchTerm?.trim().length ?? 0) > 0;
   const todayDate = useMemo(() => new Date().getDate(), []);
   const { index, selectedTaskName, setSelectedTaskName, listOpen, openTaskList, taskScreenRequest } = useView();
@@ -437,6 +495,12 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
 
   // === [Fix2] コミット直後の短時間ガードを延長するためのタイマー保持
   const pendingTimers = useRef<Partial<Record<Period, number>>>({});
+  const pendingListOrder = useRef(false);
+  const pendingListTimer = useRef<number | null>(null);
+  // ドラッグ保存より古い並びの再読込で、直前の並びを上書きしない
+  const orderRevision = useRef(0);
+  // 並び保存中のスナップショットで一覧を組み直すと、ドラッグ終了と重なって画面が落ちる
+  const orderSaveLockRef = useRef(0);
 
   // dnd-kit センサー（タッチ/マウス対応）
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -549,6 +613,30 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   // 今日対象かどうか（期日すぎも含む）
   const isTodayTask = useCallback((task: Task): boolean => isTaskScheduledToday(task), []);
 
+  const taskVisible = useCallback(
+    (task: Task) => {
+      if (!uid) return false;
+      if (task.userId !== uid && !(task.userIds ?? []).includes(uid)) return false;
+      if (searchTerm && !fuzzyIncludes(task.name, searchTerm)) return false;
+      if (privateFilter && getOpt(task, 'private') !== true) return false;
+      if (flaggedFilter && getOpt(task, 'flagged') !== true) return false;
+      if (heldFilter) return task.held === true;
+      if (task.held === true) return !todayFilter || searchActive;
+      return !todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true;
+    },
+    [uid, searchTerm, privateFilter, flaggedFilter, heldFilter, todayFilter, searchActive, isTodayTask]
+  );
+  const heldCount = useMemo(() => {
+    if (!uid) return 0;
+    return periods.reduce((count, period) => {
+      const n = (tasksState[period] ?? []).filter(
+        (task) =>
+          (task.userId === uid || (task.userIds ?? []).includes(uid)) && task.held === true
+      ).length;
+      return count + n;
+    }, 0);
+  }, [tasksState, uid]);
+
   useEffect(() => {
     if (index !== 1 || listOpen || !selectedTaskName) return;
     const all = periods.flatMap((p) => tasksState[p] ?? []);
@@ -566,6 +654,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
     setShowSearchBox(false);
     setFlaggedFilter(false);
     setPrivateFilter(false);
+    setHeldFilter(false);
     if (!isTodayTask(matched)) setTodayFilter(false);
     if (matched.done) {
       setShowCompleted(true);
@@ -597,7 +686,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       window.clearTimeout(start);
       window.clearTimeout(clearHighlight);
     };
-  }, [index, listOpen, focusTaskId, todayFilter, showCompleted, searchTerm, flaggedFilter, privateFilter]);
+  }, [index, listOpen, focusTaskId, todayFilter, showCompleted, searchTerm, flaggedFilter, privateFilter, heldFilter]);
 
   // Done トグル時のロジック
   const toggleDone = async (period: Period, taskId: string): Promise<boolean> => {
@@ -612,6 +701,7 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       console.warn('[toggleDone] 未ログイン状態です');
       return false;
     }
+    if (toggleInflightRef.current.has(target.id)) return false;
 
     if (target.done) {
       const proceed = await new Promise<boolean>((resolve) => {
@@ -632,7 +722,18 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       }
     }
 
+    toggleInflightRef.current.add(target.id);
+
     const completing = !target.done;
+    const nextDone = !target.done;
+    optimisticDoneRef.current.set(target.id, nextDone);
+    setTasksState((prev) => {
+      const patched: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
+      for (const p of periods) {
+        patched[p] = (prev[p] ?? []).map((t) => (t.id === target.id ? { ...t, done: nextDone } : t));
+      }
+      return patched;
+    });
     if (completing) {
       setHoldingDoneIds((prev) => {
         const next = new Set(prev);
@@ -640,13 +741,37 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         return next;
       });
     }
-    await toggleTaskDoneStatus(
-      target.id,
-      uid,
-      !target.done,
-      target.name,
-      getOpt(target, 'person') ?? ''
-    );
+    let ok = false;
+    try {
+      ok = await toggleTaskDoneStatus(
+        target.id,
+        uid,
+        nextDone,
+        target.name,
+        getOpt(target, 'person') ?? ''
+      );
+    } finally {
+      toggleInflightRef.current.delete(target.id);
+    }
+    if (!ok) {
+      optimisticDoneRef.current.delete(target.id);
+      setTasksState((prev) => {
+        const patched: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
+        for (const p of periods) {
+          patched[p] = (prev[p] ?? []).map((t) => (t.id === target.id ? { ...t, done: target.done } : t));
+        }
+        return patched;
+      });
+      if (completing) {
+        setHoldingDoneIds((prev) => {
+          if (!prev.has(target.id)) return prev;
+          const next = new Set(prev);
+          next.delete(target.id);
+          return next;
+        });
+      }
+      return false;
+    }
     if (completing) {
       window.setTimeout(() => {
         setHoldingDoneIds((prev) => {
@@ -730,8 +855,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           if (aFlag && !bFlag) return -1;
           if (!aFlag && bFlag) return 1;
 
-          if (a.done !== b.done) return a.done ? 1 : -1;
-
           const aKey = getComparableDateTimeMs(a);
           const bKey = getComparableDateTimeMs(b);
 
@@ -741,7 +864,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
           if (aKey.hasTimeOnly && bKey.hasTimeOnly) return (aKey.ms ?? 0) - (bKey.ms ?? 0);
           if (aKey.hasTimeOnly !== bKey.hasTimeOnly) return aKey.hasTimeOnly ? -1 : 1;
 
-          return a.name.localeCompare(b.name);
+          const nameA = typeof a.name === 'string' ? a.name : '';
+          const nameB = typeof b.name === 'string' ? b.name : '';
+          return nameA.localeCompare(nameB);
         });
     },
     [localOrderMap]
@@ -757,9 +882,18 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       setIsLoading(true);
       return;
     }
-
     let cancelled = false;
-    const rawTasks = householdTasks.map((t) => ({ ...t }));
+    try {
+    const rawTasks = householdTasks.map((t) => {
+      const copy = { ...t };
+      const optimistic = optimisticDoneRef.current.get(t.id);
+      if (optimistic === undefined) return copy;
+      if (copy.done === optimistic) {
+        optimisticDoneRef.current.delete(t.id);
+        return copy;
+      }
+      return { ...copy, done: optimistic };
+    });
 
     const grouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
     for (const t of rawTasks) {
@@ -777,7 +911,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       list.forEach((t, idx) => {
         const ord = getOpt(t, 'order');
         const prevLocal = localOrderRef.current[t.id];
-        if (isPending) {
+        // 完了の更新でスナップショット順に組み直すと、チェックが付く前に位置が動く
+        if (typeof prevLocal === 'number' || isPending) {
           nextOrderMap[t.id] =
             typeof prevLocal === 'number'
               ? prevLocal
@@ -788,6 +923,17 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       });
     }
 
+    const keepPendingListOrder = (orderMap: Record<string, number>) => {
+      if (!pendingListOrder.current) return orderMap;
+      const next = { ...orderMap };
+      for (const t of rawTasks) {
+        if (!taskShowsOnTodoTab(t)) continue;
+        const prevLocal = localOrderRef.current[t.id];
+        if (typeof prevLocal === 'number') next[t.id] = prevLocal;
+      }
+      return next;
+    };
+
     const applyOrderAndPaint = (orderMap: Record<string, number>) => {
       if (cancelled) return;
       const sortedGrouped: Record<Period, Task[]> = { 毎日: [], 週次: [], 不定期: [] };
@@ -795,7 +941,16 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         const list = grouped[p];
         const sorted = list
           .slice()
-          .sort((a, b) => (orderMap[a.id] ?? 0) - (orderMap[b.id] ?? 0));
+          .sort((a, b) => (orderMap[a.id] ?? 0) - (orderMap[b.id] ?? 0))
+          .map((task) => {
+            const optimistic = optimisticDoneRef.current.get(task.id);
+            if (optimistic === undefined) return task;
+            if (task.done === optimistic) {
+              optimisticDoneRef.current.delete(task.id);
+              return task;
+            }
+            return { ...task, done: optimistic };
+          });
         sortedGrouped[p] = sorted;
       }
       setLocalOrderMap(orderMap);
@@ -803,8 +958,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       setIsLoading(false);
     };
 
-    applyOrderAndPaint(nextOrderMap);
+    applyOrderAndPaint(keepPendingListOrder(nextOrderMap));
 
+    const revisionAtStart = orderRevision.current;
     (async () => {
       try {
         const cbMaps = periods.map(async (p) => {
@@ -819,6 +975,31 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         const results = await Promise.all(cbMaps);
         if (cancelled) return;
 
+        let listOrderIds: string[] | null = null;
+        try {
+          if (confirmedPairId) {
+            const sharedRef = doc(db, 'pair_task_orders', confirmedPairId);
+            const sharedSnap = await getDoc(sharedRef);
+            if (sharedSnap.exists()) {
+              listOrderIds = idsFromOrderDoc(sharedSnap.data());
+            } else {
+              const personalRef = doc(collection(doc(db, 'user_configs', uid), 'task_orders'), 'リスト');
+              const personalSnap = await getDoc(personalRef);
+              const personalIds = personalSnap.exists() ? idsFromOrderDoc(personalSnap.data()) : null;
+              if (personalIds && personalIds.length > 0) {
+                await setDoc(sharedRef, { ids: personalIds, updatedAt: serverTimestamp() });
+                listOrderIds = personalIds;
+              }
+            }
+          } else {
+            const listOrderRef = doc(collection(doc(db, 'user_configs', uid), 'task_orders'), 'リスト');
+            const listSnap = await getDoc(listOrderRef);
+            if (listSnap.exists()) listOrderIds = idsFromOrderDoc(listSnap.data());
+          }
+        } catch (e) {
+          console.warn('[CB load] リストの並び順の読込に失敗しました（処理は継続します）:', e);
+        }
+
         const mergedMap = { ...nextOrderMap };
         for (const { period: p, ids: orderIds } of results) {
           if (!orderIds || pendingOrderPeriods.current.has(p)) continue;
@@ -831,16 +1012,58 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             mergedMap[id] = idx;
           });
         }
-        applyOrderAndPaint(mergedMap);
+
+        if (cancelled || revisionAtStart !== orderRevision.current) return;
+
+        if (!pendingListOrder.current && listOrderIds) {
+          const listTaskIds = rawTasks.filter((t) => taskShowsOnTodoTab(t)).map((t) => t.id);
+          Object.assign(mergedMap, applyListOrderIds(mergedMap, listTaskIds, listOrderIds));
+        }
+        applyOrderAndPaint(keepPendingListOrder(mergedMap));
       } catch (e) {
         console.warn('[CB load] 並び順の読込に失敗しました（処理は継続します）:', e);
       }
     })();
+    } catch (e) {
+      console.error('[TaskView] 並びの反映に失敗しました:', e);
+      setIsLoading(false);
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [uid, householdTasks, tasksReady]);
+  }, [uid, householdTasks, tasksReady, confirmedPairId]);
+
+  const householdTasksRef = useRef(householdTasks);
+  householdTasksRef.current = householdTasks;
+
+  useEffect(() => {
+    if (!confirmedPairId) return;
+    const ref = doc(db, 'pair_task_orders', confirmedPairId);
+    return onSnapshot(
+      ref,
+      (snap) => {
+        try {
+          if (pendingListOrder.current || orderSaveLockRef.current > 0 || !snap.exists()) return;
+          const listOrderIds = idsFromOrderDoc(snap.data());
+          if (!listOrderIds) return;
+          const listTaskIds = householdTasksRef.current
+            .filter((task) => taskShowsOnTodoTab(task))
+            .map((task) => task.id);
+          setLocalOrderMap((prev) => {
+            const next = applyListOrderIds(prev, listTaskIds, listOrderIds);
+            localOrderRef.current = next;
+            return next;
+          });
+        } catch (err) {
+          console.warn('[pair order] snapshot failed:', err);
+        }
+      },
+      (err) => {
+        console.warn('[pair order] listener error:', err);
+      }
+    );
+  }, [confirmedPairId]);
 
   // 初期検索語の反映
   useEffect(() => {
@@ -874,10 +1097,24 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   // 虫眼鏡ボタンで検索UIをトグル（閉じる時は検索語をクリア）
   const showFilterHint = useCallback((text: string, el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
+    setFilterHintNudge(0);
     setFilterHint({ text, x: rect.left + rect.width / 2, y: rect.top });
     if (filterHintTimerRef.current != null) window.clearTimeout(filterHintTimerRef.current);
     filterHintTimerRef.current = window.setTimeout(() => setFilterHint(null), 1400);
   }, []);
+
+  useLayoutEffect(() => {
+    const el = filterHintElRef.current;
+    if (!el || !filterHint) return;
+    const width = el.getBoundingClientRect().width;
+    const left = filterHint.x - width / 2;
+    let nudge = 0;
+    if (left < 0) nudge = -left;
+    else if (left + width > window.innerWidth - 8) {
+      nudge = window.innerWidth - 8 - (left + width);
+    }
+    setFilterHintNudge((prev) => (Math.abs(prev - nudge) > 0.5 ? nudge : prev));
+  }, [filterHint]);
 
   useEffect(() => {
     return () => {
@@ -1076,19 +1313,22 @@ const toggleSelectionMode = useCallback(() => {
   // 指定 period の表示順を Firestore に保存（period 全体の ID 順）
   const persistOrderForPeriod = useCallback(
     async (period: Period, orderedIds: string[]) => {
+      const ids = orderedIds.filter(
+        (id, index, arr) => typeof id === 'string' && id.length > 0 && arr.indexOf(id) === index
+      );
       try {
-        const batch = writeBatch(db);
-        orderedIds.forEach((id, idx) => {
-          const ref = doc(db, 'tasks', id);
-          batch.update(ref, { order: idx, updatedAt: serverTimestamp() });
-        });
-        await batch.commit();
-
-        // ★★★ 追加：CB（Cloud側別領域）にも「ID配列の順序」を保存
-        // パス: user_configs/{uid}/task_orders/{period}
+        // 表示順の正は ID 配列。タスク側の order は落ちても並びは残す
         if (uid) {
           const cbDocRef = doc(collection(doc(db, 'user_configs', uid), 'task_orders'), period);
-          await setDoc(cbDocRef, { ids: orderedIds, updatedAt: serverTimestamp() }, { merge: true });
+          await setDoc(cbDocRef, { ids, updatedAt: serverTimestamp() }, { merge: true });
+        }
+
+        for (let i = 0; i < ids.length; i += 400) {
+          const batch = writeBatch(db);
+          ids.slice(i, i + 400).forEach((id, j) => {
+            batch.update(doc(db, 'tasks', id), { order: i + j, updatedAt: serverTimestamp() });
+          });
+          await batch.commit();
         }
 
         toast.success('並び順を保存しました');
@@ -1122,50 +1362,122 @@ const toggleSelectionMode = useCallback(() => {
   );
 
   // dnd-kit: ドラッグ終了（period 全体順で処理）
+  // 終了処理の途中で一覧を組み直すと、計測中のノードが外れて画面全体が落ちる
   const handleDragEnd = useCallback(
-    async (period: Period, event: DragEndEvent, periodAll: Task[], visibleIds: string[]) => {
-      const { active, over } = event;
-      if (!active?.id || !over?.id || active.id === over.id) return;
+    (period: Period, event: DragEndEvent, periodAll: Task[], visibleIds: string[]) => {
+      let handedOff = false;
+      try {
+        const activeId = event.active?.id != null ? String(event.active.id) : '';
+        const overId = event.over?.id != null ? String(event.over.id) : '';
+        if (!activeId || !overId || activeId === overId) return;
 
-      // 1) period 全体の現在順序（localOrderMap/order）で ID 配列を作成（完全リスト）
-      const fullOrderedIds = sortByDisplayOrder(periodAll).map((t) => t.id);
+        const fullOrderedIds = sortByDisplayOrder(periodAll).map((t) => t.id);
+        const visibleOldIds = fullOrderedIds.filter((id) => visibleIds.includes(id));
+        const oldIndex = visibleOldIds.indexOf(activeId);
+        const newIndex = visibleOldIds.indexOf(overId);
+        if (oldIndex < 0 || newIndex < 0) return;
 
-      // 2) 可視（表示中）ID の現在順序と、新しい順序を作る
-      const visibleOldIds = fullOrderedIds.filter((id) => visibleIds.includes(id));
-      const oldIndex = visibleOldIds.indexOf(String(active.id));
-      const newIndex = visibleOldIds.indexOf(String(over.id));
-      if (oldIndex < 0 || newIndex < 0) return;
+        const visibleNewIds = arrayMove(visibleOldIds, oldIndex, newIndex);
+        const nextFullIds = mergeVisibleReorderIntoFull(fullOrderedIds, visibleOldIds, visibleNewIds).filter(
+          (id, index, arr): id is string =>
+            typeof id === 'string' && id.length > 0 && arr.indexOf(id) === index
+        );
+        orderRevision.current += 1;
+        orderSaveLockRef.current += 1;
 
-      const visibleNewIds = arrayMove(visibleOldIds, oldIndex, newIndex);
-
-      // 3) 可視の並び替えを period 全体の順序へ合成
-      const nextFullIds = mergeVisibleReorderIntoFull(fullOrderedIds, visibleOldIds, visibleNewIds);
-
-      // 4) ローカル order 更新（period 全体）＋ 楽観的保護
-      setLocalOrderMap((prev) => {
-        const next = { ...prev };
-        nextFullIds.forEach((id, idx) => {
-          next[id] = idx;
-        });
-        return next;
-      });
-
-      pendingOrderPeriods.current.add(period);
-
-      // 5) Firestore/CB に period 全体の順序を保存
-      await persistOrderForPeriod(period, nextFullIds);
-
-      // 6) 保存直後のスナップショット遅延に備えて、短時間 pending を維持（巻き戻し防止）
-      const t = pendingTimers.current[period];
-      if (typeof t === 'number') {
-        window.clearTimeout(t);
+        window.setTimeout(() => {
+          setLocalOrderMap((prev) => {
+            const next = { ...prev };
+            nextFullIds.forEach((id, idx) => {
+              next[id] = idx;
+            });
+            localOrderRef.current = next;
+            return next;
+          });
+          pendingOrderPeriods.current.add(period);
+          void persistOrderForPeriod(period, nextFullIds).finally(() => {
+            const t = pendingTimers.current[period];
+            if (typeof t === 'number') window.clearTimeout(t);
+            pendingTimers.current[period] = window.setTimeout(() => {
+              pendingOrderPeriods.current.delete(period);
+              delete pendingTimers.current[period];
+              orderSaveLockRef.current = Math.max(0, orderSaveLockRef.current - 1);
+            }, 1200);
+          });
+        }, 0);
+        handedOff = true;
+      } catch (e) {
+        if (!handedOff) orderSaveLockRef.current = Math.max(0, orderSaveLockRef.current - 1);
+        console.error('[handleDragEnd]', e);
+        toast.error('並び順の保存に失敗しました');
       }
-      pendingTimers.current[period] = window.setTimeout(() => {
-        pendingOrderPeriods.current.delete(period);
-        delete pendingTimers.current[period];
-      }, 1200);
     },
     [persistOrderForPeriod, sortByDisplayOrder, mergeVisibleReorderIntoFull]
+  );
+
+  const handleListDragEnd = useCallback(
+    (event: DragEndEvent, listAll: Task[], visibleIds: string[]) => {
+      let handedOff = false;
+      try {
+        const activeId = event.active?.id != null ? String(event.active.id) : '';
+        const overId = event.over?.id != null ? String(event.over.id) : '';
+        if (!activeId || !overId || activeId === overId) return;
+
+        const fullOrderedIds = sortByDisplayOrder(listAll).map((t) => t.id);
+        const visibleOldIds = fullOrderedIds.filter((id) => visibleIds.includes(id));
+        const oldIndex = visibleOldIds.indexOf(activeId);
+        const newIndex = visibleOldIds.indexOf(overId);
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const visibleNewIds = arrayMove(visibleOldIds, oldIndex, newIndex);
+        orderRevision.current += 1;
+        const nextFullIds = mergeVisibleReorderIntoFull(fullOrderedIds, visibleOldIds, visibleNewIds).filter(
+          (id, index, arr): id is string =>
+            typeof id === 'string' && id.length > 0 && arr.indexOf(id) === index
+        );
+        orderSaveLockRef.current += 1;
+
+        window.setTimeout(() => {
+          setLocalOrderMap((prev) => {
+            const next = { ...prev };
+            nextFullIds.forEach((id, idx) => {
+              next[id] = idx;
+            });
+            localOrderRef.current = next;
+            return next;
+          });
+
+          pendingListOrder.current = true;
+          if (pendingListTimer.current != null) window.clearTimeout(pendingListTimer.current);
+
+          void (async () => {
+            try {
+              if (!uid) throw new Error('ログインしていません');
+              const listOrderRef = confirmedPairId
+                ? doc(db, 'pair_task_orders', confirmedPairId)
+                : doc(collection(doc(db, 'user_configs', uid), 'task_orders'), 'リスト');
+              await setDoc(listOrderRef, { ids: nextFullIds, updatedAt: serverTimestamp() }, { merge: true });
+              toast.success('並び順を保存しました');
+            } catch (e) {
+              console.error('[persistListOrder] 失敗:', e);
+              toast.error('並び順の保存に失敗しました');
+            } finally {
+              pendingListTimer.current = window.setTimeout(() => {
+                pendingListOrder.current = false;
+                pendingListTimer.current = null;
+                orderSaveLockRef.current = Math.max(0, orderSaveLockRef.current - 1);
+              }, 1200);
+            }
+          })();
+        }, 0);
+        handedOff = true;
+      } catch (e) {
+        if (!handedOff) orderSaveLockRef.current = Math.max(0, orderSaveLockRef.current - 1);
+        console.error('[handleListDragEnd]', e);
+        toast.error('並び順の保存に失敗しました');
+      }
+    },
+    [uid, confirmedPairId, sortByDisplayOrder, mergeVisibleReorderIntoFull]
   );
 
   return (
@@ -1279,15 +1591,7 @@ const toggleSelectionMode = useCallback(() => {
             {(() => {
               const allFilteredTasks = periods
                 .flatMap((period) => tasksState[period] ?? [])
-                .filter(
-                  (task) =>
-                    uid &&
-                    (task.userId === uid || (task.userIds ?? []).includes(uid)) &&
-                    (!searchTerm || fuzzyIncludes(task.name, searchTerm)) &&
-                    (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
-                    (!privateFilter || getOpt(task, 'private') === true) &&
-                    (!flaggedFilter || getOpt(task, 'flagged') === true)
-                );
+                .filter((task) => taskVisible(task));
 
               const listTasks = allFilteredTasks.filter((task) => taskShowsOnTodoTab(task));
 
@@ -1337,9 +1641,9 @@ const toggleSelectionMode = useCallback(() => {
                             リストがあるタスク
                           </span>
                           <span className="text-sm text-gray-600">
-                            {listTasks.filter((t) => !t.done).length === 0
+                            {listTasks.filter((t) => !t.done && !t.held).length === 0
                               ? 'すべてのリストが完了しました。'
-                              : `残り ${listTasks.filter((t) => !t.done).length} 件`}
+                              : `残り ${listTasks.filter((t) => !t.done && !t.held).length} 件`}
                           </span>
                         </h2>
                       </div>
@@ -1350,29 +1654,28 @@ const toggleSelectionMode = useCallback(() => {
                           );
                           if (visibleList.length === 0) return null;
                           if (selectionMode) {
-                            return visibleList.map((task) => (
-                              <li key={task.id} className="relative">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleSelect(task.id)}
-                                  className={`flex w-full min-h-[58px] items-center gap-2 rounded-xl border px-3 py-2 text-left ${
-                                    selectedIds.has(task.id)
-                                      ? 'border-emerald-400 ring-2 ring-emerald-200 bg-white'
-                                      : 'border-gray-200 bg-white'
-                                  }`}
-                                  aria-pressed={selectedIds.has(task.id)}
+                            const visibleIds = visibleList.map((t) => t.id);
+                            return (
+                              <div className="no-tab-swipe space-y-1.5">
+                                <RecoverableDndContext
+                                  sensors={sensors}
+                                  collisionDetection={closestCenter}
+                                  modifiers={[restrictToVerticalAxis]}
+                                  onDragEnd={(e) => handleListDragEnd(e, listTasks, visibleIds)}
                                 >
-                                  {selectedIds.has(task.id) ? (
-                                    <CheckCircle className="w-5 h-5 shrink-0 text-emerald-600" />
-                                  ) : (
-                                    <Circle className="w-5 h-5 shrink-0 text-gray-400" />
-                                  )}
-                                  <span className="min-w-0 flex-1 truncate font-semibold text-[#5E5E5E]">
-                                    {task.name}
-                                  </span>
-                                </button>
-                              </li>
-                            ));
+                                  <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+                                    {visibleList.map((task) => (
+                                      <SelectModeRow
+                                        key={task.id}
+                                        task={task}
+                                        selected={selectedIds.has(task.id)}
+                                        onToggleSelect={toggleSelect}
+                                      />
+                                    ))}
+                                  </SortableContext>
+                                </RecoverableDndContext>
+                              </div>
+                            );
                           }
                           return visibleList.map((task, idx) => (
                             <li
@@ -1380,7 +1683,7 @@ const toggleSelectionMode = useCallback(() => {
                               ref={(el) => {
                                 taskRowRefs.current[task.id] = el;
                               }}
-                              className="relative transition-all duration-200"
+                              className="relative"
                             >
                               <TaskCard
                                 task={task}
@@ -1412,16 +1715,9 @@ const toggleSelectionMode = useCallback(() => {
                   {periods.map((period, i) => {
                 const periodAll = tasksState[period] ?? []; // === [Fix2] 未フィルタの period 全体
                 const baseList = periodAll.filter(
-                  (task) =>
-                    uid &&
-                    (task.userId === uid || (task.userIds ?? []).includes(uid)) &&
-                    !taskShowsOnTodoTab(task) &&
-                    (!searchTerm || fuzzyIncludes(task.name, searchTerm)) &&
-                    (!todayFilter || searchActive || isTodayTask(task) || getOpt(task, 'flagged') === true) &&
-                    (!privateFilter || getOpt(task, 'private') === true) &&
-                    (!flaggedFilter || getOpt(task, 'flagged') === true)
+                  (task) => taskVisible(task) && !taskShowsOnTodoTab(task)
                 );
-                const remaining = baseList.filter((t) => !t.done).length;
+                const remaining = baseList.filter((t) => !t.done && !t.held).length
 
                 if (!uid) {
                   return (
@@ -1470,7 +1766,7 @@ const toggleSelectionMode = useCallback(() => {
 
                           return (
                             <div className="no-tab-swipe space-y-1.5">
-                            <DndContext
+                            <RecoverableDndContext
                               sensors={sensors}
                               collisionDetection={closestCenter}
                               modifiers={[restrictToVerticalAxis]}
@@ -1487,7 +1783,7 @@ const toggleSelectionMode = useCallback(() => {
                                   />
                                 ))}
                               </SortableContext>
-                            </DndContext>
+                            </RecoverableDndContext>
                             </div>
                           );
                         }
@@ -1499,7 +1795,7 @@ const toggleSelectionMode = useCallback(() => {
                             ref={(el) => {
                               taskRowRefs.current[task.id] = el;
                             }}
-                            className="relative transition-all duration-200"
+                            className="relative"
                           >
                             <TaskCard
                               task={task}
@@ -1543,8 +1839,13 @@ const toggleSelectionMode = useCallback(() => {
             <div className="w-full pointer-events-none">
               {filterHint && (
                 <div
-                  className="pointer-events-none fixed z-[1300] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-full bg-[#5E5E5E] px-2.5 py-1 text-xs font-semibold text-white shadow-md"
-                  style={{ left: filterHint.x, top: filterHint.y - 8 }}
+                  ref={filterHintElRef}
+                  className="pointer-events-none fixed z-[1300] whitespace-pre text-center leading-tight rounded-full bg-[#5E5E5E] px-2.5 py-1 text-xs font-semibold text-white shadow-md"
+                  style={{
+                    left: filterHint.x,
+                    top: filterHint.y - 8,
+                    transform: `translate(calc(-50% + ${filterHintNudge}px), -100%)`,
+                  }}
                 >
                   {filterHint.text}
                 </div>
@@ -1553,35 +1854,34 @@ const toggleSelectionMode = useCallback(() => {
                 className="
           fixed inset-x-0 z-[1200]
           bottom-[calc(env(safe-area-inset-bottom)+5.8rem)]
-          flex items-center justify-center gap-3
+          grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2
           px-4 pointer-events-none
         "
               >
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    showFilterHint(selectionMode ? '選択モード\nOFF' : '選択モード\nON', e.currentTarget);
+                    toggleSelectionMode();
+                  }}
+                  aria-pressed={selectionMode}
+                  aria-label="選択モード"
+                  title="選択モード"
+                  className={[
+                    'pointer-events-auto justify-self-start shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl border-2 shadow-lg transition-transform active:translate-y-[1px]',
+                    selectionMode
+                      ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-emerald-700'
+                      : 'bg-white text-emerald-700 border-emerald-200',
+                  ].join(' ')}
+                >
+                  <ListChecks className="h-6 w-6" />
+                </button>
                 {/* フィルタと追加ボタンを同じ高さで画面中央に置く */}
-                <div className="pointer-events-auto min-w-0 w-max max-w-[calc(100vw-2rem-3.5rem-0.75rem)] overflow-hidden rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-1.5 py-2 min-[420px]:px-2">
+                <div className="pointer-events-auto justify-self-center min-w-0 w-max max-w-full overflow-hidden rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 shadow-[0_8px_24px_rgba(0,0,0,0.16)] px-1.5 py-2 min-[420px]:px-2">
                   <div
                     className="flex items-center gap-0.5 overflow-x-auto overscroll-x-contain no-scrollbar horizontal-scroll px-0.5 whitespace-nowrap min-[420px]:gap-1 min-[420px]:px-1 [&_button]:h-9 [&_button]:w-9 min-[420px]:[&_button]:h-10 min-[420px]:[&_button]:w-10 [&_.w-px]:mx-0.5 min-[420px]:[&_.w-px]:mx-1"
                     style={{ WebkitOverflowScrolling: 'touch' }}
                   >
-                    {/* ==== 選択モードトグル ==== */}
-                    <button
-                      onClick={(e) => {
-                        showFilterHint(selectionMode ? '編集モード OFF' : '編集モード ON', e.currentTarget);
-                        toggleSelectionMode();
-                      }}
-                      aria-pressed={selectionMode}
-                      title="選択モード"
-                      className={[
-                        'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
-                        'shrink-0',
-                        selectionMode
-                          ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-[2px] border-emerald-600 shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
-                          : 'bg-white text-emerald-600 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-emerald-500 hover:text-white hover:border-emerald-500',
-                      ].join(' ')}
-                    >
-                      {selectionMode ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
-                    </button>
-
                     {hasAnyCompleted && (
                       <button
                         onClick={(e) => {
@@ -1613,8 +1913,9 @@ const toggleSelectionMode = useCallback(() => {
 
                     {/* 一括コピー（選択中のみ表示） */}
                     <>
-                      {/* 仕切り */}
-                      <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+                      {(hasAnyCompleted || selectionMode) && (
+                        <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+                      )}
                       {selectionMode && (
                         <button
                           onClick={handleBulkCopy}
@@ -1726,6 +2027,37 @@ const toggleSelectionMode = useCallback(() => {
                         >
                           <Flag className="w-6 h-6" />
                         </button>
+
+                        {/* 保留 */}
+                        <button
+                          onClick={(e) => {
+                            const next = !heldFilter;
+                            setHeldFilter(next);
+                            showFilterHint(next ? '保留のみ ON' : '保留のみ OFF', e.currentTarget);
+                          }}
+                          aria-pressed={heldFilter}
+                          aria-label="保留中のタスクのみ表示"
+                          title="保留中のタスク"
+                          className={[
+                            'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300',
+                            'shrink-0',
+                            heldFilter
+                              ? 'bg-gradient-to-b from-amber-300 to-amber-500 text-white border-[2px] border-amber-500 shadow-[0_6px_14px_rgba(0,0,0,0.18)]'
+                              : 'bg-white text-amber-500 border border-gray-300 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.15)] hover:bg-amber-500 hover:text-white hover:border-amber-500',
+                          ].join(' ')}
+                        >
+                          <Hourglass className={`w-5 h-5 ${heldCount > 0 ? '-translate-y-1' : ''} ${heldFilter ? 'text-white' : ''}`} />
+                          {heldCount > 0 && (
+                            <span
+                              className={[
+                                'absolute bottom-[3px] left-1/2 -translate-x-1/2 text-[9px] font-bold leading-none pointer-events-none',
+                                heldFilter ? 'text-white' : 'text-amber-600',
+                              ].join(' ')}
+                            >
+                              {heldCount > 99 ? '99+' : heldCount}
+                            </span>
+                          )}
+                        </button>
                       </>
                     )}
 
@@ -1754,7 +2086,7 @@ const toggleSelectionMode = useCallback(() => {
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event('open-new-task-modal'))}
-                  className="pointer-events-auto shrink-0 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#FFC25A] to-[#FFA726] text-white shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white transition-transform hover:scale-105 active:translate-y-[1px]"
+                  className="pointer-events-auto justify-self-end shrink-0 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#FFC25A] to-[#FFA726] text-white shadow-lg shadow-[#e18c3b]/60 ring-2 ring-white transition-transform hover:scale-105 active:translate-y-[1px]"
                   aria-label="新規タスク追加"
                 >
                   <Plus className="h-7 w-7" />

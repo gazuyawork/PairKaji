@@ -4,6 +4,7 @@ type DayResetTask = {
   period?: Period | string | null;
   done?: boolean;
   skipped?: boolean;
+  held?: boolean;
   completedAt?: unknown;
   completedBy?: unknown;
   updatedAt?: unknown;
@@ -97,6 +98,7 @@ function isScheduledToday(task: DayResetTask, now: Date): boolean {
 
 /** サーバーの日次リセットと同じ条件。表示だけ直す（書き込まない） */
 export function needsLocalDayReset(task: DayResetTask, now = new Date()): boolean {
+  if (task.held === true) return false;
   if (!isScheduledToday(task, now)) return false;
 
   const completedAtDate = toDateSafe(task.completedAt);

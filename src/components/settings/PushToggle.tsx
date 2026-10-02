@@ -869,7 +869,7 @@ export default function PushToggle({ uid }: Props) {
       <p className="text-sm text-gray-700 mt-4">{statusText}</p>
       {isNativeAppPlatform() && (
         <p className="text-xs text-gray-500">
-          許可すると、アプリを閉じていても家事リマインドが届きます。
+          許可すると、アプリを閉じていてもタスクリマインドが届きます。
         </p>
       )}
 

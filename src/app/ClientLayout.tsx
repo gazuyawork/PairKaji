@@ -77,7 +77,6 @@ function usePWAStandaloneScrollFix() {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLanding = pathname?.startsWith('/landing') ?? false;
   useSyncPlayEntitlement();
 
   // ★追加: PWA 初回/復帰スクロール不具合への恒久対策
@@ -92,8 +91,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const isMain = pathname?.startsWith('/main') ?? false;
   const isTodo = pathname?.startsWith('/todo') ?? false;
 
-  const allowTouch =
-    isLanding || isProfile || isPricing || isSettingsLineLink || isMain || isTodo;
+  const allowTouch = isProfile || isPricing || isSettingsLineLink || isMain || isTodo;
 
   useUnlockBodyOnUnmount();
 
@@ -173,7 +171,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       {/* 既存: allowTouch のときは PreventBounce を外す */}
       {!allowTouch && <PreventBounce />}
 
-      {/* 既存: /landing 入場時は key を切り替えて強制再マウント（初期化漏れ対策） */}
+      {/* allowTouch のページ入場時は key を切り替えて強制再マウント（初期化漏れ対策） */}
       <div
         key={allowTouch ? 'allow-touch' : 'default'}
         className={`flex flex-col min-h-[100dvh] ${
