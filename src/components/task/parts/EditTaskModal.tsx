@@ -175,18 +175,6 @@ function OptionalTimeField({
     else onChange('');
   };
 
-  if (!picking) {
-    return (
-      <button
-        type="button"
-        onClick={() => setPicking(true)}
-        className="min-h-11 text-sm font-medium text-gray-600 underline underline-offset-2"
-      >
-        時間を指定（任意）
-      </button>
-    );
-  }
-
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
       <select
