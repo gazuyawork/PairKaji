@@ -11,7 +11,7 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import { ChevronDown, ChevronUp, Plus, GripVertical, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, GripVertical, Pencil, Plus, X } from 'lucide-react';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateTodoInTask } from '@/lib/firebaseUtils';
 import {
@@ -25,6 +25,7 @@ import {
   deleteObject,
 } from 'firebase/storage';
 import BaseModal from '../../common/modals/BaseModal';
+import { createPortal } from 'react-dom';
 import NextImage from 'next/image';
 import { toast } from 'sonner';
 
@@ -237,6 +238,26 @@ type DragHandleRenderProps = {
   listeners: ReturnType<typeof useSortable>['listeners'];
 };
 
+function MemoImageFrame({ src, ready }: { src: string; ready: boolean }) {
+  return (
+    <>
+      <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
+      <div className="absolute inset-0">
+        <NextImage
+          src={src}
+          alt=""
+          fill
+          sizes="(max-width: 640px) 100vw, 640px"
+          className="object-contain transition-opacity duration-200"
+          style={{ opacity: ready ? 1 : 0 }}
+          priority={false}
+        />
+        {!ready && <div className="absolute inset-0 animate-pulse bg-gray-100" />}
+      </div>
+    </>
+  );
+}
+
 // Sortable 行（URL/チェックリスト共通で使用）
 function SortableUrlRow({
   id,
@@ -311,11 +332,11 @@ export default function TodoNoteModal({
 
   // プレビュー用
   const [imgReady, setImgReady] = useState(false);
+  const [imageZoomed, setImageZoomed] = useState(false);
   const displaySrc = previewUrl ?? imageUrl;
   const showMediaFrame = isOpen && !!displaySrc;
 
   const memoRef = useRef<HTMLTextAreaElement | null>(null);
-  const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 内容の存在判定
@@ -541,17 +562,18 @@ export default function TodoNoteModal({
     }
   }, [pendingCheckFocusIndex, checklist.length, checkIds.length]);
 
-  const resizeTitle = useCallback(() => {
-    const el = titleRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, []);
+  useEffect(() => {
+    if (!isOpen || !isPreview) setImageZoomed(false);
+  }, [isOpen, isPreview]);
 
-  useLayoutEffect(() => {
-    if (!isOpen || isPreview) return;
-    resizeTitle();
-  }, [isOpen, isPreview, todoTitle, resizeTitle]);
+  useEffect(() => {
+    if (!imageZoomed) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setImageZoomed(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [imageZoomed]);
 
   // テキストエリアのリサイズ等（備考）
   const resizeTextarea = useCallback(() => {
@@ -932,6 +954,7 @@ export default function TodoNoteModal({
   const hideActions = isLoading || isPreview;
 
   return (
+    <>
     <BaseModal
       isOpen={isOpen}
       isSaving={isSaving || isLoading}
@@ -959,30 +982,9 @@ export default function TodoNoteModal({
           className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
           style={{ minHeight: 240 }}
         >
-          {/* ヘッダー（閉じる + 編集/プレビュー切替は「非活性ではなく非表示で切替」） */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              {isPreview ? (
-                <h2 className="text-base font-bold text-gray-800 break-words">
-                  {todoTitle.trim() ? todoTitle : '（未入力）'}
-                </h2>
-              ) : (
-                <textarea
-                  ref={titleRef}
-                  value={todoTitle}
-                  rows={1}
-                  onChange={(e) => setTodoTitle(e.target.value.replace(/\r?\n/g, ''))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') e.preventDefault();
-                  }}
-                  placeholder="リスト名を入力"
-                  className="w-full resize-none overflow-hidden break-words text-base font-bold text-gray-800 bg-transparent border-b border-gray-200 focus:outline-none focus:border-blue-500 pb-1"
-                  aria-label="リスト名"
-                />
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
+          {/* ヘッダー：ボタンを上に置き、リスト名は下で全幅に折り返す */}
+          <div>
+            <div className="mb-2 flex items-center justify-end gap-2">
               {isPreview ? (
                 <button
                   type="button"
@@ -990,10 +992,11 @@ export default function TodoNoteModal({
                     setIsPreview(false);
                     setErrorsShown(false);
                   }}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-300 hover:border-blue-500"
                   aria-label="編集に切り替える"
+                  title="編集"
                 >
-                  編集
+                  <Pencil size={18} />
                 </button>
               ) : (
                 <button
@@ -1002,10 +1005,11 @@ export default function TodoNoteModal({
                     setIsPreview(true);
                     setErrorsShown(false);
                   }}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-300 hover:border-blue-500"
                   aria-label="プレビューに切り替える"
+                  title="プレビュー"
                 >
-                  プレビュー
+                  <Eye size={18} />
                 </button>
               )}
 
@@ -1020,6 +1024,31 @@ export default function TodoNoteModal({
                 <X size={18} />
               </button>
             </div>
+            {isPreview ? (
+              <h2 className="text-base font-bold text-gray-800 break-words">
+                {todoTitle.trim() ? todoTitle : '（未入力）'}
+              </h2>
+            ) : (
+              <div className="grid w-full min-w-0 text-base font-bold leading-6 text-gray-800">
+                <div
+                  aria-hidden
+                  className="invisible col-start-1 row-start-1 whitespace-pre-wrap break-words border-b border-transparent pb-1"
+                >
+                  {(todoTitle || 'リスト名を入力') + '\u200b'}
+                </div>
+                <textarea
+                  value={todoTitle}
+                  rows={1}
+                  onChange={(e) => setTodoTitle(e.target.value.replace(/\r?\n/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.preventDefault();
+                  }}
+                  placeholder="リスト名を入力"
+                  className="col-start-1 row-start-1 h-full min-h-0 w-full resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent border-b border-gray-200 pb-1 outline-none focus:border-blue-500"
+                  aria-label="リスト名"
+                />
+              </div>
+            )}
           </div>
 
           {/* 画像挿入UI（編集時のみ操作可能） */}
@@ -1053,21 +1082,23 @@ export default function TodoNoteModal({
             )}
 
             {showMediaFrame && (
-              <div className="mt-2 relative rounded-lg border border-gray-200 overflow-hidden bg-white">
-                <div className="w-full" style={{ aspectRatio: '4 / 3' }} />
-                <div className="absolute inset-0">
-                  <NextImage
-                    src={displaySrc!}
-                    alt="挿入画像プレビュー"
-                    fill
-                    sizes="(max-width: 640px) 100vw, 640px"
-                    className="object-contain transition-opacity duration-200"
-                    style={{ opacity: imgReady ? 1 : 0 }}
-                    priority={false}
-                  />
-                  {!imgReady && <div className="absolute inset-0 animate-pulse bg-gray-100" />}
+              isPreview ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (imgReady) setImageZoomed(true);
+                  }}
+                  className="mt-2 relative block w-full overflow-hidden rounded-lg border border-gray-200 bg-white"
+                  aria-label="画像を拡大"
+                  disabled={!imgReady}
+                >
+                  <MemoImageFrame src={displaySrc!} ready={imgReady} />
+                </button>
+              ) : (
+                <div className="mt-2 relative overflow-hidden rounded-lg border border-gray-200 bg-white">
+                  <MemoImageFrame src={displaySrc!} ready={imgReady} />
                 </div>
-              </div>
+              )
             )}
           </div>
 
@@ -1111,10 +1142,11 @@ export default function TodoNoteModal({
                     <button
                       type="button"
                       onClick={addUrl}
-                      className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 hover:border-blue-500"
+                      aria-label="参考リンクを追加"
+                      title="追加"
                     >
-                      <Plus size={16} />
-                      追加
+                      <Plus size={18} />
                     </button>
                   </div>
                 )}
@@ -1233,10 +1265,11 @@ export default function TodoNoteModal({
                       setCheckIds((prev) => [...prev, id]);
                       setPendingCheckFocusIndex(checkIds.length);
                     }}
-                    className="inline-flex items-center gap-1 pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-full hover:border-blue-500"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 hover:border-blue-500"
+                    aria-label="チェックリストを追加"
+                    title="追加"
                   >
-                    <Plus size={16} />
-                    追加
+                    <Plus size={18} />
                   </button>
                 )}
               </div>
@@ -1389,5 +1422,31 @@ export default function TodoNoteModal({
         </div>
       </div>
     </BaseModal>
+    {imageZoomed && displaySrc && typeof document !== 'undefined' && createPortal(
+      <div
+        className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/80 p-4"
+        onClick={() => setImageZoomed(false)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="拡大画像"
+      >
+        <button
+          type="button"
+          className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-[1] flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-gray-800"
+          aria-label="拡大を閉じる"
+          onClick={() => setImageZoomed(false)}
+        >
+          <X size={18} />
+        </button>
+        <img
+          src={displaySrc}
+          alt="拡大画像"
+          className="max-h-full max-w-full object-contain"
+          onClick={(event) => event.stopPropagation()}
+        />
+      </div>,
+      document.body
+    )}
+    </>
   );
 }

@@ -4,8 +4,7 @@
 export const dynamic = 'force-dynamic'
 
 import { motion } from 'framer-motion';
-import { useSwipeable } from 'react-swipeable';
-import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, Notebook, SquareUser, MoreVertical, Hourglass, List } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, Clock, Pencil, Flag, Trash2, Notebook, SquareUser, MoreVertical, Hourglass, ListTodo } from 'lucide-react';
 import { useEffect, useState, useRef, useMemo, memo } from 'react';
 import type { Task, Period } from '@/types/Task';
 import Image from 'next/image';
@@ -83,7 +82,6 @@ function TaskCard({
 
   const [showActions, setShowActions] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(true);
-  const [swipeDirection, setSwipeDirection] = useState<'right' | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingConfirmResolver = useRef<((ok: boolean) => void) | null>(null);
   const [localDone, setLocalDone] = useState(task.done);
@@ -176,7 +174,6 @@ function TaskCard({
       if (!cardRef.current.contains(e.target as Node)) {
         setShowActions(false);
         setShowActionButtons(false);
-        setSwipeDirection(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -208,16 +205,6 @@ function TaskCard({
     openTaskList(task.id);
   };
 
-  const swipeable = useSwipeable({
-    onSwipedRight: () => {
-      if (!showOnTodo) return;
-      setSwipeDirection('right');
-      setShowActions(false);
-    },
-    trackTouch: true,
-    delta: 40,
-  });
-
   /* ★変更: メニュー自動クローズ時間（誤 50000 → 正 5000ms に修正） */
   useEffect(() => {
     if (!showActions) return;
@@ -232,19 +219,7 @@ function TaskCard({
 
   return (
     <div className="relative no-tab-swipe" ref={cardRef}>
-      {swipeDirection === 'right' && showOnTodo && (
-        <div className="absolute left-2 top-1/2 z-20 -translate-y-1/2">
-          <button
-            type="button"
-            className="h-11 w-16 rounded-xl bg-gradient-to-b from-blue-300 to-blue-500 text-sm font-bold text-white shadow-md ring-2 ring-white active:translate-y-[1px]"
-            onClick={handleTodoClick}
-          >
-            <span className="[text-shadow:1px_1px_1px_rgba(0,0,0,0.5)]">リスト</span>
-          </button>
-        </div>
-      )}
-
-      {showActions && showActionButtons && swipeDirection === null && (
+      {showActions && showActionButtons && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto">
           <div className="flex items-center gap-4">
             {/* 削除 */}
@@ -314,10 +289,6 @@ function TaskCard({
       )}
 
       <motion.div
-        {...swipeable}
-        onClick={() => {
-          setSwipeDirection(null);
-        }}
         className={clsx(
           'w-full relative flex items-center gap-1 overflow-hidden px-2 py-1.5 [touch-action:pan-y] min-h-[52px]',
           'group text-[#5E5E5E]',
@@ -330,17 +301,6 @@ function TaskCard({
           highlighted && 'ring-2 ring-[#FFCB7D] border-[#FFCB7D] shadow-[0_0_0_3px_rgba(255,203,125,0.35)]'
         )}
       >
-        {showOnTodo && (
-          <div
-            className="pointer-events-none absolute top-0 left-0 z-10 flex h-[30px] w-[30px] items-center justify-center bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-inner ring-1 ring-white/40"
-            style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)' }}
-            role="img"
-            aria-label="リスト"
-          >
-            <List className="h-3 w-3 translate-x-[-7px] translate-y-[-7px]" strokeWidth={2.5} aria-hidden />
-          </div>
-        )}
-
         <button
           type="button"
           onClick={(e) => {
@@ -463,9 +423,9 @@ function TaskCard({
                 e.stopPropagation();
                 handleTodoClick();
               }}
-              className="pc-only-list-btn h-8 items-center justify-center rounded-lg bg-gradient-to-b from-blue-300 to-blue-500 px-2 text-xs font-bold text-white shadow-sm"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-blue-300 to-blue-500 text-white shadow-sm"
             >
-              リスト
+              <ListTodo className="h-[18px] w-[18px]" aria-hidden />
             </button>
           )}
           <button

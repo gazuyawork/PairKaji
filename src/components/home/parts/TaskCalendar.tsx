@@ -458,7 +458,7 @@ export default function TaskCalendar({ tasks }: Props) {
         {/* 日付指定 */}
         <div className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full bg-orange-400 inline-block" />
-          <span>日付指定</span>
+          <span>一回</span>
         </div>
 
         {/* 期限切れ（不定期） */}

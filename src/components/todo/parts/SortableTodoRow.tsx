@@ -55,7 +55,7 @@ type Props = {
   todo: SimpleTodo;
   dndEnabled: boolean;
   focusedTodoId: string | null;
-  todoRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
+  todoRefs: React.MutableRefObject<Record<string, HTMLTextAreaElement | null>>;
   todos: SimpleTodo[];
   editingErrors: Record<string, string>;
   setEditingErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -235,7 +235,7 @@ export default function SortableTodoRow({
         onCancel={() => closeConfirm(false)}
       />
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         {dndEnabled && (
           <span
             className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none"
@@ -277,48 +277,60 @@ export default function SortableTodoRow({
           )}
         </div>
 
-        {/* テキスト入力 */}
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onKeyDownCapture={(e) => e.stopPropagation()}
-          onKeyUpCapture={(e) => e.stopPropagation()}
-          onFocus={() => setIsEditingRow(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              setIsEditingRow(false);
-              setText(todo.text ?? '');
-              (e.currentTarget as HTMLInputElement).blur();
-              return;
-            }
-            if (e.key !== 'Enter') return;
-            if (isComposingRow) return;
-            e.preventDefault();
-            (e.currentTarget as HTMLInputElement).blur();
-          }}
-          onBlur={commit}
-          onCompositionStart={() => setIsComposingRow(true)}
-          onCompositionEnd={() => setIsComposingRow(false)}
-          ref={(el) => {
-            if (el) {
-              todoRefs.current[todo.id] = el;
-              if (focusedTodoId === todo.id) el.focus();
-            }
-          }}
-          disabled={isLocked}
+        {/* テキスト入力。見えない複製で折り返し後の行数ぶんの高さを決める */}
+        <div
           className={clsx(
-            'flex-1 border-b bg-transparent outline-none border-gray-200 h-8',
-            todo.done ? 'text-gray-400 line-through' : 'text-black',
-            isLocked && 'cursor-not-allowed opacity-70'
+            'grid min-h-8 min-w-0 flex-1 leading-6',
+            todo.done ? 'text-gray-400 line-through' : 'text-black'
           )}
-          placeholder="リストを入力"
-          aria-label="リストを入力"
-        />
+        >
+          <div
+            aria-hidden
+            className="invisible col-start-1 row-start-1 whitespace-pre-wrap break-words border-b border-transparent py-1"
+          >
+            {(text || 'リストを入力') + '\u200b'}
+          </div>
+          <textarea
+            value={text}
+            rows={1}
+            onChange={(e) => setText(e.target.value.replace(/\r?\n/g, ''))}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onKeyDownCapture={(e) => e.stopPropagation()}
+            onKeyUpCapture={(e) => e.stopPropagation()}
+            onFocus={() => setIsEditingRow(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setIsEditingRow(false);
+                setText(todo.text ?? '');
+                e.currentTarget.blur();
+                return;
+              }
+              if (e.key !== 'Enter') return;
+              if (isComposingRow) return;
+              e.preventDefault();
+              e.currentTarget.blur();
+            }}
+            onBlur={commit}
+            onCompositionStart={() => setIsComposingRow(true)}
+            onCompositionEnd={() => setIsComposingRow(false)}
+            ref={(el) => {
+              if (el) {
+                todoRefs.current[todo.id] = el;
+                if (focusedTodoId === todo.id) el.focus();
+              }
+            }}
+            disabled={isLocked}
+            className={clsx(
+              'col-start-1 row-start-1 h-full w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-b bg-transparent py-1 leading-6 outline-none border-gray-200',
+              isLocked && 'cursor-not-allowed opacity-70'
+            )}
+            placeholder="リストを入力"
+            aria-label="リストを入力"
+          />
+        </div>
 
         {todo.done && formatCompletedMd(todo.completedAt) && (
           <span className="shrink-0 text-[11px] leading-none text-gray-400 tabular-nums">

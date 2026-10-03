@@ -24,7 +24,9 @@ import {
   isWithinInterval,
   format,
 } from 'date-fns';
+import { ja } from 'date-fns/locale';
 import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import HelpPopover from '@/components/common/HelpPopover';
 import { motion } from 'framer-motion';
 import {
   CappedListToggle,
@@ -45,6 +47,15 @@ type TaskHistoryModalProps = {
 };
 
 // 履歴（taskCompletions）用の型
+function historyDayLabel(key: string): string {
+  const parts = key.split('/');
+  if (parts.length !== 3) return key;
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!month || !day) return key;
+  return `${month}/${day}`;
+}
+
 type CompletionRow = {
   id: string;
   taskId: string;
@@ -203,7 +214,7 @@ export default function TaskHistoryModal({
       const { start, end } = weekBounds;
       const days = eachDayOfInterval({ start, end });
       const dayKeys = days.map((d) => format(d, 'yyyy/MM/dd'));
-      const labels = days.map((d) => format(d, 'EEE'));
+      const labels = days.map((d) => format(d, 'EEE', { locale: ja }));
 
       const perDayMe: Record<string, number> = {};
       const perDayPartner: Record<string, number> = {};
@@ -373,10 +384,15 @@ export default function TaskHistoryModal({
       )}
 
       <div className={`${hideWeekNav ? 'mt-0' : 'mt-3'} rounded-2xl border border-gray-200 bg-white p-4 shadow-sm`}>
-        <p className="text-sm text-gray-600">
+        <p className="flex items-center gap-1 text-sm text-gray-600">
           今週の負担
-          <span className="ml-2 text-gray-500">完了 × 重さ</span>
-          <span className="ml-2 text-gray-500">動いた日 {activeDays}/7</span>
+          <HelpPopover
+            iconSize={14}
+            preferredSide="top"
+            ariaLabel="負担の数の説明を表示"
+            content={<div>完了を重さで数えた数です。</div>}
+          />
+          <span className="ml-auto text-gray-500">{activeDays}日やった</span>
         </p>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
@@ -498,17 +514,21 @@ export default function TaskHistoryModal({
 
                 return (
                   <div key={date} className="px-4 py-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">{date}</span>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-gray-700">{historyDayLabel(date)}</span>
                       <div className="flex items-center gap-3 text-gray-600">
-                        <span className="inline-flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-sm">自分 × {meCount} 件</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5 text-amber-600" />
-                          <span className="text-sm">相手 × {partnerCount} 件</span>
-                        </span>
+                        {meCount > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                            <span className="text-sm">自分 {meCount}件</span>
+                          </span>
+                        )}
+                        {partnerCount > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <CheckCircle className="h-3.5 w-3.5 text-amber-600" />
+                            <span className="text-sm">相手 {partnerCount}件</span>
+                          </span>
+                        )}
                       </div>
                     </div>
 

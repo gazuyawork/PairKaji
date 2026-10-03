@@ -54,7 +54,7 @@ interface Props {
   onBlurTodo: (todoId: string, text: string) => void;
   onDeleteTodo: (todoId: string) => void;
   // onDeleteTask: () => void;
-  todoRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
+  todoRefs: React.MutableRefObject<Record<string, HTMLTextAreaElement | null>>;
   focusedTodoId: string | null;
   onOpenNote: (text: string) => void;
   onReorderTodos: (orderedIds: string[]) => void;

@@ -116,7 +116,7 @@ export default function TodoView() {
   }, []);
   const [focusedTodoId, setFocusedTodoId] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, 'undone' | 'done'>>({});
-  const todoRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const todoRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalTask, setNoteModalTask] = useState<TodoOnlyTask | null>(null);
   const [noteModalTodo, setNoteModalTodo] = useState<{ id: string; text: string } | null>(null);

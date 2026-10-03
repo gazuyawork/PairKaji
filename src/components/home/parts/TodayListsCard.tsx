@@ -10,7 +10,7 @@ import type { Task } from '@/types/Task';
 
 function listLabel(task: Task): string {
   const leftover = countUndoneTodos(task.todos);
-  if (leftover <= 0) return 'リストを開く';
+  if (leftover <= 0) return '残り 0 件';
   return `残り ${leftover} 件`;
 }
 

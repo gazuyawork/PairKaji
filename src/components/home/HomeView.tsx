@@ -576,13 +576,13 @@ export default function HomeView() {
                     setEditMode(next);
 
                     if (next) {
-                      // 🔛 OFF → ON
-                      toast.success('編集モードに切り替えました');
+                      toast.success('並べ替えできるようにしました');
                     } else {
-                      // 🔚 ON → OFF
-                      toast.success('編集モードを終了しました');
+                      toast.success('並べ替えを終わりました');
                     }
                   }}
+                  aria-pressed={editMode}
+                  aria-label={editMode ? '並べ替え中' : '並べ替え'}
                   className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 ${editMode ? 'bg-emerald-500' : 'bg-gray-300'
                     }`}
                 >
@@ -593,7 +593,7 @@ export default function HomeView() {
                 </button>
 
                 <span className="text-sm font-medium text-gray-700 select-none">
-                  {editMode ? '編集 ON' : '編集 OFF'}
+                  {editMode ? '並べ替え中' : '並べ替え'}
                 </span>
               </div>
 

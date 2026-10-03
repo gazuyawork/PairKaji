@@ -312,11 +312,6 @@ html.dark .border-gray-300 { border-color: #5a4e44; }
 html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #4a4038; }
 html.dark .shadow-inner { --tw-shadow-color: rgb(0 0 0 / 0.35); }
 
-/* リストはスマホではスワイプ。PCだけボタンで開く */
-.pc-only-list-btn {
-  display: none;
-}
-
 /* PCで、編集できない文字の末尾をクリックすると点滅カーソルが置かれる */
 @media (hover: hover) and (pointer: fine) {
   html {
@@ -330,9 +325,5 @@ html.dark .shadow-inner { --tw-shadow-color: rgb(0 0 0 / 0.35); }
     -webkit-user-select: text;
     user-select: text;
     caret-color: auto;
-  }
-  .pc-only-list-btn {
-    display: inline-flex;
-    margin-left: 8px;
   }
 }

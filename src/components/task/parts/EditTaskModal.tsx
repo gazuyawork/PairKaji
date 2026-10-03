@@ -351,17 +351,13 @@ export default function EditTaskModal({
 
     const isNew = !(task as { id?: string }).id;
     const noteText = (task as unknown as { note?: string }).note ?? '';
-    const visibleVal = (task as unknown as { visible?: unknown }).visible;
-    const hasTime = Boolean(
-      parseHm(typeof task.time === 'string' ? task.time : '')
-    );
+    const savedUsers = Array.isArray((task as { users?: string[] }).users)
+      ? (task as { users?: string[] }).users!
+      : [];
     const hasAdvanced =
-      normalizedCategory != null ||
-      Boolean((task as unknown as { private?: unknown }).private) ||
-      noteText.trim().length > 0 ||
-      visibleVal === false ||
-      Boolean((task as unknown as { isTodo?: unknown }).isTodo) ||
-      hasTime;
+      (isPairConfirmed && Boolean((task as unknown as { private?: unknown }).private)) ||
+      (isPairConfirmed && savedUsers.length === 1) ||
+      noteText.trim().length > 0;
     setShowMore(!isNew && hasAdvanced);
 
     if (!isNew) return;
@@ -621,6 +617,16 @@ export default function EditTaskModal({
 
   if (!mounted || !isOpen || !editedTask || !portalTarget) return null;
 
+  const assignee = isPairConfirmed && !isPrivate && editedTask.users.length === 1
+    ? users.find((user) => user.id === editedTask.users[0])
+    : undefined;
+  const moreParts: string[] = [];
+  if (isPairConfirmed && isPrivate) moreParts.push('プライベート');
+  else if (assignee?.name) moreParts.push(assignee.name);
+  if ((editedTask.note ?? '').trim()) moreParts.push('備考あり');
+  const moreSummary = moreParts.length > 0 ? moreParts.join('・') : '未設定';
+  const moreTitle = isPairConfirmed ? '担当・備考' : '備考';
+
   return createPortal(
     <BaseModal
       isOpen={isOpen}
@@ -678,7 +684,7 @@ export default function EditTaskModal({
                   <ul className="list-disc pl-5 space-y-1">
                     <li>毎日：毎日おこなうタスクに使用します。</li>
                     <li>週次：週間のタスクに使用します。</li>
-                    <li>不定期：不定期に実施するタスクに使用します。</li>
+                    <li>一回：その日だけ行うタスクに使います。選ぶと今日の日付が入ります。</li>
                   </ul>
                 </div>
               }
@@ -697,7 +703,7 @@ export default function EditTaskModal({
                     selected ? 'bg-[#5E5E5E] text-white' : 'bg-gray-100 text-gray-600'
                   }`}
                 >
-                  {p}
+                  {p === '不定期' ? '一回' : p}
                 </button>
               );
             })}
@@ -786,6 +792,15 @@ export default function EditTaskModal({
           </div>
         )}
 
+        <div className="space-y-2">
+          <label className="block text-sm font-semibold text-gray-600">時間</label>
+          <OptionalTimeField
+            key={`time-${isOpen}-${(task as { id?: string }).id || 'new'}`}
+            value={editedTask.time || ''}
+            onChange={(next) => update('time', next as TaskWithNote['time'])}
+          />
+        </div>
+
         {(() => {
           const listOn = Boolean((editedTask as { isTodo?: boolean }).isTodo);
           return (
@@ -860,25 +875,27 @@ export default function EditTaskModal({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => setShowMore((v) => !v)}
-          className="w-full min-h-11 text-sm text-gray-600 underline"
-        >
-          {showMore ? '詳細を閉じる' : '詳細（時間・担当・備考）'}
-        </button>
+        <div className="rounded-2xl border border-gray-200 bg-[#fffaf1] p-3">
+          <button
+            type="button"
+            onClick={() => setShowMore((v) => !v)}
+            aria-expanded={showMore}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-gray-700">{moreTitle}</span>
+              {!showMore && (
+                <span className="mt-0.5 block text-xs leading-relaxed text-gray-500">{moreSummary}</span>
+              )}
+            </span>
+            <ChevronDown
+              className={`h-5 w-5 shrink-0 text-gray-500 transition-transform ${showMore ? '' : '-rotate-90'}`}
+              aria-hidden
+            />
+          </button>
 
         {showMore && (
-          <>
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-gray-600">時間</label>
-          <OptionalTimeField
-            key={`time-more-${isOpen}-${(task as { id?: string }).id || 'new'}`}
-            value={editedTask.time || ''}
-            onChange={(next) => update('time', next as TaskWithNote['time'])}
-          />
-        </div>
-
+          <div className="mt-3 space-y-5">
         {isPairConfirmed && (
           <>
             {!isPrivate && (
@@ -1077,8 +1094,9 @@ export default function EditTaskModal({
           </div>
           {noteError && <p className="text-xs text-red-500 mt-1">{noteError}</p>}
         </div>
-          </>
+          </div>
         )}
+        </div>
       </div>
     </BaseModal>,
     portalTarget

@@ -1745,7 +1745,7 @@ const toggleSelectionMode = useCallback(() => {
                             } 
       shadow-inner`}
                         >
-                          {period}
+                          {period === '不定期' ? '一回' : period}
                         </span>
                         <span className="text-sm text-gray-600">
                           {remaining === 0 ? 'すべてのタスクが完了しました。' : `残り ${remaining} 件`}
