@@ -27,3 +27,17 @@ export function countUndoneTodos(todos: unknown): number {
     return (item as { done?: unknown }).done !== true;
   }).length;
 }
+
+/** テキストが1文字以上あるリスト項目数（空行は含めない） */
+export function countWrittenTodos(todos: unknown): number {
+  if (!Array.isArray(todos)) return 0;
+  return todos.filter((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const text = (item as { text?: unknown }).text;
+    return typeof text === 'string' && text.trim().length > 0;
+  }).length;
+}
+
+export function hasWrittenTodos(todos: unknown): boolean {
+  return countWrittenTodos(todos) > 0;
+}

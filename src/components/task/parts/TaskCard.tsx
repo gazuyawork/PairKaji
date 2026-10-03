@@ -17,7 +17,7 @@ import { setTaskHeld } from '@/lib/taskUtils';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
 import SlideUpModal from '@/components/common/modals/SlideUpModal';
 import LinkifiedText from '@/components/common/LinkifiedText';
-import { taskShowsOnTodoTab } from '@/lib/checklistTask';
+import { hasWrittenTodos, taskShowsOnTodoTab } from '@/lib/checklistTask';
 
 const dayBorderClassMap: Record<string, string> = {
   '0': 'border-orange-200',
@@ -92,6 +92,7 @@ function TaskCard({
   const noteRaw = (task as TaskWithNote).note;
   const noteText = typeof noteRaw === 'string' ? noteRaw.trim() : '';
   const showOnTodo = taskShowsOnTodoTab(task);
+  const listHasItems = hasWrittenTodos(task.todos);
 
   useEffect(() => {
     setLocalDone(task.done);
@@ -417,13 +418,18 @@ function TaskCard({
           {showOnTodo && (
             <button
               type="button"
-              title="リスト"
-              aria-label="リストを開く"
+              title={listHasItems ? 'リスト（項目あり）' : 'リスト（空）'}
+              aria-label={listHasItems ? 'リストを開く（項目あり）' : 'リストを開く（空）'}
               onClick={(e) => {
                 e.stopPropagation();
                 handleTodoClick();
               }}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-blue-300 to-blue-500 text-white shadow-sm"
+              className={clsx(
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm',
+                listHasItems
+                  ? 'bg-gradient-to-b from-blue-300 to-blue-500 text-white'
+                  : 'bg-white text-blue-400 ring-1 ring-inset ring-blue-300'
+              )}
             >
               <ListTodo className="h-[18px] w-[18px]" aria-hidden />
             </button>
