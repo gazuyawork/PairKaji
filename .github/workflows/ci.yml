@@ -90,7 +90,9 @@ jobs:
           ./gradlew test --stacktrace --console=plain 2>&1 | tee gradle-test.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            tail -n 30 gradle-test.log | while IFS= read -r line; do
+            grep -E -i "FAILURE:|What went wrong|Could not|error:|Caused by:|Exception|requires|failed" gradle-test.log \
+              | tail -n 40 \
+              | while IFS= read -r line; do
               echo "::error title=Android unit tests::$line"
             done
           fi
