@@ -445,7 +445,13 @@ export default function HomeView() {
           }
         }}
       >
-        <main className={`px-4 py-5 ${!isChecking && plan === 'free' && isNativeMobile() ? 'pb-20' : ''}`}>
+        <main
+          className={`px-4 py-5 ${
+            !isChecking && plan === 'free' && isNativeMobile()
+              ? 'pb-48'
+              : ''
+          }`}
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: isLoading ? 0 : 1 }}

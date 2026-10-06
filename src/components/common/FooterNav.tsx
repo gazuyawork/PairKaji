@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { useView } from '@/context/ViewContext';
 import { useHousehold } from '@/context/HouseholdContext';
 import { isTaskScheduledToday } from '@/lib/todayTask';
+import { ACTIVE_NAV_COLOR } from '@/lib/uiColors';
 
 type Props = {
   currentIndex: number;
@@ -60,7 +61,8 @@ export default function FooterNav({ currentIndex, setIndex }: Props) {
                 <span className="relative">
                   <Icon
                     size={26}
-                    className={isActive ? 'text-[#FFCB7D]' : 'text-[#5E5E5E]'}
+                    className={isActive ? undefined : 'text-[#5E5E5E]'}
+                    style={isActive ? { color: ACTIVE_NAV_COLOR } : undefined}
                   />
                   {index === 1 && todayRemainingCount > 0 && (
                     <span className="absolute -right-2.5 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
@@ -70,8 +72,9 @@ export default function FooterNav({ currentIndex, setIndex }: Props) {
                 </span>
                 <span
                   className={`mt-0.5 text-xs ${
-                    isActive ? 'text-[#FFCB7D] font-semibold' : 'text-[#5E5E5E]'
+                    isActive ? 'font-semibold' : 'text-[#5E5E5E]'
                   }`}
+                  style={isActive ? { color: ACTIVE_NAV_COLOR } : undefined}
                 >
                   {item.name}
                 </span>

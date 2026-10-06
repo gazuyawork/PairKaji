@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+import { DANGER_TEXT_COLOR } from '@/lib/uiColors';
 
 export default function SettingsNavRow({
   href,
@@ -18,13 +19,14 @@ export default function SettingsNavRow({
     <Link
       href={href}
       className={`flex min-h-12 items-center justify-between gap-3 bg-white px-4 text-sm font-medium active:bg-gray-50 ${
-        danger ? 'text-gray-400' : 'text-[#5E5E5E]'
+        danger ? '' : 'text-[#5E5E5E]'
       }`}
+      style={danger ? { color: DANGER_TEXT_COLOR } : undefined}
     >
       <span>{label}</span>
       <span className="flex min-w-0 items-center gap-1">
         {value ? <span className="truncate text-xs font-normal text-gray-400">{value}</span> : null}
-        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+        <ChevronRight className={`h-4 w-4 shrink-0 ${danger ? '' : 'text-gray-400'}`} />
       </span>
     </Link>
   );

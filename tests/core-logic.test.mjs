@@ -14,6 +14,24 @@ import {
   normalizeCategoryForSave,
   parseCategoryForUI,
 } from '../src/lib/taskCategory.ts';
+import { ACTIVE_NAV_COLOR, DANGER_TEXT_COLOR } from '../src/lib/uiColors.ts';
+
+function contrastAgainstWhite(hex) {
+  const channels = hex
+    .slice(1)
+    .match(/.{2}/g)
+    .map((value) => Number.parseInt(value, 16) / 255)
+    .map((value) =>
+      value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
+    );
+  const luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  return 1.05 / (luminance + 0.05);
+}
+
+test('interactive UI colors meet WCAG AA contrast on white', () => {
+  assert.ok(contrastAgainstWhite(ACTIVE_NAV_COLOR) >= 4.5);
+  assert.ok(contrastAgainstWhite(DANGER_TEXT_COLOR) >= 4.5);
+});
 
 test('fuzzy text normalizes width, case, kana, spaces and long vowels', () => {
   assert.equal(normalizeFuzzy(' ＡＢＣ カー ド '), 'abcかど');
