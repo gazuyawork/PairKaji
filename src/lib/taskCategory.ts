@@ -18,10 +18,12 @@ export function isRetiredCategory(raw: unknown): boolean {
   );
 }
 
-export function parseCategoryForUI(_v: unknown): TaskCategoryUI {
+export function parseCategoryForUI(value: unknown): TaskCategoryUI {
+  void value;
   return null;
 }
 
-export function normalizeCategoryForSave(_v: unknown): TaskCategory {
+export function normalizeCategoryForSave(value: unknown): TaskCategory {
+  void value;
   return '未設定';
 }

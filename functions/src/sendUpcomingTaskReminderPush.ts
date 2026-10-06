@@ -113,7 +113,7 @@ const sendWithAutoVapid = async (
   const endpoint = subscription.endpoint || '';
   const isSafari = endpoint.includes('web.push.apple.com');
 
-  let current = setVapid(isSafari ? 'safari' : 'default', 'mailto:support@example.com', keys);
+  const current = setVapid(isSafari ? 'safari' : 'default', 'mailto:support@example.com', keys);
   try {
     return await webpush.sendNotification(subscription, payload, { TTL: 60 * 30 });
   } catch (e) {

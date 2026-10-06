@@ -82,8 +82,6 @@ type Props = {
 /* =========================================================
  * 便利関数
  * =======================================================*/
-const toStrictBool = (v: unknown): boolean => v === true || v === 'true' || v === 1 || v === '1';
-
 const listEnabledFromTask = (task: { isTodo?: unknown; visible?: unknown; todos?: unknown }): boolean => {
   if (task.isTodo === false || task.visible === false) return false;
   if (task.isTodo === true || task.visible === true) return true;
@@ -368,7 +366,7 @@ export default function EditTaskModal({
       window.clearTimeout(timer);
       window.clearTimeout(later);
     };
-  }, [isOpen, (task as { id?: string }).id, isPairConfirmed]);
+  }, [isOpen, task, isPairConfirmed]);
 
   // body スクロール制御
   useEffect(() => {

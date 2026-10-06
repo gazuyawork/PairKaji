@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.mjs",
+    "verify": "npm run lint && npm test && tsc --noEmit && npm run build"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.1.0",

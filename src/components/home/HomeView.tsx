@@ -40,6 +40,19 @@ import UnitPriceCompareToolCard from '@/components/home/parts/UnitPriceCompareTo
 import PartnerCompletedTasksCard from '@/components/home/parts/PartnerCompletedTasksCard';
 import TodayListsCard from '@/components/home/parts/TodayListsCard';
 
+const HOME_CARD_ORDER_KEY = 'homeCardOrderV3';
+const DEFAULT_ORDER = [
+  'ad',
+  'pairInvite',
+  'pairInviteNone',
+  'calendar',
+  'todayDone',
+  'unitPriceCompare',
+] as const;
+type CardId = (typeof DEFAULT_ORDER)[number];
+const DEFAULT_HIDDEN: CardId[] = ['unitPriceCompare'];
+const PINNED_HOME_CARDS: ReadonlySet<CardId> = new Set(['ad']);
+
 /* =========================================================
  * SortableCard（編集モードON時のみ使用）
  * =======================================================*/
@@ -245,19 +258,6 @@ export default function HomeView() {
   /* ---------------------------------------
    * カード順序 永続化 & DnD センサー
    * -------------------------------------*/
-  const HOME_CARD_ORDER_KEY = 'homeCardOrderV3';
-  const DEFAULT_ORDER = [
-    'ad',
-    'pairInvite',
-    'pairInviteNone',
-    'calendar',
-    'todayDone',
-    'unitPriceCompare',
-  ] as const;
-  type CardId = (typeof DEFAULT_ORDER)[number];
-  const DEFAULT_HIDDEN: CardId[] = ['unitPriceCompare'];
-  const PINNED_HOME_CARDS: ReadonlySet<CardId> = new Set(['ad']);
-
   /** 応援プラン案内は加入までホーム最上段に固定する */
   const pinFixedHomeCards = (order: CardId[]): CardId[] => {
     const movable = order.filter((id) => !PINNED_HOME_CARDS.has(id));
@@ -280,7 +280,6 @@ export default function HomeView() {
     } catch {
       // 失敗時は DEFAULT_ORDER のまま
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

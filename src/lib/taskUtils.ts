@@ -609,7 +609,10 @@ export const deleteTaskFromFirestore = async (taskId: string): Promise<void> => 
       time: taskData.time,
     });
 
-    if (userId) {
+    // notifyLogs はタスク所有者本人だけが更新できる。
+    // 共有メンバーによる削除ではこの補助クリーンアップを飛ばし、
+    // Firestore ルールで許可されているタスク本体の削除を妨げない。
+    if (userId && auth.currentUser?.uid === userId) {
       await removeTaskIdFromNotifyLogs(userId, taskId, dates);
     }
     await deleteDoc(taskRef);

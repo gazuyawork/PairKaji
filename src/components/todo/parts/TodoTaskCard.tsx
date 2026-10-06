@@ -640,8 +640,8 @@ export default function TodoTaskCard({
 
                     // ★ 追加：チェックリスト
                     const hasChecklist =
-                      Array.isArray((todo as any).checklist) &&
-                      (todo as any).checklist.some((item: any) => {
+                      Array.isArray(todo.checklist) &&
+                      todo.checklist.some((item) => {
                         if (!item) return false;
 
                         // 文字列チェック

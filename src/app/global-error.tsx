@@ -2,7 +2,7 @@
 
 export default function GlobalError({
   error,
-  reset: _reset,
+  reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -29,7 +29,10 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => {
-              const reload = () => location.reload();
+              const reload = () => {
+                reset();
+                location.reload();
+              };
               try {
                 if (!navigator.serviceWorker?.getRegistrations) {
                   reload();

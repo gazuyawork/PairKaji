@@ -294,7 +294,7 @@ export default function TodoNoteModal({
   const [memo, setMemo] = useState('');
   const [initialLoad, setInitialLoad] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [saveLabel, setSaveLabel] = useState('保存');
+  const saveLabel = '保存';
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
 
@@ -472,7 +472,7 @@ export default function TodoNoteModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, taskId, todoId, updateHints]);
+  }, [isOpen, taskId, todoId, todoText, updateHints]);
 
   // ★ 初期ロード完了後、内容があるならプレビュー / なければ編集 をデフォルトにする
   useEffect(() => {
@@ -751,8 +751,8 @@ export default function TodoNoteModal({
   };
 
   const onUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
-    if ((e.nativeEvent as any).isComposing) return;
-    if ((e.nativeEvent as any).keyCode === 229) return;
+    if (e.nativeEvent.isComposing) return;
+    if (e.keyCode === 229) return;
 
     if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
@@ -1330,8 +1330,8 @@ export default function TodoNoteModal({
                                   );
                                 }}
                                 onKeyDown={(e) => {
-                                  if ((e.nativeEvent as any).isComposing) return;
-                                  if ((e.nativeEvent as any).keyCode === 229) return;
+                                  if (e.nativeEvent.isComposing) return;
+                                  if (e.keyCode === 229) return;
 
                                   if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
@@ -1438,6 +1438,7 @@ export default function TodoNoteModal({
         >
           <X size={18} />
         </button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={displaySrc}
           alt="拡大画像"

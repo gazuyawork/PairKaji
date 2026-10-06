@@ -13,6 +13,7 @@ export type SimpleTodo = {
   referenceUrls?: Array<string | null>;
   price?: number | null;
   quantity?: number | null;
+  checklist?: Array<string | { text?: string } | null>;
 };
 
 export const normalizeJP = normalizeFuzzy;

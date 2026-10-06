@@ -206,7 +206,7 @@ export default function TaskHistoryModal({
   }, [grouped, listExpanded, rows.length]);
 
   // サマリー・曜日別系列（完了件数で集計）
-  const { totalMe, totalPartner, activeDays, seriesMe, seriesPartner, weekRangeLabel, dayLabels } =
+  const { activeDays, seriesMe, seriesPartner, weekRangeLabel, dayLabels } =
     useMemo(() => {
       const user = auth.currentUser;
       const meUid = user?.uid ?? '__unknown__';
