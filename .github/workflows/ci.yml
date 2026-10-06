@@ -70,6 +70,12 @@ jobs:
       - name: Install web dependencies
         run: npm ci
 
+      - name: Generate Android plugin files
+        run: |
+          mkdir -p out
+          touch out/index.html
+          npx cap update android
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
