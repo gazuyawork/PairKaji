@@ -74,6 +74,9 @@ jobs:
         run: |
           mkdir -p out
           touch out/index.html
+          mkdir -p android/capacitor-cordova-android-plugins
+          tar -xzf node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz \
+            -C android/capacitor-cordova-android-plugins
           npx cap update android
 
       - uses: actions/setup-java@v5
