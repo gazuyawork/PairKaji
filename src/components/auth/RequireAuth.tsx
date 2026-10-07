@@ -9,7 +9,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { resolveAuthUser } from '@/lib/authSession';
-import LoadingSpinner from '@/components/common/LoadingSpinner';
+import StartupIcon from '@/components/common/StartupIcon';
 
 type Props = { children: React.ReactNode };
 
@@ -68,9 +68,5 @@ export default function RequireAuth({ children }: Props) {
 
   if (allowed) return <>{children}</>;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
-      <LoadingSpinner size={48} />
-    </div>
-  );
+  return <StartupIcon />;
 }
