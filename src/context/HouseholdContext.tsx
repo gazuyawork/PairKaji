@@ -23,6 +23,7 @@ import { mapFirestoreDocToTask } from '@/lib/taskMappers';
 import { resolveProfileImageUrl } from '@/lib/imageUtils';
 import { applyLocalDayReset } from '@/lib/taskDayReset';
 import { scrubRetiredTaskData } from '@/lib/scrubRetiredCategories';
+import { repairSharedTaskViewerIds } from '@/lib/taskUtils';
 import type { FirestoreTask, Task } from '@/types/Task';
 
 const DEFAULT_PROFILE_IMAGE = '/images/default.png';
@@ -234,6 +235,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       householdUids: Array.from(ids).slice(0, 10),
     };
   }, [pairs, uid]);
+
+  useEffect(() => {
+    if (!uid || !partnerId) return;
+    void repairSharedTaskViewerIds(uid, householdUids).catch((err) => {
+      console.warn('[Household] shared task viewers repair failed:', err);
+    });
+  }, [uid, partnerId, householdUids]);
 
   useEffect(() => {
     if (authLoading) {

@@ -19,6 +19,7 @@ import { forkTaskAsPrivateForSelf } from '@/lib/firebaseUtils';
 import { parseCategoryForUI, normalizeCategoryForSave, type TaskCategoryUI } from '@/lib/taskCategory';
 import { isCalendarPeriod, isDeviceCalendarAvailable, jstYmd, jstWeekdayKanji, withCalendarDefaults } from '@/lib/deviceCalendar';
 import { BURDEN_OPTIONS, burdenWeight } from '@/lib/burden';
+import { taskViewerIds } from '@/lib/taskSharing';
 
 // 現在のユーザー判定に使用
 import { auth } from '@/lib/firebase';
@@ -513,11 +514,17 @@ export default function EditTaskModal({
 
     const categoryForSave = normalizeCategoryForSave(editedTask.category);
     const checklistOn = Boolean((editedTask as unknown as { isTodo?: boolean }).isTodo);
+    const viewerIds = taskViewerIds({
+      isPrivate,
+      currentUid,
+      householdMemberIds: users.map((user) => user.id),
+    });
 
     const transformed: Task = {
       ...editedTask,
       users: [...editedUsers],
-      userIds: [...editedUsers],
+      // users は担当者、userIds は閲覧できる世帯メンバー。用途を混ぜない。
+      userIds: viewerIds,
       daysOfWeek: editedTask.daysOfWeek.map((d) => toDayNumber(d)) as Task['daysOfWeek'],
       time: typeof editedTask.time === 'string' ? editedTask.time.trim() : '',
       private: isPrivate,
@@ -579,7 +586,7 @@ export default function EditTaskModal({
             : 'タスクの保存に失敗しました'
       );
     }
-  }, [editedTask, existingTasks, isPrivate, onSave, task, calendarSync]);
+  }, [editedTask, existingTasks, isPrivate, onSave, task, calendarSync, users]);
 
   // 備考テキスト変更後にキャレット位置を復元
   useLayoutEffect(() => {

@@ -15,6 +15,7 @@ import {
   parseCategoryForUI,
 } from '../src/lib/taskCategory.ts';
 import { ACTIVE_NAV_COLOR, DANGER_TEXT_COLOR } from '../src/lib/uiColors.ts';
+import { taskViewerIds } from '../src/lib/taskSharing.ts';
 
 function contrastAgainstWhite(hex) {
   const channels = hex
@@ -31,6 +32,25 @@ function contrastAgainstWhite(hex) {
 test('interactive UI colors meet WCAG AA contrast on white', () => {
   assert.ok(contrastAgainstWhite(ACTIVE_NAV_COLOR) >= 4.5);
   assert.ok(contrastAgainstWhite(DANGER_TEXT_COLOR) >= 4.5);
+});
+
+test('task viewers stay separate from the optional assignee', () => {
+  assert.deepEqual(
+    taskViewerIds({
+      isPrivate: false,
+      currentUid: 'me',
+      householdMemberIds: ['me', 'partner'],
+    }),
+    ['me', 'partner'],
+  );
+  assert.deepEqual(
+    taskViewerIds({
+      isPrivate: true,
+      currentUid: 'me',
+      householdMemberIds: ['me', 'partner'],
+    }),
+    ['me'],
+  );
 });
 
 test('fuzzy text normalizes width, case, kana, spaces and long vowels', () => {

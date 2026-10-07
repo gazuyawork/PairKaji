@@ -240,6 +240,38 @@ export const fetchPairUserIds = async (uid: string): Promise<string[]> => {
   }
 };
 
+/**
+ * 旧版で担当者(users)を閲覧者(userIds)として保存してしまった共有タスクを修復する。
+ * private タスクは本人だけのまま変更しない。
+ */
+export const repairSharedTaskViewerIds = async (
+  ownerUid: string,
+  householdMemberIds: string[]
+): Promise<number> => {
+  const viewers = Array.from(new Set([ownerUid, ...householdMemberIds].filter(Boolean)));
+  if (viewers.length < 2) return 0;
+
+  const snapshot = await getDocs(
+    query(collection(db, 'tasks'), where('userId', '==', ownerUid))
+  );
+  const targets = snapshot.docs.filter((taskDoc) => {
+    const data = taskDoc.data() as TaskDocMinimal;
+    // 未設定の旧データを意図せず共有しない。共有が明示されたものだけ修復する。
+    if (data.private !== false) return false;
+    const current = Array.isArray(data.userIds) ? data.userIds : [];
+    return viewers.some((uid) => !current.includes(uid));
+  });
+
+  for (let offset = 0; offset < targets.length; offset += 450) {
+    const batch = writeBatch(db);
+    targets.slice(offset, offset + 450).forEach((taskDoc) => {
+      batch.update(taskDoc.ref, { userIds: viewers, updatedAt: serverTimestamp() });
+    });
+    await batch.commit();
+  }
+  return targets.length;
+};
+
 /* =========================================================
  * FirestoreTask 生成
  * =======================================================*/

@@ -511,15 +511,6 @@ export default function TodoNoteModal({
     });
   }, [referenceUrls]);
 
-  // チェックリスト（編集モード最低1行）
-  useEffect(() => {
-    if (!isPreview && checklist.length === 0) {
-      const id = `cl_${Math.random().toString(16).slice(2)}`;
-      setChecklist([{ id, text: '', done: false }]);
-      setCheckIds([id]);
-    }
-  }, [isPreview, checklist.length]);
-
   // checkIds 同期
   useEffect(() => {
     setCheckIds((prev) => {
@@ -1355,25 +1346,17 @@ export default function TodoNoteModal({
                                 className="col-span-9 border-0 border-b border-gray-300 bg-transparent px-0 py-2 text-md focus:outline-none focus:border-blue-500"
                               />
 
-                              {checklist.length >= 2 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setChecklist((prev) => {
-                                      if (prev.length <= 1) return [{ ...prev[0], text: '', done: false }];
-                                      return prev.filter((_, i) => i !== idx);
-                                    });
-                                    setCheckIds((prev) => {
-                                      if (prev.length <= 1) return prev;
-                                      return prev.filter((_, i) => i !== idx);
-                                    });
-                                  }}
-                                  aria-label="項目を削除"
-                                  className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
-                                >
-                                  <span aria-hidden className="text-lg leading-none">×</span>
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setChecklist((prev) => prev.filter((_, i) => i !== idx));
+                                  setCheckIds((prev) => prev.filter((_, i) => i !== idx));
+                                }}
+                                aria-label="項目を削除"
+                                className="col-span-1 flex items-center justify-center w-8 h-8 text-gray-700 hover:text-red-600"
+                              >
+                                <span aria-hidden className="text-lg leading-none">×</span>
+                              </button>
                             </>
                           )}
                         </SortableUrlRow>
