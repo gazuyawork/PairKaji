@@ -184,22 +184,6 @@ export default function PushToggle({ uid }: Props) {
     notifyError(info);
   };
 
-  const fetchWithDiagnostics = async (url: string, init: RequestInit, timeoutMs = 8000) => {
-    try {
-      const res = await pTimeout(fetch(url, init), timeoutMs);
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        const err = withCode(new Error(`HTTP ${res.status}`), `HTTP_${res.status}`);
-        (err as Error & { status?: number; body?: string }).status = res.status;
-        (err as Error & { status?: number; body?: string }).body = text;
-        throw err;
-      }
-      return res;
-    } catch (e) {
-      throw e;
-    }
-  };
-
   /** basePath を推定（ENV > __NEXT_DATA__.assetPrefix > <base>） */
   const getBasePath = (): string => {
     if (ENV_BASE) return ENV_BASE;
@@ -731,15 +715,8 @@ export default function PushToggle({ uid }: Props) {
           () => console.warn('[push] subscribe timeout')
         ));
 
-      await fetchWithDiagnostics(
-        '/api/push/subscribe',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid, subscription: sub.toJSON() }),
-        },
-        8000
-      );
+      const saveWebPushSubscription = httpsCallable(functions, 'saveWebPushSubscription');
+      await pTimeout(saveWebPushSubscription({ subscription: sub.toJSON() }), 10000);
 
       await refreshSubscribedState();
       setPhase('idle');
@@ -787,6 +764,9 @@ export default function PushToggle({ uid }: Props) {
       }
       if (!any) console.warn('[push] no subscription found on any registration');
 
+      const disableWebPush = httpsCallable(functions, 'disableWebPush');
+      await pTimeout(disableWebPush({}), 10000);
+
       await refreshSubscribedState();
       setPhase('idle');
       toast.success('通知を解除しました');
@@ -808,21 +788,8 @@ export default function PushToggle({ uid }: Props) {
         setTimeout(() => setPhase('idle'), 2500);
         return;
       }
-      await fetchWithDiagnostics(
-        '/api/push/test-send',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid,
-            title: '通知テスト',
-            body: 'これはテスト通知です',
-            url: '/main',
-            badgeCount: 1,
-          }),
-        },
-        8000
-      );
+      const sendTestWebPush = httpsCallable(functions, 'sendTestWebPush');
+      await pTimeout(sendTestWebPush({}), 10000);
       setPhase('sent');
       toast.success('テスト通知を送信しました');
       setTimeout(() => setPhase('idle'), 2500);
