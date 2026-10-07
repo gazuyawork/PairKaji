@@ -5,6 +5,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } fr
 import TaskCard from '@/components/task/parts/TaskCard';
 import EditTaskModal from '@/components/task/parts/EditTaskModal';
 import SearchBox from '@/components/task/parts/SearchBox';
+import { compareTaskFlagPriority } from '@/lib/taskSort';
 import {
   collection,
   updateDoc,
@@ -836,6 +837,9 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       return list
         .slice()
         .sort((a, b) => {
+          const flagPriority = compareTaskFlagPriority(a, b);
+          if (flagPriority !== 0) return flagPriority;
+
           const la = localOrderMap[a.id];
           const lb = localOrderMap[b.id];
           if (typeof la === 'number' && typeof lb === 'number') return la - lb;
@@ -849,11 +853,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
             if (typeof oa === 'number') return -1;
             if (typeof ob === 'number') return 1;
           }
-
-          const aFlag = getOpt(a, 'flagged') === true;
-          const bFlag = getOpt(b, 'flagged') === true;
-          if (aFlag && !bFlag) return -1;
-          if (!aFlag && bFlag) return 1;
 
           const aKey = getComparableDateTimeMs(a);
           const bKey = getComparableDateTimeMs(b);

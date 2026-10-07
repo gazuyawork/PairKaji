@@ -4,8 +4,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import { forwardRef } from 'react';
-import { Search } from 'lucide-react';
+import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { Search, X } from 'lucide-react';
 
 type Props = {
   value: string;
@@ -13,6 +13,9 @@ type Props = {
 };
 
 const SearchBox = forwardRef<HTMLInputElement, Props>(({ value, onChange }, ref) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
+
   return (
     <div
         className="flex min-h-12 flex-1 items-center gap-2 rounded-xl px-3
@@ -22,7 +25,7 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
     >
       <Search className="text-gray-400 mr-2" size={20} />
       <input
-        ref={ref}
+        ref={inputRef}
         type="search"
         placeholder="キーワードを入力"
         value={value}
@@ -33,6 +36,20 @@ shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
         autoCorrect="off"
         autoComplete="off"
       />
+      {value.trim().length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            onChange('');
+            inputRef.current?.focus({ preventScroll: true });
+          }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 active:bg-gray-200"
+          aria-label="検索をクリア"
+          title="検索をクリア"
+        >
+          <X size={20} aria-hidden />
+        </button>
+      )}
     </div>
   );
 });

@@ -16,6 +16,7 @@ import {
 } from '../src/lib/taskCategory.ts';
 import { ACTIVE_NAV_COLOR, DANGER_TEXT_COLOR } from '../src/lib/uiColors.ts';
 import { taskViewerIds } from '../src/lib/taskSharing.ts';
+import { compareTaskFlagPriority } from '../src/lib/taskSort.ts';
 
 function contrastAgainstWhite(hex) {
   const channels = hex
@@ -51,6 +52,16 @@ test('task viewers stay separate from the optional assignee', () => {
     }),
     ['me'],
   );
+});
+
+test('flagged tasks are prioritized before manual and date ordering', () => {
+  const tasks = [
+    { id: 'manual-first', flagged: false, order: 0 },
+    { id: 'flagged', flagged: true, order: 99 },
+    { id: 'normal', flagged: false, order: 1 },
+  ];
+  tasks.sort((a, b) => compareTaskFlagPriority(a, b) || a.order - b.order);
+  assert.deepEqual(tasks.map((task) => task.id), ['flagged', 'manual-first', 'normal']);
 });
 
 test('fuzzy text normalizes width, case, kana, spaces and long vowels', () => {
