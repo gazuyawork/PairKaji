@@ -7,11 +7,13 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { resolveAuthUser } from '@/lib/authSession';
 import Image from 'next/image';
+import { Capacitor } from '@capacitor/core';
 
 const DURATION_MS = 450;
 
 export default function QuickSplash() {
   const router = useRouter();
+  const showWebIcon = !Capacitor.isNativePlatform();
 
   useEffect(() => {
     const html = document.documentElement;
@@ -27,7 +29,8 @@ export default function QuickSplash() {
       const dest = user ? '/main?skipQuickSplash=true' : '/login';
       document.cookie = `pk_last_dest=${encodeURIComponent(dest)}; Path=/; Max-Age=604800; SameSite=Lax`;
 
-      const remain = DURATION_MS + 30 - (Date.now() - started);
+      const minimumDuration = showWebIcon ? DURATION_MS + 30 : 0;
+      const remain = minimumDuration - (Date.now() - started);
       if (remain > 0) {
         await new Promise((r) => setTimeout(r, remain));
       }
@@ -40,11 +43,11 @@ export default function QuickSplash() {
       html.style.overflow = '';
       if (document.body) document.body.style.overflow = '';
     };
-  }, [router]);
+  }, [router, showWebIcon]);
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
-      <div
+      {showWebIcon && <div
         className="pk-icon will-change-transform"
         style={{
           transformOrigin: '50% 50%',
@@ -59,7 +62,7 @@ export default function QuickSplash() {
           height={64}
           priority
         />
-      </div>
+      </div>}
 
       <style jsx>{`
         @keyframes pk-spin-zoom-fade {

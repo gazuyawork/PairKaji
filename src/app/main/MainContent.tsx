@@ -17,6 +17,7 @@ import { useView } from '@/context/ViewContext';
 import { useFreeHomeBannerAd } from '@/hooks/useFreeHomeBannerAd';
 import clsx from 'clsx';
 import PairPremiumHint from '@/components/home/parts/PairPremiumHint';
+import { Capacitor } from '@capacitor/core';
 
 /**
  * 認証ガードは親 (page.tsx) の <RequireAuth> で実施。
@@ -44,7 +45,7 @@ export default function MainContent() {
     const withSplash = params?.get('withQuickSplash');
     const skipSplash = params?.get('skipQuickSplash');
 
-    if (withSplash === 'true') {
+    if (withSplash === 'true' && !Capacitor.isNativePlatform()) {
       setShowQuickSplash(true);
       const timer = setTimeout(() => {
         setShowQuickSplash(false);
