@@ -26,6 +26,18 @@ export async function resolveProfileImageUrl(rawUrl?: string): Promise<string> {
   return rawUrl;
 }
 
+/** 画像の取得とデコードを先に済ませ、表示箇所での遅い差し替えを防ぐ。 */
+export async function preloadProfileImage(url: string): Promise<void> {
+  if (typeof window === 'undefined' || !url || url === DEFAULT_PROFILE_IMAGE) return;
+  await new Promise<void>((resolve) => {
+    const image = new window.Image();
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = url;
+    if (image.complete) resolve();
+  });
+}
+
 /**
  * プロフィール画像を Firebase Storage にアップロードし、Firestore にダウンロードURLを保存する。
  *

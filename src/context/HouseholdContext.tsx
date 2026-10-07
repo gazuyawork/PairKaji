@@ -20,13 +20,22 @@ import {
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { mapFirestoreDocToTask } from '@/lib/taskMappers';
-import { resolveProfileImageUrl } from '@/lib/imageUtils';
+import { preloadProfileImage, resolveProfileImageUrl } from '@/lib/imageUtils';
 import { applyLocalDayReset } from '@/lib/taskDayReset';
 import { scrubRetiredTaskData } from '@/lib/scrubRetiredCategories';
 import { repairSharedTaskViewerIds } from '@/lib/taskUtils';
 import type { FirestoreTask, Task } from '@/types/Task';
 
 const DEFAULT_PROFILE_IMAGE = '/images/default.png';
+
+function cachedProfileImage(key: string): string {
+  if (typeof window === 'undefined') return DEFAULT_PROFILE_IMAGE;
+  try {
+    return localStorage.getItem(key) || DEFAULT_PROFILE_IMAGE;
+  } catch {
+    return DEFAULT_PROFILE_IMAGE;
+  }
+}
 
 export type HouseholdTask = Task & {
   order?: number;
@@ -333,14 +342,19 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       }
       return;
     }
+    // 相手プロフィールの購読結果を待つ間も、前回の画像を表示する。
+    const cacheKey = `partnerImage:${partnerId}`;
+    setPartnerImage(cachedProfileImage(cacheKey));
     let cancelled = false;
     const unsub = onSnapshot(doc(db, 'users', partnerId), async (snap) => {
       const url = await resolveProfileImageUrl(
         typeof snap.data()?.imageUrl === 'string' ? snap.data()?.imageUrl : ''
       );
+      await preloadProfileImage(url);
       if (!cancelled) {
         setPartnerImage(url);
         try {
+          localStorage.setItem(cacheKey, url);
           localStorage.setItem('partnerImage', url);
         } catch {
           /* ignore */

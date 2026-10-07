@@ -7,14 +7,11 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { resolveAuthUser } from '@/lib/authSession';
 import Image from 'next/image';
-import { Capacitor } from '@capacitor/core';
 
-const DURATION_MS = 450;
+const MINIMUM_VISIBLE_MS = 700;
 
 export default function QuickSplash() {
   const router = useRouter();
-  const showWebIcon = !Capacitor.isNativePlatform();
-
   useEffect(() => {
     const html = document.documentElement;
     html.setAttribute('data-splash', '1');
@@ -22,15 +19,16 @@ export default function QuickSplash() {
     if (document.body) document.body.style.overflow = 'hidden';
 
     let cancelled = false;
-    const started = Date.now();
+    const started = performance.now();
 
     void (async () => {
       const user = await resolveAuthUser();
       const dest = user ? '/main?skipQuickSplash=true' : '/login';
       document.cookie = `pk_last_dest=${encodeURIComponent(dest)}; Path=/; Max-Age=604800; SameSite=Lax`;
 
-      const minimumDuration = showWebIcon ? DURATION_MS + 30 : 0;
-      const remain = minimumDuration - (Date.now() - started);
+      // iOSのホーム画面起動では、最初の描画が遅れてCSSアニメーションが
+      // 見えないまま終わることがある。最低表示時間を確保して1回だけ見せる。
+      const remain = MINIMUM_VISIBLE_MS - (performance.now() - started);
       if (remain > 0) {
         await new Promise((r) => setTimeout(r, remain));
       }
@@ -43,18 +41,11 @@ export default function QuickSplash() {
       html.style.overflow = '';
       if (document.body) document.body.style.overflow = '';
     };
-  }, [router, showWebIcon]);
+  }, [router]);
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2]">
-      {showWebIcon && <div
-        className="pk-icon will-change-transform"
-        style={{
-          transformOrigin: '50% 50%',
-          willChange: 'transform, opacity, filter',
-          animation: `pk-spin-zoom-fade ${DURATION_MS}ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards`,
-        }}
-      >
+      <div className="pk-icon will-change-transform">
         <Image
           src="/icons/icon-192.png"
           alt="PairKaji icon"
@@ -62,30 +53,15 @@ export default function QuickSplash() {
           height={64}
           priority
         />
-      </div>}
+      </div>
 
       <style jsx>{`
-        @keyframes pk-spin-zoom-fade {
-          0% {
-            transform: rotate(0deg) scale(1);
-            opacity: 1;
-            filter: blur(0px);
-          }
-          80% {
-            transform: rotate(360deg) scale(1.25);
-            opacity: 0.98;
-            filter: blur(0.2px);
-          }
-          90% {
-            transform: rotate(360deg) scale(1.3);
-            opacity: 0.9;
-            filter: blur(0.4px);
-          }
-          100% {
-            transform: rotate(360deg) scale(1.9);
-            opacity: 0;
-            filter: blur(3px);
-          }
+        .pk-icon {
+          transform-origin: 50% 50%;
+          animation: pk-spin 700ms linear infinite;
+        }
+        @keyframes pk-spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

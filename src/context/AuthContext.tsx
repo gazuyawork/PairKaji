@@ -5,9 +5,18 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { resolveProfileImageUrl } from '@/lib/imageUtils';
+import { preloadProfileImage, resolveProfileImageUrl } from '@/lib/imageUtils';
 
 const DEFAULT_PROFILE_IMAGE = '/images/default.png';
+
+function cachedProfileImage(key: string): string {
+  if (typeof window === 'undefined') return DEFAULT_PROFILE_IMAGE;
+  try {
+    return localStorage.getItem(key) || DEFAULT_PROFILE_IMAGE;
+  } catch {
+    return DEFAULT_PROFILE_IMAGE;
+  }
+}
 
 type AuthCtx = {
   user: User | null;
@@ -60,6 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Firestore/Storageの応答を待たず、前回表示した画像を先に再利用する。
+    const cacheKey = `profileImage:${user.uid}`;
+    setProfileImage(cachedProfileImage(cacheKey));
+
     setIsCheckingPlan(true);
     let cancelled = false;
     const unsub = onSnapshot(
@@ -77,10 +90,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSubscriptionStatus(typeof data?.subscriptionStatus === 'string' ? data.subscriptionStatus : null);
         setIsCheckingPlan(false);
         void resolveProfileImageUrl(typeof data?.imageUrl === 'string' ? data.imageUrl : '').then(
-          (url) => {
+          async (url) => {
+            if (cancelled) return;
+            await preloadProfileImage(url);
             if (cancelled) return;
             setProfileImage(url);
             try {
+              localStorage.setItem(cacheKey, url);
               localStorage.setItem('profileImage', url);
             } catch {
               /* ignore */
