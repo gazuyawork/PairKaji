@@ -46,6 +46,7 @@ import {
   Copy,
   GripVertical,
   Plus,
+  RotateCcw,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import ConfirmModal from '@/components/common/modals/ConfirmModal';
@@ -471,6 +472,13 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
   const { index, selectedTaskName, setSelectedTaskName, listOpen, openTaskList, taskScreenRequest } = useView();
   const pendingListTaskIdRef = useRef<string | null>(null);
   const searchActive = !!(searchTerm && searchTerm.trim().length > 0);
+  const filtersAreReset =
+    !todayFilter &&
+    !privateFilter &&
+    !flaggedFilter &&
+    !heldFilter &&
+    !searchActive &&
+    showCompleted;
   const hasAnyCompleted = useMemo(
     () => periods.some((p) => (tasksState[p] ?? []).some((t) => t.done)),
     [tasksState]
@@ -1954,6 +1962,31 @@ const toggleSelectionMode = useCallback(() => {
                     {/* ===== フィルタ群は複数選択モード中は非表示 ===== */}
                     {!selectionMode && (
                       <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            setTodayFilter(false);
+                            setPrivateFilter(false);
+                            setFlaggedFilter(false);
+                            setHeldFilter(false);
+                            setSearchTerm('');
+                            setShowCompleted(true);
+                            showFilterHint('全件表示', e.currentTarget);
+                          }}
+                          disabled={filtersAreReset}
+                          aria-label="フィルターをリセットして全件表示"
+                          title="フィルターをリセットして全件表示"
+                          className={[
+                            'w-10 h-10 rounded-full border relative overflow-hidden p-0 flex items-center justify-center transition-all duration-300 shrink-0',
+                            filtersAreReset
+                              ? 'bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed'
+                              : 'bg-white text-indigo-600 border-indigo-200 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.12)] hover:bg-indigo-600 hover:text-white hover:border-indigo-600',
+                          ].join(' ')}
+                        >
+                          <RotateCcw className="h-5 w-5" />
+                        </button>
+                        <div className="w-px h-6 bg-gray-300 mx-1 shrink-0" />
+
                         {/* 📅 本日フィルター */}
                         <button
                           onClick={(e) => {
