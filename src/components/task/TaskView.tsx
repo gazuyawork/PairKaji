@@ -965,8 +965,6 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
       setIsLoading(false);
     };
 
-    applyOrderAndPaint(keepPendingListOrder(nextOrderMap));
-
     const revisionAtStart = orderRevision.current;
     (async () => {
       try {
@@ -1029,6 +1027,8 @@ export default function TaskView({ initialSearch = '', onModalOpenChange }: Prop
         applyOrderAndPaint(keepPendingListOrder(mergedMap));
       } catch (e) {
         console.warn('[CB load] 並び順の読込に失敗しました（処理は継続します）:', e);
+        // 並び順の設定が取得できない場合も、初期順を一度だけ描画する。
+        applyOrderAndPaint(keepPendingListOrder(nextOrderMap));
       }
     })();
     } catch (e) {

@@ -166,15 +166,16 @@ function AuthedMainContent(props: {
   });
 
   return (
-    <div className="h-[calc(100dvh-150px)]" {...swipeHandlers}>
+    <div
+      className={clsx(
+        'h-[calc(100dvh-150px)] transition-opacity duration-300',
+        contentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      )}
+      {...swipeHandlers}
+    >
       <PairPremiumHint />
       <Header title={currentTitle} />
-      <main
-        className={clsx(
-          'transition-opacity duration-300 bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pt-16 h-[calc(100dvh-82px)]',
-          contentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        )}
-      >
+      <main className="bg-gradient-to-b from-[#fffaf1] to-[#ffe9d2] pt-16 h-[calc(100dvh-82px)]">
         <div className="relative w-full h-full overflow-hidden">
           {mountedTabs.has(0) && (
             <div className={tabPanelClass(index === 0, false)} aria-hidden={index !== 0}>

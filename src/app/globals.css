@@ -196,9 +196,7 @@ html, body {
   animation: heartbeat 0.8s ease-in-out infinite;
 }
 
-/* =========================================================
-   スプラッシュ中のヘッダー/フッター表示制御 + ディレイつきフェードイン
-   =======================================================*/
+/* スプラッシュ中はヘッダー/フッターを隠す。表示タイミングは親画面で一括制御する。 */
 .site-header,
 .site-footer {
   transition: opacity .4s ease, transform .4s ease;
@@ -216,8 +214,6 @@ html[data-splash="1"] .site-footer {
   transform: translateY(8px);
   pointer-events: none;
 }
-html:not([data-splash="1"]) .site-header { transition-delay: .25s; }
-html:not([data-splash="1"]) .site-footer { transition-delay: .35s; }
 html[data-splash="1"],
 html[data-splash="1"] body {
   overflow: hidden !important;
