@@ -788,10 +788,10 @@ export default function PushToggle({ uid }: Props) {
         setTimeout(() => setPhase('idle'), 2500);
         return;
       }
-      const sendTestWebPush = httpsCallable(functions, 'sendTestWebPush');
-      await pTimeout(sendTestWebPush({}), 10000);
+      const sendTestWebPush = httpsCallable<undefined, { ok: boolean; sent: number }>(functions, 'sendTestWebPush');
+      const result = await pTimeout(sendTestWebPush(undefined), 10000);
       setPhase('sent');
-      toast.success('テスト通知を送信しました');
+      toast.success(`テスト通知を${result.data.sent}台の登録端末へ送信しました`);
       setTimeout(() => setPhase('idle'), 2500);
     } catch (e) {
       const maybe = e as { code?: unknown; body?: string };

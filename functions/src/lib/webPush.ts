@@ -113,57 +113,90 @@ export const sendTestWebPush = onCall(
     const userSnap = await userRef.get();
     if (!userSnap.exists) throw new HttpsError('not-found', 'ユーザーが見つかりません');
 
-    let subscription: PushSubscription | null = null;
-    const latest = await userRef.collection('subscriptions')
+    const subscriptions = new Map<string, {
+      subscription: PushSubscription;
+      ref: FirebaseFirestore.DocumentReference | null;
+    }>();
+    const activeSubscriptions = await userRef.collection('subscriptions')
       .where('webPushEnabled', '==', true)
-      .limit(1)
       .get();
-    if (!latest.empty) {
-      subscription = parseSubscription(latest.docs[0].get('webPushSubscription'));
-    } else if (userSnap.get('webPushEnabled') === true) {
-      subscription = parseSubscription(userSnap.get('webPushSubscription'));
+    for (const subscriptionDoc of activeSubscriptions.docs) {
+      try {
+        const subscription = parseSubscription(subscriptionDoc.get('webPushSubscription'));
+        subscriptions.set(subscription.endpoint, { subscription, ref: subscriptionDoc.ref });
+      } catch (error) {
+        console.warn('[sendTestWebPush] skipped invalid subscription', {
+          uid,
+          subscriptionId: subscriptionDoc.id,
+          error,
+        });
+      }
     }
-    if (!subscription) {
+    if (userSnap.get('webPushEnabled') === true) {
+      try {
+        const rootSubscription = parseSubscription(userSnap.get('webPushSubscription'));
+        if (!subscriptions.has(rootSubscription.endpoint)) {
+          subscriptions.set(rootSubscription.endpoint, { subscription: rootSubscription, ref: null });
+        }
+      } catch {
+        // ルートの旧形式が無効でも、サブコレクションがあれば送信を続ける。
+      }
+    }
+    if (subscriptions.size === 0) {
       throw new HttpsError('failed-precondition', '有効な通知購読がありません');
     }
 
-    configureVapid(subscription);
-    try {
-      const payload = JSON.stringify({
-        type: 'test',
-        title: '通知テスト',
-        body: 'これはテスト通知です',
-        url: '/main',
-        badgeCount: 1,
-      });
+    const payload = JSON.stringify({
+      type: 'test',
+      title: '通知テスト',
+      body: 'これはテスト通知です',
+      url: '/main',
+      badgeCount: 1,
+    });
+    let sent = 0;
+    let expired = 0;
+    for (const { subscription, ref } of subscriptions.values()) {
       try {
-        await webpush.sendNotification(subscription, payload, { TTL: 300 });
-      } catch (firstError) {
-        const webError = firstError as WebPushError;
-        if (
-          webError.statusCode === 400 &&
-          typeof webError.body === 'string' &&
-          webError.body.includes('VapidPkHashMismatch')
-        ) {
-          configureVapid(subscription, true);
+        configureVapid(subscription);
+        try {
           await webpush.sendNotification(subscription, payload, { TTL: 300 });
-        } else {
-          throw firstError;
+        } catch (firstError) {
+          const webError = firstError as WebPushError;
+          if (
+            webError.statusCode === 400 &&
+            typeof webError.body === 'string' &&
+            webError.body.includes('VapidPkHashMismatch')
+          ) {
+            configureVapid(subscription, true);
+            await webpush.sendNotification(subscription, payload, { TTL: 300 });
+          } else {
+            throw firstError;
+          }
         }
+        sent += 1;
+      } catch (error) {
+        const status = (error as WebPushError)?.statusCode;
+        if (status === 404 || status === 410) {
+          expired += 1;
+          if (ref) await ref.set({ webPushEnabled: false }, { merge: true });
+          continue;
+        }
+        console.error('[sendTestWebPush] destination failed', { uid, status, error });
       }
-    } catch (error) {
-      const status = (error as WebPushError)?.statusCode;
-      if (status === 404 || status === 410) {
+    }
+
+    if (sent === 0) {
+      if (expired === subscriptions.size) {
         await userRef.set({ webPushEnabled: false }, { merge: true });
         throw new HttpsError('failed-precondition', '通知購読の有効期限が切れています');
       }
-      console.error('[sendTestWebPush] failed', { uid, status, error });
       throw new HttpsError('internal', 'テスト通知の送信に失敗しました');
     }
 
     await userRef.set({
       webPushLastSentAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-    return { ok: true };
+    console.info('[sendTestWebPush] accepted', { uid, sent, expired, destinations: subscriptions.size });
+    return { ok: true, sent, expired };
   }
 );
